@@ -1,0 +1,86 @@
+name: Scheduled
+
+on:
+  schedule: [cron: "0 11 * * 6"] # 3 AM PST = 12 PM UDT, Saturdays
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  ageOutPRs:
+    name: PR Deployment Purge
+    env:
+      # https://tecadmin.net/getting-yesterdays-date-in-bash/
+      CUTOFF: "1 week ago"
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Clean up Helm Releases
+        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_token: ${{ secrets.oc_token }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            # Catch errors, unset variables, and pipe failures (e.g. grep || true )
+            set -euo pipefail
+
+            # Echos
+            echo "Delete stale Helm releases"
+            echo "Cutoff: ${{ env.CUTOFF }}"
+
+            # Before date, list of releases
+            BEFORE=$(date +%s -d "${{ env.CUTOFF }}")
+            RELEASES=$(helm ls -aq | grep ${{ github.event.repository.name }} || :)
+
+            # If releases, then iterate
+            [ -z "${RELEASES}" ]|| for r in ${RELEASES[@]}; do
+
+              # Get last update and convert the date
+              UPDATED=$(date "+%s" -d <<< echo $(helm status $r -o json | jq -r .info.last_deployed))
+
+              # Compare to cutoff and delete as necessary
+              if [[ ${UPDATED} < ${BEFORE} ]]; then
+                echo -e "\nOlder than cutoff: ${r}"
+                helm uninstall --no-hooks ${r}
+                oc delete pvc/${r}-bitnami-pg-0 || true
+              else
+                echo -e "\nNewer than cutoff: ${r}"
+                echo "No need to delete"
+              fi
+            done
+
+  schema-spy:
+    name: SchemaSpy
+    permissions:
+      contents: write
+      pages: write
+    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@ca6579bdadf383a2513397081f963889b92823a4 # v1.1.0
+
+  # Run sequentially to reduce chances of rate limiting
+  zap:
+    name: ZAP Scans
+    permissions:
+      issues: write
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        name: [backend, frontend]
+        include:
+          - name: backend
+            path: api
+          - name: frontend
+    steps:
+      - name: ZAP Scan
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
+        with:
+          allow_issue_writing: true
+          artifact_name: ${{ matrix.name }}
+          issue_title: "ZAP Security Report: ${{ matrix.name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca/${{ matrix.path }}

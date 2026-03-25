@@ -1,0 +1,97 @@
+name: .Tests
+
+on:
+  workflow_call:
+    inputs:
+      ### Required
+      target:
+        description: PR number, test or prod
+        default: ${{ github.event.number }}
+        type: string
+
+env:
+  DOMAIN: apps.silver.devops.gov.bc.ca
+  PREFIX: ${{ github.event.repository.name }}-${{ inputs.target }}
+
+permissions: {}
+
+jobs:
+  integration-tests:
+    name: Integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@v6
+      - id: cache-npm
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-cache-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-cache-node-modules-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - env:
+          API_NAME: nest
+          BASE_URL: https://${{ env.PREFIX }}.${{ env.DOMAIN }}
+        run: |
+          cd tests/integration
+          npm ci
+          node src/main.js
+
+  e2e-tests:
+    name: E2E
+    defaults:
+      run:
+        working-directory: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        project: [chromium, firefox, safari]
+    steps:
+      - uses: actions/checkout@v6
+        name: Checkout
+      - uses: actions/setup-node@v6
+        name: Setup Node
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run Tests
+        env:
+          E2E_BASE_URL: https://${{ env.PREFIX }}.${{ env.DOMAIN }}/
+          CI: "true"
+        run: |
+          npx playwright test --project="${{ matrix.project }}" --reporter=html
+
+      - uses: actions/upload-artifact@v7
+        if: (! cancelled())
+        name: upload results
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: "./frontend/playwright-report" # path from current folder
+          retention-days: 7
+
+  load-tests:
+    name: Load
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        name: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: grafana/setup-k6-action@ffe7d7290dfa715e48c2ccc924d068444c94bde2 # v1.1.0
+      - uses: grafana/run-k6-action@a15e2072ede004e8d46141e33d7f7dad8ad08d9d # v1.3.1
+        env:
+          BACKEND_URL: https://${{ env.PREFIX }}.${{ env.DOMAIN }}/api
+          FRONTEND_URL: https://${{ env.PREFIX }}.${{ env.DOMAIN }}
+        with:
+          path: ./tests/load/${{ matrix.name }}-test.js
+          flags: --vus 100 --duration 300s
