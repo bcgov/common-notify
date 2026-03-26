@@ -11,6 +11,7 @@ concurrency:
 permissions: {}
 
 jobs:
+  
   validate:
     name: Validate PR
     if: (! github.event.pull_request.draft)
@@ -22,10 +23,37 @@ jobs:
         - [Frontend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca)
         - [Backend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca/api)
 
+  typescript-validation:
+    name: TypeScript Build & Test
+    if: (! github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   results:
     name: Validate Results
     if: always()
-    needs: [validate]
+    needs: [validate, typescript-validation]
     runs-on: ubuntu-slim
     steps:
       - run: echo "Success!"
