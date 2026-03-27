@@ -1,67 +1,59 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/prisma.service'
-
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { User } from './entities/user.entity'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { UserDto } from './dto/user.dto'
-import { Prisma } from '../../generated/prisma/client.js'
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+  ) {}
 
   async create(user: CreateUserDto): Promise<UserDto> {
-    const savedUser = await this.prisma.users.create({
-      data: {
-        name: user.name,
-        email: user.email,
-      },
+    const savedUser = await this.usersRepository.save({
+      name: user.name,
+      email: user.email,
     })
 
     return {
-      id: savedUser.id.toNumber(),
+      id: savedUser.id,
       name: savedUser.name,
       email: savedUser.email,
     }
   }
 
   async findAll(): Promise<UserDto[]> {
-    const users = await this.prisma.users.findMany()
-    return users.flatMap((user) => {
-      const userDto: UserDto = {
-        id: user.id.toNumber(),
-        name: user.name,
-        email: user.email,
-      }
-      return userDto
-    })
+    const users = await this.usersRepository.find()
+    return users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }))
   }
 
   async findOne(id: number): Promise<UserDto> {
-    const user = await this.prisma.users.findUnique({
-      where: {
-        id: new Prisma.Decimal(id),
-      },
+    const user = await this.usersRepository.findOneBy({
+      id,
     })
     return {
-      id: user.id.toNumber(),
+      id: user.id,
       name: user.name,
       email: user.email,
     }
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<UserDto> {
-    const user = await this.prisma.users.update({
-      where: {
-        id: new Prisma.Decimal(id),
-      },
-      data: {
-        name: updateUserDto.name,
-        email: updateUserDto.email,
-      },
+    await this.usersRepository.update(id, {
+      name: updateUserDto.name,
+      email: updateUserDto.email,
     })
+    const user = await this.usersRepository.findOneBy({ id })
     return {
-      id: user.id.toNumber(),
+      id: user.id,
       name: user.name,
       email: user.email,
     }
@@ -69,11 +61,10 @@ export class UsersService {
 
   async remove(id: number): Promise<{ deleted: boolean; message?: string }> {
     try {
-      await this.prisma.users.delete({
-        where: {
-          id: new Prisma.Decimal(id),
-        },
-      })
+      const result = await this.usersRepository.delete(id)
+      if (result.affected === 0) {
+        return { deleted: false, message: 'User not found' }
+      }
       return { deleted: true }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -102,25 +93,104 @@ export class UsersService {
     } catch {
       throw new Error('Invalid query parameters')
     }
-    const users = await this.prisma.users.findMany({
-      skip: (page - 1) * limit,
-      take: parseInt(String(limit)),
-      orderBy: sortObj,
-      where: this.convertFiltersToPrismaFormat(filterObj),
-    })
 
-    const count = await this.prisma.users.count({
-      orderBy: sortObj,
-      where: this.convertFiltersToPrismaFormat(filterObj),
-    })
+    const query = this.usersRepository.createQueryBuilder('u')
+
+    // Apply filters
+    let paramIndex = 0
+    for (const item of filterObj) {
+      const paramName = `param${paramIndex}`
+      const conditions = this.convertFilterToTypeOrmCondition(item, paramName)
+      if (conditions) {
+        query.andWhere(conditions.where, conditions.params)
+      }
+      paramIndex++
+    }
+
+    // Apply sorts
+    for (const sortItem of sortObj) {
+      for (const [key, direction] of Object.entries(sortItem)) {
+        query.orderBy(`u.${key}`, direction as 'ASC' | 'DESC')
+      }
+    }
+
+    // Apply pagination
+    query.skip((page - 1) * limit).take(limit)
+
+    const [users, count] = await query.getManyAndCount()
 
     return {
-      users,
+      users: users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+      })),
       page,
       limit,
       total: count,
       totalPages: Math.ceil(count / limit),
     }
+  }
+
+  private convertFilterToTypeOrmCondition(
+    filter: { key: string; operation: string; value: unknown },
+    paramName: string,
+  ): { where: string; params: Record<string, unknown> } | null {
+    const { key, operation, value } = filter
+
+    if (operation === 'like') {
+      return {
+        where: `u.${key} ILIKE :${paramName}`,
+        params: { [paramName]: `%${value}%` },
+      }
+    } else if (operation === 'eq') {
+      return {
+        where: `u.${key} = :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'neq') {
+      return {
+        where: `u.${key} != :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'gt') {
+      return {
+        where: `u.${key} > :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'gte') {
+      return {
+        where: `u.${key} >= :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'lt') {
+      return {
+        where: `u.${key} < :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'lte') {
+      return {
+        where: `u.${key} <= :${paramName}`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'in') {
+      return {
+        where: `u.${key} IN (:...${paramName})`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'notin') {
+      return {
+        where: `u.${key} NOT IN (:...${paramName})`,
+        params: { [paramName]: value },
+      }
+    } else if (operation === 'isnull') {
+      return {
+        where: `u.${key} IS NULL`,
+        params: {},
+      }
+    }
+
+    return null
   }
 
   public convertFiltersToPrismaFormat(

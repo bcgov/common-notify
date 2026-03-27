@@ -3,10 +3,8 @@
   "license": "Apache-2.0",
   "main": "index.js",
   "scripts": {
-    "prisma-generate": "prisma generate",
     "prebuild": "rimraf dist",
-    "build": "prisma generate && nest build",
-    "postbuild": "npx swc generated/prisma -d dist/generated/prisma -C module.type=commonjs && find dist/generated/prisma/generated/prisma -name '*.js' -type f -exec sh -c 'relpath=\"${1#dist/generated/prisma/generated/prisma/}\"; target=\"generated/prisma/$relpath\"; mkdir -p \"$(dirname \"$target\")\"; cp \"$1\" \"$target\"' _ {} \\; && mkdir -p dist/generated && cp -r generated/prisma dist/generated/",
+    "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "deploy": "npm ci --ignore-scripts --no-update-notifier && npm run build",
     "start": "nest start",
@@ -18,7 +16,7 @@
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",
     "make-badges:ci": "npm run make-badges -- --ci",
     "test": "vitest --dir src",
-    "test:cov": "prisma generate && vitest run --coverage",
+    "test:cov": "vitest run --coverage",
     "test:e2e": "vitest --dir test"
   },
   "dependencies": {
@@ -31,9 +29,9 @@
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/testing": "^11.0.6",
-    "@prisma/client": "^7.0.0",
-    "@prisma/adapter-pg": "^7.0.0",
-    "prisma": "^7.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "typeorm": "^0.3.21",
+    "rxjs": "^7.8.1",
     "dotenv": "^17.0.0",
     "express-prom-bundle": "^8.0.0",
     "helmet": "^8.0.0",
