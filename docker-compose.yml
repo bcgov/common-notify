@@ -26,26 +26,22 @@ services:
     image: flyway/flyway:12-alpine
     container_name: migrations
     command: info migrate info
-    volumes: ["./migrations/sql:/flyway/sql:ro"]
+    volumes:
+      - "./migrations/sql:/flyway/sql:ro"
+      - "./migrations/dev:/flyway/dev:ro"
     environment:
       FLYWAY_URL: jdbc:postgresql://database:5432/postgres
       FLYWAY_USER: *POSTGRES_USER
       FLYWAY_PASSWORD: *POSTGRES_PASSWORD
       FLYWAY_BASELINE_ON_MIGRATE: true
       FLYWAY_DEFAULT_SCHEMA: users
+      # For development, include both main and dev migrations
+      # For production, set: FLYWAY_LOCATIONS=filesystem:/flyway/sql
+      FLYWAY_LOCATIONS: "filesystem:/flyway/sql,filesystem:/flyway/dev"
+      NODE_ENV: development
     depends_on:
       database:
         condition: service_healthy
-
-  schemaspy:
-    image: schemaspy/schemaspy:7.0.2
-    profiles: ["schemaspy"]
-    container_name: schemaspy
-    command: -t pgsql11 -db postgres -host database -port 5432 -u postgres -p default -schemas users
-    depends_on:
-      migrations:
-        condition: service_completed_successfully
-    volumes: ["./output:/output"]
 
   backend:
     container_name: backend
@@ -99,8 +95,9 @@ services:
 
   # Kong API Gateway
   kong-migrations:
-    image: kong:3.7-alpine
+    image: kong:latest
     container_name: kong-migrations
+    platform: linux/amd64
     command: kong migrations bootstrap
     environment:
       KONG_DATABASE: postgres
@@ -112,11 +109,11 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    profiles: ["kong"]
 
   kong:
-    image: kong:3.7-alpine
+    image: kong:latest
     container_name: kong
+    platform: linux/amd64
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: database
@@ -142,26 +139,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    profiles: ["kong"]
-
-  # Kong Admin UI (optional, for managing routes/consumers)
-  konga:
-    image: pantsel/konga:latest
-    container_name: konga
-    environment:
-      NODE_ENV: production
-      DB_ADAPTER: postgres
-      DB_HOST: database
-      DB_USER: *POSTGRES_USER
-      DB_PASSWORD: *POSTGRES_PASSWORD
-      DB_DATABASE: konga
-      DB_PORT: 5432
-    ports:
-      - "1337:1337" # Konga UI
-    depends_on:
-      kong:
-        condition: service_healthy
-    profiles: ["kong"]
 
   # Kong Seed Data - Creates test tenants and API keys
   kong-seed:
@@ -174,4 +151,3 @@ services:
     depends_on:
       kong:
         condition: service_healthy
-    profiles: ["kong"]

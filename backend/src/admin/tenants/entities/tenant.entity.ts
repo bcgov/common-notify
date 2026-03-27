@@ -1,0 +1,52 @@
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm'
+
+/**
+ * Tenant Entity
+ * Represents a multi-tenant organization that can request notifications
+ *
+ * Note: Actual API keys are stored in Kong.
+ * This entity only stores tenant metadata and a reference to Kong consumer ID.
+ */
+@Entity('tenants')
+export class Tenant {
+  @PrimaryGeneratedColumn()
+  id: number
+
+  @Column({ unique: true })
+  name: string
+
+  @Column({ nullable: true })
+  description: string
+
+  @Column({ nullable: true })
+  organization: string
+
+  @Column({ nullable: true })
+  contactEmail: string
+
+  @Column({ nullable: true })
+  contactName: string
+
+  /**
+   * Kong consumer ID - reference to the consumer created in Kong
+   * This links the tenant to its Kong identity for API key management
+   */
+  @Column({ unique: true, nullable: true })
+  kongConsumerId: string
+
+  /**
+   * Kong consumer username - the unique identifier in Kong
+   * Used to manage API keys and credentials
+   */
+  @Column({ unique: true, nullable: true })
+  kongUsername: string
+
+  @Column({ default: 'active' })
+  status: 'active' | 'inactive' | 'suspended'
+
+  @CreateDateColumn()
+  createdAt: Date
+
+  @UpdateDateColumn()
+  updatedAt: Date
+}

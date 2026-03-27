@@ -29,7 +29,7 @@ echo "Setting up route..."
 curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-route" \
   --data-urlencode "paths[]=/api" \
-  --data-urlencode "strip_path=true" \
+  --data-urlencode "strip_path=false" \
   2>/dev/null || echo "Route may already exist"
 
 # Enable key-auth plugin on service (if not exists)
@@ -54,9 +54,20 @@ if [ -z "$CONSUMER_A" ]; then
 fi
 
 echo "    Creating API key for test-tenant-a"
-API_KEY_A=$(curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/key-auth" \
+API_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/key-auth" \
   --data-urlencode "key=test-api-key-a-12345678901234567890" \
-  2>/dev/null | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+  2>/dev/null)
+HTTP_CODE=$(echo "$API_KEY_RESPONSE" | tail -n 1)
+API_KEY_BODY=$(echo "$API_KEY_RESPONSE" | head -n -1)
+API_KEY_A=$(echo "$API_KEY_BODY" | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ "$HTTP_CODE" = "409" ]; then
+  echo "    API key already exists (conflict), using provided key"
+  API_KEY_A="test-api-key-a-12345678901234567890"
+elif [ -z "$API_KEY_A" ]; then
+  echo "    Failed to create API key (HTTP $HTTP_CODE)"
+  API_KEY_A="test-api-key-a-12345678901234567890"
+fi
 
 echo "    API Key A: $API_KEY_A"
 
@@ -73,9 +84,20 @@ if [ -z "$CONSUMER_B" ]; then
 fi
 
 echo "    Creating API key for test-tenant-b"
-API_KEY_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/key-auth" \
+API_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/key-auth" \
   --data-urlencode "key=test-api-key-b-98765432109876543210" \
-  2>/dev/null | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+  2>/dev/null)
+HTTP_CODE=$(echo "$API_KEY_RESPONSE" | tail -n 1)
+API_KEY_BODY=$(echo "$API_KEY_RESPONSE" | head -n -1)
+API_KEY_B=$(echo "$API_KEY_BODY" | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ "$HTTP_CODE" = "409" ]; then
+  echo "    API key already exists (conflict), using provided key"
+  API_KEY_B="test-api-key-b-98765432109876543210"
+elif [ -z "$API_KEY_B" ]; then
+  echo "    Failed to create API key (HTTP $HTTP_CODE)"
+  API_KEY_B="test-api-key-b-98765432109876543210"
+fi
 
 echo "    API Key B: $API_KEY_B"
 
@@ -92,9 +114,20 @@ if [ -z "$CONSUMER_C" ]; then
 fi
 
 echo "    Creating API key for test-tenant-c"
-API_KEY_C=$(curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/key-auth" \
+API_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/key-auth" \
   --data-urlencode "key=test-api-key-c-11111111111111111111" \
-  2>/dev/null | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+  2>/dev/null)
+HTTP_CODE=$(echo "$API_KEY_RESPONSE" | tail -n 1)
+API_KEY_BODY=$(echo "$API_KEY_RESPONSE" | head -n -1)
+API_KEY_C=$(echo "$API_KEY_BODY" | grep -o '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ "$HTTP_CODE" = "409" ]; then
+  echo "    API key already exists (conflict), using provided key"
+  API_KEY_C="test-api-key-c-11111111111111111111"
+elif [ -z "$API_KEY_C" ]; then
+  echo "    Failed to create API key (HTTP $HTTP_CODE)"
+  API_KEY_C="test-api-key-c-11111111111111111111"
+fi
 
 echo "    API Key C: $API_KEY_C"
 

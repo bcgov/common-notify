@@ -1,0 +1,201 @@
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { Tenant } from './entities/tenant.entity'
+import { CreateTenantDto } from './dto/create-tenant.dto'
+import { KongService } from '../../shared/kong/kong.service'
+
+@Injectable()
+export class TenantsService {
+  private readonly logger = new Logger(TenantsService.name)
+
+  constructor(
+    @InjectRepository(Tenant)
+    private tenantRepository: Repository<Tenant>,
+    private kongService: KongService,
+  ) {}
+
+  /**
+   * Create a new tenant and register it with Kong
+   * @param createTenantDto Tenant creation data
+   * @returns Tenant and generated API key
+   */
+  async create(createTenantDto: CreateTenantDto) {
+    const { name, description, organization, contactEmail, contactName } = createTenantDto
+
+    // Check if tenant already exists
+    const existing = await this.tenantRepository.findOne({ where: { name } })
+    if (existing) {
+      throw new BadRequestException(`Tenant with name '${name}' already exists`)
+    }
+
+    try {
+      // Create consumer in Kong
+      const consumer = await this.kongService.ensureConsumer(name, name)
+      this.logger.log(`Created Kong consumer for tenant: ${name} (consumer_id: ${consumer.id})`)
+
+      // Create API key in Kong
+      const credential = await this.kongService.createApiKey(name)
+      const apiKey = credential.key
+
+      // Store tenant metadata in database
+      const tenant = this.tenantRepository.create({
+        name,
+        description,
+        organization,
+        contactEmail,
+        contactName,
+        kongConsumerId: consumer.id,
+        kongUsername: consumer.username,
+        status: 'active',
+      })
+
+      const savedTenant = await this.tenantRepository.save(tenant)
+      this.logger.log(`Created tenant: ${name} (id: ${savedTenant.id})`)
+
+      return {
+        tenant: savedTenant,
+        apiKey,
+        note: 'Store this key securely. It cannot be retrieved later. Use it in the `apikey` header when calling the API.',
+      }
+    } catch (error) {
+      this.logger.error(`Error creating tenant: ${error}`)
+      throw error
+    }
+  }
+
+  /**
+   * Get all tenants
+   * @returns List of all tenants
+   */
+  async findAll(): Promise<Tenant[]> {
+    return this.tenantRepository.find()
+  }
+
+  /**
+   * Get a single tenant by ID
+   * @param id Tenant ID
+   * @returns Tenant or null if not found
+   */
+  async findOne(id: number): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({ where: { id } })
+  }
+
+  /**
+   * Get a tenant by name
+   * @param name Tenant name
+   * @returns Tenant or null if not found
+   */
+  async findByName(name: string): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({ where: { name } })
+  }
+
+  /**
+   * Update a tenant
+   * @param id Tenant ID
+   * @param updateData Partial tenant data to update
+   * @returns Updated tenant
+   */
+  async update(id: number, updateData: Partial<Tenant>): Promise<Tenant> {
+    const tenant = await this.findOne(id)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with id ${id} not found`)
+    }
+
+    const updated = Object.assign(tenant, updateData)
+    return this.tenantRepository.save(updated)
+  }
+
+  /**
+   * Delete a tenant and revoke all API keys
+   * @param id Tenant ID
+   */
+  async delete(id: number): Promise<void> {
+    const tenant = await this.findOne(id)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with id ${id} not found`)
+    }
+
+    try {
+      // Delete all API keys from Kong
+      const keys = await this.kongService.listApiKeys(tenant.kongUsername)
+      for (const key of keys) {
+        await this.kongService.deleteApiKey(tenant.kongUsername, key.id)
+      }
+
+      // Delete tenant from database
+      await this.tenantRepository.delete(id)
+      this.logger.log(`Deleted tenant: ${tenant.name}`)
+    } catch (error) {
+      this.logger.error(`Error deleting tenant: ${error}`)
+      throw error
+    }
+  }
+
+  /**
+   * Generate a new API key for a tenant
+   * @param tenantId Tenant ID
+   * @returns New API key
+   */
+  async generateApiKey(tenantId: number) {
+    const tenant = await this.findOne(tenantId)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with id ${tenantId} not found`)
+    }
+
+    try {
+      const credential = await this.kongService.createApiKey(tenant.kongUsername)
+      return {
+        apiKey: credential.key,
+        note: 'Store this key securely. It cannot be retrieved later.',
+      }
+    } catch (error) {
+      this.logger.error(`Error generating API key: ${error}`)
+      throw error
+    }
+  }
+
+  /**
+   * List all API keys for a tenant
+   * @param tenantId Tenant ID
+   * @returns List of API key metadata (not the actual keys)
+   */
+  async listApiKeys(tenantId: number) {
+    const tenant = await this.findOne(tenantId)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with id ${tenantId} not found`)
+    }
+
+    try {
+      const keys = await this.kongService.listApiKeys(tenant.kongUsername)
+      // Return key IDs and creation dates, but not the actual key values
+      return keys.map((key) => ({
+        id: key.id,
+        createdAt: new Date(key.created_at * 1000), // Kong returns Unix timestamp
+      }))
+    } catch (error) {
+      this.logger.error(`Error listing API keys: ${error}`)
+      throw error
+    }
+  }
+
+  /**
+   * Revoke an API key for a tenant
+   * @param tenantId Tenant ID
+   * @param keyId API key ID
+   */
+  async revokeApiKey(tenantId: number, keyId: string): Promise<void> {
+    const tenant = await this.findOne(tenantId)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with id ${tenantId} not found`)
+    }
+
+    try {
+      await this.kongService.deleteApiKey(tenant.kongUsername, keyId)
+      this.logger.log(`Revoked API key for tenant: ${tenant.name}`)
+    } catch (error) {
+      this.logger.error(`Error revoking API key: ${error}`)
+      throw error
+    }
+  }
+}

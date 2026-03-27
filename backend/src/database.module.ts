@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from 'src/users/entities/user.entity'
+import { Tenant } from 'src/admin/tenants/entities/tenant.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -19,13 +20,13 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'users'
       password: dbPassword,
       database: dbName,
       schema: dbSchema,
-      entities: [User],
+      entities: [User, Tenant],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],
       poolErrorHandler: (error) => console.log('Pool error:', error),
       maxQueryExecutionTime: 1000,
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Tenant]),
   ],
   exports: [TypeOrmModule],
 })

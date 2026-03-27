@@ -1,0 +1,41 @@
+kind: GatewayService
+name: coco-notify-gateway-dev
+tags: [ns.gw-fe8c5]
+url: https://httpbin.org
+protocol: https
+routes:
+  - name: coco-notify-gateway-dev
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - coco-notify-gateway.dev.api.gov.bc.ca
+---
+kind: DraftDataset
+name: coco-notify-gateway-dataset
+title: coco-notify-gateway
+organization: ministry-of-citizens-services
+organizationUnit: databc
+notes: |
+  The coco-notify-gateway API is a versatile toolset for developers.
+  coco-notify-gateway API offers a variety of endpoints to streamline application development.
+
+  The endpoints in this API are accessible without authentication.
+
+  To learn more about the API, visit the coco-notify-gateway API [developer site](https://your-api-developer-site.com)
+  or view the [API specification](https://openapi.apps.gov.bc.ca/?url=https://your-api-developer-site.com/openapi.yaml).
+
+  Use the following URLs to access this API:
+  - Development environment: https://coco-notify-gateway.dev.api.gov.bc.ca
+tags: [coco-notify-gateway, openapi]
+license_title: Access Only
+security_class: PUBLIC
+record_publish_date: '2024-01-01'
+---
+kind: Product
+name: coco-notify-gateway API
+dataset: coco-notify-gateway-dataset
+environments:
+  - name: dev
+    active: false
+    approval: false
+    flow: public
+    services: [coco-notify-gateway-dev]
