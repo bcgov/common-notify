@@ -33,7 +33,6 @@ export class TenantsController {
       throw new HttpException(error.message, 400)
     }
   }
-  sss
   /**
    * List all tenants
    */

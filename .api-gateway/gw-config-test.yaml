@@ -1,0 +1,115 @@
+kind: GatewayService
+name: coco-notify-gateway-test
+tags: [ns.gw-24301]
+url: https://httpbin.org
+protocol: https
+
+routes:
+  # -------------------------------
+  # 🌐 Browser / SSO Route
+  # -------------------------------
+  - name: coco-notify-test-ui
+    tags: [ns.gw-24301, aps.route.session.cookie.enabled]
+    hosts:
+      - coco-notify-gateway.test.api.gov.bc.ca
+    paths:
+      - /
+    methods:
+      - GET
+      - POST
+      - PUT
+      - OPTIONS
+    strip_path: false
+
+    plugins:
+      - enabled: true
+        name: oidc
+        tags: [ns.gw-24301]
+        config:
+          discovery: https://test.loginproxy.gov.bc.ca/auth/realms/standard/.well-known/openid-configuration
+
+          client_id: notify-6386
+          client_secret: { grab this from css sso }
+
+          response_type: code
+          scope: openid
+
+          bearer_only: 'no'
+          unauth_action: auth
+
+          redirect_uri: https://coco-notify-gateway.test.api.gov.bc.ca/sso
+          redirect_after_logout_uri: /
+
+          logout_path: /logout
+          revoke_tokens_on_logout: 'yes'
+
+          session_secure: 'yes'
+          ssl_verify: 'no'
+
+          # Optional headers from CSS
+          header_claims:
+            - idir_username
+            - email
+          header_names:
+            - X-Idir-Username
+            - X-User-Email
+
+          disable_access_token_header: 'yes'
+          disable_id_token_header: 'yes'
+          disable_userinfo_header: 'yes'
+
+          token_endpoint_auth_method: client_secret_post
+          use_jwks: 'yes'
+
+  # -------------------------------
+  # 🔐 API Route (HYBRID AUTH)
+  # -------------------------------
+  - name: coco-notify-test-api
+    tags: [ns.gw-24301]
+    hosts:
+      - coco-notify-gateway.test.api.gov.bc.ca
+    paths:
+      - /api
+    regex_priority: 100
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    strip_path: false
+
+    plugins:
+      # 🔑 API KEY AUTH
+      - enabled: true
+        name: key-auth
+        tags: [ns.gw-24301]
+        config:
+          key_names:
+            - x-api-key
+          hide_credentials: true
+
+      # 🔐 OIDC (JWT / CLIENT CREDS MODE)
+      - enabled: true
+        name: oidc
+        tags: [ns.gw-24301]
+        config:
+          discovery: https://test.loginproxy.gov.bc.ca/auth/realms/standard/.well-known/openid-configuration
+
+          client_id: notify-6386
+          client_secret: { grab this from css sso }
+
+          bearer_only: 'yes'
+          unauth_action: pass
+
+          bearer_jwt_auth_enable: 'yes'
+          bearer_jwt_auth_allowed_auds:
+            - notify-6386
+          bearer_jwt_auth_signing_algs:
+            - RS256
+
+          access_token_as_bearer: 'yes'
+
+          ssl_verify: 'no'
+          use_jwks: 'yes'

@@ -2,34 +2,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 /**
- * Kong API Response Types
- */
-interface KongConsumer {
-  id: string
-  username: string
-  custom_id?: string
-  created_at: number
-}
-
-interface KongCredential {
-  id: string
-  consumer_id: string
-  key: string
-  created_at: number
-}
-
-interface KongApiKeyResponse {
-  key: string
-  consumer_id: string
-  created_at: number
-}
-
-interface KongListResponse<T> {
-  data: T[]
-  offset?: string
-}
-
-/**
  * Kong Admin API Service
  * Handles all interactions with Kong gateway for consumer and credential management
  */
@@ -48,7 +20,7 @@ export class KongService {
    * @param customId Custom metadata for the tenant
    * @returns Consumer object with id, username, etc.
    */
-  async createConsumer(username: string, customId?: string): Promise<KongConsumer> {
+  async createConsumer(username: string, customId?: string) {
     try {
       const data = new URLSearchParams()
       data.append('username', username)
@@ -68,7 +40,7 @@ export class KongService {
         throw new Error(`Kong API error: ${response.status} - ${error}`)
       }
 
-      const consumer = (await response.json()) as KongConsumer
+      const consumer = await response.json()
       this.logger.log(`Created consumer: ${username} (id: ${consumer.id})`)
       return consumer
     } catch (error) {
@@ -82,7 +54,7 @@ export class KongService {
    * @param username Consumer username
    * @returns Consumer object or null if not found
    */
-  async getConsumer(username: string): Promise<KongConsumer | null> {
+  async getConsumer(username: string) {
     try {
       const response = await fetch(`${this.kongAdminUrl}/consumers/${username}`)
 
@@ -96,7 +68,7 @@ export class KongService {
         throw new Error(`Kong API error: ${response.status}`)
       }
 
-      return (await response.json()) as KongConsumer
+      return await response.json()
     } catch (error) {
       this.logger.error(`Error getting consumer: ${error}`)
       throw error
@@ -109,7 +81,7 @@ export class KongService {
    * @param customId Custom metadata
    * @returns Consumer object
    */
-  async ensureConsumer(username: string, customId?: string): Promise<KongConsumer> {
+  async ensureConsumer(username: string, customId?: string) {
     let consumer = await this.getConsumer(username)
 
     if (!consumer) {
@@ -125,7 +97,7 @@ export class KongService {
    * @param apiKey Optional specific API key value (if not provided, Kong generates one)
    * @returns Credential object with the key
    */
-  async createApiKey(consumerUsername: string, apiKey?: string): Promise<KongApiKeyResponse> {
+  async createApiKey(consumerUsername: string, apiKey?: string) {
     try {
       const data = new URLSearchParams()
       if (apiKey) {
@@ -145,7 +117,6 @@ export class KongService {
         return {
           key: apiKey || 'duplicate',
           consumer_id: consumerUsername,
-          created_at: Date.now(),
         }
       }
 
@@ -155,7 +126,7 @@ export class KongService {
         throw new Error(`Kong API error: ${response.status}`)
       }
 
-      const credential = (await response.json()) as KongApiKeyResponse
+      const credential = await response.json()
       this.logger.log(`Created API key for consumer: ${consumerUsername}`)
       return credential
     } catch (error) {
@@ -169,7 +140,7 @@ export class KongService {
    * @param consumerUsername Username of the consumer
    * @returns Array of key-auth credentials
    */
-  async listApiKeys(consumerUsername: string): Promise<KongCredential[]> {
+  async listApiKeys(consumerUsername: string) {
     try {
       const response = await fetch(`${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth`)
 
@@ -177,7 +148,7 @@ export class KongService {
         throw new Error(`Kong API error: ${response.status}`)
       }
 
-      const result = (await response.json()) as KongListResponse<KongCredential>
+      const result = await response.json()
       return result.data || []
     } catch (error) {
       this.logger.error(`Error listing API keys: ${error}`)
@@ -190,7 +161,7 @@ export class KongService {
    * @param consumerUsername Username of the consumer
    * @param keyId ID or key of the credential
    */
-  async deleteApiKey(consumerUsername: string, keyId: string): Promise<void> {
+  async deleteApiKey(consumerUsername: string, keyId: string) {
     try {
       const response = await fetch(
         `${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth/${keyId}`,
