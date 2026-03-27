@@ -5,7 +5,7 @@ FROM node:24.14.0-slim AS build
 WORKDIR /app
 COPY . ./
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm run deploy
+RUN npm ci --ignore-scripts --no-update-notifier && npm run prisma-generate && npm run build
 
 # Dependencies
 FROM node:24.14.0-slim AS dependencies
