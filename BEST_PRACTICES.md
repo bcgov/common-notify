@@ -95,8 +95,8 @@ Consistent naming makes code more readable and predictable. Follow these pattern
 
 - **Components**: `{ComponentName}.tsx` (PascalCase, e.g., `Dashboard.tsx`)
 - **Services**: `{feature}-service.ts` (kebab-case, e.g., `api-service.ts`)
-- **Interfaces/Types**: `{Entity}.ts` or `{Entity}.interface.ts` (PascalCase, e.g., `UserDto.ts`)
-- **Tests**: `__tests__/{ComponentName}.tsx` or `{file}.spec.ts`
+- **Interfaces/Types**: `{Entity}.ts` (PascalCase, e.g., `UserDto.ts`)
+- **Tests**: `__tests__/{ComponentName}.tsx`
 - **Routes**: `{name}.tsx` (kebab-case route names become PascalCase files)
 
 ### Directory Names
@@ -201,6 +201,10 @@ export default interface UserDto {
 
 ---
 
+## 6. REDUX
+
+Todo - need to check what CSTAR does so we align with them.
+
 ## 6. Local Development Workflow
 
 ### Setting Up Local Environment
@@ -213,10 +217,6 @@ export default interface UserDto {
 **Initial Setup:**
 
 ```bash
-# Clone repository
-git clone https://github.com/bcgov/common-notify.git
-cd common-notify
-
 # Install dependencies for both backend and frontend
 cd backend && npm install && cd ..
 cd frontend && npm install && cd ..
@@ -383,12 +383,15 @@ test.describe('Dashboard', () => {
 
 ### Frontend to Backend Communication
 
-**Caddy Proxy Setup:** All frontend requests to `/api/*` are automatically proxied to the backend:
+**Caddy Proxy Setup:** All frontend requests to `/api/*` are automatically proxied to the api
+gateway (tpd):
 
 ```
-Frontend request:  GET /api/users
-                   ↓ (Caddy reverse proxy)
-Backend service:   GET http://backend:3001/users
+Frontend request:    GET /api/users
+                      ↓ (Caddy reverse proxy)
+API Gateway service: GET tpd
+                      ↓
+Backend service:     GET http://backend:3001/users
 ```
 
 **Using the API Client:**
@@ -986,8 +989,7 @@ V2.0.0__redesign_notifications_table.sql
 
 ### Immutability Rule
 
-**CRITICAL:** Once a versioned script (V-prefixed) is deployed to TEST or PROD, it can **NEVER be
-modified**.
+Onc a versioned script (V-prefixed) is deployed to TEST or PROD, it can **NEVER be modified**.
 
 **If you need to change something:**
 
@@ -1009,12 +1011,10 @@ modified**.
 
 **When creating Flyway scripts for TEST/DEV:**
 
-1. **Communicate**: Notify the team when you're creating new Flyway scripts
-2. **Include**: What changes, which tables, any schema documentation
-3. **Coordinate numbering**: If multiple PRs have scripts, coordinate version numbers to avoid
-   conflicts
-4. **Synchronize before merge**: Ensure version numbers don't conflict with other in-flight
-   migrations
+1. Notify the team when you're creating new Flyway scripts
+2. What changes, which tables, any schema documentation
+3. If multiple PRs have scripts, coordinate version numbers to avoid conflicts
+4. Ensure version numbers don't conflict with other in-flight migrations
 
 **Example Notification:**
 

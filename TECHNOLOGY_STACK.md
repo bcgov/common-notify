@@ -44,11 +44,12 @@ gateway approach for sending notifications across multiple channels.
 
 ### Data Access & ORM
 
-- **Prisma 7.x**: Modern ORM with:
-  - Type-safe database queries
-  - Auto-generated types matching database schema
-  - Schema migration management
-  - Query builder and relation management
+- **TypeORM 0.3.x**: Enterprise ORM with:
+  - Type-safe database queries with TypeScript entities
+  - Decorators and metadata for seamless database mapping
+  - Query builder for complex queries
+  - Relation management and lazy loading
+  - Support for multiple database engines
 - **PostgreSQL (Crunchy)**: Enterprise PostgreSQL with:
   - PostGIS support for geospatial data
   - Automated backups and high availability
@@ -254,8 +255,8 @@ gateway approach for sending notifications across multiple channels.
 
 ### Database
 
-- **Schema**: Prisma-managed schema with TypeScript types
-- **Migrations**: Flyway-managed SQL migrations
+- **Schema**: TypeORM entities define schema with TypeScript decorators
+- **Migrations**: Flyway-managed SQL migrations (schema versioning)
 - **Caching**: Redis for session and temporary data
 
 ### Logging
@@ -281,7 +282,7 @@ gateway approach for sending notifications across multiple channels.
 ### Application Security
 
 - **Helmet**: HTTP headers for security
-- **Input validation**: NestJS decorators and Prisma strong typing
+- **Input validation**: NestJS decorators and TypeORM entity validation
 - **Authentication**: JWT or similar (implementation-specific)
 - **Authorization**: Role-based access control (RBAC)
 

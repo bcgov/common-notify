@@ -31,9 +31,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '~': fileURLToPath(new URL('./node_modules', import.meta.url)),
-      '~bootstrap': fileURLToPath(
-        new URL('./node_modules/bootstrap', import.meta.url),
-      ),
+      '~bootstrap': fileURLToPath(new URL('./node_modules/bootstrap', import.meta.url)),
     },
     extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue'],
   },
@@ -66,6 +64,7 @@ export default defineConfig({
           'color-functions',
           'global-builtin',
           'import',
+          'if-function',
         ],
       },
     },
