@@ -150,17 +150,45 @@ Frontend → Kong → Backend
 
 ## Identity Propagation
 
-Kong injects identity headers:
+Kong injects identity headers **after validating the API key**. These headers allow the backend to
+identify and track the authenticated consumer.
 
+### Kong Header Injection Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Kong as "Kong Gateway"
+    participant Backend as "Notify Backend"
+
+    Client->>Kong: POST /api/v1/email/send<br/>(with apikey header)
+    Kong->>Kong: ✓ Validate API key<br/>✓ Lookup consumer
+    Note over Kong: Kong injects headers:<br/>X-Consumer-Username<br/>X-Consumer-ID<br/>X-Credential-ID
+
+    Kong->>Backend: Forward request<br/>+ Kong headers
+    Backend->>Backend: ✓ Extract headers<br/>✓ Lookup tenant<br/>✓ Process request
+    Backend-->>Kong: Response
+    Kong-->>Client: Response
 ```
-x-consumer-username: tenant-abc
-```
 
-Notify API uses this to:
+### Kong Headers Added to Request
 
-- Identify tenant
-- Apply authorization rules
-- Track usage
+After successful API key validation, Kong adds:
+
+| Header                | Example Value                          | Purpose                           |
+| --------------------- | -------------------------------------- | --------------------------------- |
+| `X-Consumer-Username` | `bchealth`                             | Tenant identifier (Kong consumer) |
+| `X-Consumer-ID`       | `550e8400-e29b-41d4-a716-446655440000` | Kong's internal UUID for consumer |
+| `X-Credential-ID`     | `key-123-abc`                          | The specific API key ID           |
+
+### Backend Usage
+
+Notify API uses these headers to:
+
+- **Authenticate**: Confirm the API key was validated by Kong
+- **Identify tenant**: Look up tenant in database by `X-Consumer-Username`
+- **Track requests**: Log both DB ID (internal) and Kong ID (gateway-level audit)
+- **Apply authorization**: Ensure tenant can perform the requested action
 
 ---
 

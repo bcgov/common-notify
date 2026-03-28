@@ -1,0 +1,235 @@
+{
+  "info": {
+    "_postman_id": "notify-api-tests",
+    "name": "Notify API Tests",
+    "description": "Testing suite for Notify Admin and Email APIs\n\n## Architecture Overview\n\n### Frontend → Kong → Backend Flow\n1. **Frontend (Vite)** runs on http://localhost:3000\n2. **Caddy** (reverse proxy) on port 3000 proxies `/api/*` requests\n3. **Kong** (API Gateway) intercepts API requests for authentication\n4. **Kong** routes authenticated requests to **Backend** (port 3001)\n\n### Testing Flow\n1. Use Admin APIs (direct to backend) to create tenant and get API key\n2. Use Email API with the tenant's API key (simulating Kong request)\n3. In production, frontend requests go through Kong automatically\n\n## Setup Instructions\n\n1. Start the backend: `docker-compose up backend`\n2. Create a tenant via Admin API\n3. Get the API key from the response\n4. Use that API key in Email API requests\n5. Kong will validate the key and route to email service\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Admin APIs",
+      "item": [
+        {
+          "name": "1. Create Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"bchealth-notifications\",\n  \"description\": \"BC Health Notifications Service\",\n  \"organization\": \"BC Ministry of Health\",\n  \"contactEmail\": \"admin@bchealth.ca\",\n  \"contactName\": \"Admin User\"\n}"
+            },
+            "url": {
+              "raw": "{{backend_url}}/api/v1/admin/tenants",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "admin", "tenants"]
+            },
+            "description": "Create a new tenant in the system.\n\n**Response includes API key that you'll use for subsequent requests.**\n\nSave the `apiKey` from the response - you'll need it!\n\nExample response:\n```json\n{\n  \"tenant\": {\n    \"id\": 1,\n    \"name\": \"bchealth-notifications\",\n    \"status\": \"active\"\n  },\n  \"apiKey\": \"your-secret-api-key\",\n  \"note\": \"Store this key securely...\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get All Tenants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/api/v1/admin/tenants",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "admin", "tenants"]
+            },
+            "description": "List all created tenants"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Tenant by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/api/v1/admin/tenants/1",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "admin", "tenants", "1"]
+            },
+            "description": "Get details of a specific tenant. Replace `1` with your tenant ID."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Generate New API Key",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{backend_url}}/api/v1/admin/tenants/1/keys",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "admin", "tenants", "1", "keys"]
+            },
+            "description": "Generate a new API key for a tenant. Replace `1` with your tenant ID.\n\nUse this when you need to rotate keys or issue additional keys."
+          },
+          "response": []
+        },
+        {
+          "name": "5. List Tenant's API Keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/api/v1/admin/tenants/1/keys",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "admin", "tenants", "1", "keys"]
+            },
+            "description": "List all API keys for a specific tenant. Replace `1` with your tenant ID."
+          },
+          "response": []
+        }
+      ],
+      "description": "Admin endpoints for managing tenants and API keys.\n\nThese endpoints are used by administrators to set up tenants and provision API keys."
+    },
+    {
+      "name": "Email API (Direct Backend)",
+      "item": [
+        {
+          "name": "1. Send Email (Direct to Backend)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"recipient@example.com\",\n  \"subject\": \"Welcome to BC Notify\",\n  \"body\": \"Hello! This is a test email from BC Notify.\",\n  \"cc\": \"cc@example.com\",\n  \"bcc\": \"bcc@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{backend_url}}/api/v1/email/send",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "email", "send"]
+            },
+            "description": "Send an email directly to the backend (no authentication).\n\nThis is for testing only. In production, requests come through Kong with API key validation.\n\nResponse includes email ID you can use to check status."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Email Status (Direct to Backend)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/api/v1/email/status/email_123456_abcdef",
+              "host": ["{{backend_url}}"],
+              "path": ["api", "v1", "email", "status", "email_123456_abcdef"]
+            },
+            "description": "Get the delivery status of an email. Replace the ID with an actual email ID from a send response."
+          },
+          "response": []
+        }
+      ],
+      "description": "Email API endpoints accessed directly. In production, these go through Kong with API key authentication."
+    },
+    {
+      "name": "Email API (Via Kong - Authenticated)",
+      "item": [
+        {
+          "name": "1. Send Email (Via Kong with API Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "apikey",
+                "value": "{{tenant_api_key}}",
+                "description": "API key obtained from 'Create Tenant' endpoint"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"user@example.com\",\n  \"subject\": \"Test Email via Kong\",\n  \"body\": \"This email was sent through Kong API Gateway.\"\n}"
+            },
+            "url": {
+              "raw": "{{kong_url}}/api/v1/email/send",
+              "host": ["{{kong_url}}"],
+              "path": ["api", "v1", "email", "send"]
+            },
+            "description": "Send an email through Kong gateway.\n\n**Required steps before testing:**\n1. Run '1. Create Tenant' in Admin APIs\n2. Copy the `apiKey` from the response\n3. Set `tenant_api_key` environment variable\n4. Then run this request\n\nKong will:\n1. Validate the API key\n2. Identify the tenant\n3. Route to the email service\n4. Return the response"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Email Status (Via Kong with API Key)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{tenant_api_key}}",
+                "description": "Same API key used for sending"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_url}}/api/v1/email/status/email_123456_abcdef",
+              "host": ["{{kong_url}}"],
+              "path": ["api", "v1", "email", "status", "email_123456_abcdef"]
+            },
+            "description": "Get email status through Kong gateway with API key authentication.\n\nReplace the email ID with an actual ID from a send response."
+          },
+          "response": []
+        }
+      ],
+      "description": "Email API endpoints accessed through Kong with API key authentication.\n\nThis simulates how frontend requests will work in production after being proxied through Kong."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Pre-request script - runs before each request",
+          "// Add any setup code here if needed"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": ["// Test script - runs after each request", "// Add assertions here if needed"]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "backend_url",
+      "value": "http://localhost:3001",
+      "type": "string",
+      "description": "Direct backend URL (no authentication)"
+    },
+    {
+      "key": "kong_url",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "Kong API Gateway URL (requires API key authentication)"
+    },
+    {
+      "key": "tenant_api_key",
+      "value": "",
+      "type": "string",
+      "description": "API key for your tenant. Set this after creating a tenant using the Admin API."
+    }
+  ]
+}
