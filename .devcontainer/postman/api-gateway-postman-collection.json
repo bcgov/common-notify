@@ -297,6 +297,42 @@
             "description": "Get all tenants using JWT authentication from CSS SSO.\n\nUse either:\n1. **`{{oauth_access_token}}`** - Real token from \"Get OAuth Token from CSS SSO\"\n2. **`{{jwt_token}}`** - Local test token from \"Generate JWT Token\" (dev only)\n\nKong extracts user claims from JWT and may pass them as headers:\n- `X-Consumer-ID`: Kong consumer ID\n- `X-Consumer-Username`: Consumer username\n- `X-Authenticated-Userid`: Authenticated user ID"
           },
           "response": []
+        },
+        {
+          "name": "Create Template (JWT)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{oauth_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Welcome Email\",\n  \"description\": \"Welcome template for new users\",\n  \"subject\": \"Welcome to Notify!\",\n  \"body\": \"Hello {{firstName}}, welcome to our service!\",\n  \"tags\": [\"welcome\", \"onboarding\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/admin/templates",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "admin", "templates"]
+            },
+            "description": "Create a new email template using JWT authentication from CSS SSO.\n\nUse either:\n1. **`{{oauth_access_token}}`** - Real token from \"Get OAuth Token from CSS SSO\"\n2. **`{{jwt_token}}`** - Local test token from \"Generate JWT Token\" (dev only)\n\nThis demonstrates admin operations that require user authentication via JWT."
+          },
+          "response": []
         }
       ],
       "event": [
@@ -355,16 +391,18 @@
               }
             ],
             "url": {
-              "raw": "{{kong_url}}/api/v1/admin/tenants",
-              "host": ["{{kong_url}}"],
+              "raw": "http://localhost:8000/api/v1/admin/tenants",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
               "path": ["api", "v1", "admin", "tenants"]
             },
-            "description": "Get all tenants using API key authentication.\n\nUseful for admin tools or backend services that need direct API access."
+            "description": "Get all tenants using API key authentication.\n\nThis request:\n1. Goes through Kong on port 8000 (proxy)\n2. Kong validates the API key\n3. Kong strips the apikey header and injects identity headers:\n   - X-Consumer-Username\n   - X-Consumer-ID\n   - X-Credential-ID\n4. Kong routes to the backend admin API\n5. Returns the response\n\nUseful for admin tools or backend services that need direct API access."
           },
           "response": []
         },
         {
-          "name": "Create Template (API Key)",
+          "name": "Send Email (API Key)",
           "request": {
             "method": "POST",
             "header": [
@@ -381,14 +419,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Welcome Email\",\n  \"description\": \"Welcome template for new users\",\n  \"subject\": \"Welcome to Notify!\",\n  \"body\": \"Hello {{firstName}}, welcome to our service!\",\n  \"tags\": [\"welcome\", \"onboarding\"]\n}"
+              "raw": "{\n  \"to\": \"user@example.com\",\n  \"subject\": \"Test Email\",\n  \"body\": \"This is a test email sent through Kong gateway\",\n  \"templateId\": \"welcome-template\",\n  \"variables\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\"\n  }\n}"
             },
             "url": {
-              "raw": "{{kong_url}}/api/v1/admin/templates",
-              "host": ["{{kong_url}}"],
-              "path": ["api", "v1", "admin", "templates"]
+              "raw": "http://localhost:8000/api/v1/email/send",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "email", "send"]
             },
-            "description": "Create a new email template using API key authentication.\n\nThis is a typical admin operation that uses API key authentication."
+            "description": "Send an email through Kong gateway using API key authentication.\n\nThis request:\n1. Goes through Kong on port 8000 (proxy)\n2. Kong validates the API key against the key-auth plugin\n3. Kong strips the apikey header and injects identity headers:\n   - X-Consumer-Username: identifies the tenant\n   - X-Consumer-ID: Kong's internal consumer UUID\n   - X-Credential-ID: the specific API key credential ID\n4. Kong routes to the backend email service\n5. Backend extracts headers to identify the tenant\n6. Returns the response\n\nRequired:\n- API Key in `apikey` header\n- Valid email address in `to` field\n- Either `subject` + `body` for custom email, or `templateId` for template-based email\n\nNote: The backend never sees the original API key, only the Kong-injected identity headers."
           },
           "response": []
         },
