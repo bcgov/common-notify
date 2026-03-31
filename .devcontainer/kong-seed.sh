@@ -62,7 +62,7 @@ fi
 echo "Enabling key-auth plugin on email route..."
 curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
   --data-urlencode "name=key-auth" \
-  --data-urlencode "config.key_names[]=apikey" \
+  --data-urlencode "config.key_names[]=x-api-key" \
   --data-urlencode "config.key_in_body=false" \
   --data-urlencode "config.hide_credentials=true" \
   2>/dev/null || echo "Key-auth plugin may already exist on email route"
