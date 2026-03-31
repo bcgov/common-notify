@@ -1,11 +1,12 @@
 name: Deploy CrunchyDB
 
 on:
-  workflow_dispatch:
   push:
     branches:
-      - main
-
+      - dev
+      - test
+      - prod
+  workflow_dispatch:
 jobs:
   deploy-crunchydb:
     name: Deploy CrunchyDB
