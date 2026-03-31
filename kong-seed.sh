@@ -38,6 +38,14 @@ curl -s -X POST "$KONG_ADMIN_URL/services/notify/plugins" \
   --data-urlencode "name=key-auth" \
   2>/dev/null || echo "Plugin may already exist"
 
+# Enable JWT plugin on service (if not exists)
+echo "Enabling JWT plugin..."
+curl -s -X POST "$KONG_ADMIN_URL/services/notify/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.key_claim_name=iss" \
+  --data-urlencode "config.secret_is_base64=false" \
+  2>/dev/null || echo "JWT plugin may already exist"
+
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
 
@@ -71,6 +79,16 @@ fi
 
 echo "    API Key A: $API_KEY_A"
 
+# Create JWT credential for Tenant A
+echo "    Creating JWT credential for test-tenant-a"
+JWT_SECRET_A="secret-key-for-tenant-a-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/jwt" \
+  --data-urlencode "key=test-tenant-a" \
+  --data-urlencode "secret=$JWT_SECRET_A" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret A: $JWT_SECRET_A"
+
 # Tenant 2: Test Tenant B
 echo "  Creating tenant: test-tenant-b"
 CONSUMER_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
@@ -100,6 +118,16 @@ elif [ -z "$API_KEY_B" ]; then
 fi
 
 echo "    API Key B: $API_KEY_B"
+
+# Create JWT credential for Tenant B
+echo "    Creating JWT credential for test-tenant-b"
+JWT_SECRET_B="secret-key-for-tenant-b-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/jwt" \
+  --data-urlencode "key=test-tenant-b" \
+  --data-urlencode "secret=$JWT_SECRET_B" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret B: $JWT_SECRET_B"
 
 # Tenant 3: Test Tenant C
 echo "  Creating tenant: test-tenant-c"
@@ -131,13 +159,31 @@ fi
 
 echo "    API Key C: $API_KEY_C"
 
+# Create JWT credential for Tenant C
+echo "    Creating JWT credential for test-tenant-c"
+JWT_SECRET_C="secret-key-for-tenant-c-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/jwt" \
+  --data-urlencode "key=test-tenant-c" \
+  --data-urlencode "secret=$JWT_SECRET_C" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret C: $JWT_SECRET_C"
+
 echo ""
 echo "✅ Kong seeding complete!"
 echo ""
-echo "Test credentials:"
+echo "Test credentials (API Key Flow):"
 echo "  Tenant A: username=test-tenant-a, api_key=test-api-key-a-12345678901234567890"
 echo "  Tenant B: username=test-tenant-b, api_key=test-api-key-b-98765432109876543210"
 echo "  Tenant C: username=test-tenant-c, api_key=test-api-key-c-11111111111111111111"
 echo ""
-echo "Test a request:"
+echo "Test credentials (JWT Flow):"
+echo "  Tenant A: key=test-tenant-a, secret=secret-key-for-tenant-a-do-not-use-in-production"
+echo "  Tenant B: key=test-tenant-b, secret=secret-key-for-tenant-b-do-not-use-in-production"
+echo "  Tenant C: key=test-tenant-c, secret=secret-key-for-tenant-c-do-not-use-in-production"
+echo ""
+echo "Test a request (API Key):"
 echo "  curl -H 'apikey: test-api-key-a-12345678901234567890' http://localhost:8000/api/health"
+echo ""
+echo "Test a request (JWT):"
+echo "  See Postman collection for JWT generation and testing"

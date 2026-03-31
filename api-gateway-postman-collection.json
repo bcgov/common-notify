@@ -11,6 +11,87 @@
       "name": "JWT Flow (User/Frontend Auth)",
       "item": [
         {
+          "name": "Get OAuth Token from CSS SSO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('oauth_access_token', jsonData.access_token);",
+                  "    pm.environment.set('oauth_token_type', jsonData.token_type || 'Bearer');",
+                  "    if (jsonData.expires_in) {",
+                  "        pm.environment.set('oauth_token_expires_in', jsonData.expires_in);",
+                  "    }",
+                  "    pm.test('Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ OAuth token saved to {{oauth_access_token}}');",
+                  "} else {",
+                  "    pm.test('Failed to get token', function() {",
+                  "        pm.expect.fail('Could not obtain token from CSS SSO: ' + pm.response.status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{auth_client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "testuser",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "testpassword",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{auth_server_url}}/realms/{{auth_realm}}/protocol/openid-connect/token",
+              "host": ["{{auth_server_url}}"],
+              "path": ["realms", "{{auth_realm}}", "protocol", "openid-connect", "token"]
+            },
+            "description": "Get an OAuth access token from BC Government CSS SSO using password grant.\n\n**Setup Required:**\n1. Set up an Environment in Postman with:\n   - `auth_client_secret`: Your CSS client secret\n   - `auth_token_url`: {{auth_token_url}} (already configured)\n   - `auth_client_id`: {{auth_client_id}} (already configured)\n2. Update `username` and `password` with valid CSS credentials\n3. Run this request\n\nThe token response will be automatically saved to `{{oauth_access_token}}` for use in other requests.\n\n**Alternative (Better for Real Use):** Use the Authorization tab's OAuth2 flow with browser login, but then you'll need to manually copy the token to this variable."
+          },
+          "response": []
+        },
+        {
           "name": "Generate JWT Token",
           "event": [
             {
@@ -20,11 +101,8 @@
                   "// Generate a JWT token for testing",
                   "// This simulates a token issued by CSS SSO",
                   "",
-                  "const crypto = require('crypto');",
-                  "",
                   "function base64UrlEncode(str) {",
-                  "    return Buffer.from(str, 'utf8')",
-                  "        .toString('base64')",
+                  "    return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(str))",
                   "        .replace(/\\+/g, '-')",
                   "        .replace(/\\//g, '_')",
                   "        .replace(/=/g, '');",
@@ -34,20 +112,20 @@
                   "const header = {",
                   "    'alg': 'HS256',",
                   "    'typ': 'JWT',",
-                  "    'kid': 'test-tenant-a'  // Key ID matching Kong consumer",
+                  "    'kid': 'test-tenant-a'",
                   "};",
                   "",
-                  "// JWT Payload (customize as needed)",
+                  "// JWT Payload",
                   "const now = Math.floor(Date.now() / 1000);",
                   "const payload = {",
-                  "    'iss': 'test-tenant-a',              // Issuer (matches Kong JWT key)",
-                  "    'sub': 'user-123',                    // Subject (user ID)",
-                  "    'iat': now,                           // Issued at",
-                  "    'exp': now + 3600,                    // Expires in 1 hour",
-                  "    'aud': 'notify-api',                  // Audience",
-                  "    'tenant_id': 'tenant-a',              // Custom claim: tenant",
-                  "    'user_id': 'user-123',                // Custom claim: user",
-                  "    'email': 'user@example.com'           // Custom claim: email",
+                  "    'iss': 'test-tenant-a',",
+                  "    'sub': 'user-123',",
+                  "    'iat': now,",
+                  "    'exp': now + 3600,",
+                  "    'aud': 'notify-api',",
+                  "    'tenant_id': 'tenant-a',",
+                  "    'user_id': 'user-123',",
+                  "    'email': 'user@example.com'",
                   "};",
                   "",
                   "// Encode header and payload",
@@ -55,12 +133,10 @@
                   "const encodedPayload = base64UrlEncode(JSON.stringify(payload));",
                   "const message = encodedHeader + '.' + encodedPayload;",
                   "",
-                  "// Create signature using JWT secret",
-                  "const jwtSecret = pm.environment.get('JWT_SECRET_A');",
-                  "const signature = crypto",
-                  "    .createHmac('sha256', jwtSecret)",
-                  "    .update(message)",
-                  "    .digest('base64')",
+                  "// Create signature using HMAC-SHA256",
+                  "const jwtSecret = pm.environment.get('JWT_SECRET_A') || 'secret-key-for-tenant-a-do-not-use-in-production';",
+                  "const hmacSha256 = CryptoJS.HmacSHA256(message, jwtSecret);",
+                  "const signature = CryptoJS.enc.Base64.stringify(hmacSha256)",
                   "    .replace(/\\+/g, '-')",
                   "    .replace(/\\//g, '_')",
                   "    .replace(/=/g, '');",
@@ -70,11 +146,11 @@
                   "",
                   "// Save to environment",
                   "pm.environment.set('jwt_token', jwt);",
+                  "pm.environment.set('oauth_access_token', jwt);",
                   "pm.environment.set('jwt_payload', JSON.stringify(payload, null, 2));",
                   "",
-                  "console.log('JWT Generated:');",
-                  "console.log('Token:', jwt);",
-                  "console.log('Payload:', payload);"
+                  "console.log('✅ JWT Generated and saved to oauth_access_token');",
+                  "console.log('Token (first 50 chars):', jwt.substring(0, 50) + '...');"
                 ],
                 "type": "text/javascript"
               }
@@ -162,8 +238,10 @@
               "raw": "{\n  \"name\": \"my-test-tenant\",\n  \"description\": \"Test tenant for API development\",\n  \"organization\": \"BC Government\",\n  \"contactEmail\": \"admin@bcgov.ca\",\n  \"contactName\": \"Admin User\"\n}"
             },
             "url": {
-              "raw": "{{kong_url}}/api/v1/admin/tenants",
-              "host": ["{{kong_url}}"],
+              "raw": "http://localhost:3000/api/v1/admin/tenants",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
               "path": ["api", "v1", "admin", "tenants"]
             },
             "description": "Create a new tenant and get an API key.\n\n**Prerequisites:**\n1. Run \"Get OAuth Token from CSS SSO\" first to get `{{oauth_access_token}}`\n2. Or use \"Generate JWT Token\" for local testing\n\n**Response:**\n```json\n{\n  \"tenant\": {\n    \"id\": 1,\n    \"name\": \"my-test-tenant\",\n    \"status\": \"active\"\n  },\n  \"apiKey\": \"generated-api-key-value\",\n  \"note\": \"Store this key securely\"\n}\n```\n\n**Notes:**\n- The API key is shown only once - save it!\n- The generated API key is automatically saved to `{{generated_api_key}}` environment variable\n- Use this key for subsequent API Key Flow requests"
@@ -186,8 +264,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/api/health",
-              "host": ["{{kong_url}}"],
+              "raw": "{{frontend_url}}/api/health",
+              "host": ["{{frontend_url}}"],
               "path": ["api", "health"]
             },
             "description": "Test health endpoint with JWT authentication from CSS SSO.\n\nUse either:\n1. **`{{oauth_access_token}}`** - Real token from \"Get OAuth Token from CSS SSO\"\n2. **`{{jwt_token}}`** - Local test token from \"Generate JWT Token\" (dev only)\n\nKong validates:\n1. JWT signature is correct\n2. Token has not expired\n3. Issuer (`iss`) matches a registered consumer\n\nThe request is forwarded to the backend with user information in headers."
@@ -210,8 +288,10 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/api/v1/admin/tenants",
-              "host": ["{{kong_url}}"],
+              "raw": "http://localhost:3000/api/v1/admin/tenants",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
               "path": ["api", "v1", "admin", "tenants"]
             },
             "description": "Get all tenants using JWT authentication from CSS SSO.\n\nUse either:\n1. **`{{oauth_access_token}}`** - Real token from \"Get OAuth Token from CSS SSO\"\n2. **`{{jwt_token}}`** - Local test token from \"Generate JWT Token\" (dev only)\n\nKong extracts user claims from JWT and may pass them as headers:\n- `X-Consumer-ID`: Kong consumer ID\n- `X-Consumer-Username`: Consumer username\n- `X-Authenticated-Userid`: Authenticated user ID"
@@ -383,6 +463,20 @@
             "description": "List all registered Kong consumers (tenants).\n\nEach consumer can have both API keys and JWT credentials."
           },
           "response": []
+        },
+        {
+          "name": "List JWT Credentials for test-tenant-a",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kong_url}}/consumers/test-tenant-a/jwt",
+              "host": ["{{kong_url}}"],
+              "path": ["consumers", "test-tenant-a", "jwt"]
+            },
+            "description": "List JWT credentials registered for test-tenant-a consumer.\n\nThis should return the JWT key/secret pair that Kong uses to validate JWT tokens.\n\nIf empty, the JWT credentials weren't created by the seed script and need to be manually created."
+          },
+          "response": []
         }
       ]
     }
@@ -419,6 +513,11 @@
         "key": "addTokenTo",
         "value": "header",
         "type": "string"
+      },
+      {
+        "key": "tokenName",
+        "value": "oauth_access_token",
+        "type": "string"
       }
     ]
   },
@@ -447,7 +546,7 @@
       "key": "kong_url",
       "value": "http://localhost:8000",
       "type": "string",
-      "description": "Kong Proxy URL (external API gateway)"
+      "description": "Kong Proxy URL (local - from kong_url)"
     },
     {
       "key": "api_key",
@@ -483,19 +582,19 @@
       "key": "auth_server_url",
       "value": "https://dev.loginproxy.gov.bc.ca/auth",
       "type": "string",
-      "description": "BC Government CSS SSO server URL"
+      "description": "BC Government CSS SSO server URL (from auth_server_url)"
     },
     {
       "key": "auth_realm",
       "value": "standard",
       "type": "string",
-      "description": "Keycloak realm for CSS"
+      "description": "Keycloak realm for CSS (from auth_realm)"
     },
     {
       "key": "auth_client_id",
       "value": "notify-6388",
       "type": "string",
-      "description": "CSS SSO client ID (from AUTH_SERVER_RESOURCE)"
+      "description": "CSS SSO client ID (from auth_client_id)"
     },
     {
       "key": "auth_url",
