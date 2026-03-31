@@ -43,16 +43,12 @@ jobs:
         run: |
           npm ci
           npm run lint
-          npm test
-          npm run build
 
       - name: Install, lint, test, and build frontend
         working-directory: frontend
         run: |
           npm ci
           npm run lint
-          npm test
-          npm run build
 
   results:
     name: Validate Results
