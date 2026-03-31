@@ -19,9 +19,9 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
-      // Proxy API requests to the backend
+      // Proxy API requests to Kong API Gateway
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://kong:8000',
         changeOrigin: true,
       },
     },

@@ -24,19 +24,48 @@ curl -s -X POST "$KONG_ADMIN_URL/services" \
   --data-urlencode "protocol=http" \
   2>/dev/null || echo "Service may already exist"
 
-# Create route (if not exists)
-echo "Setting up route..."
-curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-route" \
-  --data-urlencode "paths[]=/api" \
+# Create admin route with JWT (if not exists)
+echo "Setting up admin route with JWT authentication..."
+ADMIN_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-admin-route" \
+  --data-urlencode "paths[]=/api/v1/admin" \
   --data-urlencode "strip_path=false" \
-  2>/dev/null || echo "Route may already exist"
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
-# Enable key-auth plugin on service (if not exists)
-echo "Enabling key-auth plugin..."
-curl -s -X POST "$KONG_ADMIN_URL/services/notify/plugins" \
+if [ -z "$ADMIN_ROUTE" ]; then
+  echo "  Admin route may already exist, fetching..."
+  ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Enable JWT plugin on admin route (if not exists)
+echo "Enabling JWT plugin on admin route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$ADMIN_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.key_claim_name=iss" \
+  --data-urlencode "config.secret_is_base64=false" \
+  2>/dev/null || echo "JWT plugin may already exist on admin route"
+
+# Create email route with key-auth (if not exists)
+echo "Setting up email route with key-auth authentication..."
+EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-email-route" \
+  --data-urlencode "paths[]=/api/v1/email" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$EMAIL_ROUTE" ]; then
+  echo "  Email route may already exist, fetching..."
+  EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Enable key-auth plugin on email route (if not exists)
+echo "Enabling key-auth plugin on email route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
   --data-urlencode "name=key-auth" \
-  2>/dev/null || echo "Plugin may already exist"
+  --data-urlencode "config.key_names[]=apikey" \
+  --data-urlencode "config.key_in_body=false" \
+  --data-urlencode "config.hide_credentials=true" \
+  2>/dev/null || echo "Key-auth plugin may already exist on email route"
 
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
@@ -71,6 +100,16 @@ fi
 
 echo "    API Key A: $API_KEY_A"
 
+# Create JWT credential for Tenant A
+echo "    Creating JWT credential for test-tenant-a"
+JWT_SECRET_A="secret-key-for-tenant-a-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/jwt" \
+  --data-urlencode "key=test-tenant-a" \
+  --data-urlencode "secret=$JWT_SECRET_A" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret A: $JWT_SECRET_A"
+
 # Tenant 2: Test Tenant B
 echo "  Creating tenant: test-tenant-b"
 CONSUMER_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
@@ -100,6 +139,16 @@ elif [ -z "$API_KEY_B" ]; then
 fi
 
 echo "    API Key B: $API_KEY_B"
+
+# Create JWT credential for Tenant B
+echo "    Creating JWT credential for test-tenant-b"
+JWT_SECRET_B="secret-key-for-tenant-b-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/jwt" \
+  --data-urlencode "key=test-tenant-b" \
+  --data-urlencode "secret=$JWT_SECRET_B" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret B: $JWT_SECRET_B"
 
 # Tenant 3: Test Tenant C
 echo "  Creating tenant: test-tenant-c"
@@ -131,13 +180,31 @@ fi
 
 echo "    API Key C: $API_KEY_C"
 
+# Create JWT credential for Tenant C
+echo "    Creating JWT credential for test-tenant-c"
+JWT_SECRET_C="secret-key-for-tenant-c-do-not-use-in-production"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/jwt" \
+  --data-urlencode "key=test-tenant-c" \
+  --data-urlencode "secret=$JWT_SECRET_C" \
+  --data-urlencode "algorithm=HS256" \
+  2>/dev/null || echo "JWT credential may already exist"
+echo "    JWT Secret C: $JWT_SECRET_C"
+
 echo ""
 echo "✅ Kong seeding complete!"
 echo ""
-echo "Test credentials:"
+echo "Test credentials (API Key Flow):"
 echo "  Tenant A: username=test-tenant-a, api_key=test-api-key-a-12345678901234567890"
 echo "  Tenant B: username=test-tenant-b, api_key=test-api-key-b-98765432109876543210"
 echo "  Tenant C: username=test-tenant-c, api_key=test-api-key-c-11111111111111111111"
 echo ""
-echo "Test a request:"
+echo "Test credentials (JWT Flow):"
+echo "  Tenant A: key=test-tenant-a, secret=secret-key-for-tenant-a-do-not-use-in-production"
+echo "  Tenant B: key=test-tenant-b, secret=secret-key-for-tenant-b-do-not-use-in-production"
+echo "  Tenant C: key=test-tenant-c, secret=secret-key-for-tenant-c-do-not-use-in-production"
+echo ""
+echo "Test a request (API Key):"
 echo "  curl -H 'apikey: test-api-key-a-12345678901234567890' http://localhost:8000/api/health"
+echo ""
+echo "Test a request (JWT):"
+echo "  See Postman collection for JWT generation and testing"

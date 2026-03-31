@@ -4,32 +4,55 @@
 
 We are building a Notify service that allows tenants to send emails/sms/messages/etc. via an API.
 
+TBD - CSTAR - Need to understand this. Is it running? Can we use it? Is it effectively the APS
+Gateway? Dig in.
+
 Authentication is enforced by the API Gateway, but:
 
 > The Notify system is responsible for creating and managing API keys via API Gatewaygwa (not
-> directly via Kong).
+> directly via Kong). Do not store keys.
 
 ### Simple Flow
 
 ```mermaid
 flowchart LR
-    User -->|Browser/API Request| Kong[Kong Gateway]
+    User -->|Browser| Frontend[Frontend UI<br/>Caddy/Vite]
+    Service -->|Service Request| Kong[Kong Gateway]
 
-    Kong -->|"/"| UI[Frontend UI to login]
-    Kong -->|"/admin"| AdminAPI[Notify Admin API]
-    Kong -->|"/api (x-api-key)"| Notify[Notify API]
+    Frontend -->|Admin Request + JWT| Kong
+    Kong -->|"/admin" + JWT| AdminAPI[Notify Admin API]
+    Kong -->|"/api" + API Key| Notify[Notify Email API]
 
     AdminAPI -->|Create Tenant + Key| APS[APS Management API]
     APS --> Kong
     Notify --> Email[Send Email]
+
+    style Kong fill:#ff9800
+    style Frontend fill:#4CAF50
+    style AdminAPI fill:#4CAF50
+    style Notify fill:#2196F3
+
+    linkStyle 0 stroke:#4CAF50,stroke-width:2px
+    linkStyle 1 stroke:#ff6b6b,stroke-width:2px
+    linkStyle 2 stroke:#4CAF50,stroke-width:2px
+    linkStyle 3 stroke:#4CAF50,stroke-width:2px
+    linkStyle 4 stroke:#ff6b6b,stroke-width:2px
+    linkStyle 5 stroke:#4CAF50,stroke-width:2px
+    linkStyle 6 stroke:#4CAF50,stroke-width:2px
+    linkStyle 7 stroke:#2196F3,stroke-width:2px
 ```
 
 ### Key Points
 
-- Kong is the **only entry point**
+- **Frontend** (Caddy/Vite) is the entry point for users
+- Frontend makes requests to **Kong** (the only API entry point)
+- **Two authentication methods**:
+  - **JWT** (for frontend/users): Users authenticate with CSS SSO → receive JWT → frontend includes
+    in Authorization header
+  - **API Keys** (for services): Service-to-service authentication for admin tools
+- Kong validates credentials and injects tenant headers
 - Admin API creates API keys via **APS Management API**
-- Notify API processes requests
-- Tenants are identified via headers injected by Kong
+- Notify API processes email requests
 - Backend services are **not publicly accessible**
 
 ---
@@ -38,49 +61,251 @@ flowchart LR
 
 ### System Components
 
-| Component          | Responsibility                    |
-| ------------------ | --------------------------------- |
-| Kong Gateway (APS) | Auth, routing, identity injection |
-| APS Management API | Consumer + credential management  |
-| Frontend UI        | Admin interface                   |
-| Notify API         | Core email functionality          |
-| Notify Admin API   | Tenant + API key management       |
-| CSS / Keycloak     | OAuth / SSO                       |
+| Component          | Responsibility                                    |
+| ------------------ | ------------------------------------------------- |
+| Kong Gateway       | Auth (JWT + API Key), routing, identity injection |
+| Kong JWT Plugin    | Validates JWT signatures and claims               |
+| Kong Key-Auth      | Validates API keys                                |
+| APS Management API | Consumer + credential management                  |
+| Frontend UI        | Admin interface (authenticates via JWT)           |
+| Notify API         | Core email functionality                          |
+| Notify Admin API   | Tenant + API key management                       |
+| CSS / Keycloak     | OAuth / SSO (issues JWT tokens)                   |
 
 ---
 
 ## Detailed Flow
 
+### User/Frontend Flow (JWT Authentication)
+
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Keycloak
+    participant User as "User (Browser)"
+    participant CSS as "CSS SSO"
+    participant Frontend as "Frontend<br/>(Caddy/Vite)"
+    participant Kong as "Kong Gateway"
+    participant AdminAPI as "Notify Admin API"
+
+    User->>CSS: Login request
+    CSS-->>User: JWT Token (signed with secret)
+
+    User->>Frontend: Admin Request (with JWT)
+    Frontend->>Kong: Proxy request with JWT<br/>Authorization: Bearer token
+    Kong->>Kong: Validate JWT signature
+    Kong->>Kong: Check token expiry & claims
+    Kong->>AdminAPI: Forward request + headers
+    AdminAPI-->>Kong: Response
+    Kong-->>Frontend: Response
+    Frontend-->>User: Response
+```
+
+### Service/Email Flow (API Key Authentication)
+
+```mermaid
+sequenceDiagram
+    participant Service
+    participant Kong as "Kong Gateway"
+    participant API as "Notify Email API"
+
+    Service->>Kong: POST /api/v1/email/send<br/>apikey: [key]
+    Kong->>Kong: Validate API key
+    Kong->>Kong: Lookup consumer/tenant
+    Kong->>API: Forward request + headers
+    API-->>Kong: Response
+    Kong-->>Service: Response
+```
+
+### Credential Management Flow
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Frontend as "Frontend<br/>(Admin UI)"
     participant Kong as "Kong Gateway"
     participant AdminAPI as "Notify Admin API"
     participant APS as "APS Management API"
-    participant Notify as "Notify API"
 
-    %% --- Admin Flow ---
-    User->>Kong: Access UI (/)
-    Kong->>Keycloak: Redirect for login
-    Keycloak-->>User: Authenticated session
-
-    User->>Kong: Call /admin
-    Kong->>AdminAPI: Forward authenticated request
-    AdminAPI->>AdminAPI: Validate user
-
-    AdminAPI->>APS: Create/Ensure Consumer (tenant)
-    AdminAPI->>APS: Generate API Key
-    APS-->>AdminAPI: Return API Key
-    AdminAPI-->>User: Return API Key
-
-    %% --- API Flow ---
-    User->>Kong: Call /api (x-api-key)
-    Kong->>Kong: Validate API Key
-    Kong->>Notify: Forward request + headers
-    Notify->>Notify: Resolve tenant
-    Notify-->>User: Response
+    Admin->>Frontend: Create tenant/API key request (with JWT)
+    Frontend->>Kong: Proxy request + JWT
+    Kong->>AdminAPI: Forward to Admin API
+    AdminAPI->>APS: Create consumer + credentials
+    APS->>APS: Generate API key
+    APS-->>AdminAPI: API key response
+    AdminAPI-->>Kong: Response
+    Kong-->>Frontend: Response
+    Frontend-->>Admin: Display new API key
 ```
+
+---
+
+## Kong Authentication Plugins
+
+Kong uses **two authentication plugins** to handle both authentication flows:
+
+### 1. JWT Plugin (for User/Frontend Auth)
+
+The **JWT plugin** validates JSON Web Tokens issued by your OAuth provider (CSS SSO).
+
+**How it works:**
+
+1. User logs in via CSS → receives signed JWT
+2. Frontend includes JWT in `Authorization: Bearer <token>` header
+3. Kong JWT plugin validates:
+   - JWT signature (using configured secret)
+   - Token expiration (`exp` claim)
+   - Issuer claim (`iss`) matches a registered consumer
+4. Kong injects headers and forwards to backend
+
+**Kong Configuration:**
+
+```yaml
+# JWT Plugin on Kong Service
+name: jwt
+config:
+  key_claim_name: iss # Claims to look up consumer
+  secret_is_base64: false # Secret format
+```
+
+**Token Structure:**
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+{
+  "iss": "test-tenant-a",      # Consumer identifier
+  "sub": "user-123",            # Subject (user ID)
+  "iat": 1234567890,            # Issued at
+  "exp": 1234571490,            # Expires (1 hour)
+  "tenant_id": "tenant-a",      # Custom claim
+  "user_id": "user-123",        # Custom claim
+  "email": "user@example.com"   # Custom claim
+}
+```
+
+### 2. Key-Auth Plugin (for Service/Admin Auth)
+
+The **key-auth plugin** validates static API keys for service-to-service communication.
+
+**How it works:**
+
+1. Service/admin tool includes API key in `apikey` header
+2. Kong key-auth plugin validates:
+   - Key exists and is active
+   - Key belongs to a valid consumer
+3. Kong injects headers and forwards to backend
+
+**Request Format:**
+
+```http
+GET /api/v1/admin/tenants
+apikey: test-api-key-a-12345678901234567890
+```
+
+---
+
+## Kong Plugin Setup & Configuration
+
+Kong requires two authentication plugins to be installed and configured on routes:
+
+### Plugin Installation
+
+Both plugins come built-in with Kong:
+
+- `jwt` - JSON Web Token authentication
+- `key-auth` - Static API key authentication
+
+No additional installation needed; they're enabled via configuration.
+
+### Route-Specific Plugin Configuration
+
+#### Admin Route (`/api/v1/admin`)
+
+**Route Configuration:**
+
+```
+Name: notify-admin-route
+Paths: /api/v1/admin
+Strip Path: false
+Service: notify (backend:3000)
+```
+
+**JWT Plugin:**
+
+```yaml
+name: jwt
+config:
+  key_claim_name: iss # Use 'iss' claim to identify Kong consumer
+  secret_is_base64: false # Secrets are plaintext
+  algorithms:
+    - HS256 # Support HMAC-SHA256 signed tokens
+  claims_to_verify:
+    - exp # Verify token expiration
+```
+
+#### Email Route (`/api/v1/email`)
+
+**Route Configuration:**
+
+```
+Name: notify-email-route
+Paths: /api/v1/email
+Strip Path: false
+Service: notify (backend:3000)
+```
+
+**Key-Auth Plugin:**
+
+```yaml
+name: key-auth
+config:
+  key_names:
+    - apikey # Header name for API key (clients send this)
+  key_in_body: false # Only accept in headers (not request body)
+  hide_credentials: true # IMPORTANT: Strip API key from upstream headers
+```
+
+**Request Flow:**
+
+1. Client sends: `apikey: test-api-key-a-12345678901234567890`
+2. Kong validates the API key
+3. Kong **strips the `apikey` header** (because `hide_credentials: true`)
+4. Kong injects identity headers for backend:
+   - `X-Consumer-Username: test-tenant-a`
+   - `X-Consumer-ID: <kong-uuid>`
+   - `X-Credential-ID: <key-id>`
+5. Backend receives request WITHOUT the API key
+
+### Consumer & Credential Setup
+
+For each tenant, create:
+
+1. **Kong Consumer** (represents a tenant/service)
+
+   ```
+   username: test-tenant-a
+   custom_id: tenant-a
+   ```
+
+2. **JWT Credentials** (for JWT authentication)
+
+   ```
+   key: test-tenant-a           # Must match JWT 'iss' claim
+   secret: <secret-key>         # Used by issuer to sign JWT
+   ```
+
+3. **Key-Auth Credentials** (for API key authentication)
+   ```
+   key: test-api-key-a-12345678901234567890
+   ```
+
+### Security Considerations
+
+- **JWT Secret**: Should be shared only with the SSL issuer (CSS/Keycloak), not stored in Kong
+- **API Keys**: Generated by APS, never reused, rotated regularly
+- **Claims Validation**: Kong verifies token expiration and issuer on every request
+- **Header Injection**: Kong adds `X-Consumer-Username`, `X-Consumer-ID` after validation
 
 ---
 
@@ -100,22 +325,51 @@ Kong is the **only enforcement layer** for authentication.
 
 ---
 
-## API Key Management
+## Authentication Methods
 
-- API keys are stored in **Kong (via APS)**
-- Notify should not store API keys, need to confirm because I think this is the datamodel
-- Notify only stores metadata (tenant, credential ID, etc.)
+### JWT Method (User/Frontend)
 
-### Flow
+- **Use case**: End-user applications, browser-based clients
+- **Token source**: CSS SSO / Identity provider
+- **Header**: `Authorization: Bearer <jwt_token>`
+- **Validation**: Signature verification + expiration check
+- **Duration**: Typically 1 hour (can be configured)
+- **Storage**: Stored client-side (localStorage/sessionStorage)
+
+### API Key Method (Service/Admin)
+
+- **Use case**: Service-to-service, admin tools, backend operations
+- **Key source**: Generated via APS Management API
+- **Header**: `apikey: <api_key_value>`
+- **Validation**: Key lookup + active status check
+- **Duration**: Long-lived (no automatic expiration)
+- **Rotation**: Manual via APS API
+
+---
+
+## API Key & Credential Management
+
+- API keys and JWT credentials are stored in **Kong (via APS)**
+- Notify should not store secrets - only metadata (tenant, credential ID)
+- Both authentication methods are managed through the APS Management API
+
+### API Key Flow
 
 1. Admin API receives request to create API key
-2. Admin API authenticates user (OIDC via Kong)
+2. Admin API authenticates (either via JWT or existing API key)
 3. Admin API uses **service account** to call APS
 4. APS:
-   - Creates consumer (if needed)
+   - Creates consumer/tenant (if needed)
    - Generates API key
 5. API key returned **once** to user
 6. Notify stores metadata only
+
+### JWT Setup
+
+1. Kong JWT plugin is configured with the issuer secret
+2. Users authenticate with CSS SSO and receive JWT
+3. Tokens are validated by Kong on each request
+4. No manual management needed - relies on SSO token issuance
 
 ---
 
