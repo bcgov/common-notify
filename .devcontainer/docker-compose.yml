@@ -27,7 +27,7 @@ services:
     container_name: migrations
     command: info migrate info
     volumes:
-      - "./migrations/sql:/flyway/sql:ro"
+      - "../migrations/sql:/flyway/sql:ro"
       - "./migrations/dev:/flyway/dev:ro"
     environment:
       FLYWAY_URL: jdbc:postgresql://database:5432/postgres
@@ -60,7 +60,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
     working_dir: "/app"
-    volumes: ["./backend:/app", "/app/node_modules"]
+    volumes: ["../backend:/app", "/app/node_modules"]
 
   frontend:
     container_name: frontend
@@ -71,7 +71,7 @@ services:
       NODE_ENV: development
     image: *node-image
     ports: ["3000:3000"]
-    volumes: ["./frontend:/app", "/app/node_modules"]
+    volumes: ["../frontend:/app", "/app/node_modules"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
     working_dir: "/app"
@@ -82,14 +82,14 @@ services:
   caddy:
     container_name: caddy
     profiles: ["caddy"]
-    build: ./frontend
+    build: ../frontend
     environment:
       NODE_ENV: development
       PORT: 3000
       BACKEND_URL: http://backend:3000
       LOG_LEVEL: info
     ports: ["3005:3000"]
-    volumes: ["./frontend/Caddyfile:/etc/caddy/Caddyfile"]
+    volumes: ["../frontend/Caddyfile:/etc/caddy/Caddyfile"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
     depends_on:
@@ -110,8 +110,8 @@ services:
       KONG_PG_DATABASE: kong
       KONG_PG_PORT: 5432
     depends_on:
-      database:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
 
   kong:
     image: kong:latest
