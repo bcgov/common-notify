@@ -10,16 +10,13 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "strictNullChecks": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": [
-      "vitest/globals",
-      "node",
-    ],
+    "types": ["vitest/globals", "node"],
     "baseUrl": "./",
     "paths": {
       "@": ["src"],

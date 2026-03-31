@@ -1,9 +1,8 @@
 import type { FC } from 'react'
-import type { AxiosResponse } from '~/axios'
 import type UserDto from '@/interfaces/UserDto'
 import { useEffect, useState } from 'react'
 import { Table, Modal, Button } from 'react-bootstrap'
-import apiService from '@/service/api-service'
+import { get, generateApiParameters } from '@/common/api'
 
 type ModalProps = {
   show: boolean
@@ -36,19 +35,8 @@ const Dashboard: FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserDto | undefined>(undefined)
 
   useEffect(() => {
-    apiService
-      .getAxiosInstance()
-      .get('/v1/users')
-      .then((response: AxiosResponse) => {
-        const users: UserDto[] = []
-        for (const user of response.data) {
-          const userDto = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-          }
-          users.push(userDto)
-        }
+    get<UserDto[]>(generateApiParameters('/api/v1/users'))
+      .then((users) => {
         setData(users)
       })
       .catch((error) => {

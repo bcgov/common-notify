@@ -8,14 +8,21 @@ import {
   Delete,
   Query,
   HttpException,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { UsersService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { UserDto } from './dto/user.dto'
+import { JwtAuthGuard } from 'src/auth/jwtauth.guard'
+import { JwtRoleGuard } from 'src/auth/jwtrole.guard'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { Role } from 'src/enum/role.enum'
 
 @ApiTags('users')
+@UseGuards(JwtAuthGuard, JwtRoleGuard)
+@Roles(Role.NOTIFY_ADMIN)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
