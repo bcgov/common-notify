@@ -365,8 +365,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/api/health",
-              "host": ["{{kong_url}}"],
+              "raw": "{{api_gateway_url}}/api/health",
+              "host": ["{{api_gateway_url}}"],
               "path": ["api", "health"]
             },
             "description": "Test health endpoint - no authentication required.\n\nThis is a public endpoint that returns the health status of the Kong gateway and backend services. Use this to verify that the API is running and responding before attempting authenticated requests.\n\nReturns 200 OK if healthy, 5xx if there are issues."
@@ -385,10 +385,8 @@
               }
             ],
             "url": {
-              "raw": "http://localhost:8000/api/v1/admin/tenants",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "8000",
+              "raw": "{{api_gateway_url}}/api/v1/admin/tenants",
+              "host": ["{{api_gateway_url}}"],
               "path": ["api", "v1", "admin", "tenants"]
             },
             "description": "Get all tenants as an authenticated service/admin through Kong gateway.\n\nAuthentication Flow:\n1. Service/admin sends request with API key in `apikey` header\n2. Kong validates the API key via key-auth plugin\n3. Kong **strips the apikey header** (NOT forwarded to backend)\n4. Kong **injects identity headers** for backend:\n   - X-Consumer-Username: admin/service identifier\n   - X-Consumer-ID: Kong internal UUID for this consumer\n   - X-Credential-ID: the specific API key credential ID\n5. Kong routes to the backend admin API\n6. Backend uses injected headers to identify the caller (no API key validation needed)\n\nUseful for admin tools or backend services that need direct API access.\n\n**Important**: Backend never sees the original API key. Kong handles all validation and injects identity headers instead."
@@ -416,10 +414,8 @@
               "raw": "{\n  \"to\": \"user@example.com\",\n  \"subject\": \"Test Email\",\n  \"body\": \"This is a test email sent through Kong gateway\",\n  \"templateId\": \"welcome-template\",\n  \"variables\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\"\n  }\n}"
             },
             "url": {
-              "raw": "http://localhost:8000/api/v1/email/send",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "8000",
+              "raw": "{{api_gateway_url}}/api/v1/email/send",
+              "host": ["{{api_gateway_url}}"],
               "path": ["api", "v1", "email", "send"]
             },
             "description": "Send an email as an authenticated service/tenant through Kong gateway.\n\nAuthentication Flow:\n1. Service/tenant sends request with API key in `apikey` header\n2. Kong validates the API key via key-auth plugin\n3. Kong **strips the apikey header** (NOT forwarded to backend)\n4. Kong **injects identity headers** for backend:\n   - X-Consumer-Username: tenant identifier (e.g., 'bchealth')\n   - X-Consumer-ID: Kong internal UUID for this consumer\n   - X-Credential-ID: the specific API key credential ID\n5. Kong routes to backend email service\n6. Backend uses injected headers to identify tenant (no API key validation needed)\n\nRequired:\n- API Key in `apikey` header (Kong validates this)\n- Valid email address in `to` field\n- Either `subject` + `body` for custom email, or `templateId` for template-based email\n\n**Important**: Backend never sees the original API key. Kong handles all validation and injects identity headers instead."
@@ -476,8 +472,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/status",
-              "host": ["{{kong_url}}"],
+              "raw": "{{api_gateway_url}}/status",
+              "host": ["{{api_gateway_url}}"],
               "path": ["status"]
             },
             "description": "Check Kong Admin API status.\n\nIf this returns a 200 status, Kong is healthy and ready to process requests."
@@ -490,8 +486,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/consumers",
-              "host": ["{{kong_url}}"],
+              "raw": "{{api_gateway_url}}/consumers",
+              "host": ["{{api_gateway_url}}"],
               "path": ["consumers"]
             },
             "description": "List all registered Kong consumers (tenants).\n\nEach consumer can have both API keys and JWT credentials."
@@ -504,8 +500,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{kong_url}}/consumers/test-tenant-a/jwt",
-              "host": ["{{kong_url}}"],
+              "raw": "{{api_gateway_url}}/consumers/test-tenant-a/jwt",
+              "host": ["{{api_gateway_url}}"],
               "path": ["consumers", "test-tenant-a", "jwt"]
             },
             "description": "List JWT credentials registered for test-tenant-a consumer.\n\nThis should return the JWT key/secret pair that Kong uses to validate JWT tokens.\n\nIf empty, the JWT credentials weren't created by the seed script and need to be manually created."
@@ -577,10 +573,10 @@
   ],
   "variable": [
     {
-      "key": "kong_url",
+      "key": "api_gateway_url",
       "value": "http://localhost:8000",
       "type": "string",
-      "description": "Kong Proxy URL (local - from kong_url)"
+      "description": "API Gateway URL - from environment (api_gateway_url)"
     },
     {
       "key": "api_key",
