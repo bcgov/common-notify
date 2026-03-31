@@ -15,13 +15,13 @@ import { UsersService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { UserDto } from './dto/user.dto'
-import { JwtAuthGuard } from 'src/auth/jwtauth.guard'
-import { JwtRoleGuard } from 'src/auth/jwtrole.guard'
+import { AuthJwtGuard } from 'src/auth/auth.jwt-guard'
+import { RoleGuard } from 'src/auth/role.guard'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { Role } from 'src/enum/role.enum'
 
 @ApiTags('users')
-@UseGuards(JwtAuthGuard, JwtRoleGuard)
+@UseGuards(AuthJwtGuard, RoleGuard)
 @Roles(Role.NOTIFY_ADMIN)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {

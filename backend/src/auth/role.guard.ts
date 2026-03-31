@@ -15,8 +15,8 @@ import { ROLES_KEY } from './decorators/roles.decorator'
  * An API guard used to authorize controller methods.  This guard checks for othe @Roles decorator, and compares it against the role_names of the authenticated user's jwt.
  * Requires the @JwtRoleGuard to be applied against the class, even if the @Role is used at the method levels
  */
-export class JwtRoleGuard extends AuthGuard('jwt') implements CanActivate {
-  private readonly logger = new Logger(JwtRoleGuard.name)
+export class RoleGuard extends AuthGuard('jwt') implements CanActivate {
+  private readonly logger = new Logger(RoleGuard.name)
 
   constructor(private reflector: Reflector) {
     super()

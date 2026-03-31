@@ -12,7 +12,7 @@ import { AppService } from './app.service'
 import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
-import { JwtAuthModule } from './auth/jwtauth.module'
+import { AuthModule } from './auth/auth.module'
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { JwtAuthModule } from './auth/jwtauth.module'
     UsersModule,
     AdminModule,
     ApiModule,
-    JwtAuthModule,
+    AuthModule,
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],

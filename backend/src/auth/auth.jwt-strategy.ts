@@ -8,8 +8,8 @@ import { passportJwtSecret } from 'jwks-rsa'
 /**
  * JWT Auth Strategy for Passport.  Uses the BC Ministry's OIDC well-known endpoints for a public cert to verify the JWT signature
  */
-export class JwtAuthStrategy extends PassportStrategy(Strategy) {
-  private readonly logger = new Logger(JwtAuthStrategy.name)
+export class AuthJwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(AuthJwtStrategy.name)
 
   constructor() {
     super({

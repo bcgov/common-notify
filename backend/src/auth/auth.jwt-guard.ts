@@ -6,8 +6,8 @@ import { AuthGuard } from '@nestjs/passport'
 /**
  * An API guard that validates JWT tokens. If the JWT is invalid or missing, an UnauthorizedException is thrown.
  */
-export class JwtAuthGuard extends AuthGuard('jwt') {
-  private readonly logger = new Logger(JwtAuthGuard.name)
+export class AuthJwtGuard extends AuthGuard('jwt') {
+  private readonly logger = new Logger(AuthJwtGuard.name)
 
   constructor(private reflector: Reflector) {
     super()
