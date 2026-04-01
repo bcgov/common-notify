@@ -4,7 +4,7 @@
 kind: GatewayService
 name: coco-notify-ui-dev
 tags: [ns.gw-fe8c5]
-url: http://notify-frontend.namespace.svc.cluster.local
+url: https://httpbin.org # we'll want to update this to point to the frontend route in openshift once that's working.
 protocol: http
 
 routes:
@@ -26,8 +26,8 @@ routes:
         config:
           discovery: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/.well-known/openid-configuration
 
-          client_id: notify-6386
-          client_secret: 
+          client_id: notify-service-6393
+          client_secret: { inject secret via pipelie }
 
           response_type: code
           scope: openid
@@ -60,22 +60,23 @@ routes:
 
 
 # ========================================
-# ADMIN API SERVICE (SSO / JWT)
+# BACKEND API SERVICE (Admin + Email)
 # ========================================
 ---
 kind: GatewayService
-name: coco-notify-admin-dev
+name: coco-notify-backend-dev
 tags: [ns.gw-fe8c5]
-url: http://notify-admin-api.namespace.svc.cluster.local
+url: https://httpbin.org # we'll want to update this to point to the dev backend service in openshift once that's working.
 protocol: http
 
 routes:
+  # Admin API route with JWT authentication
   - name: coco-notify-dev-admin
     tags: [ns.gw-fe8c5]
     hosts:
       - coco-notify-gateway.dev.api.gov.bc.ca
     paths:
-      - /admin
+      - /api/v1/admin
     methods:
       - GET
       - POST
@@ -87,42 +88,19 @@ routes:
 
     plugins:
       - enabled: true
-        name: oidc
+        name: jwt
         tags: [ns.gw-fe8c5]
         config:
-          discovery: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/.well-known/openid-configuration
+          key_claim_name: iss
+          secret_is_base64: false
 
-          client_id: notify-6386
-          client_secret: 
-
-          bearer_only: 'no'
-          unauth_action: auth
-
-          scope: openid
-
-          session_secure: 'yes'
-          ssl_verify: 'no'
-          use_jwks: 'yes'
-
-
-# ========================================
-# PUBLIC API SERVICE (API KEYS ONLY)
-# ========================================
----
-kind: GatewayService
-name: coco-notify-api-dev
-tags: [ns.gw-fe8c5]
-url: http://notify-api.namespace.svc.cluster.local
-protocol: http
-
-routes:
-  - name: coco-notify-dev-api
+  # Email API route with API key authentication
+  - name: coco-notify-dev-email
     tags: [ns.gw-fe8c5]
     hosts:
       - coco-notify-gateway.dev.api.gov.bc.ca
     paths:
-      - /api
-    regex_priority: 100
+      - /api/v1/email
     methods:
       - GET
       - POST
@@ -131,6 +109,7 @@ routes:
       - DELETE
       - OPTIONS
     strip_path: false
+    regex_priority: 100
 
     plugins:
       - enabled: true
