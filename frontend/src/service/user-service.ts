@@ -14,18 +14,18 @@ const initKeycloak = (onAuthenticatedCallback: () => void) => {
       pkceMethod: 'S256',
       checkLoginIframe: false,
     })
-    .then((authenticated) => {
+    .then((authenticated: boolean) => {
       if (authenticated) {
         localStorage.setItem(AUTH_TOKEN, `${_kc.token}`)
         onAuthenticatedCallback()
       }
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       console.error('Keycloak init failed:', err)
     })
 
   _kc.onTokenExpired = () => {
-    _kc.updateToken(5).then((refreshed) => {
+    _kc.updateToken(5).then((refreshed: boolean) => {
       if (refreshed) {
         localStorage.setItem(AUTH_TOKEN, `${_kc.token}`)
       }
