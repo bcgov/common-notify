@@ -19,16 +19,16 @@ services:
     environment:
       <<: *postgres-vars
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", *POSTGRES_USER]
-    ports: ["5432:5432"]
+      test: ['CMD', 'pg_isready', '-U', *POSTGRES_USER]
+    ports: ['5432:5432']
 
   migrations:
     image: flyway/flyway:12-alpine
     container_name: migrations
     command: info migrate info
     volumes:
-      - "../migrations/sql:/flyway/sql:ro"
-      - "./migrations/dev:/flyway/dev:ro"
+      - '../migrations/sql:/flyway/sql:ro'
+      - './migrations/dev:/flyway/dev:ro'
     environment:
       FLYWAY_URL: jdbc:postgresql://database:5432/postgres
       FLYWAY_USER: *POSTGRES_USER
@@ -37,7 +37,7 @@ services:
       FLYWAY_DEFAULT_SCHEMA: users
       # For development, include both main and dev migrations
       # For production, set: FLYWAY_LOCATIONS=filesystem:/flyway/sql
-      FLYWAY_LOCATIONS: "filesystem:/flyway/sql,filesystem:/flyway/dev"
+      FLYWAY_LOCATIONS: 'filesystem:/flyway/sql,filesystem:/flyway/dev'
       NODE_ENV: development
     depends_on:
       database:
@@ -56,11 +56,11 @@ services:
       NODE_ENV: development
       KONG_ADMIN_URL: http://kong:8001
     image: *node-image
-    ports: ["3001:3000"]
+    ports: ['3001:3000']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
-    working_dir: "/app"
-    volumes: ["../backend:/app", "/app/node_modules"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+    working_dir: '/app'
+    volumes: ['../backend:/app', '/app/node_modules']
 
   frontend:
     container_name: frontend
@@ -70,28 +70,28 @@ services:
       PORT: 3000
       NODE_ENV: development
     image: *node-image
-    ports: ["3000:3000"]
-    volumes: ["../frontend:/app", "/app/node_modules"]
+    ports: ['3000:3000']
+    volumes: ['../frontend:/app', '/app/node_modules']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-    working_dir: "/app"
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000']
+    working_dir: '/app'
     depends_on:
       backend:
         condition: service_healthy
 
   caddy:
     container_name: caddy
-    profiles: ["caddy"]
+    profiles: ['caddy']
     build: ../frontend
     environment:
       NODE_ENV: development
       PORT: 3000
       BACKEND_URL: http://backend:3000
       LOG_LEVEL: info
-    ports: ["3005:3000"]
-    volumes: ["../frontend/Caddyfile:/etc/caddy/Caddyfile"]
+    ports: ['3005:3000']
+    volumes: ['../frontend/Caddyfile:/etc/caddy/Caddyfile']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000']
     depends_on:
       backend:
         condition: service_healthy
@@ -130,13 +130,13 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
     ports:
-      - "8000:8000" # Proxy port
-      - "8001:8001" # Admin API port
+      - '8000:8000' # Proxy port
+      - '8001:8001' # Admin API port
     depends_on:
       kong-migrations:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "kong", "health"]
+      test: ['CMD', 'kong', 'health']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -149,6 +149,7 @@ services:
     command: /kong-seed.sh
     volumes:
       - ./kong-seed.sh:/kong-seed.sh:ro
+    env_file: .env
     depends_on:
       kong:
         condition: service_healthy
