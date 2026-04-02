@@ -2,17 +2,16 @@
 
 ## Overview
 
-Notify includes built-in notification plugins (Email, SMS) that tenants configure via simple JSON
-configuration.
-
-_Future: In Phase 2, we plan to extend this into a more elaborate pluggable architecture allowing
-external developers to create custom plugins. Would likely require publishing plugins to
-artifactory, or a similar repo. For now, in phase 1, this we're proposing a configuration-driven
-with plugins just for sms and emails (and possibly other channels as Notify grows)_
+Provide built-in notification plugins (Email, SMS) that are pre-configured to connect to a default
+email and sms provider (ches and twilio?) such that when users send notifications via Notify,
+plugins are used to define how to send the notifications, and where required credentials are stored.
+The plugins define what users need to supply, and validation rules that need to pass when
+notifications are sent. This pattern will allow future development of plugins by external developers
+by following the same plugin structure.
 
 ## Design Principles
 
-- **Configuration-First**: Built-in plugins configured via UI/API (JSON config)
+- **Configuration-First**: Pre-Built plugins for email and sms
 - **Tenant-Scoped**: Plugins are enabled per-tenant with independent configurations
 - **Vault-Backed Secrets**: All sensitive credentials (SMTP passwords, API tokens, etc.) stored in
   HashiCorp Vault, never in database. Backend retrieves credentials on-demand when needed.
@@ -22,31 +21,24 @@ with plugins just for sms and emails (and possibly other channels as Notify grow
 ### 1. Sending Notifications (Happy Path)
 
 ```mermaid
-graph LR
-    A[Notification Request] --> B[Orchestrator Service]
-    B --> |Get Registry| C[Plugin Registry]
-    C --> |Available Plugins| B
+graph TD
+    A["Notification Request<br/>(x-api-key + message payload)"] --> B["API Gateway<br/>"]
+    B -->|"X-Consumer-Username<br/>X-Consumer-ID<br/>X-Credential-ID"| C["Plugin Orchestrator<br/>Service"]
+    C -->|Email Enabled| D[Email CHES Plugin]
+    C -->|SMS Enabled| E[SMS Twilio Plugin]
 
-    B --> |Get Config + Vault Path| D[Plugin Config Service]
-    D --> |Tenant Config| B
+    D --> F[Retrieve Credentials<br/>from Vault]
+    E --> F
 
-    B --> |Route to Plugin| E{Plugin Type}
-    E -->|Email| F[Email CHES Plugin]
-    E -->|SMS| G[SMS Twilio Plugin]
+    F --> G{Send Message}
 
-    F --> |Retrieve Credentials| V[HashiCorp Vault]
-    G --> |Retrieve Credentials| V
+    G -->|Email Path| H[Call CHES API]
+    G -->|SMS Path| I[Call Twilio API]
 
-    V --> |Credentials| F
-    V --> |Credentials| G
-
-    F --> |Send Email| H[CHES API]
-    G --> |Send SMS| I[Twilio API]
-
-    H --> J[Notification Result]
+    H --> J[Save to Database]
     I --> J
 
-    J --> K[Database: Save Status]
+    J --> K[Return Status<br/>to Client]
 ```
 
 ### 2. Plugin Configuration (Tenant Enablement)
@@ -58,7 +50,7 @@ graph LR
     A --> B["Email CHES Plugin<br/>(api_key stored in Vault)"]
     A --> C["SMS Twilio Plugin<br/>(account_sid, auth_token in Vault)"]
 
-    B --> D[Plugin Registry]
+    B --> D["Plugin Registry<br/>(Table-driven configuration)"]
     C --> D
 
     E["Tenant User Signs In"] --> F{Enable Plugins?}
@@ -75,6 +67,10 @@ graph LR
     L -.-> M["Retrieves config from DB<br/>& credentials from Vault"]
     M -.-> N["Routes to appropriate plugin"]
 ```
+
+**Note:** This diagram shows the default plugins for Phase 1 (Email CHES and SMS Twilio). Additional
+pre-configured plugins may be added in the future. The Plugin Registry is a simple table in the
+Notify database containing plugin metadata (id, name, type, configSchema, etc.).
 
 ## Core Components
 
@@ -115,17 +111,7 @@ interface INotificationPlugin {
 - Email via CHES (BC Gov's email service)
 - SMS via Twilio
 
-### 2. Plugin Registry Service
-
-Built-in registry of available plugins (no external registration needed for Phase 1).
-
-**Responsibilities:**
-
-- Maintain list of available plugins and their config schemas
-- Return plugin catalog for UI/API
-- All plugins are pre-registered at system startup
-
-### 3. Plugin Config Service
+### 1. Plugin Config Service
 
 - Manages plugin configurations per tenant
 - Validates configuration before storing
@@ -140,9 +126,9 @@ Built-in registry of available plugins (no external registration needed for Phas
 - Validate plugin configuration
 - Maintain vault path references in database
 
-### 4. Notification Orchestrator Service
+### 2. Notification Orchestrator Service
 
-- Receives send requests from tenant API
+- Receives send requests from tenant user
 - Determines which plugin to use
 - Retrieves plugin configuration for tenant
 - Routes to correct plugin
@@ -155,7 +141,7 @@ sequenceDiagram
     Note over Client: {type: 'sms', recipient: '+1234567890'}
 
     Gateway->>Orchestrator: Send Notification Request
-    Note over Gateway: Tenant ID from Kong headers
+    Note over Gateway: Tenant ID from headers
 
 Orchestrator->>Registry: Get Email Plugins
     Registry-->>Orchestrator: [email-ches]
@@ -201,6 +187,59 @@ CREATE TABLE plugins (
   updated_at TIMESTAMP DEFAULT NOW(),
   owner VARCHAR(255),                          -- E.g., 'bc-gov', 'external-team'
   documentation_url VARCHAR(500)
+);
+```
+
+**Example Entries:**
+
+```sql
+-- Email CHES Plugin
+INSERT INTO plugins (plugin_id, name, type, version, description, config_schema, status, owner, documentation_url)
+VALUES (
+  'email-ches',
+  'Email via CHES',
+  'email',
+  '1.0.0',
+  'Send emails through BC Gov Common Hosted Email Service',
+  '{
+    "fields": [
+      {
+        "name": "ches_api_endpoint",
+        "type": "string",
+        "label": "CHES API Endpoint",
+        "required": true
+      }
+    ],
+    "required": ["ches_api_endpoint"]
+  }',
+  'active',
+  'bc-gov',
+  'https://developer.gov.bc.ca/CHES'
+);
+
+-- SMS Twilio Plugin
+INSERT INTO plugins (plugin_id, name, type, version, description, config_schema, status, owner, documentation_url)
+VALUES (
+  'sms-twilio',
+  'SMS via Twilio',
+  'sms',
+  '1.0.0',
+  'Send SMS messages through Twilio',
+  '{
+    "fields": [
+      {
+        "name": "twilio_from_number",
+        "type": "string",
+        "label": "Twilio From Number",
+        "required": true,
+        "validation": { "pattern": "^\\+[0-9]{1,15}$" }
+      }
+    ],
+    "required": ["twilio_from_number"]
+  }',
+  'active',
+  'bc-gov',
+  'https://www.twilio.com/docs/sms'
 );
 ```
 

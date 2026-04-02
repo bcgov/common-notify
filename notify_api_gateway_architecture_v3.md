@@ -18,7 +18,7 @@ We don't store keys. That said, we likely want to store the following, which is 
 Gateway:
 
 - `X-Consumer-Username: test-tenant-a`
-- `X-Consumer-ID: <kong-uuid>`
+- `X-Consumer-ID: <tenant-uuid>`
 - `X-Credential-ID: <key-id>`
 
 These three pieces of information should allow us to identify the tenant of all requests, the user
@@ -39,17 +39,17 @@ backend are valid requests.
 ```mermaid
 flowchart LR
     User -->|Browser| Frontend[Frontend UI<br/>Caddy/Vite]
-    Service -->|Service Request| Kong[Kong Gateway]
+    Service -->|Service Request| Gateway[API Gateway]
 
-    Frontend -->|Admin Request + JWT| Kong
-    Kong -->|"/admin" + JWT| AdminAPI[Notify Admin API]
-    Kong -->|"/api" + API Key| Notify[Notify Email API]
+    Frontend -->|Admin Request + JWT| Gateway
+    Gateway -->|"./admin" + JWT| AdminAPI[Notify Admin API]
+    Gateway -->|"./api" + API Key| Notify[Notify Email API]
 
     AdminAPI -->|Create Tenant + Key| APS[APS Management API]
-    APS --> Kong
+    APS --> Gateway
     Notify --> Email[Send Email]
 
-    style Kong fill:#ff9800
+    style Gateway fill:#ff9800
     style Frontend fill:#4CAF50
     style AdminAPI fill:#4CAF50
     style Notify fill:#2196F3
@@ -111,19 +111,19 @@ sequenceDiagram
     participant User as "User (Browser)"
     participant CSS as "CSS SSO"
     participant Frontend as "Frontend<br/>(Caddy/Vite)"
-    participant Kong as "Kong Gateway"
+    participant Gateway as "API Gateway"
     participant AdminAPI as "Notify Admin API"
 
     User->>CSS: Login request
     CSS-->>User: JWT Token (signed with secret)
 
     User->>Frontend: Admin Request (with JWT)
-    Frontend->>Kong: Proxy request with JWT<br/>Authorization: Bearer token
-    Kong->>Kong: Validate JWT signature
-    Kong->>Kong: Check token expiry & claims
-    Kong->>AdminAPI: Forward request + headers
-    AdminAPI-->>Kong: Response
-    Kong-->>Frontend: Response
+    Frontend->>Gateway: Proxy request with JWT<br/>Authorization: Bearer token
+    Gateway->>Gateway: Validate JWT signature
+    Gateway->>Gateway: Check token expiry & claims
+    Gateway->>AdminAPI: Forward request + headers
+    AdminAPI-->>Gateway: Response
+    Gateway-->>Frontend: Response
     Frontend-->>User: Response
 ```
 
@@ -132,15 +132,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Service
-    participant Kong as "Kong Gateway"
+    participant Gateway as "API Gateway"
     participant API as "Notify Email API"
 
-    Service->>Kong: POST /api/v1/email/send<br/>apikey: [key]
-    Kong->>Kong: Validate API key
-    Kong->>Kong: Lookup consumer/tenant
-    Kong->>API: Forward request + headers
-    API-->>Kong: Response
-    Kong-->>Service: Response
+    Service->>Gateway: POST /api/v1/email/send<br/>apikey: [key]
+    Gateway->>Gateway: Validate API key
+    Gateway->>Gateway: Lookup consumer/tenant
+    Gateway->>API: Forward request + headers
+    API-->>Gateway: Response
+    Gateway-->>Service: Response
 ```
 
 ### Credential Management Flow
@@ -149,26 +149,26 @@ sequenceDiagram
 sequenceDiagram
     participant Admin
     participant Frontend as "Frontend<br/>(Admin UI)"
-    participant Kong as "Kong Gateway"
+    participant Gateway as "API Gateway"
     participant AdminAPI as "Notify Admin API"
     participant APS as "APS Management API"
 
     Admin->>Frontend: Create tenant/API key request (with JWT)
-    Frontend->>Kong: Proxy request + JWT
-    Kong->>AdminAPI: Forward to Admin API
+    Frontend->>Gateway: Proxy request + JWT
+    Gateway->>AdminAPI: Forward to Admin API
     AdminAPI->>APS: Create consumer + credentials
     APS->>APS: Generate API key
     APS-->>AdminAPI: API key response
-    AdminAPI-->>Kong: Response
-    Kong-->>Frontend: Response
+    AdminAPI-->>Gateway: Response
+    Gateway-->>Frontend: Response
     Frontend-->>Admin: Display new API key
 ```
 
 ---
 
-## Kong Authentication Plugins
+## API Gateway Authentication Plugins
 
-Kong uses **two authentication plugins** to handle both authentication flows:
+API Gateway uses **two authentication plugins** to handle both authentication flows:
 
 ### 1. JWT Plugin (for User/Frontend Auth)
 
@@ -178,11 +178,11 @@ The **JWT plugin** validates JSON Web Tokens issued by your OAuth provider (CSS 
 
 1. User logs in via CSS → receives signed JWT
 2. Frontend includes JWT in `Authorization: Bearer <token>` header
-3. Kong JWT plugin validates:
+3. API Gateway JWT plugin validates:
    - JWT signature (using configured secret)
    - Token expiration (`exp` claim)
    - Issuer claim (`iss`) matches a registered consumer
-4. Kong injects headers and forwards to backend
+4. API Gateway injects headers and forwards to backend
 
 ### 2. Key-Auth Plugin (for Service/Admin Auth)
 
@@ -191,10 +191,10 @@ The **key-auth plugin** validates static API keys for service-to-service communi
 **How it works:**
 
 1. Service/admin tool includes API key in `x-api-key` header
-2. Kong key-auth plugin validates:
+2. API Gateway key-auth plugin validates:
    - Key exists and is active
    - Key belongs to a valid consumer
-3. Kong injects headers and forwards to backend
+3. API Gateway injects headers and forwards to backend
 
 **Request Format:**
 
@@ -205,11 +205,11 @@ x-api-key: test-api-key-a-12345678901234567890
 
 ---
 
-## Kong Plugin Setup & Configuration
+## API Gateway Plugin Setup & Configuration
 
-Kong requires two authentication plugins to be installed and configured on routes. This is setup via
-the files in .api-gateway (need to integrate this into the pipeline so that dev/test/prod use the
-correct gateways).
+API Gateway requires two authentication plugins to be installed and configured on routes. This is
+setup via the files in .api-gateway (need to integrate this into the pipeline so that dev/test/prod
+use the correct gateways).
 
 ### Plugin Installation
 
@@ -256,9 +256,9 @@ once I verify that the gateway services work correctly.
 
 ### JWT Setup
 
-1. Kong JWT plugin is configured with the issuer secret
+1. API Gateway JWT plugin is configured with the issuer secret
 2. Users authenticate with CSS SSO and receive JWT
-3. Tokens are validated by Kong on each request
+3. Tokens are validated by API Gateway on each request
 4. No manual management needed - relies on SSO token issuance
 
 ---
@@ -274,7 +274,7 @@ Backend services are not publicly accessible.
 
 ### Network Policy
 
-Restrict traffic so that only Kong can communicate with backend services.
+Restrict traffic so that only the API Gateway can communicate with backend services.
 
 ---
 
@@ -288,51 +288,51 @@ standard pattern.
 
 ## Identity Propagation
 
-Kong injects identity headers after validating the API key. These headers allow the backend to
-identify and track the authenticated consumer.
+API Gateway injects identity headers after validating the API key. These headers allow the backend
+to identify and track the authenticated consumer.
 
-### Kong Header Injection Flow
+### API Gateway Header Injection Flow
 
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Kong as "Kong Gateway"
+    participant Gateway as "API Gateway"
     participant Backend as "Notify Backend"
 
-    Client->>Kong: POST /api/v1/email/send<br/>(with apikey header)
-    Kong->>Kong: ✓ Validate API key<br/>✓ Lookup consumer
-    Note over Kong: Kong injects headers:<br/>X-Consumer-Username<br/>X-Consumer-ID<br/>X-Credential-ID
+    Client->>Gateway: POST /api/v1/email/send<br/>(with apikey header)
+    Gateway->>Gateway: ✓ Validate API key<br/>✓ Lookup consumer
+    Note over Gateway: API Gateway injects headers:<br/>X-Consumer-Username<br/>X-Consumer-ID<br/>X-Credential-ID
 
-    Kong->>Backend: Forward request<br/>+ Kong headers
+    Gateway->>Backend: Forward request<br/>+ Gateway headers
     Backend->>Backend: ✓ Extract headers<br/>✓ Lookup tenant<br/>✓ Process request
-    Backend-->>Kong: Response
-    Kong-->>Client: Response
+    Backend-->>Gateway: Response
+    Gateway-->>Client: Response
 ```
 
-### Kong Headers Added to Request
+### API Gateway Headers Added to Request
 
-After successful API key validation, Kong adds:
+After successful API key validation, API Gateway adds:
 
-| Header                | Example Value                          | Purpose                           |
-| --------------------- | -------------------------------------- | --------------------------------- |
-| `X-Consumer-Username` | `bchealth`                             | Tenant identifier (Kong consumer) |
-| `X-Consumer-ID`       | `550e8400-e29b-41d4-a716-446655440000` | Kong's internal UUID for consumer |
-| `X-Credential-ID`     | `key-123-abc`                          | The specific API key ID           |
+| Header                | Example Value                          | Purpose                                  |
+| --------------------- | -------------------------------------- | ---------------------------------------- |
+| `X-Consumer-Username` | `bchealth`                             | Tenant identifier (API Gateway consumer) |
+| `X-Consumer-ID`       | `550e8400-e29b-41d4-a716-446655440000` | API Gateway's internal UUID for consumer |
+| `X-Credential-ID`     | `key-123-abc`                          | The specific API key ID                  |
 
 ### Backend Usage
 
 Notify API uses these headers to:
 
-- **Authenticate**: Confirm the API key was validated by Kong
+- **Authenticate**: Confirm the API key was validated by API Gateway
 - **Identify tenant**: Look up tenant in database by `X-Consumer-Username`
-- **Track requests**: Log both DB ID (internal) and Kong ID (gateway-level audit)
+- **Track requests**: Log both DB ID (internal) and API Gateway ID (gateway-level audit)
 - **Apply authorization**: Ensure tenant can perform the requested action
 
 ---
 
 ## Responsibilities Breakdown
 
-### Kong Gateway
+### API Gateway
 
 - Enforces authentication
 - Validates API keys and JWTs
@@ -376,7 +376,7 @@ Work in progress, need to chat with Nick about pipeline changes that will be nee
 
 ## Overview
 
-Use GraphQL API to manage Kong resources such as:
+Use GraphQL API to manage API Gateway resources such as:
 
 - Consumers (tenants)
 - API Keys (credentials)
