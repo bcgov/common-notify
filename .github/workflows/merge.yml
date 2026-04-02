@@ -25,6 +25,7 @@ permissions: {}
 jobs:
   deploy-dev:
     name: Deploy (DEV)
+    environment: DEV
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
@@ -34,6 +35,7 @@ jobs:
 
   deploy-test:
     name: Deploy (TEST)
+    environment: TEST
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
@@ -64,20 +66,20 @@ jobs:
   #       --set backend.pdb.enabled=true
   #     tag: ${{ inputs.tag }}
 
-  promote:
-    name: Promote Images
-    needs: [deploy-prod]
-    runs-on: ubuntu-slim
-    permissions:
-      packages: write
-    strategy:
-      matrix:
-        package: [migrations, backend, frontend]
-    timeout-minutes: 1
-    steps:
-      - uses: shrink/actions-docker-registry-tag@f04afd0559f66b288586792eb150f45136a927fa # v4
-        with:
-          registry: ghcr.io
-          repository: ${{ github.repository }}/${{ matrix.package }}
-          target: ${{ needs.deploy-prod.outputs.tag }}
-          tags: prod
+  # promote:
+  #   name: Promote Images
+  #   needs: [deploy-prod]
+  #   runs-on: ubuntu-slim
+  #   permissions:
+  #     packages: write
+  #   strategy:
+  #     matrix:
+  #       package: [migrations, backend, frontend]
+  #   timeout-minutes: 1
+  #   steps:
+  #     - uses: shrink/actions-docker-registry-tag@f04afd0559f66b288586792eb150f45136a927fa # v4
+  #       with:
+  #         registry: ghcr.io
+  #         repository: ${{ github.repository }}/${{ matrix.package }}
+  #         target: ${{ needs.deploy-prod.outputs.tag }}
+  #         tags: prod

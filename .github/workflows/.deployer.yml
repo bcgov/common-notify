@@ -98,6 +98,7 @@ jobs:
         with:
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
+          oc_server: ${{ inputs.oc_server }}
           environment: ${{ inputs.environment }}
           values_file: charts/crunchy/values.yml
           triggers: ${{ inputs.db_triggers }}
