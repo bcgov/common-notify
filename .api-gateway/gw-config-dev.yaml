@@ -94,13 +94,16 @@ routes:
           key_claim_name: iss
           secret_is_base64: false
 
-  # Email API route with API key authentication
-  - name: coco-notify-dev-email
+  # Notification API route with multiple authentication methods
+  # Supports both:
+  #   1. API Key authentication: x-api-key header
+  #   2. OAuth2 client credentials: client_id + client_secret
+  - name: coco-notify-dev-notifications
     tags: [ns.gw-fe8c5]
     hosts:
       - coco-notify-gateway.dev.api.gov.bc.ca
     paths:
-      - /api/v1/email
+      - /api/v1/notifications
     methods:
       - GET
       - POST
@@ -112,6 +115,8 @@ routes:
     regex_priority: 100
 
     plugins:
+      # Method 1: API Key Authentication
+      # Usage: curl -H "x-api-key: <key>" https://...
       - enabled: true
         name: key-auth
         tags: [ns.gw-fe8c5]
@@ -119,3 +124,72 @@ routes:
           key_names:
             - x-api-key
           hide_credentials: true
+
+      # Method 2: OAuth2 Client Credentials Flow
+      # Usage: POST /auth/oauth/token with client_id & client_secret
+      # Then: curl -H "Authorization: Bearer <token>" https://...
+      - enabled: true
+        name: oauth2
+        tags: [ns.gw-fe8c5]
+        config:
+          scopes:
+            - notify
+          token_expiration: 3600
+          enable_client_credentials_grant: true
+          hide_credentials: true
+
+          # Keycloak OIDC provider for token issuance
+          token_endpoint: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
+
+          provision_key: notify-oauth-key
+          accept_http_if_already_terminated: true
+
+---
+# ========================================
+# AUTHENTICATION PATTERNS FOR TENANTS
+# ========================================
+#
+# Tenants can authenticate using TWO methods:
+#
+# METHOD 1: API KEY (Simpler)
+# ========================================
+# 1. Register tenant via admin endpoint
+# 2. Receive API Key and API Secret from Notify
+# 3. Use API Key in x-api-key header:
+#
+#    curl -X POST https://coco-notify-gateway.dev.api.gov.bc.ca/api/v1/notifications/send \
+#      -H "x-api-key: tenant-key-12345" \
+#      -H "Content-Type: application/json" \
+#      -d '{"type":"email", "recipient":"user@example.com", ...}'
+#
+# METHOD 2: OAUTH2 CLIENT CREDENTIALS (Enterprise-grade)
+# ========================================
+# 1. Register tenant via admin endpoint
+# 2. Receive Client ID and Client Secret
+# 3. Exchange credentials for JWT access token:
+#
+#    curl -X POST https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token \
+#      -H "Content-Type: application/x-www-form-urlencoded" \
+#      -d "grant_type=client_credentials" \
+#      -d "client_id=tenant-client-id" \
+#      -d "client_secret=tenant-client-secret" \
+#      -d "scope=notify"
+#
+#    Response: { "access_token": "eyJhbGc...", "expires_in": 3600 }
+#
+# 4. Use token in Authorization header:
+#
+#    curl -X POST https://coco-notify-gateway.dev.api.gov.bc.ca/api/v1/notifications/send \
+#      -H "Authorization: Bearer eyJhbGc..." \
+#      -H "Content-Type: application/json" \
+#      -d '{"type":"email", "recipient":"user@example.com", ...}'
+#
+# GATEWAY FLOW:
+# ========================================
+# 1. API Gateway (APS) validates credentials (API Key OR OAuth2 token)
+# 2. API Gateway injects identity headers into backend request:
+#    - X-Consumer-Username: tenant identifier
+#    - X-Consumer-ID: gateway consumer UUID
+#    - X-Credential-ID: which credential was used
+# 3. Backend receives headers and logs/identifies tenant
+# 4. Backend routes request to appropriate plugin
