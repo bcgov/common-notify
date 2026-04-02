@@ -2,7 +2,7 @@ name: Merge
 
 on:
   push:
-    branches: [main]
+    branches: [main, crunchy-demo]
     paths-ignore:
       - '*.md'
       - '.github/**'
