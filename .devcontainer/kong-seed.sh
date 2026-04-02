@@ -37,36 +37,36 @@ if [ -z "$ADMIN_ROUTE" ]; then
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create notifications route with key-auth and oauth2
-echo "Setting up notifications route with key-auth and oauth2..."
-NOTIFICATIONS_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-notifications-route" \
-  --data-urlencode "paths[]=/api/v1/notifications" \
+# Create email route with key-auth and oauth2
+echo "Setting up email route with key-auth and oauth2..."
+EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-email-route" \
+  --data-urlencode "paths[]=/api/v1/email" \
   --data-urlencode "strip_path=false" \
   2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
-if [ -z "$NOTIFICATIONS_ROUTE" ]; then
-  echo "  Notifications route may already exist, fetching..."
-  NOTIFICATIONS_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-notifications-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+if [ -z "$EMAIL_ROUTE" ]; then
+  echo "  Email route may already exist, fetching..."
+  EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Enable key-auth plugin on notifications route (if not exists)
-echo "Enabling key-auth plugin on notifications route..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$NOTIFICATIONS_ROUTE/plugins" \
+# Enable key-auth plugin on email route (if not exists)
+echo "Enabling key-auth plugin on email route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
   --data-urlencode "name=key-auth" \
   --data-urlencode "config.key_names[]=x-api-key" \
   --data-urlencode "config.hide_credentials=true" \
-  2>/dev/null || echo "Key-auth plugin may already exist on notifications route"
+  2>/dev/null || echo "Key-auth plugin may already exist on email route"
 
-# Enable oauth2 plugin on notifications route (if not exists)
-echo "Enabling oauth2 plugin on notifications route..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$NOTIFICATIONS_ROUTE/plugins" \
+# Enable oauth2 plugin on email route (if not exists)
+echo "Enabling oauth2 plugin on email route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
   --data-urlencode "name=oauth2" \
   --data-urlencode "config.scopes[]=notify" \
   --data-urlencode "config.token_expiration=3600" \
   --data-urlencode "config.enable_client_credentials=true" \
   --data-urlencode "config.hide_credentials=true" \
-  2>/dev/null || echo "OAuth2 plugin may already exist on notifications route"
+  2>/dev/null || echo "OAuth2 plugin may already exist on email route"
 
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
