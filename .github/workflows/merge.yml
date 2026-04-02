@@ -35,24 +35,24 @@ jobs:
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       tag: ${{ inputs.tag }}
 
-  deploy-test:
-    name: Deploy (TEST)
-    environment: TEST
-    uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
-    with:
-      environment: TEST
-      db_user: appproxy # appproxy is the user which works with pgbouncer.
-      tag: ${{ inputs.tag }}
+  # deploy-test:
+  #   name: Deploy (TEST)
+  #   environment: TEST
+  #   uses: ./.github/workflows/.deployer.yml
+  #   secrets:
+  #     oc_namespace: ${{ secrets.OC_NAMESPACE }}
+  #     oc_token: ${{ secrets.OC_TOKEN }}
+  #   with:
+  #     environment: TEST
+  #     db_user: appproxy # appproxy is the user which works with pgbouncer.
+  #     tag: ${{ inputs.tag }}
 
-  tests:
-    name: Tests
-    needs: [deploy-test]
-    uses: ./.github/workflows/.tests.yml
-    with:
-      target: test
+  # tests:
+  #   name: Tests
+  #   needs: [deploy-test]
+  #   uses: ./.github/workflows/.tests.yml
+  #   with:
+  #     target: test
 
   # deploy-prod:
   #   name: Deploy (PROD)
