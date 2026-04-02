@@ -9,13 +9,15 @@ well as other admin tasks.
 TBD - CSTAR - Need to understand this. Is it running? Can we use it? Is it effectively the APS
 Gateway? Dig in.
 
-Authentication is enforced by the API Gateway. The API Gateway validates three authentication methods:
+Authentication is enforced by the API Gateway. The API Gateway validates three authentication
+methods:
+
 1. **JWT** (for user/admin UI access)
 2. **API Keys** (for service-to-service, simple static keys)
 3. **OAuth2 Client Credentials** (for service-to-service, token-based)
 
-The API Gateway will only relay requests back to Notify if they're valid. No JWT or API key validation
-needs to happen a second time on the backend.
+The API Gateway will only relay requests back to Notify if they're valid. No JWT or API key
+validation needs to happen a second time on the backend.
 
 We don't store keys. That said, we likely want to store the following, which is injected by the API
 Gateway:
@@ -34,9 +36,9 @@ may not be until "later". So I'll need to better understand this.
 ### Simple Flow
 
 Quick and dirty version: we'll want to route everything through the API gateway. They validate api
-keys, JWTs, and OAuth2 tokens (we can use the jwt plugin, key-auth plugin, and oauth2 plugin for 
-these three purposes). The API gateway proxies requests to Notify. We create a network policy in 
-OpenShift that only accepts traffic to the backend from the API Gateway. In this way, we know that 
+keys, JWTs, and OAuth2 tokens (we can use the jwt plugin, key-auth plugin, and oauth2 plugin for
+these three purposes). The API gateway proxies requests to Notify. We create a network policy in
+OpenShift that only accepts traffic to the backend from the API Gateway. In this way, we know that
 any requests to the backend are valid requests.
 
 ### 1. User/Admin Flow (JWT)
@@ -45,7 +47,7 @@ any requests to the backend are valid requests.
 flowchart LR
     User -->|Browser| Frontend[Frontend UI<br/>Caddy/Vite]
     CSS["CSS SSO<br/>(Keycloak)"]
-    
+
     User -->|Login| CSS
     CSS -->|JWT Token| User
     Frontend -->|Admin Request + JWT| Gateway[API Gateway]
@@ -56,7 +58,7 @@ flowchart LR
     style Frontend fill:#4CAF50
     style AdminAPI fill:#4CAF50
     style CSS fill:#9C27B0
-    style APS fill:#2196F3
+    style APS fill:#ff9800
 ```
 
 ### 2. API Key Flow (Direct Service Integration)
@@ -64,15 +66,15 @@ flowchart LR
 ```mermaid
 flowchart LR
     Service["External Service<br/>(Application)"]
-    
+
     Service -->|POST /api/v1/notifications/send<br/>x-api-key: key-123| Gateway[API Gateway]
     Gateway -->|Validate Key<br/>Inject Headers| NotifyAPI[Notify Notification API]
     NotifyAPI -->|Send Email/SMS| Email["CHES/Twilio<br/>Providers"]
 
     style Gateway fill:#ff9800
     style Service fill:#ff6b6b
-    style NotifyAPI fill:#2196F3
-    style Email fill:#4CAF50
+    style NotifyAPI fill:#4CAF50
+    style Email fill:#2196F3
 ```
 
 ### 3. Client Credentials Flow (OAuth2 Service Integration)
@@ -81,7 +83,7 @@ flowchart LR
 flowchart LR
     Service["External Service<br/>(Application)"]
     Keycloak["Keycloak<br/>(Token Endpoint)"]
-    
+
     Service -->|client_id + client_secret| Keycloak
     Keycloak -->|JWT Token<br/>expires_in: 3600| Service
     Service -->|POST /api/v1/notifications/send<br/>Authorization: Bearer token| Gateway[API Gateway]
@@ -90,8 +92,8 @@ flowchart LR
 
     style Gateway fill:#ff9800
     style Service fill:#ff6b6b
-    style NotifyAPI fill:#2196F3
-    style Email fill:#4CAF50
+    style NotifyAPI fill:#4CAF50
+    style Email fill:#2196F3
     style Keycloak fill:#9C27B0
 ```
 
@@ -99,7 +101,8 @@ flowchart LR
 
 - **Three authentication paths**: JWT (User), API Key (Service), OAuth2 Client Credentials (Service)
 - **Frontend** (Caddy/Vite) is the entry point for user/admin interactions
-- **API Gateway** is the single entry point for all API requests (enforces authentication, injects headers)
+- **API Gateway** is the single entry point for all API requests (enforces authentication, injects
+  headers)
 - **External Services** can use either simple API keys or OAuth2 client credentials
 - API Gateway validates credentials and injects tenant headers
 - Admin API creates credentials (via APS Management API)
@@ -114,17 +117,17 @@ flowchart LR
 
 ### System Components
 
-| Component          | Responsibility                                           |
-| ------------------ | ------------------------------------------------------- |
+| Component          | Responsibility                                              |
+| ------------------ | ----------------------------------------------------------- |
 | API Gateway        | Auth (JWT + API Key + OAuth2), routing, identity injection. |
-| JWT Plugin         | Validates JWT signatures and claims                  |
-| Key-Auth Plugin    | Validates API keys                                   |
-| OAuth2 Plugin      | Handles client credentials flow, token issuance     |
-| APS Management API | Consumer + credential management (maybe use CSTAR?) |
-| Frontend UI        | Admin interface (authenticates via JWT)             |
-| Notify API         | Core messaging functionality                        |
-| Notify Admin API   | Tenant + API key management                         |
-| CSS / Keycloak     | OAuth / SSO (issues JWT tokens)                     |
+| JWT Plugin         | Validates JWT signatures and claims                         |
+| Key-Auth Plugin    | Validates API keys                                          |
+| OAuth2 Plugin      | Handles client credentials flow, token issuance             |
+| APS Management API | Consumer + credential management (maybe use CSTAR?)         |
+| Frontend UI        | Admin interface (authenticates via JWT)                     |
+| Notify API         | Core messaging functionality                                |
+| Notify Admin API   | Tenant + API key management                                 |
+| CSS / Keycloak     | OAuth / SSO (issues JWT tokens)                             |
 
 ---
 
@@ -184,7 +187,7 @@ sequenceDiagram
     Service->>Keycloak: POST /token<br/>grant_type: client_credentials<br/>client_id: [id]<br/>client_secret: [secret]
     Keycloak->>Keycloak: Generate JWT<br/>Set expiry (1 hour)
     Keycloak-->>Service: {access_token: jwt, expires_in: 3600}
-    
+
     Service->>Gateway: POST /api/v1/notifications/send<br/>Authorization: Bearer [jwt]
     Gateway->>Gateway: Validate JWT signature<br/>Check token expiry
     Gateway->>Gateway: Lookup consumer/tenant
@@ -206,19 +209,19 @@ sequenceDiagram
     Admin->>Frontend: Create tenant/credentials request (with JWT)
     Frontend->>Gateway: Proxy request + JWT
     Gateway->>AdminAPI: Forward to Admin API
-    
+
     Note over AdminAPI: Create Consumer (one-time)
     AdminAPI->>APS: mutation: createConsumer
     APS-->>AdminAPI: {id: consumer-uuid}
-    
+
     Note over AdminAPI: Option A: Create API Key
     AdminAPI->>APS: mutation: createApiKey(consumerId)
     APS-->>AdminAPI: {key: "notify_key_...", id: cred-id}
-    
+
     Note over AdminAPI: Option B: Create OAuth2 Credentials
     AdminAPI->>APS: mutation: createOAuth2Credentials(consumerId)
     APS-->>AdminAPI: {client_id: "...", client_secret: "...", id: cred-id}
-    
+
     AdminAPI-->>Gateway: Response (API Key OR OAuth2 Credentials)
     Gateway-->>Frontend: Response
     Frontend-->>Admin: Display new credentials (one-time display)
@@ -266,8 +269,7 @@ Content-Type: application/json
 {"type": "email", "recipient": "user@example.com", ...}
 ```
 
-**Pros**: Simple, no token exchange needed
-**Cons**: Static key must be included in every request
+**Pros**: Simple, no token exchange needed **Cons**: Static key must be included in every request
 
 ---
 
@@ -278,6 +280,7 @@ The **OAuth2 plugin** implements the client credentials grant flow for token-bas
 **How it works:**
 
 1. Service exchanges credentials for a JWT access token:
+
    ```bash
    curl -X POST https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token \
      -H "Content-Type: application/x-www-form-urlencoded" \
@@ -288,6 +291,7 @@ The **OAuth2 plugin** implements the client credentials grant flow for token-bas
    ```
 
 2. Service receives OAuth2 token response:
+
    ```json
    {
      "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -298,6 +302,7 @@ The **OAuth2 plugin** implements the client credentials grant flow for token-bas
    ```
 
 3. Service includes token in Authorization header for API calls:
+
    ```bash
    curl -X POST https://coco-notify-gateway.dev.api.gov.bc.ca/api/v1/notifications/send \
      -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
@@ -308,8 +313,8 @@ The **OAuth2 plugin** implements the client credentials grant flow for token-bas
 4. API Gateway validates token signature and expiry
 5. API Gateway injects headers and forwards to backend
 
-**Pros**: Token-based (more secure), tokens expire automatically, aligns with OAuth2 industry standard
-**Cons**: Requires extra step to exchange credentials for token
+**Pros**: Token-based (more secure), tokens expire automatically, aligns with OAuth2 industry
+standard **Cons**: Requires extra step to exchange credentials for token
 
 ---
 
@@ -337,54 +342,56 @@ once I verify that the gateway services work correctly.
 
 ### 1. JWT Method (User/Frontend/Admin)
 
-| Property | Value |
-|----------|-------|
-| **Use case** | Users login to administer templates, manage tenants, view reports |
-| **Token source** | CSS SSO (Keycloak Standard realm) |
-| **Validation** | API Gateway |
-| **Storage** | Stored client-side (localStorage/sessionStorage) |
-| **Path** | `/api/v1/admin/*` |
-| **Header** | `Authorization: Bearer <jwt>` |
-| **Duration** | Typically 15-60 minutes (SSO managed) |
+| Property         | Value                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| **Use case**     | Users login to administer templates, manage tenants, view reports |
+| **Token source** | CSS SSO (Keycloak Standard realm)                                 |
+| **Validation**   | API Gateway                                                       |
+| **Storage**      | Stored client-side (localStorage/sessionStorage)                  |
+| **Path**         | `/api/v1/admin/*`                                                 |
+| **Header**       | `Authorization: Bearer <jwt>`                                     |
+| **Duration**     | Typically 15-60 minutes (SSO managed)                             |
 
 ### 2. API Key Method (Service/Direct API)
 
-| Property | Value |
-|----------|-------|
-| **Use case** | Services call Notify to send emails/SMS directly |
+| Property       | Value                                                                |
+| -------------- | -------------------------------------------------------------------- |
+| **Use case**   | Services call Notify to send emails/SMS directly                     |
 | **Key source** | Generated via APS Management API (called from Notify admin endpoint) |
-| **Validation** | API Gateway |
-| **Path** | `/api/v1/notifications/*` |
-| **Header** | `x-api-key: <static_key>` |
-| **Duration** | Indefinite (until revoked) |
-| **Scope** | Full access (tenant-scoped via APS consumer) |
-| **Best for** | Simple integrations, direct API usage, lower security requirements |
+| **Validation** | API Gateway                                                          |
+| **Path**       | `/api/v1/notifications/*`                                            |
+| **Header**     | `x-api-key: <static_key>`                                            |
+| **Duration**   | Indefinite (until revoked)                                           |
+| **Scope**      | Full access (tenant-scoped via APS consumer)                         |
+| **Best for**   | Simple integrations, direct API usage, lower security requirements   |
 
 ### 3. OAuth2 Client Credentials (Service/Token-Based)
 
-| Property | Value |
-|----------|-------|
-| **Use case** | Services securely exchange credentials for temporary tokens |
-| **Credentials** | Client ID + Client Secret (generated via APS Management API) |
-| **Token exchange** | POST to Keycloak `/protocol/openid-connect/token` |
-| **Validation** | API Gateway validates JWT signature and expiry |
-| **Path** | `/api/v1/notifications/*` |
-| **Header** | `Authorization: Bearer <oauth2_token>` |
-| **Duration** | Token: typically 1 hour. Can be refreshed with client credentials |
-| **Scope** | `notify` scope |
-| **Best for** | Enterprise integrations, higher security, audit compliance, token rotation |
+| Property           | Value                                                                      |
+| ------------------ | -------------------------------------------------------------------------- |
+| **Use case**       | Services securely exchange credentials for temporary tokens                |
+| **Credentials**    | Client ID + Client Secret (generated via APS Management API)               |
+| **Token exchange** | POST to Keycloak `/protocol/openid-connect/token`                          |
+| **Validation**     | API Gateway validates JWT signature and expiry                             |
+| **Path**           | `/api/v1/notifications/*`                                                  |
+| **Header**         | `Authorization: Bearer <oauth2_token>`                                     |
+| **Duration**       | Token: typically 1 hour. Can be refreshed with client credentials          |
+| **Scope**          | `notify` scope                                                             |
+| **Best for**       | Enterprise integrations, higher security, audit compliance, token rotation |
 
 ---
 
 ### Credential Lifecycle
 
 **API Key Flow:**
+
 1. Admin creates tenant via `/api/v1/admin/tenants` (JWT auth)
 2. Notify backend calls APS API to create consumer + generate API key
 3. API key returned to admin (displayed once, must be stored securely)
 4. Service uses API key in `x-api-key` header indefinitely
 
 **OAuth2 Client Credentials Flow:**
+
 1. Admin creates tenant via `/api/v1/admin/tenants` (JWT auth)
 2. Notify backend calls APS API to create consumer + OAuth2 credentials (client_id + secret)
 3. Credentials returned to admin (must be stored securely)
@@ -396,7 +403,8 @@ once I verify that the gateway services work correctly.
 
 ### API Key Registration Flow
 
-1. Admin authenticates with JWT and calls `/api/v1/admin/tenants/{tenantId}/credentials/api-key` (POST)
+1. Admin authenticates with JWT and calls `/api/v1/admin/tenants/{tenantId}/credentials/api-key`
+   (POST)
 2. Notify backend validates JWT and authorization (admin for that tenant)
 3. Notify backend calls APS Management API to:
    - Ensure consumer exists (created during tenant registration)
@@ -415,7 +423,8 @@ once I verify that the gateway services work correctly.
 
 ### OAuth2 Client Credentials Registration Flow
 
-1. Admin authenticates with JWT and calls `/api/v1/admin/tenants/{tenantId}/credentials/oauth2` (POST)
+1. Admin authenticates with JWT and calls `/api/v1/admin/tenants/{tenantId}/credentials/oauth2`
+   (POST)
 2. Notify backend validates JWT and authorization (admin for that tenant)
 3. Notify backend calls APS Management API to:
    - Ensure consumer exists (created during tenant registration)
