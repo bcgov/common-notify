@@ -25,7 +25,6 @@ permissions: {}
 jobs:
   deploy-dev:
     name: Deploy (DEV)
-    environment: DEV
     uses: ./.github/workflows/.deployer.yml
     secrets:
       oc_namespace: ${{ secrets.OC_NAMESPACE }}
