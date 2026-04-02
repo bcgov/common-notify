@@ -27,7 +27,9 @@ jobs:
     name: Deploy (DEV)
     environment: DEV
     uses: ./.github/workflows/.deployer.yml
-    secrets: inherit
+    secrets:
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
     with:
       environment: DEV
       db_user: appproxy # appproxy is the user which works with pgbouncer.
@@ -37,7 +39,9 @@ jobs:
     name: Deploy (TEST)
     environment: TEST
     uses: ./.github/workflows/.deployer.yml
-    secrets: inherit
+    secrets:
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
     with:
       environment: TEST
       db_user: appproxy # appproxy is the user which works with pgbouncer.
