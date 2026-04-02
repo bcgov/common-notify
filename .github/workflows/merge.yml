@@ -23,12 +23,21 @@ concurrency:
 permissions: {}
 
 jobs:
+  deploy-dev:
+    name: Deploy (DEV)
+    uses: ./.github/workflows/.deployer.yml
+    secrets: inherit
+    with:
+      environment: DEV
+      db_user: appproxy # appproxy is the user which works with pgbouncer.
+      tag: ${{ inputs.tag }}
+
   deploy-test:
     name: Deploy (TEST)
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
-      environment: test
+      environment: TEST
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       tag: ${{ inputs.tag }}
 
@@ -45,7 +54,7 @@ jobs:
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
-      environment: prod
+      environment: PROD
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params:
         --set backend.deploymentStrategy=RollingUpdate
