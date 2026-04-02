@@ -1,79 +1,12 @@
 {
   "info": {
-    "_postman_id": "ba0be387-bb47-4d3d-ac05-5c59f8cac9bd",
+    "_postman_id": "461986e4-94f1-463d-990e-29d1787e6bf7",
     "name": "API Gateway Auth Testing - API Key & JWT",
     "description": "Collection for testing Kong API Gateway with two authentication flows:\n\n## Authentication Flows\n\n### 1. API Key Flow (Service-to-Service)\n- Used for backend services, admin tools, or service accounts\n- Tenant credentials managed via Kong API key plugin\n- Simple header-based authentication\n\n### 2. JWT Flow (User/Frontend)\n- Used for end-user authentication (CSS SSO)\n- Browser frontend logs in via SSO → receives JWT\n- Frontend sends JWT with requests → Kong validates signature\n- Perfect for public apps with user authentication\n\n## Setup Instructions\n\n1. Run Kong seed script: `docker-compose up kong-migrations && docker-compose up kong`\n2. Choose authentication method below\n3. Run appropriate requests\n\n## Test Credentials\n\n**API Key Method:**\n- API Key: `test-api-key-a-12345678901234567890`\n\n**JWT Method:**\n- Key: `test-tenant-a`\n- Secret: `secret-key-for-tenant-a-do-not-use-in-production`\n- Use the \"Generate JWT\" request to create tokens\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "9083839"
   },
   "item": [
-    {
-      "name": "Get API Gateway Client Credentials Token",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "if (pm.response.code === 200) {",
-              "    const jsonData = pm.response.json();",
-              "    pm.environment.set('api_gateway_token', jsonData.access_token);",
-              "    pm.environment.set('api_gateway_token_type', jsonData.token_type || 'Bearer');",
-              "    if (jsonData.expires_in) {",
-              "        pm.environment.set('api_gateway_token_expires_in', jsonData.expires_in);",
-              "    }",
-              "    pm.test('API Gateway Token obtained successfully', function() {",
-              "        pm.expect(jsonData.access_token).to.exist;",
-              "    });",
-              "    console.log('✅ API Gateway token saved to {{api_gateway_token}}');",
-              "} else {",
-              "    pm.test('Failed to get API Gateway token', function() {",
-              "        pm.expect.fail('Could not obtain token from API Gateway: ' + pm.response.status);",
-              "    });",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/x-www-form-urlencoded",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
-            {
-              "key": "grant_type",
-              "value": "client_credentials",
-              "type": "text"
-            },
-            {
-              "key": "client_id",
-              "value": "{{api_gateway_client_id}}",
-              "type": "text"
-            },
-            {
-              "key": "client_secret",
-              "value": "{{api_gateway_client_secret}}",
-              "type": "text"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{api_gateway_token_url}}",
-          "protocol": "https",
-          "host": ["authz", "apps", "gov", "bc", "ca"],
-          "path": ["auth", "realms", "aps", "protocol", "openid-connect", "token"]
-        },
-        "description": "Get an access token from the API Gateway using client credentials grant flow.\n\n**Setup Required:**\n1. Ensure your Postman environment has these variables:\n   - `api_gateway_client_id`: Service account client ID\n   - `api_gateway_client_secret`: Service account client secret\n   - `api_gateway_token_url`: Token endpoint URL\n\n2. Run this request to obtain a token\n\nThe token response will be automatically saved to `{{api_gateway_token}}` for use in other requests like creating tenants.\n\n**Usage:**\n- Run this first to get an access token\n- Use `{{api_gateway_token}}` in subsequent requests\n- Token expires after the time specified in `expires_in`"
-      },
-      "response": []
-    },
     {
       "name": "JWT Flow (User/Frontend Auth)",
       "item": [
@@ -277,7 +210,9 @@
                   "    });",
                   "}"
                 ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
               }
             }
           ],
@@ -302,12 +237,11 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"notify-test-tenant\",\n  \"description\": \"Test tenant for API development\",\n  \"organization\": \"BC Government\",\n  \"contactEmail\": \"barrett.falk@gov.bc.ca\",\n  \"contactName\": \"Admin User\"\n}"
+              "raw": "{\n  \"name\": \"notify-test-tenant-barrett\",\n  \"description\": \"Test tenant for API development-barrett\",\n  \"organization\": \"BC Government\",\n  \"contactEmail\": \"barrett.falk@gov.bc.ca\",\n  \"contactName\": \"Admin User\"\n}"
             },
             "url": {
-              "raw": "{{api_gateway_url}}/v1/admin/tenants",
-              "protocol": "https",
-              "host": ["coco-notify-gateway", "dev", "api", "gov", "bc", "ca"],
+              "raw": "{{api_gateway_url}}/api/v1/admin/tenants",
+              "host": ["{{api_gateway_url}}"],
               "path": ["api", "v1", "admin", "tenants"]
             },
             "description": "Create a new tenant and get an API key via the API Gateway.\n\n**Prerequisites:**\n1. Run \"Get API Gateway Client Credentials Token\" first to get `{{api_gateway_token}}`\n\n**Response:**\n```json\n{\n  \"tenant\": {\n    \"id\": 1,\n    \"name\": \"my-test-tenant\",\n    \"status\": \"active\"\n  },\n  \"apiKey\": \"generated-api-key-value\",\n  \"note\": \"Store this key securely\"\n}\n```\n\n**Notes:**\n- The API key is shown only once - save it!\n- The generated API key is automatically saved to `{{generated_api_key}}` environment variable\n- Use this key for subsequent API Key Flow requests"
@@ -492,7 +426,10 @@
           "name": "New Request",
           "request": {
             "method": "GET",
-            "header": []
+            "header": [],
+            "url": {
+              "raw": ""
+            }
           },
           "response": []
         }
@@ -575,6 +512,73 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Get API Gateway Client Credentials Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const jsonData = pm.response.json();",
+              "    pm.environment.set('api_gateway_token', jsonData.access_token);",
+              "    pm.environment.set('api_gateway_token_type', jsonData.token_type || 'Bearer');",
+              "    if (jsonData.expires_in) {",
+              "        pm.environment.set('api_gateway_token_expires_in', jsonData.expires_in);",
+              "    }",
+              "    pm.test('API Gateway Token obtained successfully', function() {",
+              "        pm.expect(jsonData.access_token).to.exist;",
+              "    });",
+              "    console.log('✅ API Gateway token saved to {{api_gateway_token}}');",
+              "} else {",
+              "    pm.test('Failed to get API Gateway token', function() {",
+              "        pm.expect.fail('Could not obtain token from API Gateway: ' + pm.response.status);",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "client_credentials",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "{{api_gateway_client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{api_gateway_client_secret}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token",
+          "protocol": "https",
+          "host": ["authz", "apps", "gov", "bc", "ca"],
+          "path": ["auth", "realms", "aps", "protocol", "openid-connect", "token"]
+        },
+        "description": "Get an access token from the API Gateway using client credentials grant flow.\n\n**Setup Required:**\n1. Ensure your Postman environment has these variables:\n   - `api_gateway_client_id`: Service account client ID\n   - `api_gateway_client_secret`: Service account client secret\n   - `api_gateway_token_url`: Token endpoint URL\n\n2. Run this request to obtain a token\n\nThe token response will be automatically saved to `{{api_gateway_token}}` for use in other requests like creating tenants.\n\n**Usage:**\n- Run this first to get an access token\n- Use `{{api_gateway_token}}` in subsequent requests\n- Token expires after the time specified in `expires_in`"
+      },
+      "response": []
     }
   ],
   "auth": {

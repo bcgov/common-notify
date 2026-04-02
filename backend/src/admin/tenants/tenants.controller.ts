@@ -1,11 +1,31 @@
-import { Controller, Get, Post, Delete, Param, Body, HttpCode, HttpException } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger'
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  Body,
+  HttpCode,
+  HttpException,
+  UseGuards,
+} from '@nestjs/common'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 import { TenantDto, CreateTenantResponseDto } from './dto/tenant.dto'
+import { JwtGuard } from '../../common/guards/jwt.guard'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
+@UseGuards(JwtGuard)
+@ApiBearerAuth()
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
@@ -16,15 +36,20 @@ export class TenantsController {
    * 2. Generates an API key in Kong
    * 3. Stores tenant metadata in the database
    *
+   * Requires a valid JWT Bearer token from Keycloak's APS realm.
    * The API key is returned ONCE and must be stored by the caller.
    */
   @Post()
   @ApiOperation({
     summary: 'Create a new tenant',
-    description: 'Creates a new tenant and generates an API key. The key is shown only once.',
+    description:
+      'Creates a new tenant and generates an API key. The key is shown only once. Requires JWT authentication.',
   })
   @ApiCreatedResponse({
     type: CreateTenantResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid or missing JWT Bearer token',
   })
   async create(@Body() createTenantDto: CreateTenantDto) {
     try {
