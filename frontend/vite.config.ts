@@ -19,9 +19,9 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
-      // Proxy API requests to Kong API Gateway
+      // Proxy API requests to Kong API Gateway (or local Kong in development)
       '/api': {
-        target: 'http://kong:8000',
+        target: process.env.VITE_API_GATEWAY_NOTIFY_URL || 'http://kong:8000',
         changeOrigin: true,
       },
     },

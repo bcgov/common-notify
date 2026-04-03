@@ -47,17 +47,20 @@ any requests to the backend are valid requests.
 flowchart LR
     User -->|Browser| Frontend[Frontend UI<br/>Caddy/Vite]
     CSS["CSS SSO<br/>(Keycloak)"]
+    ServiceAccount["Service Account<br/>(Keycloak)"]
 
     User -->|Login| CSS
     CSS -->|JWT Token| User
     Frontend -->|Admin Request + JWT| Gateway[API Gateway]
     Gateway -->|Validate + Inject Headers| AdminAPI[Notify Admin API]
-    AdminAPI -->|Create Tenant<br/>Generate Credentials| APS[APS Management API]
+    AdminAPI -->|1. Get Service Token| ServiceAccount
+    AdminAPI -->|2. Create Tenant<br/>+Generate Credentials| APS[APS Management API]
 
     style Gateway fill:#ff9800
     style Frontend fill:#4CAF50
     style AdminAPI fill:#4CAF50
     style CSS fill:#9C27B0
+    style ServiceAccount fill:#9C27B0
     style APS fill:#ff9800
 ```
 
@@ -204,22 +207,27 @@ sequenceDiagram
     participant Frontend as "Frontend<br/>(Admin UI)"
     participant Gateway as "API Gateway"
     participant AdminAPI as "Notify Admin API"
+    participant Keycloak as "Keycloak<br/>(Service Account)"
     participant APS as "APS Management API"
 
     Admin->>Frontend: Create tenant/credentials request (with JWT)
     Frontend->>Gateway: Proxy request + JWT
     Gateway->>AdminAPI: Forward to Admin API
 
-    Note over AdminAPI: Create Consumer (one-time)
-    AdminAPI->>APS: mutation: createConsumer
+    Note over AdminAPI: Step 1: Get Service Account Token
+    AdminAPI->>Keycloak: POST /token<br/>grant_type: client_credentials<br/>client_id: notify-service
+    Keycloak-->>AdminAPI: {access_token: jwt}
+
+    Note over AdminAPI: Step 2: Create Consumer (one-time)
+    AdminAPI->>APS: mutation: createConsumer<br/>Authorization: Bearer [service token]
     APS-->>AdminAPI: {id: consumer-uuid}
 
-    Note over AdminAPI: Option A: Create API Key
-    AdminAPI->>APS: mutation: createApiKey(consumerId)
+    Note over AdminAPI: Step 3a: Create API Key
+    AdminAPI->>APS: mutation: createApiKey(consumerId)<br/>Authorization: Bearer [service token]
     APS-->>AdminAPI: {key: "notify_key_...", id: cred-id}
 
-    Note over AdminAPI: Option B: Create OAuth2 Credentials
-    AdminAPI->>APS: mutation: createOAuth2Credentials(consumerId)
+    Note over AdminAPI: Step 3b: Create OAuth2 Credentials
+    AdminAPI->>APS: mutation: createOAuth2Credentials(consumerId)<br/>Authorization: Bearer [service token]
     APS-->>AdminAPI: {client_id: "...", client_secret: "...", id: cred-id}
 
     AdminAPI-->>Gateway: Response (API Key OR OAuth2 Credentials)
