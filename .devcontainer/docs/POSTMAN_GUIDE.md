@@ -144,11 +144,11 @@ Example response:
 
 ## Environment Variables
 
-| Variable         | Default                 | Description                  |
-| ---------------- | ----------------------- | ---------------------------- |
-| `backend_url`    | `http://localhost:3001` | Direct backend (no auth)     |
-| `kong_url`       | `http://localhost:8000` | Kong gateway (requires auth) |
-| `tenant_api_key` | (empty)                 | Set after creating tenant    |
+| Variable          | Default                 | Description                  |
+| ----------------- | ----------------------- | ---------------------------- |
+| `backend_url`     | `http://localhost:3001` | Direct backend (no auth)     |
+| `api_gateway_url` | `http://localhost:8000` | Kong gateway (requires auth) |
+| `tenant_api_key`  | (empty)                 | Set after creating tenant    |
 
 ## Future Testing Scenarios
 
