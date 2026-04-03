@@ -58,15 +58,17 @@ curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
   --data-urlencode "config.hide_credentials=true" \
   2>/dev/null || echo "Key-auth plugin may already exist on email route"
 
-# Enable oauth2 plugin on email route (if not exists)
-echo "Enabling oauth2 plugin on email route..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  --data-urlencode "name=oauth2" \
-  --data-urlencode "config.scopes[]=notify" \
-  --data-urlencode "config.token_expiration=3600" \
-  --data-urlencode "config.enable_client_credentials=true" \
-  --data-urlencode "config.hide_credentials=true" \
-  2>/dev/null || echo "OAuth2 plugin may already exist on email route"
+# OAuth2 plugin on email route
+# NOTE: OAuth2 requires HTTPS and is disabled for local HTTP development.
+# To enable OAuth2 in production with HTTPS:
+#   curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
+#     --data-urlencode "name=oauth2" \
+#     --data-urlencode "config.scopes[]=notify" \
+#     --data-urlencode "config.token_expiration=3600" \
+#     --data-urlencode "config.enable_client_credentials=true" \
+#     --data-urlencode "config.hide_credentials=true"
+echo "⚠️  OAuth2 plugin disabled for local development (requires HTTPS)"
+echo "    OAuth2 will be enabled in production when deployed with HTTPS"
 
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
@@ -111,6 +113,22 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/jwt" \
   2>/dev/null || echo "JWT credential may already exist"
 echo "    JWT Secret A: $JWT_SECRET_A"
 
+# Create OAuth2 credentials for Tenant A (client credentials flow)
+echo "    Creating OAuth2 credentials for test-tenant-a"
+OAUTH2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/oauth2" \
+  --data-urlencode "client_id=test-client-a" \
+  --data-urlencode "client_secret=test-client-secret-a-12345678901234567890" \
+  --data-urlencode "redirect_uris=http://localhost:3000/callback" \
+  2>/dev/null)
+HTTP_CODE=$(echo "$OAUTH2_RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
+  echo "    OAuth2 credentials created successfully"
+  echo "    Client ID: test-client-a"
+  echo "    Client Secret: test-client-secret-a-12345678901234567890"
+else
+  echo "    OAuth2 credentials may already exist"
+fi
+
 # Tenant 2: Test Tenant B
 echo "  Creating tenant: test-tenant-b"
 CONSUMER_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
@@ -150,6 +168,14 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/jwt" \
   --data-urlencode "algorithm=HS256" \
   2>/dev/null || echo "JWT credential may already exist"
 echo "    JWT Secret B: $JWT_SECRET_B"
+
+# Create OAuth2 credentials for Tenant B
+echo "    Creating OAuth2 credentials for test-tenant-b"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/oauth2" \
+  --data-urlencode "client_id=test-client-b" \
+  --data-urlencode "client_secret=test-client-secret-b-98765432109876543210" \
+  --data-urlencode "redirect_uris=http://localhost:3000/callback" \
+  2>/dev/null || echo "OAuth2 credentials may already exist for test-tenant-b"
 
 # Tenant 3: Test Tenant C
 echo "  Creating tenant: test-tenant-c"
@@ -191,21 +217,54 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/jwt" \
   2>/dev/null || echo "JWT credential may already exist"
 echo "    JWT Secret C: $JWT_SECRET_C"
 
+# Create OAuth2 credentials for Tenant C
+echo "    Creating OAuth2 credentials for test-tenant-c"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/oauth2" \
+  --data-urlencode "client_id=test-client-c" \
+  --data-urlencode "client_secret=test-client-secret-c-11111111111111111111" \
+  --data-urlencode "redirect_uris=http://localhost:3000/callback" \
+  2>/dev/null || echo "OAuth2 credentials may already exist for test-tenant-c"
+
 echo ""
 echo "✅ Kong seeding complete!"
 echo ""
-echo "Test credentials (API Key Flow):"
-echo "  Tenant A: username=test-tenant-a, api_key=test-api-key-a-12345678901234567890"
-echo "  Tenant B: username=test-tenant-b, api_key=test-api-key-b-98765432109876543210"
-echo "  Tenant C: username=test-tenant-c, api_key=test-api-key-c-11111111111111111111"
+echo "═══════════════════════════════════════════════════════════════"
+echo "AUTHENTICATION METHODS - LOCAL DEVELOPMENT"
+echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "Test credentials (JWT Flow):"
-echo "  Tenant A: key=test-tenant-a, secret=secret-key-for-tenant-a-do-not-use-in-production"
-echo "  Tenant B: key=test-tenant-b, secret=secret-key-for-tenant-b-do-not-use-in-production"
-echo "  Tenant C: key=test-tenant-c, secret=secret-key-for-tenant-c-do-not-use-in-production"
+echo "✅ API Key Authentication (LOCAL)"
+echo "   Enabled in local HTTP environment"
+echo "   Test credentials:"
+echo "     Tenant A: api_key=test-api-key-a-12345678901234567890"
+echo "     Tenant B: api_key=test-api-key-b-98765432109876543210"
+echo "     Tenant C: api_key=test-api-key-c-11111111111111111111"
 echo ""
-echo "Test a request (API Key):"
-echo "  curl -H 'apikey: test-api-key-a-12345678901234567890' http://localhost:8000/api/health"
+echo "ℹ️  JWT Authentication (Keycloak APS Realm)"
+echo "   Used for admin operations (tenant creation, etc.)"
+echo "   Generates tokens from: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token"
+echo "   See Postman collection for setup"
 echo ""
-echo "Test a request (JWT):"
-echo "  See Postman collection for JWT generation and testing"
+echo "❌ OAuth2 Client Credentials (LOCAL)"
+echo "   DISABLED for local HTTP development (requires HTTPS)"
+echo "   Will be enabled in production with HTTPS"
+echo "   Credentials are created in Kong and ready for production:"
+echo "     Tenant A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890"
+echo "     Tenant B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210"
+echo "     Tenant C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111"
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "QUICK START EXAMPLES"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "🔑 Test API Key Authentication:"
+echo "  curl -X POST http://localhost:8000/api/v1/email/send \\"
+echo "    -H 'x-api-key: test-api-key-a-12345678901234567890' \\"
+echo "    -H 'Content-Type: application/json' \\"
+echo "    -d '{\"to\":\"user@example.com\",\"subject\":\"Test\",\"body\":\"Test body\"}'"
+echo ""
+echo "🔑 Test via Postman:"
+echo "  1. Open .devcontainer/postman/api-gateway-postman-collection.json"
+echo "  2. Use 'Send Email (API Key)' request"
+echo "  3. Load .devcontainer/postman/.env.postman.local.json as environment"
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
