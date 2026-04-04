@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "a098a788-f8c1-46ff-9f04-4298c99b7822",
-    "name": "API Gateway Auth Testing - API Key & JWT",
-    "description": "Collection for testing Kong API Gateway with two authentication flows:\n\n## Authentication Flows\n\n### 1. API Flow (Service-to-Service)\n- Used for backend services, admin tools, or service accounts\n- Tenant credentials managed via Kong API key plugin\n- Simple header-based authentication\n\n### 2. JWT Flow (User/Frontend)\n- Used for end-user authentication (CSS SSO)\n- Browser frontend logs in via SSO → receives JWT\n- Frontend sends JWT with requests → Kong validates signature\n- Perfect for public apps with user authentication\n\n## Setup Instructions\n\n1. Run Kong seed script: `docker-compose up kong-migrations && docker-compose up kong`\n2. Choose authentication method below\n3. Run appropriate requests\n\n## Test Credentials\n\n**API Key Method:**\n- API Key: `test-api-key-a-12345678901234567890`\n\n**JWT Method:**\n- Key: `test-tenant-a`\n- Secret: `secret-key-for-tenant-a-do-not-use-in-production`\n- Use the \"Generate JWT\" request to create tokens\n",
+    "name": "Kong API Gateway - Consumer Management (Service Account)",
+    "description": "Collection for managing Kong API Gateway consumers using the BC Government central API Gateway with service account authentication.\n\n## Architecture\n\nThis collection uses the **Kong Gateway REST API** (not GraphQL) to manage consumers/tenants in the BC Gov API Gateway. This is the official, documented way to manage gateway resources.\n\n## Authentication\n\nAll requests use **Service Account credentials** (OAuth2 Client Credentials Grant):\n1. Service accounts provide backend-to-backend authentication\n2. Use service account credentials to get an access token\n3. Token is used in Bearer header for all Kong API requests\n4. Credentials must have at least `GatewayConfig.Publish` scope\n\n## Required Environment Variables\n\n- `api_gateway_client_id`: sa-gw-fe8c5-ca853245-4596dd67c09f\n- `api_gateway_client_secret`: (your service account secret)\n- `api_gateway_namespace`: ns.gw-fe8c5 (target gateway namespace)\n\n## Workflow\n\n1. **Get Service Account Token** \n   - Run: \"Get API Gateway Client Credentials Token\"\n   - Returns: {{api_gateway_token}} (valid for ~1 hour)\n\n2. **Create a Consumer**\n   - Run: \"Create Consumer (Kong REST API)\"\n   - Returns: Consumer ID and username in environment variables\n\n3. **Create API Key for Consumer**\n   - Run: \"Create Consumer API Key (Kong REST API)\"\n   - Returns: API key (save immediately, cannot be retrieved again)\n\n4. **Optional: Manage Consumer**\n   - Get consumer details: \"Get Consumer Details\"\n   - Delete consumer: \"Delete Consumer\"\n\n## API Documentation\n\n- **Kong Gateway API (PROD)**: https://gwa.api.gov.bc.ca/docs/v2/openapi.yaml\n- **Kong Gateway API (TEST)**: https://gwa-api-gov-bc-ca.test.api.gov.bc.ca/docs/v2/openapi.yaml\n\n## Notes\n\n- API keys are shown only once - save immediately if needed\n- Consumers follow Kong's standard model\n- Use generated API key in subsequent API calls for authentication\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "9083839"
   },
@@ -730,10 +730,245 @@
       "response": []
     },
     {
-      "name": "New Request",
+      "name": "Create Consumer (Kong REST API)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Verify token is available",
+              "const token = pm.environment.get('api_gateway_token');",
+              "if (!token) {",
+              "    throw new Error('API Gateway token not found. Run \"Get API Gateway Client Credentials Token\" first');",
+              "}",
+              "console.log('✅ Using service account token for Kong API');"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200 || pm.response.code === 201) {",
+              "    const jsonData = pm.response.json();",
+              "    if (jsonData.id) {",
+              "        pm.environment.set('created_consumer_id', jsonData.id);",
+              "        pm.environment.set('created_consumer_username', jsonData.username);",
+              "    }",
+              "    pm.test('✅ Consumer created', function() {",
+              "        pm.expect(jsonData.id || jsonData.username).to.exist;",
+              "    });",
+              "    console.log('✅ Consumer created: ' + (jsonData.username || jsonData.id));",
+              "} else if (pm.response.code === 409) {",
+              "    pm.test('Consumer already exists', function() {",
+              "        pm.expect.fail('Consumer already exists (409)');",
+              "    });",
+              "} else {",
+              "    const errorBody = pm.response.text();",
+              "    pm.test('Create consumer failed', function() {",
+              "        pm.expect.fail('Failed to create consumer: ' + pm.response.status + ' ' + errorBody);",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_gateway_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"test-consumer-{{$timestamp}}\"\n}"
+        },
+        "url": "{{kong_gateway_api_url}}/v2/gateways/{{api_gateway_namespace}}/consumers/test-consumer-{{$timestamp}}",
+        "description": "Create a new consumer/tenant in the Kong API Gateway using service account credentials.\n\n**Prerequisites:**\n1. Run \"Get API Gateway Client Credentials Token\" first to get {{api_gateway_token}}\n2. Service account must have GatewayConfig.Publish scope\n\n**How it works:**\nThis uses the Kong Gateway API to create a consumer. The consumer username is auto-generated with timestamp to ensure uniqueness.\n\n**Response:**\nReturns the created consumer object with ID and username, which are saved to environment variables:\n- `created_consumer_id`: The consumer ID (needed for credential creation)\n- `created_consumer_username`: The consumer username\n\n**Next steps:**\n1. Create credentials/API key using \"Create Consumer API Key (Kong REST API)\"\n\n**Note:**\nThe username in the URL and body can be customized. The {{$timestamp}} variable ensures uniqueness for testing."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Consumer API Key (Kong REST API)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Verify token and consumer username are available",
+              "const token = pm.environment.get('api_gateway_token');",
+              "const consumerUsername = pm.environment.get('created_consumer_username');",
+              "",
+              "if (!token) {",
+              "    throw new Error('API Gateway token not found. Run \"Get API Gateway Client Credentials Token\" first');",
+              "}",
+              "",
+              "if (!consumerUsername) {",
+              "    throw new Error('Consumer username not found. Run \"Create Consumer (Kong REST API)\" first');",
+              "}",
+              "",
+              "console.log('✅ Token and consumer available');"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200 || pm.response.code === 201) {",
+              "    const jsonData = pm.response.json();",
+              "    if (jsonData.key || jsonData.id) {",
+              "        if (jsonData.key) {",
+              "            pm.environment.set('created_api_key', jsonData.key);",
+              "        }",
+              "        if (jsonData.id) {",
+              "            pm.environment.set('created_api_key_id', jsonData.id);",
+              "        }",
+              "    }",
+              "    pm.test('✅ API Key created', function() {",
+              "        pm.expect(jsonData.key || jsonData.id).to.exist;",
+              "    });",
+              "    console.log('✅ API Key created');",
+              "    if (jsonData.key) {",
+              "        console.log('⚠️  Save this KEY immediately - cannot be retrieved later:');",
+              "        console.log(jsonData.key);",
+              "    }",
+              "} else {",
+              "    const errorBody = pm.response.text();",
+              "    pm.test('Create API key failed', function() {",
+              "        pm.expect.fail('Failed to create API key: ' + pm.response.status + ' ' + errorBody);",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_gateway_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": "{{kong_gateway_api_url}}/v2/gateways/{{api_gateway_namespace}}/consumers/{{created_consumer_username}}/key-auth",
+        "description": "Create an API key credential for a consumer in the Kong API Gateway.\n\n**Prerequisites:**\n1. Run \"Get API Gateway Client Credentials Token\" first\n2. Run \"Create Consumer (Kong REST API)\" to create a consumer\n\n**How it works:**\nThis creates a key-auth credential for the consumer, allowing them to authenticate using an API key in the `apikey` request header.\n\n**Response:**\nReturns credential details including the API key (if applicable for key-auth plugin).\n\n**Important:**\n- ⚠️  API key is shown only once in the response\n- Save it immediately  - cannot be retrieved later\n- Use the key in subsequent API requests as: `header: apikey: <key_value>`\n\n**Usage in API Requests:**\nOnce you have the API key, use it in the Authorization or custom header:\n```\nAuthorization: apikey {{created_api_key}}\n```\nor\n```\napikey: {{created_api_key}}\n```\n\nDepending on your Kong configuration."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Consumer Details",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const token = pm.environment.get('api_gateway_token');",
+              "const consumerUsername = pm.environment.get('created_consumer_username');",
+              "",
+              "if (!token) {",
+              "    throw new Error('API Gateway token not found. Run \"Get API Gateway Client Credentials Token\" first');",
+              "}",
+              "",
+              "if (!consumerUsername) {",
+              "    throw new Error('Consumer username not found. Run \"Create Consumer (Kong REST API)\" first');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
       "request": {
         "method": "GET",
-        "header": []
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_gateway_token}}",
+            "type": "text"
+          }
+        ],
+        "url": "{{kong_gateway_api_url}}/v2/gateways/{{api_gateway_namespace}}/consumers/{{created_consumer_username}}",
+        "description": "Retrieve details about a consumer from the Kong API Gateway.\n\n**Prerequisites:**\n1. Run \"Get API Gateway Client Credentials Token\" first\n2. Run \"Create Consumer (Kong REST API)\" to create a consumer\n\n**How it works:**\nFetches the consumer object with all its associated credentials and details.\n\n**Response:**\nReturns consumer details including:\n- id: Consumer ID  \n- username: Consumer username\n- custom_id: Optional custom identifier\n- created_at: Creation timestamp"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Consumer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const token = pm.environment.get('api_gateway_token');",
+              "const consumerUsername = pm.environment.get('created_consumer_username');",
+              "",
+              "if (!token) {",
+              "    throw new Error('API Gateway token not found. Run \"Get API Gateway Client Credentials Token\" first');",
+              "}",
+              "",
+              "if (!consumerUsername) {",
+              "    throw new Error('Consumer username not found. Run \"Create Consumer (Kong REST API)\" first');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 204) {",
+              "    pm.test('✅ Consumer deleted', function() {",
+              "        pm.expect(pm.response.status).to.equal('No Content');",
+              "    });",
+              "    console.log('✅ Consumer deleted');",
+              "} else if (pm.response.code === 404) {",
+              "    pm.test('Consumer not found', function() {",
+              "        pm.expect.fail('Consumer not found (404)');",
+              "    });",
+              "} else {",
+              "    pm.test('Delete consumer failed', function() {",
+              "        pm.expect.fail('Failed to delete consumer: ' + pm.response.status);",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_gateway_token}}",
+            "type": "text"
+          }
+        ],
+        "url": "{{kong_gateway_api_url}}/v2/gateways/{{api_gateway_namespace}}/consumers/{{created_consumer_username}}",
+        "description": "Delete a consumer from the Kong API Gateway.\n\n**Prerequisites:**\n1. Run \"Get API Gateway Client Credentials Token\" first\n2. Run \"Create Consumer (Kong REST API)\" to create a consumer\n\n**How it works:**\nDeletes the consumer and all its associated credentials.\n\n**Warning:**\n⚠️  This operation is irreversible. All credentials for this consumer will be deleted.\n\n**Response:**\nReturns HTTP 204 No Content on success."
       },
       "response": []
     }
