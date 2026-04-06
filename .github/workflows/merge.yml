@@ -52,7 +52,7 @@ jobs:
         uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
         with:
           oc_namespace: f6bc3f-tools
-          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
           oc_server: ${{ vars.oc_server }}
           commands: |
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev ${{ matrix.package }}:dev --source=docker --reference-policy=local
