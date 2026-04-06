@@ -4,6 +4,7 @@ import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 import { KongService } from '../../shared/kong/kong.service'
+import { ApiGatewayService } from '../../shared/api-gateway/api-gateway.service'
 
 @Injectable()
 export class TenantsService {
@@ -13,10 +14,13 @@ export class TenantsService {
     @InjectRepository(Tenant)
     private tenantRepository: Repository<Tenant>,
     private kongService: KongService,
+    private apiGatewayService: ApiGatewayService,
   ) {}
 
   /**
-   * Create a new tenant and register it with Kong
+   * Create a new tenant and register it with Kong and/or API Gateway
+   * In local environment: creates consumer in Kong only
+   * In dev/test/prod: creates consumer in Kong AND registers with API Gateway GraphQL
    * @param createTenantDto Tenant creation data
    * @returns Tenant and generated API key
    */
@@ -30,15 +34,30 @@ export class TenantsService {
     }
 
     try {
-      // Create consumer in Kong
+      // Step 1: Create consumer in Kong (always, as Kong is the actual gateway)
       const consumer = await this.kongService.ensureConsumer(name, name)
       this.logger.log(`Created Kong consumer for tenant: ${name} (consumer_id: ${consumer.id})`)
 
-      // Create API key in Kong
+      // Step 2: If in dev/test/prod, also register consumer with API Gateway GraphQL
+      if (this.apiGatewayService.isUsingGraphQL()) {
+        try {
+          await this.apiGatewayService.createConsumer(name, name)
+          this.logger.log(`Registered consumer in API Gateway: ${name}`)
+
+          // Link consumer to the correct namespace in API Gateway
+          await this.apiGatewayService.linkConsumerToNamespace(name)
+          this.logger.log(`Linked consumer ${name} to API Gateway namespace`)
+        } catch (error) {
+          this.logger.error(`Warning: Failed to register consumer in API Gateway: ${error}`)
+          // Don't fail the whole tenant creation - Kong is the primary gateway
+        }
+      }
+
+      // Step 3: Create API key in Kong
       const credential = await this.kongService.createApiKey(name)
       const apiKey = credential.key
 
-      // Store tenant metadata in database
+      // Step 4: Store tenant metadata in database
       const tenant = this.tenantRepository.create({
         name,
         description,
@@ -51,12 +70,14 @@ export class TenantsService {
       })
 
       const savedTenant = await this.tenantRepository.save(tenant)
-      this.logger.log(`Created tenant: ${name} (id: ${savedTenant.id})`)
+      this.logger.log(
+        `Created tenant: ${name} (id: ${savedTenant.id}, environment: ${this.apiGatewayService.getEnvironment()})`,
+      )
 
       return {
         tenant: savedTenant,
         apiKey,
-        note: 'Store this key securely. It cannot be retrieved later. Use it in the `apikey` header when calling the API.',
+        note: 'Store this key securely. It cannot be retrieved later. Use it in the `x-api-key` header when calling the API.',
       }
     } catch (error) {
       this.logger.error(`Error creating tenant: ${error}`)

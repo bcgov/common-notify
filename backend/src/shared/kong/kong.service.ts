@@ -39,7 +39,7 @@ export class KongService {
   private readonly kongAdminUrl: string
 
   constructor(private configService: ConfigService) {
-    this.kongAdminUrl = this.configService.get('KONG_ADMIN_URL') || 'http://localhost:8001'
+    this.kongAdminUrl = this.configService.get('KONG_ADMIN_URL') || 'http://kong:8001'
   }
 
   /**
