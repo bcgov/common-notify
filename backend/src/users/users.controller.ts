@@ -15,9 +15,9 @@ import { UsersService } from './users.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { UserDto } from './dto/user.dto'
-import { AuthJwtGuard } from 'src/auth/auth.jwt-guard'
-import { RoleGuard } from 'src/auth/role.guard'
-import { Roles } from 'src/auth/decorators/roles.decorator'
+import { AuthJwtGuard } from '../auth/guards/auth.jwt-guard'
+import { RoleGuard } from 'src/common/guards/role.guard'
+import { Roles } from 'src/common/decorators/roles.decorator'
 import { Role } from 'src/enum/role.enum'
 
 @ApiTags('users')

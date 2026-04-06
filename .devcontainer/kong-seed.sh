@@ -37,8 +37,67 @@ if [ -z "$ADMIN_ROUTE" ]; then
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create email route with key-auth and oauth2
-echo "Setting up email route with key-auth and oauth2..."
+# Enable JWT plugin on admin route (if not exists)
+echo "Enabling JWT plugin on admin route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$ADMIN_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.algorithm=RS256" \
+  --data-urlencode "config.jwks_uri=$JWKS_URI" \
+  --data-urlencode "config.issuer=$JWT_ISSUER" \
+  --data-urlencode "config.audience=$KEYCLOAK_CLIENT_ID" \
+  2>/dev/null || echo "JWT plugin may already exist on admin route"
+
+# Users module is part of the template, it is being used to test api gateway routing
+# Remove this when users module is deleted
+# Create users route with JWT (if not exists)
+echo "Setting up users route with JWT authentication..."
+USERS_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-users-route" \
+  --data-urlencode "paths[]=/api/v1/users" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$USERS_ROUTE" ]; then
+  echo "  Users route may already exist, fetching..."
+  USERS_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-users-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Enable JWT plugin on users route (if not exists)
+echo "Enabling JWT plugin on users route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$USERS_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.algorithm=RS256" \
+  --data-urlencode "config.jwks_uri=$JWKS_URI" \
+  --data-urlencode "config.issuer=$JWT_ISSUER" \
+  --data-urlencode "config.audience=$KEYCLOAK_CLIENT_ID" \
+  2>/dev/null || echo "JWT plugin may already exist on users route"
+
+# users routes end
+
+# Create ches route with key-auth (if not exists)
+echo "Setting up ches route with key-auth authentication..."
+CHES_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-route" \
+  --data-urlencode "paths[]=/api/v1/ches" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_ROUTE" ]; then
+  echo "  Ches route may already exist, fetching..."
+  CHES_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Enable key-auth plugin on ches route (if not exists)
+echo "Enabling key-auth plugin on ches route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_ROUTE/plugins" \
+  --data-urlencode "name=key-auth" \
+  --data-urlencode "config.key_names[]=x-api-key" \
+  --data-urlencode "config.key_in_body=false" \
+  --data-urlencode "config.hide_credentials=true" \
+  2>/dev/null || echo "Key-auth plugin may already exist on ches route"
+
+# Create email route with key-auth (if not exists)
+echo "Setting up email route with key-auth authentication..."
 EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-email-route" \
   --data-urlencode "paths[]=/api/v1/email" \
