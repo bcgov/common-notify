@@ -176,7 +176,8 @@ jobs:
             # print the values.yaml file to see the values being used
             # Helm upgrade/rollout
             helm upgrade \
-              --set-string global.repository=${{ github.repository }} \
+              --set-string global.registry="image-registry.apps.silver.devops.gov.bc.ca" \
+              --set-string global.repository="${{ secrets.oc_namespace }}-tools" \
               --set-string global.tag="${{ steps.vars.outputs.tag }}" \
               --set-string global.config.databaseUser="${{ inputs.db_user }}" \
               --set-string global.databaseAlias="${{ steps.deploy_crunchy.outputs.release }}-crunchy" \
