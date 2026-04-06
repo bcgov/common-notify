@@ -62,8 +62,8 @@ jobs:
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
       environment: DEV
       db_user: appproxy # appproxy is the user which works with pgbouncer.
@@ -71,15 +71,15 @@ jobs:
 
   # deploy-test:
   #   name: Deploy (TEST)
-  #   environment: TEST
+  #   needs: [import]
   #   uses: ./.github/workflows/.deployer.yml
   #   secrets:
-  #     oc_namespace: ${{ secrets.OC_NAMESPACE }}
-  #     oc_token: ${{ secrets.OC_TOKEN }}
+  #     oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
+  #     oc_token: ${{ secrets.OC_TEST_TOKEN }}
   #   with:
   #     environment: TEST
   #     db_user: appproxy # appproxy is the user which works with pgbouncer.
-  #     tag: ${{ inputs.tag }}
+  #     tag: test
 
   # tests:
   #   name: Tests
@@ -92,7 +92,9 @@ jobs:
   #   name: Deploy (PROD)
   #   needs: [tests]
   #   uses: ./.github/workflows/.deployer.yml
-  #   secrets: inherit
+  #   secrets:
+  #     oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
+  #     oc_token: ${{ secrets.OC_PROD_TOKEN }}
   #   with:
   #     environment: PROD
   #     db_user: appproxy # appproxy is the user which works with pgbouncer.
@@ -102,7 +104,7 @@ jobs:
   #       --set global.autoscaling=true
   #       --set frontend.pdb.enabled=true
   #       --set backend.pdb.enabled=true
-  #     tag: ${{ inputs.tag }}
+  #     tag: prod
 
   # promote:
   #   name: Promote Images
