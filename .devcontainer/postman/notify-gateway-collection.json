@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "Notify Gateway API",
+    "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get JWT Token (Client Credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('jwt_token', jsonData.access_token);",
+                  "    pm.environment.set('token_expires_in', jsonData.expires_in || 3600);",
+                  "    pm.test('JWT Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ JWT Token saved to {{jwt_token}}');",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "} else {",
+                  "    pm.test('Failed to get JWT token', function() {",
+                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{client_secret}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "{{keycloak_realm}}", "protocol", "openid-connect", "token"]
+            },
+            "description": "Get a JWT access token from Keycloak using client credentials flow.\n\n**Setup Required:**\n1. Set environment variables in .env.notify-dev.json:\n   - `client_id`: Your OAuth2 client ID\n   - `client_secret`: Your OAuth2 client secret\n\n2. Run this request to obtain a JWT token\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "API Endpoints",
+      "item": [
+        {
+          "name": "Send Email (CHES)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"to\": [\n    \"{{recipient_email}}\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Test Email\",\n  \"body\": \"<h1>Hello</h1><p>This is a test email.</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"UTF-8\",\n  \"priority\": \"normal\",\n  \"attachments\": [\n    {\n      \"content\": \"string\",\n      \"contentType\": \"application/octet-stream\",\n      \"filename\": \"document.pdf\",\n      \"disposition\": \"attachment\"\n    }\n  ],\n  \"tag\": \"test\",\n  \"delayTs\": null,\n  \"mergeData\": {}\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/ches/api/v1/email",
+              "host": ["{{gateway_url}}"],
+              "path": ["ches", "api", "v1", "email"]
+            },
+            "description": "Send an email via the CHES (Common Hosted Email Service) API.\n\n**Prerequisites:**\n1. Run \"Get JWT Token\" first to obtain a token\n2. Token will be automatically used in Authorization header\n\n**CHESMessage Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\" (default: \"text\")\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\" (default: \"normal\")\n- `attachments`: Array of attachment objects (optional)\n  - `content`: Base64-encoded file content\n  - `contentType`: MIME type (e.g., \"application/pdf\")\n  - `filename`: Original filename\n  - `disposition`: \"attachment\" or \"inline\"\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional, null = send immediately)\n- `mergeData`: Object for template variable substitution (optional)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "https://gw-fe8c5-notify.dev.api.gov.bc.ca",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_url",
+      "value": "https://dev.loginproxy.gov.bc.ca/auth",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_realm",
+      "value": "apigw",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recipient_email",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
