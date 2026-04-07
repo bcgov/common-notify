@@ -12,6 +12,7 @@ import { AppService } from './app.service'
 import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
+import { RootOAuth2Controller } from './root-oauth2.controller'
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { HealthController } from './health.controller'
     AdminModule,
     ApiModule,
   ],
-  controllers: [AppController, MetricsController, HealthController],
+  controllers: [AppController, MetricsController, HealthController, RootOAuth2Controller],
   providers: [AppService],
 })
 export class AppModule {
