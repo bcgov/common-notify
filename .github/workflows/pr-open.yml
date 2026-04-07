@@ -34,8 +34,8 @@ jobs:
     needs: [builds]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
       db_user: app-${{ github.event.number }}
       params: --set global.secrets.persist=false

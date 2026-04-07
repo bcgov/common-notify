@@ -175,9 +175,12 @@ jobs:
             helm package -u . --app-version="tag-${{ steps.vars.outputs.tag }}_run-${{ github.run_number }}" --version=${{ steps.pr.outputs.pr || steps.vars.outputs.version }}
             # print the values.yaml file to see the values being used
             # Helm upgrade/rollout
+            # Extract license plate from namespace (e.g., f6bc3f-dev -> f6bc3f)
+            LICENSE_PLATE=$(echo "${{ secrets.oc_namespace }}" | cut -d'-' -f1)
+
             helm upgrade \
               --set-string global.registry="image-registry.apps.silver.devops.gov.bc.ca" \
-              --set-string global.repository="${{ secrets.oc_namespace }}-tools" \
+              --set-string global.repository="${LICENSE_PLATE}-tools" \
               --set-string global.tag="${{ steps.vars.outputs.tag }}" \
               --set-string global.config.databaseUser="${{ inputs.db_user }}" \
               --set-string global.databaseAlias="${{ steps.deploy_crunchy.outputs.release }}-crunchy" \
