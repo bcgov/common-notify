@@ -84,7 +84,9 @@ export class KongService {
    */
   async getConsumer(username: string): Promise<KongConsumer | null> {
     try {
-      const response = await fetch(`${this.kongAdminUrl}/consumers/${username}`)
+      const response = await fetch(
+        `${this.kongAdminUrl}/consumers/${encodeURIComponent(username)}`,
+      )
 
       if (response.status === 404) {
         return null
