@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { VersioningType } from '@nestjs/common'
 import { metricsMiddleware } from 'src/middleware/prom'
+import bodyParser from 'body-parser'
 
 /**
  *
@@ -14,6 +15,11 @@ export async function bootstrap() {
   const app: NestExpressApplication = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: customLogger,
   })
+
+  // Add body parsers for form data
+  app.use(bodyParser.urlencoded({ extended: true }))
+  app.use(bodyParser.json())
+
   app.use(helmet())
   app.enableCors()
   app.set('trust proxy', 1)
