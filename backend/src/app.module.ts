@@ -13,6 +13,7 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ChesModule } from './ches/ches.module'
+import { RootOAuth2Controller } from './root-oauth2.controller'
 import configuration from './config/configuration'
 
 @Module({
@@ -30,7 +31,7 @@ import configuration from './config/configuration'
     AuthModule,
     ChesModule,
   ],
-  controllers: [AppController, MetricsController, HealthController],
+  controllers: [AppController, MetricsController, HealthController, RootOAuth2Controller],
   providers: [AppService],
 })
 export class AppModule {

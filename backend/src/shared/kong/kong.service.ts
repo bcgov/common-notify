@@ -84,7 +84,9 @@ export class KongService {
    */
   async getConsumer(username: string): Promise<KongConsumer | null> {
     try {
-      const response = await fetch(`${this.kongAdminUrl}/consumers/${username}`)
+      const response = await fetch(
+        `${this.kongAdminUrl}/consumers/${encodeURIComponent(username)}`,
+      )
 
       if (response.status === 404) {
         return null
@@ -192,8 +194,9 @@ export class KongService {
    */
   async deleteApiKey(consumerUsername: string, keyId: string): Promise<void> {
     try {
+      const safeKeyId = encodeURIComponent(keyId)
       const response = await fetch(
-        `${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth/${keyId}`,
+        `${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth/${safeKeyId}`,
         { method: 'DELETE' },
       )
 

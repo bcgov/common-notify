@@ -215,6 +215,13 @@ export class TenantsService {
    * @param keyId API key ID
    */
   async revokeApiKey(tenantId: number, keyId: string): Promise<void> {
+    // Validate keyId to prevent path traversal or injection into Kong Admin URL
+    // Accept only URL-safe credential IDs (alphanumeric, underscore, hyphen)
+    const KEY_ID_REGEX = /^[A-Za-z0-9_-]+$/
+    if (!KEY_ID_REGEX.test(keyId)) {
+      throw new BadRequestException('Invalid API key identifier')
+    }
+
     const tenant = await this.findOne(tenantId)
     if (!tenant) {
       throw new NotFoundException(`Tenant with id ${tenantId} not found`)

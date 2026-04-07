@@ -442,22 +442,24 @@
           "response": []
         },
         {
-          "name": "Get OAuth2 Token (Client Credentials)",
+          "name": "Get OAuth2 Token (Client Credentials - Kong Proxy)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "if (pm.response.code === 200) {",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
                   "    const jsonData = pm.response.json();",
                   "    pm.environment.set('oauth_bearer_token', jsonData.access_token);",
+                  "    pm.environment.set('oauth_token_expires_in', jsonData.expires_in || 3600);",
                   "    pm.test('OAuth2 Token obtained successfully', function() {",
                   "        pm.expect(jsonData.access_token).to.exist;",
                   "    });",
                   "    console.log('✅ OAuth2 Bearer token saved to {{oauth_bearer_token}}');",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
                   "} else {",
                   "    pm.test('Failed to get OAuth2 token', function() {",
-                  "        pm.expect.fail('Could not obtain token from Kong: ' + pm.response.status);",
+                  "        pm.expect.fail('Could not obtain token from Kong OAuth2 endpoint: ' + pm.response.status + ' - ' + pm.response.text());",
                   "    });",
                   "}"
                 ],
@@ -477,17 +479,12 @@
                 "key": "X-Forwarded-Proto",
                 "value": "https",
                 "type": "text",
-                "description": "Tell Kong to treat HTTP connection as HTTPS (required for OAuth2 in local dev)"
+                "description": "Tell Kong this is an HTTPS request (required for OAuth2 plugin)"
               }
             ],
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                {
-                  "key": "grant_type",
-                  "value": "client_credentials",
-                  "type": "text"
-                },
                 {
                   "key": "client_id",
                   "value": "test-client-a",
@@ -499,6 +496,11 @@
                   "type": "text"
                 },
                 {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
                   "key": "scope",
                   "value": "notify",
                   "type": "text"
@@ -506,11 +508,13 @@
               ]
             },
             "url": {
-              "raw": "{{api_gateway_url}}/oauth2/token",
-              "host": ["{{api_gateway_url}}"],
+              "raw": "http://localhost:8000/oauth2/token",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
               "path": ["oauth2", "token"]
             },
-            "description": "Get an OAuth2 access token using client credentials grant flow.\n\n**Setup:**\n1. Kong's OAuth2 plugin provides the `/oauth2/token` endpoint\n2. Send your client_id and client_secret\n3. Kong validates credentials and returns an access_token\n\n**Flow:**\n1. Client sends client_id + client_secret to Kong's OAuth2 endpoint\n2. Kong validates credentials against registered OAuth2 app\n3. Kong returns access_token (JWT or opaque token)\n4. Client uses Bearer token in Authorization header for API calls\n5. Kong validates token and injects identity headers for backend\n\n**Default Test Credentials:**\n- Client ID: `test-client-a`\n- Client Secret: `test-client-secret-a-12345678901234567890`\n- Scope: `notify`\n\n**For other tenants:**\n- Tenant B: `test-client-b` / `test-client-secret-b-98765432109876543210`\n- Tenant C: `test-client-c` / `test-client-secret-c-11111111111111111111`"
+            "description": "Generate an OAuth2 access token using Kong's OAuth2 client credentials grant flow.\n\n**How it works:**\n1. This uses Kong's OAuth2 token endpoint (port 8000, the proxy)\n2. Send your client_id and client_secret\n3. Kong validates credentials against registered OAuth2 credentials\n4. Kong returns an access_token\n5. Use this token for API requests in the Authorization header\n\n**Flow:**\n1. Client sends client_id + client_secret + grant_type to Kong's token endpoint\n2. Kong validates credentials against OAuth2 app (registered consumer credentials)\n3. Kong returns access_token + expires_in\n4. Client uses token for API calls: `Authorization: Bearer <access_token>`\n5. Kong validates token and injects identity headers for backend\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client ID: `test-client-a`\n- Client Secret: `test-client-secret-a-12345678901234567890`\n- Grant Type: `client_credentials`\n- Scope: `notify`\n\n**Usage:**\n1. Modify client_id and client_secret in body if testing different tenants\n2. Run this request to get an access_token\n3. The token is automatically saved to {{oauth_bearer_token}}\n4. Use the token in \\\"Send Email (OAuth2 Bearer Token)\\\" request\n\n**For other tenants:**\n- Tenant B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Tenant C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111"
           },
           "response": []
         },
