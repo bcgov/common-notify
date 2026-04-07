@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import type { MiddlewareConsumer } from '@nestjs/common'
 import { Module, RequestMethod } from '@nestjs/common'
 import { HTTPLoggerMiddleware } from './middleware/req.res.logger'
@@ -14,10 +13,15 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ChesModule } from './ches/ches.module'
+import configuration from './config/configuration'
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '.env.local'],
+      load: [configuration],
+    }),
     TerminusModule,
     DatabaseModule,
     UsersModule,

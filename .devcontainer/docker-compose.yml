@@ -55,6 +55,11 @@ services:
       <<: *postgres-vars
       NODE_ENV: development
       KONG_ADMIN_URL: http://kong:8001
+      CHES_BASE_URL: ${CHES_BASE_URL}
+      CHES_TOKEN_URL: ${CHES_TOKEN_URL}
+      CHES_CLIENT_ID: ${CHES_CLIENT_ID}
+      CHES_CLIENT_SECRET: ${CHES_CLIENT_SECRET}
+      CHES_FROM: ${CHES_FROM}
     image: *node-image
     ports: ['3001:3000']
     healthcheck:

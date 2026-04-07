@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { passportJwtSecret } from 'jwks-rsa'
@@ -11,17 +12,17 @@ import { passportJwtSecret } from 'jwks-rsa'
 export class AuthJwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(AuthJwtStrategy.name)
 
-  constructor() {
+  constructor(config: ConfigService) {
     super({
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 5,
-        jwksUri: process.env.JWKS_URI,
+        jwksUri: config.get<string>('auth.jwksUri'),
       }),
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience: process.env.KEYCLOCK_CLIENT_ID,
-      issuer: process.env.JWT_ISSUER,
+      audience: config.get<string>('auth.keycloakClientId'),
+      issuer: config.get<string>('auth.jwtIssuer'),
       algorithms: ['RS256'],
     })
   }

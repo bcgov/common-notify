@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { AuthGuard } from '@nestjs/passport'
 
 @Injectable()
@@ -10,10 +11,14 @@ import { AuthGuard } from '@nestjs/passport'
 export class AuthJwtGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(AuthJwtGuard.name)
 
+  constructor(private readonly config: ConfigService) {
+    super()
+  }
+
   handleRequest(err, user, info) {
     if (err || !user) {
       this.logger.error(
-        `JWKS_URI ${process.env.JWKS_URI} JWT_ISSUER ${process.env.JWT_ISSUER} KEYCLOCK_CLIENT_ID ${process.env.KEYCLOCK_CLIENT_ID}`,
+        `JWKS_URI ${this.config.get('auth.jwksUri')} JWT_ISSUER ${this.config.get('auth.jwtIssuer')} KEYCLOAK_CLIENT_ID ${this.config.get('auth.keycloakClientId')}`,
       )
       this.logger.error(`JWT is not valid. Err: ${err}. User: ${user}. Info: ${info}`)
       throw err || new UnauthorizedException()
