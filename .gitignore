@@ -133,9 +133,7 @@ web_modules/
 .env.production.local
 .env.local
 .env.postman.*
-
-# API Gateway configuration files
-.api-gateway/gw-config-*.yaml
+.env.notify-dev.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
