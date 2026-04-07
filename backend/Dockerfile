@@ -4,8 +4,7 @@ FROM node:24.14.0-slim AS build
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
 COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm ci --ignore-scripts --no-update-notifier && npm run prisma-generate && npm run build
+RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
 FROM node:24.14.0-slim AS dependencies
@@ -13,7 +12,6 @@ FROM node:24.14.0-slim AS dependencies
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
 COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
 # Deploy using minimal Distroless image
