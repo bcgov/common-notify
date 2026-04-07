@@ -165,8 +165,9 @@ export class KongService {
    */
   async deleteApiKey(consumerUsername: string, keyId: string) {
     try {
+      const safeKeyId = encodeURIComponent(keyId)
       const response = await fetch(
-        `${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth/${keyId}`,
+        `${this.kongAdminUrl}/consumers/${consumerUsername}/key-auth/${safeKeyId}`,
         { method: 'DELETE' },
       )
 
