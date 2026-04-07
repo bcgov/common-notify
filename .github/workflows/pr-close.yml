@@ -18,8 +18,8 @@ jobs:
     permissions:
       packages: write
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
       cleanup: helm
       packages: backend frontend migrations
@@ -31,7 +31,7 @@ jobs:
       - uses: bcgov/action-crunchy@v1.2.6
         name: Remove PR Specific User
         with:
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_token: ${{ secrets.oc_token }}
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
           oc_server: ${{ vars.oc_server }}
           values_file: charts/crunchy/values.yml
