@@ -15,7 +15,10 @@ jobs:
   builds:
     name: Builds
     permissions:
+      contents: read
       packages: write
+      id-token: write
+      attestations: write
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -29,14 +32,32 @@ jobs:
           tag_fallback: latest
           triggers: ('${{ matrix.package }}/')
 
+  import:
+    name: Import to ImageStream
+    needs: [builds]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        package: [backend, frontend, migrations]
+    steps:
+      - name: Import image to OpenShift ImageStream
+        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        with:
+          oc_namespace: f6bc3f-tools
+          oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:${{ github.event.number }} ${{ matrix.package }}:${{ github.event.number }} --source=docker --reference-policy=local
+
   deploys:
     name: Deploys (${{ github.event.number }})
-    needs: [builds]
+    needs: [import]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
+      tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
       params: --set global.secrets.persist=false
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
