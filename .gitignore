@@ -133,6 +133,7 @@ web_modules/
 .env.production.local
 .env.local
 .env.postman.*
+.env.notify-dev.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
