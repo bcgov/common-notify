@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { SendEmailDto } from './dto/send-email.dto'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
 export interface EmailResponse {
@@ -10,6 +9,19 @@ export interface EmailResponse {
   timestamp: Date
   tenantId?: number
   tenantName?: string
+}
+
+/**
+ * Generic email message interface
+ */
+export interface EmailMessage {
+  from?: string
+  to: string | string[]
+  subject: string
+  body: string
+  cc?: string | string[]
+  bcc?: string | string[]
+  [key: string]: any
 }
 
 /**
@@ -24,27 +36,31 @@ export class EmailService {
 
   /**
    * Send an email
-   * @param sendEmailDto Email details
+   * @param emailMessage Email details
    * @param tenant The authenticated tenant making the request
-   * @param kongConsumerId Kong's consumer ID for the tenant
+   * @param kongConsumerId Kong's consumer ID for the tenant (optional)
    * @returns Email response with status and tenant info
    */
   async sendEmail(
-    sendEmailDto: SendEmailDto,
+    emailMessage: EmailMessage,
     tenant: Tenant,
-    kongConsumerId: string,
+    kongConsumerId: string = '',
   ): Promise<EmailResponse> {
-    const { to, subject, body, cc, bcc } = sendEmailDto
-    this.logger.log(
-      `[Tenant: ${tenant.name} (DB ID: ${tenant.id}, Kong ID: ${kongConsumerId})] Sending email to: ${to}, subject: ${subject}`,
-    )
+    const to = Array.isArray(emailMessage.to) ? emailMessage.to[0] : emailMessage.to
+    const { subject, body, cc, bcc } = emailMessage
+
+    const tenantInfo = kongConsumerId
+      ? `[Tenant: ${tenant.name} (DB ID: ${tenant.id}, Kong ID: ${kongConsumerId})]`
+      : `[Tenant: ${tenant.name} (DB ID: ${tenant.id})]`
+
+    this.logger.log(`${tenantInfo} Sending email to: ${to}, subject: ${subject}`)
     if (cc) {
-      this.logger.log(`[Tenant: ${tenant.name} (Kong ID: ${kongConsumerId})] CC: ${cc}`)
+      this.logger.log(`${tenantInfo} CC: ${cc}`)
     }
     if (bcc) {
-      this.logger.log(`[Tenant: ${tenant.name} (Kong ID: ${kongConsumerId})] BCC: ${bcc}`)
+      this.logger.log(`${tenantInfo} BCC: ${bcc}`)
     }
-    this.logger.debug(`[Tenant: ${tenant.name}] Body: ${body}`)
+    this.logger.debug(`${tenantInfo} Body: ${body}`)
 
     // Mock response - simulate successful email send
     const mockEmailId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
