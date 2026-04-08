@@ -41,6 +41,13 @@ export class Tenant {
   @Column({ unique: true, nullable: true, name: 'kong_username' })
   kongUsername: string
 
+  /**
+   * OAuth2 client ID - for OAuth2-based authentication (e.g., client credentials flow)
+   * Maps the tenant to an OAuth2 client for token-based authentication
+   */
+  @Column({ unique: true, nullable: true, name: 'oauth2_client_id' })
+  oauth2ClientId: string
+
   @Column({ default: 'active' })
   status: 'active' | 'inactive' | 'suspended'
 
