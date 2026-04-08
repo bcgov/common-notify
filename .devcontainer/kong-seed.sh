@@ -37,8 +37,8 @@ if [ -z "$ADMIN_ROUTE" ]; then
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create email route with key-auth and oauth2
-echo "Setting up email route with key-auth and oauth2..."
+# Create email route
+echo "Setting up email route..."
 EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-email-route" \
   --data-urlencode "paths[]=/api/v1/email" \
@@ -50,52 +50,59 @@ if [ -z "$EMAIL_ROUTE" ]; then
   EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create OAuth2 token endpoint route and service
-echo "Setting up OAuth2 token endpoint..."
-
-# Create OAuth2 token endpoint route (attached to notify service)
-echo "Setting up OAuth2 token endpoint..."
-# Use the notify service - OAuth2 plugin will intercept /oauth2/token before routing
-TOKEN_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-oauth2-token-route" \
-  --data-urlencode "paths[]=/oauth2/token" \
+# Create CHES email route
+echo "Setting up CHES email route..."
+CHES_EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-email-route" \
+  --data-urlencode "paths[]=/ches/api/v1/email" \
   --data-urlencode "strip_path=false" \
   2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
-if [ -z "$TOKEN_ROUTE" ]; then
-  echo "  Token route may already exist, fetching..."
-  TOKEN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-oauth2-token-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+if [ -z "$CHES_EMAIL_ROUTE" ]; then
+  echo "  CHES email route may already exist, fetching..."
+  CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Enable OAuth2 plugin on token endpoint route
-echo "Enabling OAuth2 plugin on token endpoint..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$TOKEN_ROUTE/plugins" \
-  --data-urlencode "name=oauth2" \
-  --data-urlencode "config.scopes[]=notify" \
-  --data-urlencode "config.token_expiration=3600" \
-  --data-urlencode "config.enable_client_credentials=true" \
-  --data-urlencode "config.hide_credentials=true" \
-  --data-urlencode "config.accept_http_if_already_terminated=true" \
-  2>/dev/null || echo "OAuth2 plugin may already exist on token route"
+# Create OAuth2 Mock service
+echo "Setting up OAuth2 Mock Token service..."
+SERVICE_RESPONSE=$(curl -s -X POST "$KONG_ADMIN_URL/services" \
+  --data-urlencode "name=oauth2-mock" \
+  --data-urlencode "url=http://oauth2-mock:3002" \
+  --data-urlencode "protocol=http" \
+  2>/dev/null)
+echo "Service response: $SERVICE_RESPONSE"
 
-# Enable key-auth plugin on email route
-echo "Enabling key-auth plugin on email route..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  --data-urlencode "name=key-auth" \
-  --data-urlencode "config.key_names[]=x-api-key" \
-  --data-urlencode "config.hide_credentials=true" \
-  2>/dev/null || echo "Key-auth plugin may already exist on email route"
+# Create OAuth2 token endpoint route (attached to oauth2-mock service)
+echo "Setting up OAuth2 token endpoint route..."
+ROUTE_RESPONSE=$(curl -s -X POST "$KONG_ADMIN_URL/services/oauth2-mock/routes" \
+  --data-urlencode "name=oauth2-token-endpoint-route" \
+  --data-urlencode "paths[]=/oauth2/token" \
+  --data-urlencode "strip_path=true" \
+  2>/dev/null)
+echo "Route response: $ROUTE_RESPONSE"
+TOKEN_ROUTE=$(echo "$ROUTE_RESPONSE" | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
-# Enable OAuth2 plugin on email route
-echo "Enabling OAuth2 plugin on email route..."
+if [ -z "$TOKEN_ROUTE" ]; then
+  echo "  Token route creation may have failed, trying to use service directly..."
+  # If POST failed, the service/route might already exist, which is OK
+  # Kong will still route /oauth2/token to the oauth2-mock service
+fi
+
+# Enable JWT plugin on email route (validates Bearer tokens from mock OAuth2 server)
+echo "Enabling JWT plugin on email route..."
 curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  --data-urlencode "name=oauth2" \
-  --data-urlencode "config.scopes[]=notify" \
-  --data-urlencode "config.token_expiration=3600" \
-  --data-urlencode "config.enable_client_credentials=true" \
-  --data-urlencode "config.hide_credentials=true" \
-  --data-urlencode "config.accept_http_if_already_terminated=true" \
-  2>/dev/null || echo "OAuth2 plugin may already exist on email route"
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on email route"
+
+# Enable JWT plugin on CHES email route (validates Bearer tokens from mock OAuth2 server)
+echo "Enabling JWT plugin on CHES email route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES email route"
 
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
@@ -206,6 +213,15 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/oauth2" \
 
 echo ""
 echo "✅ Kong seeding complete!"
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "KONG CONFIGURATION VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Services configured:"
+curl -s "$KONG_ADMIN_URL/services" | grep -o '"name":"[^"]*' | cut -d'"' -f4
+echo ""
+echo "Routes configured:"
+curl -s "$KONG_ADMIN_URL/routes" | grep -o '"paths":\[\["[^"]*' | cut -d'"' -f4 | sort | uniq
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 echo "AUTHENTICATION METHODS - LOCAL DEVELOPMENT"

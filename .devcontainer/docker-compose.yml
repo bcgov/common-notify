@@ -142,6 +142,26 @@ services:
       retries: 5
 
   # Kong Seed Data - Creates test tenants and API keys
+  # Mock OAuth2 Token Server
+  oauth2-mock:
+    image: *node-image
+    container_name: oauth2-mock
+    working_dir: /app
+    entrypoint: sh -c "npm install && npm start"
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+    ports: ["3002:3002"]
+    volumes:
+      - ./oauth2-mock-server.js:/app/server.js
+      - ./oauth2-mock-package.json:/app/package.json
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+    depends_on:
+      database:
+        condition: service_healthy
+
   kong-seed:
     image: curlimages/curl:latest
     container_name: kong-seed
@@ -151,4 +171,6 @@ services:
       - ./kong-seed.sh:/kong-seed.sh:ro
     depends_on:
       kong:
+        condition: service_healthy
+      oauth2-mock:
         condition: service_healthy

@@ -71,21 +71,36 @@ export class TenantGuard implements CanActivate {
         const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
 
         this.logger.log(`JWT Payload: ${JSON.stringify(payload, null, 2)}`)
-        this.logger.warn(
-          'JWT token logged for inspection. Update TenantGuard to extract tenant info from JWT claims.',
-        )
 
-        // For now, reject the request so we can see the JWT structure
-        // TODO: Extract tenant identifier from JWT and look up in database
-        throw new UnauthorizedException(
-          'JWT authentication not yet configured. Check logs for JWT payload structure.',
-        )
-      } catch (error) {
-        if (error instanceof UnauthorizedException) {
-          throw error
+        // Extract tenant identifier from JWT claims
+        // The 'sub' claim contains the OAuth2 client ID (e.g., "test-client-a")
+        const clientId = payload.sub as string
+        if (!clientId) {
+          throw new Error('JWT missing required "sub" claim')
         }
-        this.logger.error(`Failed to decode JWT: ${error.message}`)
-        throw new UnauthorizedException('Invalid JWT token')
+
+        this.logger.log(`JWT client_id from 'sub' claim: ${clientId}`)
+
+        // Look up tenant by OAuth2 client ID
+        const tenant = await this.tenantsService.findByOAuth2ClientId(clientId).catch(() => null)
+
+        if (!tenant) {
+          this.logger.error(
+            `Tenant not found for OAuth2 client_id "${clientId}". Ensure tenant is registered in database.`,
+          )
+          throw new UnauthorizedException(
+            `Tenant not found for OAuth2 client_id: ${clientId}. Please create the tenant first.`,
+          )
+        }
+
+        this.logger.log(`Tenant authenticated via JWT: ${tenant.name} (Client ID: ${clientId})`)
+
+        request.tenant = tenant
+        request.clientId = clientId
+        return true
+      } catch (error) {
+        this.logger.error(`Failed to process JWT: ${error.message}`)
+        throw new UnauthorizedException(`Invalid JWT token: ${error.message}`)
       }
     }
 

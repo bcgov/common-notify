@@ -121,6 +121,15 @@ export class TenantsService {
   }
 
   /**
+   * Get a tenant by OAuth2 client ID
+   * @param oauth2ClientId OAuth2 client ID
+   * @returns Tenant or null if not found
+   */
+  async findByOAuth2ClientId(oauth2ClientId: string): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({ where: { oauth2ClientId } })
+  }
+
+  /**
    * Update a tenant
    * @param id Tenant ID
    * @param updateData Partial tenant data to update
