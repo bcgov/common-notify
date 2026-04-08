@@ -17,6 +17,19 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: gw-fe8c5-email-api
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/email
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: gw-fe8c5-ches-email
     tags: [ns.gw-fe8c5]
     hosts:
@@ -61,6 +74,11 @@ plugins:
     enabled: true
     config:
       http_method: null
+      add:
+        headers:
+          - X-Consumer-Username:$(consumer_username)
+          - X-Consumer-ID:$(consumer_id)
+          - X-Credential-ID:$(credential_id)
 ---
 kind: CredentialIssuer
 name: gw-fe8c5 default
