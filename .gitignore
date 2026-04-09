@@ -250,6 +250,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Playwright E2E test reports
+test-results/
+playwright-report/
+.auth/
+
 # Translations
 *.mo
 *.pot
