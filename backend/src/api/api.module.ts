@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { EmailModule } from './email/email.module'
+import { NotifyModule } from './notify/notify.module'
 
 /**
  * API Module
@@ -7,14 +8,14 @@ import { EmailModule } from './email/email.module'
  *
  * Modules:
  * - EmailModule: Email sending functionality
+ * - NotifyModule: Core notification sending (email, SMS, etc)
  *
  * Future modules:
- * - NotifyModule: Core notification sending (email, SMS, etc)
  * - WebhookModule: Webhook delivery
  * - StatusModule: Message tracking
  */
 @Module({
-  imports: [EmailModule],
-  exports: [EmailModule],
+  imports: [EmailModule, NotifyModule],
+  exports: [EmailModule, NotifyModule],
 })
 export class ApiModule {}
