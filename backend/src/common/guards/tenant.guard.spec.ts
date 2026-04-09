@@ -136,15 +136,17 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(mockTenant)
 
+      const request = {
+        headers: {
+          authorization: `Bearer ${jwtToken}`,
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: `Bearer ${jwtToken}`,
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -152,8 +154,8 @@ describe('TenantGuard', () => {
 
       expect(result).toBe(true)
       expect(mockTenantsService.findByOAuth2ClientId).toHaveBeenCalledWith('test-client-a')
-      expect(mockContext.switchToHttp().getRequest().tenant).toEqual(mockTenant)
-      expect(mockContext.switchToHttp().getRequest().clientId).toBe('test-client-a')
+      expect(request.tenant).toEqual(mockTenant)
+      expect(request.clientId).toBe('test-client-a')
     })
 
     it('should create tenant if not found by OAuth2 client ID', async () => {
@@ -169,15 +171,17 @@ describe('TenantGuard', () => {
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
+      const request = {
+        headers: {
+          authorization: `Bearer ${jwtToken}`,
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: `Bearer ${jwtToken}`,
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -188,7 +192,7 @@ describe('TenantGuard', () => {
         { name: 'new-client' },
         { oauth2ClientId: 'new-client' },
       )
-      expect(mockContext.switchToHttp().getRequest().tenant).toEqual(newTenant)
+      expect(request.tenant).toEqual(newTenant)
     })
 
     it('should throw UnauthorizedException if JWT tenant creation fails', async () => {
@@ -198,15 +202,17 @@ describe('TenantGuard', () => {
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
+      const request = {
+        headers: {
+          authorization: `Bearer ${jwtToken}`,
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: `Bearer ${jwtToken}`,
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -214,15 +220,17 @@ describe('TenantGuard', () => {
     })
 
     it('should throw UnauthorizedException for invalid JWT format', async () => {
+      const request = {
+        headers: {
+          authorization: 'Bearer invalid-token-format',
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'Bearer invalid-token-format',
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -234,15 +242,17 @@ describe('TenantGuard', () => {
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTc2MTI0M30.test'
 
+      const request = {
+        headers: {
+          authorization: `Bearer ${jwtToken}`,
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: `Bearer ${jwtToken}`,
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -252,13 +262,15 @@ describe('TenantGuard', () => {
 
   describe('Authentication failure', () => {
     it('should throw BadRequestException when no auth headers provided', async () => {
+      const request = {
+        headers: {},
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {},
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -274,18 +286,20 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
 
+      const request = {
+        headers: {
+          'x-consumer-username': 'kong-tenant',
+          'x-consumer-id': 'kong-id-999',
+          authorization:
+            'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqd3QtY2xpZW50In0.test',
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              'x-consumer-username': 'kong-tenant',
-              'x-consumer-id': 'kong-id-999',
-              authorization:
-                'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqd3QtY2xpZW50In0.test',
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
