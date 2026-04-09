@@ -9,14 +9,16 @@ describe('TenantsController', () => {
   let service: TenantsService
 
   const mockTenant = {
-    id: 1,
+    id: 'uuid-1',
+    externalId: 'ext-123',
     name: 'test-tenant',
-    description: 'Test tenant',
-    organization: 'Test Org',
-    contactEmail: 'contact@test.com',
-    contactName: 'John Doe',
-    kongUsername: 'test-tenant',
+    slug: 'test-tenant',
     status: 'active',
+    createdAt: new Date(),
+    createdBy: 'user@example.com',
+    updatedAt: new Date(),
+    updatedBy: 'user@example.com',
+    isDeleted: false,
   }
 
   const mockService = {

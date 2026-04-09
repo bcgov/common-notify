@@ -30,12 +30,12 @@ export class TenantGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    // First, try to get tenant from Kong headers
+    // First, try to get tenant from Kong headers (if Kong is in use)
     const kongUsername = request.headers['x-consumer-username']
     const kongConsumerId = request.headers['x-consumer-id']
 
     this.logger.log(
-      `Incoming request: method=${request.method}, url=${request.url}, KongUsername=${kongUsername}, KongConsumerId=${kongConsumerId}, request.headers=${JSON.stringify(request.headers, null, 2)}`,
+      `Incoming request: method=${request.method}, url=${request.url}, KongUsername=${kongUsername}, KongConsumerId=${kongConsumerId}`,
     )
 
     if (kongUsername) {
@@ -43,21 +43,25 @@ export class TenantGuard implements CanActivate {
         `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
       )
 
-      let tenant = await this.tenantsService.findByKongUsername(kongUsername as string)
+      // Try to find tenant by external ID (Kong consumer ID)
+      let tenant = kongConsumerId
+        ? await this.tenantsService.findByExternalId(kongConsumerId as string).catch(() => null)
+        : null
+
+      if (!tenant) {
+        // If not found by external ID, try by name
+        tenant = await this.tenantsService.findByName(kongUsername as string).catch(() => null)
+      }
 
       if (!tenant) {
         this.logger.log(
           `Tenant not found for Kong username: ${kongUsername}. Creating new tenant...`,
         )
         try {
-          const createResult = await this.tenantsService.create(
-            {
-              name: kongUsername as string,
-            },
-            {
-              kongUsername: kongUsername as string,
-            },
-          )
+          const createResult = await this.tenantsService.create({
+            name: kongUsername as string,
+            externalId: kongConsumerId as string,
+          })
           tenant = createResult.tenant
           this.logger.log(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
         } catch (error) {
@@ -106,22 +110,18 @@ export class TenantGuard implements CanActivate {
 
         this.logger.log(`JWT client_id from 'sub' claim: ${clientId}`)
 
-        // Look up tenant by OAuth2 client ID
-        let tenant = await this.tenantsService.findByOAuth2ClientId(clientId).catch(() => null)
+        // Look up tenant by external ID (OAuth2 client ID stored in externalId)
+        let tenant = await this.tenantsService.findByExternalId(clientId).catch(() => null)
 
         if (!tenant) {
           this.logger.log(
             `Tenant not found for OAuth2 client_id: ${clientId}. Creating new tenant...`,
           )
           try {
-            const createResult = await this.tenantsService.create(
-              {
-                name: clientId,
-              },
-              {
-                oauth2ClientId: clientId,
-              },
-            )
+            const createResult = await this.tenantsService.create({
+              name: clientId,
+              externalId: clientId,
+            })
             tenant = createResult.tenant
             this.logger.log(`Created new tenant: ${tenant.name} (Client ID: ${clientId})`)
           } catch (error) {

@@ -1,68 +1,54 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class TenantDto {
-  @ApiProperty()
-  id: number
+  @ApiProperty({
+    description: 'Unique identifier for the tenant',
+  })
+  id: string
+
+  @ApiPropertyOptional({
+    description: 'External identifier from CSTAR or Gateway',
+  })
+  externalId?: string
 
   @ApiProperty({
-    description: 'Unique tenant name (Kong consumer username)',
+    description: 'Human-readable name of the tenant organization',
   })
   name: string
 
   @ApiProperty({
-    description: 'Human-readable description',
+    description: 'URL-friendly unique identifier for the tenant',
   })
-  description: string
+  slug: string
 
   @ApiProperty({
-    description: 'Organization name',
-  })
-  organization: string
-
-  @ApiProperty({
-    description: 'Contact email',
-  })
-  contactEmail: string
-
-  @ApiProperty({
-    description: 'Contact name',
-  })
-  contactName: string
-
-  @ApiProperty({
-    description: 'Kong consumer ID',
-  })
-  kongConsumerId: string
-
-  @ApiProperty({
-    description: 'Kong consumer username',
-  })
-  kongUsername: string
-
-  @ApiProperty({
-    enum: ['active', 'inactive', 'suspended'],
-    description: 'Tenant status',
+    enum: ['active', 'disabled'],
+    description: 'Current status of the tenant',
   })
   status: string
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Timestamp when the tenant record was created',
+  })
   createdAt: Date
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Identifier of the user or process that created this record',
+  })
+  createdBy?: string
+
+  @ApiProperty({
+    description: 'Timestamp when the tenant record was last updated',
+  })
   updatedAt: Date
-}
 
-export class CreateTenantResponseDto {
-  @ApiProperty()
-  tenant: TenantDto
+  @ApiPropertyOptional({
+    description: 'Identifier of the user or process that last updated this record',
+  })
+  updatedBy?: string
 
   @ApiProperty({
-    description: 'Newly generated API key (shown only once)',
+    description: 'Soft delete flag. When true, the tenant is considered inactive.',
   })
-  apiKey: string
-
-  @ApiProperty({
-    description: 'Note: Store this key securely. It cannot be retrieved later.',
-  })
-  note: string
+  isDeleted: boolean
 }

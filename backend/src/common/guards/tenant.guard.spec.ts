@@ -19,8 +19,8 @@ describe('TenantGuard', () => {
   let tenantsService: TenantsService
 
   const mockTenantsService = {
-    findByKongUsername: vi.fn(),
-    findByOAuth2ClientId: vi.fn(),
+    findByExternalId: vi.fn(),
+    findByName: vi.fn(),
     create: vi.fn(),
   }
 
@@ -43,13 +43,17 @@ describe('TenantGuard', () => {
   describe('Kong authentication', () => {
     it('should authenticate with Kong headers', async () => {
       const mockTenant = {
-        id: 1,
+        id: 'uuid-1',
         name: 'test-tenant',
-        kongUsername: 'test-tenant',
-        oauth2ClientId: null,
+        slug: 'test-tenant',
+        externalId: 'kong-id-123',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false,
       }
 
-      mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
 
       const request: MockRequest = {
         headers: {
@@ -69,19 +73,25 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.findByKongUsername).toHaveBeenCalledWith('test-tenant')
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('kong-id-123')
       expect(request.tenant).toEqual(mockTenant)
       expect(request.kongConsumerId).toBe('kong-id-123')
     })
 
     it('should create tenant if not found by Kong username', async () => {
       const newTenant = {
-        id: 2,
+        id: 'uuid-2',
         name: 'new-tenant',
-        kongUsername: 'new-tenant',
+        slug: 'new-tenant',
+        externalId: 'kong-id-456',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false,
       }
 
-      mockTenantsService.findByKongUsername.mockResolvedValue(null)
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
+      mockTenantsService.findByName.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
       const request: MockRequest = {
@@ -102,15 +112,16 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith(
-        { name: 'new-tenant' },
-        { kongUsername: 'new-tenant' },
-      )
+      expect(mockTenantsService.create).toHaveBeenCalledWith({
+        name: 'new-tenant',
+        externalId: 'kong-id-456',
+      })
       expect(request.tenant).toEqual(newTenant)
     })
 
     it('should throw BadRequestException if Kong tenant creation fails', async () => {
-      mockTenantsService.findByKongUsername.mockResolvedValue(null)
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
+      mockTenantsService.findByName.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
       const request: MockRequest = {
@@ -135,16 +146,21 @@ describe('TenantGuard', () => {
   describe('JWT authentication', () => {
     it('should authenticate with valid JWT Bearer token', async () => {
       const mockTenant = {
-        id: 3,
+        id: 'uuid-3',
         name: 'test-client-a',
-        oauth2ClientId: 'test-client-a',
+        slug: 'test-client-a',
+        externalId: 'test-client-a',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false,
       }
 
       // JWT with sub claim 'test-client-a'
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWNsaWVudC1hIiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU3NjEyNDN9.test'
 
-      mockTenantsService.findByOAuth2ClientId.mockResolvedValue(mockTenant)
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
 
       const request: MockRequest = {
         headers: {
@@ -163,22 +179,27 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.findByOAuth2ClientId).toHaveBeenCalledWith('test-client-a')
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('test-client-a')
       expect(request.tenant).toEqual(mockTenant)
       expect(request.clientId).toBe('test-client-a')
     })
 
     it('should create tenant if not found by OAuth2 client ID', async () => {
       const newTenant = {
-        id: 4,
+        id: 'uuid-4',
         name: 'new-client',
-        oauth2ClientId: 'new-client',
+        slug: 'new-client',
+        externalId: 'new-client',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false,
       }
 
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZXctY2xpZW50IiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU3NjEyNDN9.test'
 
-      mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
       const request: MockRequest = {
@@ -198,10 +219,10 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith(
-        { name: 'new-client' },
-        { oauth2ClientId: 'new-client' },
-      )
+      expect(mockTenantsService.create).toHaveBeenCalledWith({
+        name: 'new-client',
+        externalId: 'new-client',
+      })
       expect(request.tenant).toEqual(newTenant)
     })
 
@@ -209,7 +230,7 @@ describe('TenantGuard', () => {
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYWlsaW5nLWNsaWVudCIsImlhdCI6MTc3NTc2MTI0MywiZXhwIjoxNzc1NzYxMjQzfQ.test'
 
-      mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
       const request: MockRequest = {
@@ -289,12 +310,17 @@ describe('TenantGuard', () => {
 
     it('should prioritize Kong headers over JWT', async () => {
       const mockTenant = {
-        id: 5,
+        id: 'uuid-5',
         name: 'kong-tenant',
-        kongUsername: 'kong-tenant',
+        slug: 'kong-tenant',
+        externalId: 'kong-id-999',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false,
       }
 
-      mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
 
       const request: MockRequest = {
         headers: {
@@ -316,8 +342,7 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.findByKongUsername).toHaveBeenCalled()
-      expect(mockTenantsService.findByOAuth2ClientId).not.toHaveBeenCalled()
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalled()
     })
   })
 })
