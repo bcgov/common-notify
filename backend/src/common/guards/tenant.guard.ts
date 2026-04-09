@@ -50,9 +50,14 @@ export class TenantGuard implements CanActivate {
           `Tenant not found for Kong username: ${kongUsername}. Creating new tenant...`,
         )
         try {
-          const createResult = await this.tenantsService.create({
-            name: kongUsername as string,
-          })
+          const createResult = await this.tenantsService.create(
+            {
+              name: kongUsername as string,
+            },
+            {
+              kongUsername: kongUsername as string,
+            },
+          )
           tenant = createResult.tenant
           this.logger.log(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
         } catch (error) {
@@ -109,9 +114,14 @@ export class TenantGuard implements CanActivate {
             `Tenant not found for OAuth2 client_id: ${clientId}. Creating new tenant...`,
           )
           try {
-            const createResult = await this.tenantsService.create({
-              name: clientId,
-            })
+            const createResult = await this.tenantsService.create(
+              {
+                name: clientId,
+              },
+              {
+                oauth2ClientId: clientId,
+              },
+            )
             tenant = createResult.tenant
             this.logger.log(`Created new tenant: ${tenant.name} (Client ID: ${clientId})`)
           } catch (error) {

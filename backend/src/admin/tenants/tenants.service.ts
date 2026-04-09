@@ -23,9 +23,16 @@ export class TenantsService {
   /**
    * Create a new tenant record
    * @param createTenantDto Tenant creation data
+   * @param options Optional metadata like kongUsername or oauth2ClientId
    * @returns Created tenant
    */
-  async create(createTenantDto: CreateTenantDto) {
+  async create(
+    createTenantDto: CreateTenantDto,
+    options?: {
+      kongUsername?: string
+      oauth2ClientId?: string
+    },
+  ) {
     const { name, description, organization, contactEmail, contactName } = createTenantDto
 
     // Check if tenant already exists
@@ -42,8 +49,8 @@ export class TenantsService {
         organization,
         contactEmail,
         contactName,
-        kongUsername: name,
-        status: 'active',
+        kongUsername: options?.kongUsername,
+        oauth2ClientId: options?.oauth2ClientId,
       })
 
       const savedTenant = await this.tenantRepository.save(tenant)

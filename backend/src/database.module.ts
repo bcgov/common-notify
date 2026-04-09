@@ -7,7 +7,7 @@ const dbUser = process.env.POSTGRES_USER || 'postgres'
 const dbPassword = process.env.POSTGRES_PASSWORD || 'default'
 const dbPort = parseInt(process.env.POSTGRES_PORT || '5432', 10)
 const dbName = process.env.POSTGRES_DATABASE || 'postgres'
-const dbSchema = process.env.POSTGRES_SCHEMA || 'users'
+const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
 
 @Module({
   imports: [
