@@ -1,7 +1,7 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType } from '@nestjs/common'
+import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
 import {
   NotifySimpleController,
@@ -11,6 +11,17 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { TenantGuard } from '../../common/guards/tenant.guard'
+
+// Mock TenantGuard to bypass authentication in tests
+const mockTenantGuard: CanActivate = {
+  canActivate: (context: ExecutionContext) => {
+    const request = context.switchToHttp().getRequest()
+    // Attach a mock tenant to the request
+    request.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
+    return true
+  },
+}
 
 describe('Notify Controllers', () => {
   let service: NotifyService
@@ -26,7 +37,10 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [NotifyService],
-    }).compile()
+    })
+      .overrideGuard(TenantGuard)
+      .useValue(mockTenantGuard)
+      .compile()
 
     service = module.get<NotifyService>(NotifyService)
     app = module.createNestApplication()
