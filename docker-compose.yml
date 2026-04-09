@@ -32,7 +32,7 @@ services:
       FLYWAY_USER: *POSTGRES_USER
       FLYWAY_PASSWORD: *POSTGRES_PASSWORD
       FLYWAY_BASELINE_ON_MIGRATE: true
-      FLYWAY_DEFAULT_SCHEMA: users
+      FLYWAY_DEFAULT_SCHEMA: notify
     depends_on:
       database:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
     image: schemaspy/schemaspy:7.0.2
     profiles: ["schemaspy"]
     container_name: schemaspy
-    command: -t pgsql11 -db postgres -host database -port 5432 -u postgres -p default -schemas users
+    command: -t pgsql11 -db postgres -host database -port 5432 -u postgres -p default -schemas notify
     depends_on:
       migrations:
         condition: service_completed_successfully
