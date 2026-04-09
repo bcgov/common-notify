@@ -24,7 +24,7 @@ curl -s -X POST "$KONG_ADMIN_URL/services" \
   --data-urlencode "protocol=http" \
   2>/dev/null || echo "Service may already exist"
 
-# Create admin route (JWT validation now happens in backend)
+# Create admin route - no email route needed anymore (using notify endpoints)
 echo "Setting up admin route..."
 ADMIN_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-admin-route" \
@@ -36,20 +36,6 @@ if [ -z "$ADMIN_ROUTE" ]; then
   echo "  Admin route may already exist, fetching..."
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
-
-# Create email route
-echo "Setting up email route..."
-EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-email-route" \
-  --data-urlencode "paths[]=/api/v1/email" \
-  --data-urlencode "strip_path=false" \
-  2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
-
-if [ -z "$EMAIL_ROUTE" ]; then
-  echo "  Email route creation may have failed, fetching existing..."
-  EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-email-route" 2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
-fi
-echo "  DEBUG: EMAIL_ROUTE=$EMAIL_ROUTE"
 
 # Create CHES email route
 echo "Setting up CHES email route..."
@@ -116,17 +102,6 @@ if [ -z "$TOKEN_ROUTE" ]; then
   # Kong will still route /oauth2/token to the oauth2-mock service
 fi
 
-# Enable JWT plugin on email route (validates Bearer tokens from mock OAuth2 server)
-echo "Enabling JWT plugin on email route (route=$EMAIL_ROUTE)..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "jwt",
-    "config": {
-      "key_claim_name": "sub"
-    }
-  }' || echo "JWT plugin creation may have failed"
-
 # Enable JWT plugin on CHES email route (validates Bearer tokens from mock OAuth2 server)
 echo "Enabling JWT plugin on CHES email route (route=$CHES_EMAIL_ROUTE)..."
 curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
@@ -137,22 +112,6 @@ curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
       "key_claim_name": "sub"
     }
   }' || echo "CHES JWT plugin creation may have failed"
-
-# Enable request-transformer plugin on email route to inject tenant headers
-echo "Enabling request-transformer plugin on email route (for header injection)..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "request-transformer",
-    "config": {
-      "add": {
-        "headers": [
-          "X-Consumer-Username:$(consumer_username)",
-          "X-Consumer-ID:$(consumer_id)"
-        ]
-      }
-    }
-  }' || echo "Request-Transformer plugin creation may have failed"
 
 # Enable request-transformer plugin on CHES email route to inject tenant headers
 echo "Enabling request-transformer plugin on CHES email route (for header injection)..."
