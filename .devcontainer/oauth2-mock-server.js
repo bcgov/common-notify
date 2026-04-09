@@ -5,11 +5,19 @@ const app = express()
 app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 
-// Test credentials (must match kong-seed.sh)
+// Test credentials (must match kong-seed.sh and Kong JWT credentials)
+// Note: These secrets are used to sign JWTs expected by Kong's JWT plugin
 const testClients = {
   'test-client-a': 'test-client-secret-a-12345678901234567890',
   'test-client-b': 'test-client-secret-b-98765432109876543210',
   'test-client-c': 'test-client-secret-c-11111111111111111111',
+}
+
+// JWT signing secrets (must match Kong JWT credentials created with 'secret' field)
+const jwtSecrets = {
+  'test-client-a': 'test-secret-a',
+  'test-client-b': 'test-secret-b',
+  'test-client-c': 'test-secret-c',
 }
 
 // Health check endpoint
@@ -46,7 +54,8 @@ app.post('/', (req, res) => {
     })
   }
 
-  // Generate a simple JWT-like token (not a real JWT for simplicity)
+  // Generate a signed JWT token (HS256)
+  const header = { alg: 'HS256', typ: 'JWT' }
   const payload = {
     sub: client_id,
     scope: scope || 'notify',
@@ -54,9 +63,25 @@ app.post('/', (req, res) => {
     exp: Math.floor((Date.now() + 3600000) / 1000),
   }
 
-  // Create a mock token (sub.payload.sig format like JWT)
-  const tokenPayload = Buffer.from(JSON.stringify(payload)).toString('base64')
-  const token = `mock.${tokenPayload}.${crypto.randomBytes(16).toString('hex')}`
+  // Helper function to base64url encode
+  const base64urlEncode = (str) =>
+    Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+
+  const headerEncoded = base64urlEncode(JSON.stringify(header))
+  const payloadEncoded = base64urlEncode(JSON.stringify(payload))
+  const message = `${headerEncoded}.${payloadEncoded}`
+
+  // Sign the message with HMAC-SHA256 using the JWT secret
+  const secret = jwtSecrets[client_id]
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(message)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+
+  const token = `${message}.${signature}`
 
   res.json({
     access_token: token,
