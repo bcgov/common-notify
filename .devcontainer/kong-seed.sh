@@ -63,9 +63,33 @@ if [ -z "$CHES_EMAIL_ROUTE" ]; then
   echo "  CHES email route creation may have failed, fetching existing..."
   CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
 fi
-echo "  DEBUG: CHES_EMAIL_ROUTE=$CHES_EMAIL_ROUTE"
-echo "  DEBUG: CHES_EMAIL_ROUTE=$CHES_EMAIL_ROUTE"
-echo "  CHES_EMAIL_ROUTE=$CHES_EMAIL_ROUTE"
+
+# Create Notify API routes
+echo "Setting up Notify API routes..."
+
+# Create routes using simple loops (sh-compatible, not bash-only associative arrays)
+ROUTE_CONFIGS="
+notifysimple:/api/v1/notifysimple
+notifyevent:/api/v1/notifyevent
+notifyevent-preview:/api/v1/notifyevent/preview
+notifyevent-types:/api/v1/notifyevent/types
+notify-list:/api/v1/notify
+notify-status:/api/v1/notify/status
+notify-callbacks:/api/v1/notify/registerCallback
+templates:/api/v1/templates
+"
+
+echo "$ROUTE_CONFIGS" | while read -r route_config; do
+  [ -z "$route_config" ] && continue
+  route_key="${route_config%%:*}"
+  route_path="${route_config##*:}"
+  echo "  Creating route: $route_key ($route_path)"
+  curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+    --data-urlencode "name=notify-$route_key-route" \
+    --data-urlencode "paths[]=$route_path" \
+    --data-urlencode "strip_path=false" \
+    2>/dev/null || echo "    Route $route_key may already exist"
+done
 
 # Create OAuth2 Mock service
 echo "Setting up OAuth2 Mock Token service..."
