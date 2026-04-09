@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common'
+import { vi } from 'vitest'
 import { TenantGuard } from './tenant.guard'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 
@@ -8,9 +9,9 @@ describe('TenantGuard', () => {
   let tenantsService: TenantsService
 
   const mockTenantsService = {
-    findByKongUsername: jest.fn(),
-    findByOAuth2ClientId: jest.fn(),
-    create: jest.fn(),
+    findByKongUsername: vi.fn(),
+    findByOAuth2ClientId: vi.fn(),
+    create: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -26,7 +27,7 @@ describe('TenantGuard', () => {
 
     guard = module.get<TenantGuard>(TenantGuard)
     tenantsService = module.get<TenantsService>(TenantsService)
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('Kong authentication', () => {
@@ -40,16 +41,18 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
 
+      const request = {
+        headers: {
+          'x-consumer-username': 'test-tenant',
+          'x-consumer-id': 'kong-id-123',
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              'x-consumer-username': 'test-tenant',
-              'x-consumer-id': 'kong-id-123',
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -57,8 +60,8 @@ describe('TenantGuard', () => {
 
       expect(result).toBe(true)
       expect(mockTenantsService.findByKongUsername).toHaveBeenCalledWith('test-tenant')
-      expect(mockContext.switchToHttp().getRequest().tenant).toEqual(mockTenant)
-      expect(mockContext.switchToHttp().getRequest().kongConsumerId).toBe('kong-id-123')
+      expect(request.tenant).toEqual(mockTenant)
+      expect(request.kongConsumerId).toBe('kong-id-123')
     })
 
     it('should create tenant if not found by Kong username', async () => {
@@ -71,16 +74,18 @@ describe('TenantGuard', () => {
       mockTenantsService.findByKongUsername.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
+      const request = {
+        headers: {
+          'x-consumer-username': 'new-tenant',
+          'x-consumer-id': 'kong-id-456',
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              'x-consumer-username': 'new-tenant',
-              'x-consumer-id': 'kong-id-456',
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
@@ -91,23 +96,25 @@ describe('TenantGuard', () => {
         { name: 'new-tenant' },
         { kongUsername: 'new-tenant' },
       )
-      expect(mockContext.switchToHttp().getRequest().tenant).toEqual(newTenant)
+      expect(request.tenant).toEqual(newTenant)
     })
 
     it('should throw BadRequestException if Kong tenant creation fails', async () => {
       mockTenantsService.findByKongUsername.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
+      const request = {
+        headers: {
+          'x-consumer-username': 'failing-tenant',
+          'x-consumer-id': 'kong-id-789',
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
       const mockContext = {
         switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              'x-consumer-username': 'failing-tenant',
-              'x-consumer-id': 'kong-id-789',
-            },
-            method: 'POST',
-            url: '/api/test',
-          }),
+          getRequest: () => request,
         }),
       } as ExecutionContext
 
