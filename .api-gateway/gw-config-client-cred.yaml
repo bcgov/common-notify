@@ -17,19 +17,6 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-email-api
-    tags: [ns.gw-fe8c5]
-    hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
-    paths:
-      - /api/v1/email
-    methods:
-      - POST
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
   - name: gw-fe8c5-ches-email
     tags: [ns.gw-fe8c5]
     hosts:
