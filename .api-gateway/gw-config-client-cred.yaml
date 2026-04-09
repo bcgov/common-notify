@@ -78,7 +78,6 @@ plugins:
         headers:
           - X-Consumer-Username:$(consumer_username)
           - X-Consumer-ID:$(consumer_id)
-          - X-Credential-ID:$(credential_id)
 ---
 kind: CredentialIssuer
 name: gw-fe8c5 default
