@@ -1,5 +1,5 @@
 # Notify Service — Overview 
->[!INFO] version  3
+>[!NOTE] version  3
 ## What it does
 
 The Notify service is a **multi-channel, multi-tenanted, notification service**. It comprises a user interface which provides administration capabilities, and an API which is called by your application to send notifications on your behalf, using the defaults you have configured for your service. You send it a request, and it delivers an email, an SMS, or a 3rd-party message - or any  combination of these — through a single, consistent interface. The service handles : 
