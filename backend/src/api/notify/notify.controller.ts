@@ -22,7 +22,7 @@ export class NotifySimpleController {
   @Version('1')
   @Post()
   @HttpCode(501)
-  simpleSend(@Body() body: any) {
+  simpleSend(@Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 }
@@ -35,28 +35,28 @@ export class NotifyEventController {
   @Version('1')
   @Post()
   @HttpCode(501)
-  eventTypeSend(@Body() body: any) {
+  eventTypeSend(@Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Post('preview')
   @HttpCode(501)
-  eventTypePreview(@Body() body: any) {
+  eventTypePreview(@Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Get('types')
   @HttpCode(501)
-  listEventTypes(@Query('limit') limit?: string, @Query('cursor') cursor?: string) {
+  listEventTypes(@Query('limit') _limit?: string, @Query('cursor') _cursor?: string) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Get('types/:eventTypeId')
   @HttpCode(501)
-  getEventType(@Param('eventTypeId') eventTypeId: string) {
+  getEventType(@Param('eventTypeId') _eventTypeId: string) {
     return this.notifyService.notImplemented()
   }
 }
@@ -70,11 +70,11 @@ export class NotifyController {
   @Get()
   @HttpCode(501)
   listNotifications(
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-    @Query('status') status?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    @Query('limit') _limit?: string,
+    @Query('cursor') _cursor?: string,
+    @Query('status') _status?: string,
+    @Query('startDate') _startDate?: string,
+    @Query('endDate') _endDate?: string,
   ) {
     return this.notifyService.notImplemented()
   }
@@ -82,35 +82,35 @@ export class NotifyController {
   @Version('1')
   @Delete()
   @HttpCode(501)
-  cancelNotification(@Query('notifyId') notifyId: string) {
+  cancelNotification(@Query('notifyId') _notifyId: string) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Get('status/:notifyId')
   @HttpCode(501)
-  getNotificationStatus(@Param('notifyId') notifyId: string) {
+  getNotificationStatus(@Param('notifyId') _notifyId: string) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Post('registerCallback')
   @HttpCode(501)
-  registerCallback(@Body() body: any) {
+  registerCallback(@Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Patch('registerCallback/:callbackId')
   @HttpCode(501)
-  updateCallback(@Param('callbackId') callbackId: string, @Body() body: any) {
+  updateCallback(@Param('callbackId') _callbackId: string, @Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Delete('registerCallback/:callbackId')
   @HttpCode(501)
-  deleteCallback(@Param('callbackId') callbackId: string) {
+  deleteCallback(@Param('callbackId') _callbackId: string) {
     return this.notifyService.notImplemented()
   }
 }
@@ -123,14 +123,14 @@ export class TemplatesController {
   @Version('1')
   @Get()
   @HttpCode(501)
-  listTemplates(@Query('limit') limit?: string, @Query('cursor') cursor?: string) {
+  listTemplates(@Query('limit') _limit?: string, @Query('cursor') _cursor?: string) {
     return this.notifyService.notImplemented()
   }
 
   @Version('1')
   @Get(':templateId')
   @HttpCode(501)
-  getTemplate(@Param('templateId') templateId: string) {
+  getTemplate(@Param('templateId') _templateId: string) {
     return this.notifyService.notImplemented()
   }
 }
@@ -142,7 +142,7 @@ export class ChesEmailController {
 
   @Post()
   @HttpCode(501)
-  chesEmail(@Body() body: any) {
+  chesEmail(@Body() _body: any) {
     return this.notifyService.notImplemented()
   }
 }

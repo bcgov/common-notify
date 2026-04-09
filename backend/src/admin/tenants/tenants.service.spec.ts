@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { TenantsService } from './tenants.service'
@@ -8,7 +7,6 @@ import { Tenant } from './entities/tenant.entity'
 
 describe('TenantsService', () => {
   let service: TenantsService
-  let repository: Repository<Tenant>
 
   const mockTenant: Tenant = {
     id: 'uuid-1',
@@ -43,7 +41,6 @@ describe('TenantsService', () => {
     }).compile()
 
     service = module.get<TenantsService>(TenantsService)
-    repository = module.get<Repository<Tenant>>(getRepositoryToken(Tenant))
     vi.clearAllMocks()
   })
 
@@ -89,22 +86,19 @@ describe('TenantsService', () => {
       expect(result.tenant.slug).toBe('test-tenant')
     })
 
-
     it('should throw BadRequestException if tenant already exists', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
-      await expect(
-        service.create({ name: 'test-tenant' }),
-      ).rejects.toThrow(BadRequestException)
+      await expect(service.create({ name: 'test-tenant' })).rejects.toThrow(BadRequestException)
     })
 
     it('should throw BadRequestException if slug already exists', async () => {
       mockRepository.findOne.mockResolvedValueOnce(null) // findByName returns null
       mockRepository.findOne.mockResolvedValueOnce(mockTenant) // findBySlug returns tenant
 
-      await expect(
-        service.create({ name: 'new-name', slug: 'test-tenant' }),
-      ).rejects.toThrow(BadRequestException)
+      await expect(service.create({ name: 'new-name', slug: 'test-tenant' })).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('should handle database errors during creation', async () => {
@@ -124,6 +118,7 @@ describe('TenantsService', () => {
       const result = await service.create({ name: 'minimal-tenant' })
 
       expect(result.tenant).toEqual(mockTenant)
+    })
   })
 
   describe('findAll', () => {

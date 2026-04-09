@@ -16,7 +16,6 @@ interface MockRequest {
 
 describe('TenantGuard', () => {
   let guard: TenantGuard
-  let tenantsService: TenantsService
 
   const mockTenantsService = {
     findByExternalId: vi.fn(),
@@ -36,7 +35,6 @@ describe('TenantGuard', () => {
     }).compile()
 
     guard = module.get<TenantGuard>(TenantGuard)
-    tenantsService = module.get<TenantsService>(TenantsService)
     vi.clearAllMocks()
   })
 
