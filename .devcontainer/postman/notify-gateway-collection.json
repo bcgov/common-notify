@@ -73,7 +73,7 @@
           "response": []
         },
         {
-          "name": "Get OAuth2 Token (Kong - Dev)",
+          "name": "Get OAuth2 Token (Kong - Local)",
           "event": [
             {
               "listen": "test",
@@ -176,7 +176,7 @@
               "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "email"]
             },
-            "description": "Send an email using Bearer token authentication (OAuth2 or JWT).\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Dev)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
+            "description": "Send an email using Bearer token authentication (OAuth2 or JWT).\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
           },
           "response": []
         }
