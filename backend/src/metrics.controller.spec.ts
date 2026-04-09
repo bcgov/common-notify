@@ -56,7 +56,7 @@ describe('MetricsController', () => {
 
     it('should handle errors when metrics collection fails', async () => {
       // Arrange
-      const { register } = await import('src/middleware/prom')
+      const { register } = await import('src/middleware/prom.js')
       vi.mocked(register.metrics).mockRejectedValue(new Error('Metrics collection failed'))
 
       // Act & Assert

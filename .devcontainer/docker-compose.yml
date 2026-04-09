@@ -34,7 +34,7 @@ services:
       FLYWAY_USER: *POSTGRES_USER
       FLYWAY_PASSWORD: *POSTGRES_PASSWORD
       FLYWAY_BASELINE_ON_MIGRATE: true
-      FLYWAY_DEFAULT_SCHEMA: users
+      FLYWAY_DEFAULT_SCHEMA: notify
       # For development, include both main and dev migrations
       # For production, set: FLYWAY_LOCATIONS=filesystem:/flyway/sql
       FLYWAY_LOCATIONS: "filesystem:/flyway/sql,filesystem:/flyway/dev"

@@ -9,10 +9,13 @@ import {
   Body,
   HttpCode,
   Version,
+  UseGuards,
 } from '@nestjs/common'
+import { TenantGuard } from '../../common/guards/tenant.guard'
 import { NotifyService } from './notify.service'
 
 @Controller('notifysimple')
+@UseGuards(TenantGuard)
 export class NotifySimpleController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -25,6 +28,7 @@ export class NotifySimpleController {
 }
 
 @Controller('notifyevent')
+@UseGuards(TenantGuard)
 export class NotifyEventController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -58,6 +62,7 @@ export class NotifyEventController {
 }
 
 @Controller('notify')
+@UseGuards(TenantGuard)
 export class NotifyController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -111,6 +116,7 @@ export class NotifyController {
 }
 
 @Controller('templates')
+@UseGuards(TenantGuard)
 export class TemplatesController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -130,6 +136,7 @@ export class TemplatesController {
 }
 
 @Controller('ches/api/v1/email')
+@UseGuards(TenantGuard)
 export class ChesEmailController {
   constructor(private readonly notifyService: NotifyService) {}
 
