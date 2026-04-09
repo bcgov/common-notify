@@ -5,25 +5,15 @@ import { HTTPLoggerMiddleware } from './middleware/req.res.logger'
 import { ConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import { DatabaseModule } from './database.module'
-import { UsersModule } from './users/users.module'
 import { AdminModule } from './admin/admin.module'
 import { ApiModule } from './api/api.module'
 import { AppService } from './app.service'
 import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
-import { RootOAuth2Controller } from './root-oauth2.controller'
-
 @Module({
-  imports: [
-    ConfigModule.forRoot(),
-    TerminusModule,
-    DatabaseModule,
-    UsersModule,
-    AdminModule,
-    ApiModule,
-  ],
-  controllers: [AppController, MetricsController, HealthController, RootOAuth2Controller],
+  imports: [ConfigModule.forRoot(), TerminusModule, DatabaseModule, AdminModule, ApiModule],
+  controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],
 })
 export class AppModule {
