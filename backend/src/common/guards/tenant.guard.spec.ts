@@ -4,6 +4,16 @@ import { vi } from 'vitest'
 import { TenantGuard } from './tenant.guard'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 
+// Type for request object with guard-added properties
+interface MockRequest {
+  headers: Record<string, string>
+  method: string
+  url: string
+  tenant?: any
+  kongConsumerId?: string
+  clientId?: string
+}
+
 describe('TenantGuard', () => {
   let guard: TenantGuard
   let tenantsService: TenantsService
@@ -41,7 +51,7 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           'x-consumer-username': 'test-tenant',
           'x-consumer-id': 'kong-id-123',
@@ -74,7 +84,7 @@ describe('TenantGuard', () => {
       mockTenantsService.findByKongUsername.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           'x-consumer-username': 'new-tenant',
           'x-consumer-id': 'kong-id-456',
@@ -103,7 +113,7 @@ describe('TenantGuard', () => {
       mockTenantsService.findByKongUsername.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           'x-consumer-username': 'failing-tenant',
           'x-consumer-id': 'kong-id-789',
@@ -136,7 +146,7 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(mockTenant)
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           authorization: `Bearer ${jwtToken}`,
         },
@@ -171,7 +181,7 @@ describe('TenantGuard', () => {
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
       mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           authorization: `Bearer ${jwtToken}`,
         },
@@ -202,7 +212,7 @@ describe('TenantGuard', () => {
       mockTenantsService.findByOAuth2ClientId.mockResolvedValue(null)
       mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           authorization: `Bearer ${jwtToken}`,
         },
@@ -220,7 +230,7 @@ describe('TenantGuard', () => {
     })
 
     it('should throw UnauthorizedException for invalid JWT format', async () => {
-      const request = {
+      const request: MockRequest = {
         headers: {
           authorization: 'Bearer invalid-token-format',
         },
@@ -242,7 +252,7 @@ describe('TenantGuard', () => {
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTc2MTI0M30.test'
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           authorization: `Bearer ${jwtToken}`,
         },
@@ -262,7 +272,7 @@ describe('TenantGuard', () => {
 
   describe('Authentication failure', () => {
     it('should throw BadRequestException when no auth headers provided', async () => {
-      const request = {
+      const request: MockRequest = {
         headers: {},
         method: 'POST',
         url: '/api/test',
@@ -286,7 +296,7 @@ describe('TenantGuard', () => {
 
       mockTenantsService.findByKongUsername.mockResolvedValue(mockTenant)
 
-      const request = {
+      const request: MockRequest = {
         headers: {
           'x-consumer-username': 'kong-tenant',
           'x-consumer-id': 'kong-id-999',
