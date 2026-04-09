@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { HttpException } from '@nestjs/common'
+import { vi } from 'vitest'
 import { TenantsController } from './tenants.controller'
 import { TenantsService } from './tenants.service'
 
@@ -19,11 +20,11 @@ describe('TenantsController', () => {
   }
 
   const mockService = {
-    create: jest.fn(),
-    findAll: jest.fn(),
-    findOne: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    create: vi.fn(),
+    findAll: vi.fn(),
+    findOne: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -39,7 +40,7 @@ describe('TenantsController', () => {
 
     controller = module.get<TenantsController>(TenantsController)
     service = module.get<TenantsService>(TenantsService)
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('create', () => {

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { vi } from 'vitest'
 import { TenantsService } from './tenants.service'
 import { Tenant } from './entities/tenant.entity'
 
@@ -25,11 +26,11 @@ describe('TenantsService', () => {
   }
 
   const mockRepository = {
-    findOne: jest.fn(),
-    find: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    delete: jest.fn(),
+    findOne: vi.fn(),
+    find: vi.fn(),
+    create: vi.fn(),
+    save: vi.fn(),
+    delete: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -45,7 +46,7 @@ describe('TenantsService', () => {
 
     service = module.get<TenantsService>(TenantsService)
     repository = module.get<Repository<Tenant>>(getRepositoryToken(Tenant))
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('create', () => {
@@ -100,9 +101,7 @@ describe('TenantsService', () => {
     it('should throw BadRequestException if tenant already exists', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
-      await expect(
-        service.create({ name: 'test-tenant' }),
-      ).rejects.toThrow(BadRequestException)
+      await expect(service.create({ name: 'test-tenant' })).rejects.toThrow(BadRequestException)
     })
 
     it('should handle database errors during creation', async () => {
@@ -268,9 +267,7 @@ describe('TenantsService', () => {
       const result = await service.update(1, updateData)
 
       expect(result).toEqual(updatedTenant)
-      expect(mockRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining(updateData),
-      )
+      expect(mockRepository.save).toHaveBeenCalledWith(expect.objectContaining(updateData))
     })
   })
 
