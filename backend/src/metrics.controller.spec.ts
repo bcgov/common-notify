@@ -41,7 +41,7 @@ describe('MetricsController', () => {
     it('should return metrics from prometheus register', async () => {
       // Arrange
       const mockMetrics = 'http_requests_total 100\nhttp_requests_duration_seconds 0.5'
-      const { register } = await import('src/middleware/prom')
+      const { register } = await import('src/middleware/prom.js')
       vi.mocked(register.metrics).mockResolvedValue(mockMetrics)
 
       // Act & Assert
