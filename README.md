@@ -1,7 +1,5 @@
-# Notify Service — Overview
-
-> [!INFO] version 3
-
+# Notify Service — Overview 
+> [!INFO] version  3
 ## What it does
 
 The Notify service is a **multi-channel, multi-tenanted, notification service**. It comprises a user
