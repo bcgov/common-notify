@@ -58,7 +58,10 @@ jobs:
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           commands: |
+            # Import dev tag
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev ${{ matrix.package }}:dev --source=docker --reference-policy=local
+            # Tag as test for TEST environment
+            oc tag ${{ matrix.package }}:dev ${{ matrix.package }}:test
 
   deploy-dev:
     name: Deploy (DEV)
@@ -72,17 +75,17 @@ jobs:
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       tag: dev
 
-  # deploy-test:
-  #   name: Deploy (TEST)
-  #   needs: [import]
-  #   uses: ./.github/workflows/.deployer.yml
-  #   secrets:
-  #     oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
-  #     oc_token: ${{ secrets.OC_TEST_TOKEN }}
-  #   with:
-  #     environment: TEST
-  #     db_user: appproxy # appproxy is the user which works with pgbouncer.
-  #     tag: test
+  deploy-test:
+    name: Deploy (TEST)
+    needs: [import]
+    uses: ./.github/workflows/.deployer.yml
+    secrets:
+      oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TEST_TOKEN }}
+    with:
+      environment: TEST
+      db_user: appproxy # appproxy is the user which works with pgbouncer.
+      tag: test
 
   # tests:
   #   name: Tests
