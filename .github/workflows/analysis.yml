@@ -41,7 +41,7 @@ jobs:
           commands: |
             npm ci
             npm run lint
-            npm run test:cov
+            npm run test:unit:cov
           dir: backend
           node_version: "22"
           sonar_args: >
