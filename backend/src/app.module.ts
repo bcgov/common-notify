@@ -24,6 +24,7 @@ export class AppModule {
       .exclude(
         { path: 'metrics', method: RequestMethod.ALL },
         { path: 'health', method: RequestMethod.ALL },
+        { path: 'api/health', method: RequestMethod.ALL },
       )
       .forRoutes('*')
   }
