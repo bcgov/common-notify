@@ -7,6 +7,7 @@ import helmet from 'helmet'
 import { VersioningType } from '@nestjs/common'
 import { metricsMiddleware } from 'src/middleware/prom'
 import bodyParser from 'body-parser'
+import { Router } from 'express'
 
 /**
  *
@@ -25,6 +26,14 @@ export async function bootstrap() {
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
+
+  // Health check at root level (before global prefix) for Kong's health probe
+  const rootRouter = Router()
+  rootRouter.get('/', (req, res) => {
+    res.json({ status: 'ok' })
+  })
+  app.use(rootRouter)
+
   app.setGlobalPrefix('api')
   app.enableVersioning({
     type: VersioningType.URI,
