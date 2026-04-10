@@ -8,6 +8,11 @@ on:
         description: PR number, test or prod
         default: ${{ github.event.number }}
         type: string
+    secrets:
+      E2E_TEST_CLIENT_ID:
+        required: false
+      E2E_TEST_CLIENT_SECRET:
+        required: false
 
 env:
   DOMAIN: apps.silver.devops.gov.bc.ca

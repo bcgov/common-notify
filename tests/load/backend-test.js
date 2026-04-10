@@ -19,7 +19,7 @@ function checkStatus(response, checkName, statusCode = 200) {
 }
 
 export default function () {
-  // Test the health endpoint (no auth required)
+  // Test the health endpoint (BACKEND_URL already includes /api, so just add /health)
   let healthUrl = `${__ENV.BACKEND_URL}/health`
   let healthParams = {
     headers: {
@@ -28,9 +28,4 @@ export default function () {
   }
   let healthRes = http.get(healthUrl, healthParams)
   checkStatus(healthRes, 'health-check', 200)
-
-  // Test the health endpoint with /api prefix (no auth required)
-  let apiHealthUrl = `${__ENV.BACKEND_URL}/api/health`
-  let apiHealthRes = http.get(apiHealthUrl, healthParams)
-  checkStatus(apiHealthRes, 'api-health-check', 200)
 }
