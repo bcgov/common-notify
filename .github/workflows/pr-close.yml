@@ -33,5 +33,5 @@ jobs:
         with:
           oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.OC_DEV_TOKEN }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
           values_file: charts/crunchy/values.yml

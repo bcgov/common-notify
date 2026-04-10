@@ -56,7 +56,7 @@ jobs:
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
           commands: |
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev ${{ matrix.package }}:dev --source=docker --reference-policy=local
 
