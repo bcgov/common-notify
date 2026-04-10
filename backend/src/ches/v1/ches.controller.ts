@@ -19,8 +19,8 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger'
-import { ChesApiClient } from './ches-api.client'
-import type { ChesStatusQuery } from './ches-api.client'
+import { ChesApiClient } from '../ches-api.client'
+import type { ChesStatusQuery } from '../ches-api.client'
 import { ChesMessageObject } from './schemas/ches-message-object'
 import { ChesTransactionResponse } from './schemas/ches-transaction-response'
 import { ChesMergeRequest } from './schemas/ches-merge-request'

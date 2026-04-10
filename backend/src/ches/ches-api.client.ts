@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ChesOAuthService } from './ches-oauth.service'
-import { ChesMessageObject } from './schemas/ches-message-object'
-import { ChesTransactionResponse } from './schemas/ches-transaction-response'
-import { ChesMergeRequest } from './schemas/ches-merge-request'
-import { ChesStatusObject } from './schemas/ches-status-object'
+import { ChesMessageObject } from './v1/schemas/ches-message-object'
+import { ChesTransactionResponse } from './v1/schemas/ches-transaction-response'
+import { ChesMergeRequest } from './v1/schemas/ches-merge-request'
+import { ChesStatusObject } from './v1/schemas/ches-status-object'
 
 export { ChesMergeRequest, ChesStatusObject }
 
