@@ -69,6 +69,12 @@ backend:
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+  networkPolicy:
+    enabled: true # enable NetworkPolicy to restrict traffic to backend
+    # By default, allows traffic from:
+    # 1. OpenShift Router (for external API Gateway access)
+    # 2. Frontend pods in same release (for internal communication)
+    # 3. Monitoring namespace (for metrics scraping)
 
 frontend:
   # -- enable or disable a component deployment.

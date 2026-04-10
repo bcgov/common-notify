@@ -1,0 +1,42 @@
+{{- if and .Values.backend.enabled .Values.backend.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-backend-netpol
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from OpenShift Router (for external API Gateway access)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow traffic from frontend pods in the same release (internal communication)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: frontend
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow traffic from monitoring/metrics scrapers
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: 3000
+{{- end }}
