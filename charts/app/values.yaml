@@ -84,6 +84,12 @@ frontend:
   # -- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
 
+  # -- Keycloak configuration
+  keycloakUrl: ~ # default: https://dev.loginproxy.gov.bc.ca/auth
+  keycloakRealm: ~ # default: standard
+  keycloakClientId: ~ # default: notify-6388
+  apiGatewayNotifyUrl: ~ # default: https://coco-notify-gateway.dev.api.gov.bc.ca
+
   #-- autoscaling for the component. it is optional and is an object.
   autoscaling:
     #-- enable or disable autoscaling.
