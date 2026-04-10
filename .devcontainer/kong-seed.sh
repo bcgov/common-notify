@@ -112,16 +112,6 @@ if [ -z "$TOKEN_ROUTE" ]; then
   # Kong will still route /oauth2/token to the oauth2-mock service
 fi
 
-# Enable JWT plugin on all CHES routes
-echo "Enabling JWT plugin on CHES routes..."
-for ches_route in notify-ches-email-route notify-ches-emailmerge-route notify-ches-status-route notify-ches-promote-route notify-ches-cancel-route notify-ches-health-route; do
-  echo "  Adding JWT plugin to $ches_route..."
-  curl -s -X POST "$KONG_ADMIN_URL/routes/$ches_route/plugins" \
-    --data-urlencode "name=jwt" \
-    --data-urlencode "config.key_claim_name=sub" \
-    2>/dev/null || echo "    JWT plugin may already exist on $ches_route"
-done
-
 # Enable request-transformer plugin on CHES email route to inject tenant headers
 echo "Enabling request-transformer plugin on CHES email route (for header injection)..."
 curl -s -X POST "$KONG_ADMIN_URL/routes/notify-ches-email-route/plugins" \
