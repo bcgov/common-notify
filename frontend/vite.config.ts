@@ -49,7 +49,6 @@ export default defineConfig({
         manualChunks: {
           // Split external library from transpiled code.
           react: ['react', 'react-dom'],
-          axios: ['axios'],
         },
       },
     },
