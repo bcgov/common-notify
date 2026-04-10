@@ -41,12 +41,12 @@ fi
 echo "Setting up CHES API routes..."
 
 CHES_ROUTE_CONFIGS="
-ches-email:/ches/api/v1/email
-ches-emailmerge:/ches/api/v1/emailMerge
-ches-status:/ches/api/v1/status
-ches-promote:/ches/api/v1/promote
-ches-cancel:/ches/api/v1/cancel
-ches-health:/ches/api/v1/health
+ches-email:/api/v1/ches/email
+ches-emailmerge:/api/v1/ches/emailMerge
+ches-status:/api/v1/ches/status
+ches-promote:/api/v1/ches/promote
+ches-cancel:/api/v1/ches/cancel
+ches-health:/api/v1/ches/health
 "
 
 echo "$CHES_ROUTE_CONFIGS" | while read -r route_config; do
