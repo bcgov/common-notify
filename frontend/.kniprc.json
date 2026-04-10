@@ -1,11 +1,15 @@
 {
   "entry": [
+    "index.html",
     "src/main.tsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "vite.config.ts",
-    "vitest.config.ts",
+    "src/service/api-service.ts",
     "playwright.config.ts",
-    "e2e/**/*.ts"
-  ]
+    "e2e/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+  "dependencies": {
+    "axios": ["src/service/api-service.ts"],
+    "@playwright/test": ["playwright.config.ts", "e2e/**/*.ts"]
+  }
 }
