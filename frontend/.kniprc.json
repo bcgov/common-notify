@@ -1,0 +1,10 @@
+{
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "e2e/**/*.ts",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+  "ignoreDependencies": ["axios", "@playwright/test"]
+}
