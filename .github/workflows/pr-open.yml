@@ -67,7 +67,6 @@ jobs:
     name: Tests
     if: needs.deploys.outputs.triggered == 'true'
     needs: [deploys]
-    environment: DEV
     uses: ./.github/workflows/.tests.yml
     secrets:
       E2E_TEST_CLIENT_ID: ${{ secrets.E2E_TEST_CLIENT_ID }}
