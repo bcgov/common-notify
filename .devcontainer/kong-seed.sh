@@ -63,6 +63,71 @@ if [ -z "$CHES_EMAIL_ROUTE" ]; then
   CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
+# Create CHES email merge route (POST /ches/emailMerge, POST /ches/emailMerge/preview)
+echo "Setting up CHES email merge route..."
+CHES_EMAIL_MERGE_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-email-merge-route" \
+  --data-urlencode "paths[]=/ches/api/v1/emailMerge" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_EMAIL_MERGE_ROUTE" ]; then
+  echo "  CHES email merge route may already exist, fetching..."
+  CHES_EMAIL_MERGE_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-merge-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Create CHES status route (GET /ches/status, GET /ches/status/:msgId)
+echo "Setting up CHES status route..."
+CHES_STATUS_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-status-route" \
+  --data-urlencode "paths[]=/ches/api/v1/status" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_STATUS_ROUTE" ]; then
+  echo "  CHES status route may already exist, fetching..."
+  CHES_STATUS_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-status-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Create CHES promote route (POST /ches/promote, POST /ches/promote/:msgId)
+echo "Setting up CHES promote route..."
+CHES_PROMOTE_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-promote-route" \
+  --data-urlencode "paths[]=/ches/api/v1/promote" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_PROMOTE_ROUTE" ]; then
+  echo "  CHES promote route may already exist, fetching..."
+  CHES_PROMOTE_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-promote-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Create CHES cancel route (DELETE /ches/cancel, DELETE /ches/cancel/:msgId)
+echo "Setting up CHES cancel route..."
+CHES_CANCEL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-cancel-route" \
+  --data-urlencode "paths[]=/ches/api/v1/cancel" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_CANCEL_ROUTE" ]; then
+  echo "  CHES cancel route may already exist, fetching..."
+  CHES_CANCEL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-cancel-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+# Create CHES health route (GET /ches/health)
+echo "Setting up CHES health route..."
+CHES_HEALTH_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-ches-health-route" \
+  --data-urlencode "paths[]=/ches/api/v1/health" \
+  --data-urlencode "strip_path=false" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$CHES_HEALTH_ROUTE" ]; then
+  echo "  CHES health route may already exist, fetching..."
+  CHES_HEALTH_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-health-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
 # Create OAuth2 Mock service
 echo "Setting up OAuth2 Mock Token service..."
 SERVICE_RESPONSE=$(curl -s -X POST "$KONG_ADMIN_URL/services" \
@@ -103,6 +168,46 @@ curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
   --data-urlencode "config.claims_to_verify[]=sub" \
   --data-urlencode "config.key_claim_name=sub" \
   2>/dev/null || echo "JWT plugin may already exist on CHES email route"
+
+# Enable JWT plugin on CHES email merge route
+echo "Enabling JWT plugin on CHES email merge route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_MERGE_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES email merge route"
+
+# Enable JWT plugin on CHES status route
+echo "Enabling JWT plugin on CHES status route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_STATUS_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES status route"
+
+# Enable JWT plugin on CHES promote route
+echo "Enabling JWT plugin on CHES promote route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_PROMOTE_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES promote route"
+
+# Enable JWT plugin on CHES cancel route
+echo "Enabling JWT plugin on CHES cancel route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_CANCEL_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES cancel route"
+
+# Enable JWT plugin on CHES health route
+echo "Enabling JWT plugin on CHES health route..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_HEALTH_ROUTE/plugins" \
+  --data-urlencode "name=jwt" \
+  --data-urlencode "config.claims_to_verify[]=sub" \
+  --data-urlencode "config.key_claim_name=sub" \
+  2>/dev/null || echo "JWT plugin may already exist on CHES health route"
 
 # Create test tenants (consumers) and API keys
 echo "Creating test tenants and API keys..."
