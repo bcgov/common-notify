@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { TenantsModule } from '../../admin/tenants/tenants.module'
+import { ChesModule } from '../../ches/ches.module'
 import {
   NotifyController,
   NotifySimpleController,
@@ -10,7 +11,7 @@ import {
 import { NotifyService } from './notify.service'
 
 @Module({
-  imports: [TenantsModule],
+  imports: [TenantsModule, ChesModule],
   controllers: [
     NotifySimpleController,
     NotifyEventController,
