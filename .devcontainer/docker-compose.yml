@@ -43,6 +43,17 @@ services:
       database:
         condition: service_healthy
 
+  schemaspy:
+    image: schemaspy/schemaspy:7.0.2
+    profiles: ['schemaspy']
+    container_name: schemaspy
+    command:
+      -t pgsql11 -db postgres -host database -port 5432 -u postgres -p default -schemas notify
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    volumes: ['./output:/output']
+
   backend:
     container_name: backend
     depends_on:
@@ -55,15 +66,10 @@ services:
       <<: *postgres-vars
       NODE_ENV: development
       KONG_ADMIN_URL: http://kong:8001
-      CHES_BASE_URL: ${CHES_BASE_URL}
-      CHES_TOKEN_URL: ${CHES_TOKEN_URL}
-      CHES_CLIENT_ID: ${CHES_CLIENT_ID}
-      CHES_CLIENT_SECRET: ${CHES_CLIENT_SECRET}
-      CHES_FROM: ${CHES_FROM}
     image: *node-image
     ports: ['3001:3000']
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api']
     working_dir: '/app'
     volumes: ['../backend:/app', '/app/node_modules']
 
@@ -156,13 +162,13 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3002
-    ports: ["3002:3002"]
+    ports: ['3002:3002']
     volumes:
       - ./oauth2-mock-server.js:/app/server.js
       - ./oauth2-mock-package.json:/app/package.json
       - /app/node_modules
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3002/health']
     depends_on:
       database:
         condition: service_healthy
@@ -174,7 +180,6 @@ services:
     command: /kong-seed.sh
     volumes:
       - ./kong-seed.sh:/kong-seed.sh:ro
-    env_file: .env
     depends_on:
       kong:
         condition: service_healthy

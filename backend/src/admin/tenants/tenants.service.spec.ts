@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { TenantsService } from './tenants.service'
@@ -8,21 +7,18 @@ import { Tenant } from './entities/tenant.entity'
 
 describe('TenantsService', () => {
   let service: TenantsService
-  let repository: Repository<Tenant>
 
   const mockTenant: Tenant = {
-    id: 1,
+    id: 'uuid-1',
+    externalId: 'ext-123',
     name: 'test-tenant',
-    description: 'Test tenant',
-    organization: 'Test Org',
-    contactEmail: 'contact@test.com',
-    contactName: 'John Doe',
-    kongUsername: 'test-tenant',
-    kongConsumerId: 'kong-123',
-    oauth2ClientId: 'client-123',
+    slug: 'test-tenant',
     status: 'active',
     createdAt: new Date(),
+    createdBy: 'user@example.com',
     updatedAt: new Date(),
+    updatedBy: 'user@example.com',
+    isDeleted: false,
   }
 
   const mockRepository = {
@@ -30,7 +26,7 @@ describe('TenantsService', () => {
     find: vi.fn(),
     create: vi.fn(),
     save: vi.fn(),
-    delete: vi.fn(),
+    update: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -45,26 +41,21 @@ describe('TenantsService', () => {
     }).compile()
 
     service = module.get<TenantsService>(TenantsService)
-    repository = module.get<Repository<Tenant>>(getRepositoryToken(Tenant))
     vi.clearAllMocks()
   })
 
   describe('create', () => {
-    it('should create a new tenant with Kong username', async () => {
+    it('should create a new tenant with externalId', async () => {
       mockRepository.findOne.mockResolvedValue(null)
       mockRepository.create.mockReturnValue(mockTenant)
       mockRepository.save.mockResolvedValue(mockTenant)
 
-      const result = await service.create(
-        {
-          name: 'test-tenant',
-          description: 'Test tenant',
-          organization: 'Test Org',
-          contactEmail: 'contact@test.com',
-          contactName: 'John Doe',
-        },
-        { kongUsername: 'test-tenant' },
-      )
+      const result = await service.create({
+        name: 'test-tenant',
+        externalId: 'ext-123',
+        slug: 'test-tenant',
+        createdBy: 'user@example.com',
+      })
 
       expect(result.tenant).toEqual(mockTenant)
       expect(mockRepository.findOne).toHaveBeenCalledWith({
@@ -73,35 +64,41 @@ describe('TenantsService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'test-tenant',
-          kongUsername: 'test-tenant',
+          slug: 'test-tenant',
+          externalId: 'ext-123',
         }),
       )
       expect(mockRepository.save).toHaveBeenCalled()
     })
 
-    it('should create a new tenant with OAuth2 client ID', async () => {
-      const oauth2Tenant = { ...mockTenant, oauth2ClientId: 'oauth2-456' }
-      mockRepository.findOne.mockResolvedValue(null)
-      mockRepository.create.mockReturnValue(oauth2Tenant)
-      mockRepository.save.mockResolvedValue(oauth2Tenant)
+    it('should auto-generate slug from name if not provided', async () => {
+      const tenantWithAutoSlug = { ...mockTenant, slug: 'test-tenant' }
+      mockRepository.findOne.mockResolvedValueOnce(null) // findByName
+      mockRepository.findOne.mockResolvedValueOnce(null) // findBySlug
+      mockRepository.create.mockReturnValue(tenantWithAutoSlug)
+      mockRepository.save.mockResolvedValue(tenantWithAutoSlug)
 
-      const result = await service.create(
-        { name: 'oauth2-tenant' },
-        { oauth2ClientId: 'oauth2-456' },
-      )
+      const result = await service.create({
+        name: 'Test Tenant',
+        externalId: 'ext-456',
+      })
 
-      expect(result.tenant).toEqual(oauth2Tenant)
-      expect(mockRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          oauth2ClientId: 'oauth2-456',
-        }),
-      )
+      expect(result.tenant.slug).toBe('test-tenant')
     })
 
     it('should throw BadRequestException if tenant already exists', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
       await expect(service.create({ name: 'test-tenant' })).rejects.toThrow(BadRequestException)
+    })
+
+    it('should throw BadRequestException if slug already exists', async () => {
+      mockRepository.findOne.mockResolvedValueOnce(null) // findByName returns null
+      mockRepository.findOne.mockResolvedValueOnce(mockTenant) // findBySlug returns tenant
+
+      await expect(service.create({ name: 'new-name', slug: 'test-tenant' })).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('should handle database errors during creation', async () => {
@@ -113,20 +110,14 @@ describe('TenantsService', () => {
     })
 
     it('should create tenant with minimal required data', async () => {
-      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.findOne.mockResolvedValueOnce(null) // findByName
+      mockRepository.findOne.mockResolvedValueOnce(null) // findBySlug
       mockRepository.create.mockReturnValue(mockTenant)
       mockRepository.save.mockResolvedValue(mockTenant)
 
       const result = await service.create({ name: 'minimal-tenant' })
 
       expect(result.tenant).toEqual(mockTenant)
-      expect(mockRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'minimal-tenant',
-          description: undefined,
-          organization: undefined,
-        }),
-      )
     })
   })
 
@@ -154,16 +145,16 @@ describe('TenantsService', () => {
     it('should find a tenant by ID', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
-      const result = await service.findOne(1)
+      const result = await service.findOne('uuid-1')
 
       expect(result).toEqual(mockTenant)
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id: 1 } })
+      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id: 'uuid-1' } })
     })
 
     it('should return null if tenant not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      const result = await service.findOne(999)
+      const result = await service.findOne('nonexistent-uuid')
 
       expect(result).toBeNull()
     })
@@ -190,43 +181,43 @@ describe('TenantsService', () => {
     })
   })
 
-  describe('findByKongUsername', () => {
-    it('should find a tenant by Kong username', async () => {
+  describe('findBySlug', () => {
+    it('should find a tenant by slug', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
-      const result = await service.findByKongUsername('test-tenant')
+      const result = await service.findBySlug('test-tenant')
 
       expect(result).toEqual(mockTenant)
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { kongUsername: 'test-tenant' },
+        where: { slug: 'test-tenant' },
       })
     })
 
-    it('should return null if tenant not found by Kong username', async () => {
+    it('should return null if tenant not found by slug', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      const result = await service.findByKongUsername('nonexistent')
+      const result = await service.findBySlug('nonexistent-slug')
 
       expect(result).toBeNull()
     })
   })
 
-  describe('findByOAuth2ClientId', () => {
-    it('should find a tenant by OAuth2 client ID', async () => {
+  describe('findByExternalId', () => {
+    it('should find a tenant by external ID', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
 
-      const result = await service.findByOAuth2ClientId('client-123')
+      const result = await service.findByExternalId('ext-123')
 
       expect(result).toEqual(mockTenant)
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { oauth2ClientId: 'client-123' },
+        where: { externalId: 'ext-123' },
       })
     })
 
-    it('should return null if tenant not found by OAuth2 client ID', async () => {
+    it('should return null if tenant not found by external ID', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      const result = await service.findByOAuth2ClientId('nonexistent-client')
+      const result = await service.findByExternalId('nonexistent-ext')
 
       expect(result).toBeNull()
     })
@@ -234,16 +225,16 @@ describe('TenantsService', () => {
 
   describe('update', () => {
     it('should update a tenant', async () => {
-      const updatedTenant = { ...mockTenant, description: 'Updated description' }
+      const updatedTenant = { ...mockTenant, name: 'updated-tenant' }
       mockRepository.findOne.mockResolvedValue(mockTenant)
       mockRepository.save.mockResolvedValue(updatedTenant)
 
-      const result = await service.update(1, { description: 'Updated description' })
+      const result = await service.update('uuid-1', { name: 'updated-tenant' })
 
       expect(result).toEqual(updatedTenant)
       expect(mockRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: 'Updated description',
+          name: 'updated-tenant',
         }),
       )
     })
@@ -251,20 +242,19 @@ describe('TenantsService', () => {
     it('should throw NotFoundException if tenant does not exist', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.update(999, {})).rejects.toThrow(NotFoundException)
+      await expect(service.update('nonexistent-uuid', {})).rejects.toThrow(NotFoundException)
     })
 
     it('should update multiple fields', async () => {
       const updateData = {
-        description: 'New description',
-        organization: 'New Org',
-        contactEmail: 'newemail@test.com',
+        name: 'new-name',
+        status: 'disabled' as const,
       }
       const updatedTenant = { ...mockTenant, ...updateData }
       mockRepository.findOne.mockResolvedValue(mockTenant)
       mockRepository.save.mockResolvedValue(updatedTenant)
 
-      const result = await service.update(1, updateData)
+      const result = await service.update('uuid-1', updateData)
 
       expect(result).toEqual(updatedTenant)
       expect(mockRepository.save).toHaveBeenCalledWith(expect.objectContaining(updateData))
@@ -272,26 +262,26 @@ describe('TenantsService', () => {
   })
 
   describe('delete', () => {
-    it('should delete a tenant', async () => {
+    it('should soft delete a tenant', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
-      mockRepository.delete.mockResolvedValue({ affected: 1 })
+      mockRepository.update.mockResolvedValue({ affected: 1 })
 
-      await service.delete(1)
+      await service.delete('uuid-1')
 
-      expect(mockRepository.delete).toHaveBeenCalledWith(1)
+      expect(mockRepository.update).toHaveBeenCalledWith('uuid-1', { isDeleted: true })
     })
 
     it('should throw NotFoundException if tenant does not exist', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.delete(999)).rejects.toThrow(NotFoundException)
+      await expect(service.delete('nonexistent-uuid')).rejects.toThrow(NotFoundException)
     })
 
     it('should handle database errors during deletion', async () => {
       mockRepository.findOne.mockResolvedValue(mockTenant)
-      mockRepository.delete.mockRejectedValue(new Error('Database error'))
+      mockRepository.update.mockRejectedValue(new Error('Database error'))
 
-      await expect(service.delete(1)).rejects.toThrow(Error)
+      await expect(service.delete('uuid-1')).rejects.toThrow(Error)
     })
   })
 })

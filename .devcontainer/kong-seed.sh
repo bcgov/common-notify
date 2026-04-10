@@ -112,9 +112,20 @@ if [ -z "$TOKEN_ROUTE" ]; then
   # Kong will still route /oauth2/token to the oauth2-mock service
 fi
 
+# Enable JWT plugin on CHES email route (validates Bearer tokens from mock OAuth2 server)
+echo "Enabling JWT plugin on CHES email route (route=$CHES_EMAIL_ROUTE)..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "jwt",
+    "config": {
+      "key_claim_name": "sub"
+    }
+  }' || echo "CHES JWT plugin creation may have failed"
+
 # Enable request-transformer plugin on CHES email route to inject tenant headers
 echo "Enabling request-transformer plugin on CHES email route (for header injection)..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/notify-ches-email-route/plugins" \
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "request-transformer",

@@ -1,8 +1,10 @@
 {
   "info": {
+    "_postman_id": "6ba17d35-c99c-4a29-bab2-86b021f45e45",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "9083839"
   },
   "item": [
     {
@@ -30,7 +32,9 @@
                   "    });",
                   "}"
                 ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
               }
             }
           ],
@@ -172,10 +176,8 @@
               "raw": "{\n  \"email\": {\n    \"to\": [\"user@example.com\"],\n    \"subject\": \"Test Notification\",\n    \"body\": \"This is a test notification\"\n  }\n}"
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notifysimple",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notifysimple"]
             },
             "description": "Send a simple multi-channel notification"

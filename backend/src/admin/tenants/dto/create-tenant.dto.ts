@@ -1,43 +1,40 @@
-import { IsString, IsEmail, IsOptional } from 'class-validator'
+import { IsString, IsOptional, Matches } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreateTenantDto {
+  @ApiPropertyOptional({
+    description:
+      'External identifier from CSTAR or Gateway used to correlate this tenant with external systems',
+    example: 'ext-12345',
+  })
+  @IsOptional()
+  @IsString()
+  externalId?: string
+
   @ApiProperty({
-    description: 'Unique tenant name (will be used as Kong consumer username)',
-    example: 'bchealth-notifications',
+    description: 'Human-readable name of the tenant organization',
+    example: 'Ministry of Health',
   })
   @IsString()
   name: string
 
   @ApiPropertyOptional({
-    description: 'Human-readable description of the tenant',
-    example: 'BC Health Notifications Service',
+    description:
+      'URL-friendly unique identifier for the tenant. Must be unique across all tenants. If not provided, will be auto-generated from the name.',
+    example: 'ministry-of-health',
   })
   @IsOptional()
   @IsString()
-  description?: string
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'Slug must contain only lowercase letters, numbers, and hyphens',
+  })
+  slug?: string
 
   @ApiPropertyOptional({
-    description: 'Organization name',
-    example: 'BC Ministry of Health',
+    description: 'Identifier of the user or process creating this record',
+    example: 'user@bcgov.ca',
   })
   @IsOptional()
   @IsString()
-  organization?: string
-
-  @ApiPropertyOptional({
-    description: 'Contact email for the tenant administrator',
-    example: 'admin@bchealth.ca',
-  })
-  @IsOptional()
-  @IsEmail()
-  contactEmail?: string
-
-  @ApiPropertyOptional({
-    description: 'Contact name for the tenant administrator',
-    example: 'John Doe',
-  })
-  @IsOptional()
-  @IsString()
-  contactName?: string
+  createdBy?: string
 }

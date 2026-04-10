@@ -39,7 +39,7 @@ describe('bootstrap', () => {
           setTimeout(() => reject(new Error('Bootstrap timeout')), 5000),
         ),
       ])
-    } catch (error) {
+    } catch {
       // Database likely not available - skip this integration test
       console.log(
         'Skipping bootstrap test - database not available. Run in container with: docker exec -it backend npm test',
@@ -51,7 +51,7 @@ describe('bootstrap', () => {
     if (app) {
       try {
         await app.close()
-      } catch (error) {
+      } catch {
         // Ignore errors during cleanup
       }
     }

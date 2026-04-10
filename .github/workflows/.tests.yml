@@ -8,6 +8,11 @@ on:
         description: PR number, test or prod
         default: ${{ github.event.number }}
         type: string
+    secrets:
+      E2E_TEST_CLIENT_ID:
+        required: false
+      E2E_TEST_CLIENT_SECRET:
+        required: false
 
 env:
   DOMAIN: apps.silver.devops.gov.bc.ca
@@ -35,6 +40,8 @@ jobs:
       - env:
           API_NAME: nest
           BASE_URL: https://${{ env.PREFIX }}.${{ env.DOMAIN }}
+          E2E_TEST_CLIENT_ID: ${{ secrets.E2E_TEST_CLIENT_ID }}
+          E2E_TEST_CLIENT_SECRET: ${{ secrets.E2E_TEST_CLIENT_SECRET }}
         run: |
           cd tests/integration
           npm ci

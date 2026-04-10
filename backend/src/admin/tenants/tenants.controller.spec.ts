@@ -6,17 +6,18 @@ import { TenantsService } from './tenants.service'
 
 describe('TenantsController', () => {
   let controller: TenantsController
-  let service: TenantsService
 
   const mockTenant = {
-    id: 1,
+    id: 'uuid-1',
+    externalId: 'ext-123',
     name: 'test-tenant',
-    description: 'Test tenant',
-    organization: 'Test Org',
-    contactEmail: 'contact@test.com',
-    contactName: 'John Doe',
-    kongUsername: 'test-tenant',
+    slug: 'test-tenant',
     status: 'active',
+    createdAt: new Date(),
+    createdBy: 'user@example.com',
+    updatedAt: new Date(),
+    updatedBy: 'user@example.com',
+    isDeleted: false,
   }
 
   const mockService = {
@@ -39,7 +40,6 @@ describe('TenantsController', () => {
     }).compile()
 
     controller = module.get<TenantsController>(TenantsController)
-    service = module.get<TenantsService>(TenantsService)
     vi.clearAllMocks()
   })
 
@@ -96,7 +96,7 @@ describe('TenantsController', () => {
       const result = await controller.findOne('1')
 
       expect(result).toEqual(mockTenant)
-      expect(mockService.findOne).toHaveBeenCalledWith(1)
+      expect(mockService.findOne).toHaveBeenCalledWith('1')
     })
 
     it('should throw HttpException if tenant not found', async () => {
@@ -110,7 +110,7 @@ describe('TenantsController', () => {
 
       await controller.findOne('42')
 
-      expect(mockService.findOne).toHaveBeenCalledWith(42)
+      expect(mockService.findOne).toHaveBeenCalledWith('42')
     })
   })
 
@@ -120,7 +120,7 @@ describe('TenantsController', () => {
 
       await expect(controller.delete('1')).resolves.not.toThrow()
 
-      expect(mockService.delete).toHaveBeenCalledWith(1)
+      expect(mockService.delete).toHaveBeenCalledWith('1')
     })
 
     it('should handle deletion errors', async () => {
@@ -134,7 +134,7 @@ describe('TenantsController', () => {
 
       await controller.delete('99')
 
-      expect(mockService.delete).toHaveBeenCalledWith(99)
+      expect(mockService.delete).toHaveBeenCalledWith('99')
     })
   })
 })

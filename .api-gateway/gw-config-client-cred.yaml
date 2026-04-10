@@ -6,10 +6,12 @@ port: 80
 protocol: http
 retries: 0
 routes:
-  - name: gw-fe8c5-notify-dev
+  - name: gw-fe8c5-notify-health
     tags: [ns.gw-fe8c5]
     hosts:
       - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /health
     methods:
       - GET
     strip_path: false
@@ -141,6 +143,189 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
+    route: gw-fe8c5-ches-email
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-simple
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-event
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-event-preview
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-list
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-status
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-callbacks
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-templates
     config:
       allowed_iss:
         - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
