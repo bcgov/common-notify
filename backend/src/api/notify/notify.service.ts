@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
+import { Injectable, BadRequestException, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ChesMessageObject } from '../../ches/schemas/ches-message-object'
@@ -7,6 +7,8 @@ import { NotifySimpleRequest, NotifyEmailChannel } from './schemas'
 
 @Injectable()
 export class NotifyService {
+  private readonly logger = new Logger(NotifyService.name)
+
   constructor(
     private readonly chesApiClient: ChesApiClient,
     private readonly configService: ConfigService,
@@ -25,7 +27,7 @@ export class NotifyService {
   }
 
   private sendEmail(email: NotifyEmailChannel): Promise<ChesTransactionResponse> {
-    const from = this.configService.get<string>('ches.from') ?? 'noreply@localhost'
+    const from = this.configService.get<string>('ches.from') ?? 'noreply@notify-test.gov.bc.ca'
     const chesMessage: ChesMessageObject = {
       from,
       to: email.to,

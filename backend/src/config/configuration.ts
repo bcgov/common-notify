@@ -1,5 +1,5 @@
 export default () => {
-  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'noreply@localhost'
+  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'noreply@notify-test.gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
   const defaultTemplateSubject = process.env.DEFAULT_TEMPLATE_SUBJECT || 'Notification'
 
