@@ -1,3 +1,4 @@
 {
-  "project": ["src/**/*.ts", "test/**/*.ts", "e2e/**/*.ts", "vitest.config.mts", "nest-cli.json"]
+  "project": ["src/**/*.ts", "test/**/*.ts", "e2e/**/*.ts", "vitest.config.mts", "nest-cli.json"],
+  "dependencies": {}
 }
