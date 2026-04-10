@@ -6,6 +6,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { VersioningType } from '@nestjs/common'
 import { metricsMiddleware } from 'src/middleware/prom'
+import bodyParser from 'body-parser'
+import { Router } from 'express'
 
 /**
  *
@@ -14,11 +16,24 @@ export async function bootstrap() {
   const app: NestExpressApplication = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: customLogger,
   })
+
+  // Add body parsers for form data
+  app.use(bodyParser.urlencoded({ extended: true }))
+  app.use(bodyParser.json())
+
   app.use(helmet())
   app.enableCors()
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
+
+  // Health check at root level (before global prefix) for Kong's health probe
+  const rootRouter = Router()
+  rootRouter.get('/', (req, res) => {
+    res.json({ status: 'ok' })
+  })
+  app.use(rootRouter)
+
   app.setGlobalPrefix('api')
   app.enableVersioning({
     type: VersioningType.URI,

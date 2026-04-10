@@ -39,4 +39,11 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+    # Allow traffic from any namespace on port 3000 (allows Kong API Gateway)
+    # NOTE: Platform team support needed to identify proper namespace selector for API Gateway
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
 {{- end }}

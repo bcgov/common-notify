@@ -19,7 +19,7 @@ global:
   config:
     databaseUser: ~
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
-  domain: "apps.silver.devops.gov.bc.ca" # it is apps.gold.devops.gov.bc.ca for gold cluster
+  domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
 
 #-- the components of the application, backend.
@@ -71,10 +71,12 @@ backend:
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
   networkPolicy:
     enabled: true # enable NetworkPolicy to restrict traffic to backend
-    # By default, allows traffic from:
-    # 1. OpenShift Router (for external API Gateway access)
-    # 2. Frontend pods in same release (for internal communication)
-    # 3. Monitoring namespace (for metrics scraping)
+    # Allows traffic from:
+    # 1. OpenShift Router (ingress policy-group)
+    # 2. Frontend pods in same release
+    # 3. Monitoring namespace (monitoring policy-group)
+    # 4. Any namespace on port 3000 (for Kong API Gateway)
+    # NOTE: More restrictive namespace selector needed from platform team
 
 frontend:
   # -- enable or disable a component deployment.
@@ -113,13 +115,13 @@ frontend:
         name: metrics
   ingress:
     annotations:
-      haproxy.router.openshift.io/balance: "roundrobin"
-      route.openshift.io/termination: "edge"
-      haproxy.router.openshift.io/rate-limit-connections: "true"
-      haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: "10"
-      haproxy.router.openshift.io/rate-limit-connections.rate-http: "20"
-      haproxy.router.openshift.io/rate-limit-connections.rate-tcp: "50"
-      haproxy.router.openshift.io/disable_cookies: "true"
+      haproxy.router.openshift.io/balance: 'roundrobin'
+      route.openshift.io/termination: 'edge'
+      haproxy.router.openshift.io/rate-limit-connections: 'true'
+      haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: '10'
+      haproxy.router.openshift.io/rate-limit-connections.rate-http: '20'
+      haproxy.router.openshift.io/rate-limit-connections.rate-tcp: '50'
+      haproxy.router.openshift.io/disable_cookies: 'true'
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
