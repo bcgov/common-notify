@@ -28,11 +28,9 @@ export class TenantsService {
     return name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters (specific character class)
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-      .replace(/^-+/, '') // Remove leading hyphens
-      .replace(/-+$/, '') // Remove trailing hyphens
+      .split(/[^a-z0-9-]+/) // Split on non-alphanumeric and non-hyphen characters
+      .filter(Boolean) // Remove empty strings
+      .join('-') // Join with hyphens
   }
 
   /**

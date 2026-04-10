@@ -18,45 +18,9 @@
       ]
     },
     {
-      "name": "Notify Event Types",
+      "name": "API Health Check",
       "methods": ["GET"],
-      "path": "/api/v1/notifyevent/types",
-      "headers": {
-        "accept": "application/json"
-      },
-      "assertions": [
-        {
-          "method": "GET",
-          "status_code": 200
-        }
-      ]
-    },
-    {
-      "name": "Notify Simple",
-      "methods": ["POST"],
-      "path": "/api/v1/notifysimple",
-      "headers": {
-        "Content-Type": "application/json",
-        "accept": "application/json"
-      },
-      "data": {
-        "post_payload": {
-          "to": "test@example.com",
-          "subject": "Test Subject",
-          "body": "Test Body"
-        }
-      },
-      "assertions": [
-        {
-          "method": "POST",
-          "status_code": 200
-        }
-      ]
-    },
-    {
-      "name": "Notify List",
-      "methods": ["GET"],
-      "path": "/api/v1/notify",
+      "path": "/api/health",
       "headers": {
         "accept": "application/json"
       },
