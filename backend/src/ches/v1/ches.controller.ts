@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Param,
   Query,
+  Version,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -34,6 +35,7 @@ import { TenantGuard } from 'src/common/guards/tenant.guard'
 export class ChesController {
   constructor(private readonly chesApiClient: ChesApiClient) {}
 
+  @Version('1')
   @Post('email')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send an email' })
@@ -53,6 +55,7 @@ export class ChesController {
     return this.chesApiClient.sendEmail(body)
   }
 
+  @Version('1')
   @Post('emailMerge')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Template mail merge and email sending' })
@@ -68,6 +71,7 @@ export class ChesController {
     return this.chesApiClient.sendEmailMerge(body)
   }
 
+  @Version('1')
   @Post('emailMerge/preview')
   @ApiOperation({ summary: 'Template mail merge validation and preview' })
   @ApiBody({ type: ChesMergeRequest, description: 'Merge request details' })
@@ -82,6 +86,7 @@ export class ChesController {
     return this.chesApiClient.previewEmailMerge(body)
   }
 
+  @Version('1')
   @Get('status')
   @ApiOperation({ summary: 'Query CHES message status' })
   @ApiQuery({ name: 'msgId', required: false })
@@ -102,6 +107,7 @@ export class ChesController {
     return this.chesApiClient.getStatusQuery(query)
   }
 
+  @Version('1')
   @Get('status/:msgId')
   @ApiOperation({ summary: 'Get CHES message status' })
   @ApiParam({ name: 'msgId', description: 'Message UUID' })
@@ -116,6 +122,7 @@ export class ChesController {
     return this.chesApiClient.getStatusMessage(msgId)
   }
 
+  @Version('1')
   @Post('promote')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Promote CHES messages' })
@@ -133,6 +140,7 @@ export class ChesController {
     return this.chesApiClient.promoteQuery(query)
   }
 
+  @Version('1')
   @Post('promote/:msgId')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Promote a single CHES message' })
@@ -144,6 +152,7 @@ export class ChesController {
     return this.chesApiClient.promoteMessage(msgId)
   }
 
+  @Version('1')
   @Delete('cancel')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Cancel CHES messages' })
@@ -161,6 +170,7 @@ export class ChesController {
     return this.chesApiClient.cancelQuery(query)
   }
 
+  @Version('1')
   @Delete('cancel/:msgId')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Cancel a single CHES message' })
@@ -172,6 +182,7 @@ export class ChesController {
     return this.chesApiClient.cancelMessage(msgId)
   }
 
+  @Version('1')
   @Get('health')
   @ApiOperation({ summary: 'CHES health' })
   @ApiResponse({ status: 200, description: 'CHES health status' })
