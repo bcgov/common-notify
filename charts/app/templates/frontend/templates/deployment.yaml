@@ -42,6 +42,12 @@ spec:
               value: "info"
             - name: VITE_API_GATEWAY_NOTIFY_URL
               value: {{ .Values.frontend.apiGatewayNotifyUrl | default "https://coco-notify-gateway.dev.api.gov.bc.ca" | quote }}
+            - name: VITE_KEYCLOAK_URL
+              value: {{ .Values.frontend.keycloakUrl | default "https://dev.loginproxy.gov.bc.ca/auth" | quote }}
+            - name: VITE_KEYCLOAK_REALM
+              value: {{ .Values.frontend.keycloakRealm | default "standard" | quote }}
+            - name: VITE_KEYCLOAK_CLIENT_ID
+              value: {{ .Values.frontend.keycloakClientId | default "notify-6388" | quote }}
           ports:
             - name: http
               containerPort: 3000
