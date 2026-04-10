@@ -1,9 +1,3 @@
 {
-  "entry": [
-    "src/main.ts",
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "e2e/**/*.ts",
-    "vitest.config.mts"
-  ]
+  "entry": ["src/main.ts", "src/**/*.ts", "test/**/*.ts", "e2e/**/*.ts", "vitest.config.mts"]
 }
