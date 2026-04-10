@@ -1,13 +1,11 @@
 {
-  "project": [
-    "src/**/*.{ts,tsx}",
-    "e2e/**/*.ts",
-    "playwright.config.ts",
+  "entry": [
+    "src/main.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "vite.config.ts",
-    "vitest.config.ts"
-  ],
-  "dependencies": {
-    "axios": [],
-    "@playwright/test": []
-  }
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "e2e/**/*.ts"
+  ]
 }
