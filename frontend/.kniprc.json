@@ -6,5 +6,8 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "ignoreDependencies": ["axios", "@playwright/test"]
+  "dependencies": {
+    "axios": [],
+    "@playwright/test": []
+  }
 }
