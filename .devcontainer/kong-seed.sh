@@ -24,7 +24,7 @@ curl -s -X POST "$KONG_ADMIN_URL/services" \
   --data-urlencode "protocol=http" \
   2>/dev/null || echo "Service may already exist"
 
-# Create admin route (JWT validation now happens in backend)
+# Create admin route - no email route needed anymore (using notify endpoints)
 echo "Setting up admin route..."
 ADMIN_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-admin-route" \
@@ -37,30 +37,17 @@ if [ -z "$ADMIN_ROUTE" ]; then
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create email route
-echo "Setting up email route..."
-EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-email-route" \
-  --data-urlencode "paths[]=/api/v1/email" \
-  --data-urlencode "strip_path=false" \
-  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
-
-if [ -z "$EMAIL_ROUTE" ]; then
-  echo "  Email route may already exist, fetching..."
-  EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
-fi
-
 # Create CHES email route
 echo "Setting up CHES email route..."
 CHES_EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
   --data-urlencode "name=notify-ches-email-route" \
   --data-urlencode "paths[]=/ches/api/v1/email" \
   --data-urlencode "strip_path=false" \
-  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+  2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
 
 if [ -z "$CHES_EMAIL_ROUTE" ]; then
-  echo "  CHES email route may already exist, fetching..."
-  CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+  echo "  CHES email route creation may have failed, fetching existing..."
+  CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
 fi
 
 # Create CHES email merge route (POST /ches/emailMerge, POST /ches/emailMerge/preview)
@@ -127,6 +114,32 @@ if [ -z "$CHES_HEALTH_ROUTE" ]; then
   echo "  CHES health route may already exist, fetching..."
   CHES_HEALTH_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-health-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
+# Create Notify API routes
+echo "Setting up Notify API routes..."
+
+# Create routes using simple loops (sh-compatible, not bash-only associative arrays)
+ROUTE_CONFIGS="
+notifysimple:/api/v1/notifysimple
+notifyevent:/api/v1/notifyevent
+notifyevent-preview:/api/v1/notifyevent/preview
+notifyevent-types:/api/v1/notifyevent/types
+notify-list:/api/v1/notify
+notify-status:/api/v1/notify/status
+notify-callbacks:/api/v1/notify/registerCallback
+templates:/api/v1/templates
+"
+
+echo "$ROUTE_CONFIGS" | while read -r route_config; do
+  [ -z "$route_config" ] && continue
+  route_key="${route_config%%:*}"
+  route_path="${route_config##*:}"
+  echo "  Creating route: $route_key ($route_path)"
+  curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+    --data-urlencode "name=notify-$route_key-route" \
+    --data-urlencode "paths[]=$route_path" \
+    --data-urlencode "strip_path=false" \
+    2>/dev/null || echo "    Route $route_key may already exist"
+done
 
 # Create OAuth2 Mock service
 echo "Setting up OAuth2 Mock Token service..."
@@ -153,21 +166,32 @@ if [ -z "$TOKEN_ROUTE" ]; then
   # Kong will still route /oauth2/token to the oauth2-mock service
 fi
 
-# Enable JWT plugin on email route (validates Bearer tokens from mock OAuth2 server)
-echo "Enabling JWT plugin on email route..."
-curl -s -X POST "$KONG_ADMIN_URL/routes/$EMAIL_ROUTE/plugins" \
-  --data-urlencode "name=jwt" \
-  --data-urlencode "config.claims_to_verify[]=sub" \
-  --data-urlencode "config.key_claim_name=sub" \
-  2>/dev/null || echo "JWT plugin may already exist on email route"
-
 # Enable JWT plugin on CHES email route (validates Bearer tokens from mock OAuth2 server)
-echo "Enabling JWT plugin on CHES email route..."
+echo "Enabling JWT plugin on CHES email route (route=$CHES_EMAIL_ROUTE)..."
 curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
-  --data-urlencode "name=jwt" \
-  --data-urlencode "config.claims_to_verify[]=sub" \
-  --data-urlencode "config.key_claim_name=sub" \
-  2>/dev/null || echo "JWT plugin may already exist on CHES email route"
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "jwt",
+    "config": {
+      "key_claim_name": "sub"
+    }
+  }' || echo "CHES JWT plugin creation may have failed"
+
+# Enable request-transformer plugin on CHES email route to inject tenant headers
+echo "Enabling request-transformer plugin on CHES email route (for header injection)..."
+curl -s -X POST "$KONG_ADMIN_URL/routes/$CHES_EMAIL_ROUTE/plugins" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "request-transformer",
+    "config": {
+      "add": {
+        "headers": [
+          "X-Consumer-Username:$(consumer_username)",
+          "X-Consumer-ID:$(consumer_id)"
+        ]
+      }
+    }
+  }' || echo "CHES Request-Transformer plugin creation may have failed"
 
 # Enable JWT plugin on CHES email merge route
 echo "Enabling JWT plugin on CHES email merge route..."
@@ -216,7 +240,7 @@ echo "Creating test tenants and API keys..."
 echo "  Creating tenant: test-tenant-a"
 CONSUMER_A=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
   --data-urlencode "username=test-tenant-a" \
-  --data-urlencode "custom_id=tenant-a" \
+  --data-urlencode "custom_id=test-client-a" \
   2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
 if [ -z "$CONSUMER_A" ]; then
@@ -252,11 +276,24 @@ else
   echo "    OAuth2 credentials may already exist"
 fi
 
+# Create JWT credentials for Tenant A (for JWT validation in Kong)
+echo "    Creating JWT credentials for test-tenant-a"
+JWT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/test-tenant-a/jwt" \
+  --data "key=test-client-a" \
+  --data "secret=test-secret-a" \
+  2>/dev/null)
+HTTP_CODE=$(echo "$JWT_RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "409" ]; then
+  echo "    JWT credentials created successfully"
+else
+  echo "    JWT credentials may already exist"
+fi
+
 # Tenant 2: Test Tenant B
 echo "  Creating tenant: test-tenant-b"
 CONSUMER_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
   --data-urlencode "username=test-tenant-b" \
-  --data-urlencode "custom_id=tenant-b" \
+  --data-urlencode "custom_id=test-client-b" \
   2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
 if [ -z "$CONSUMER_B" ]; then
@@ -284,11 +321,18 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/oauth2" \
   --data-urlencode "redirect_uris=http://localhost:3000/callback" \
   2>/dev/null || echo "OAuth2 credentials may already exist for test-tenant-b"
 
+# Create JWT credentials for Tenant B
+echo "    Creating JWT credentials for test-tenant-b"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-b/jwt" \
+  --data "key=test-client-b" \
+  --data "secret=test-secret-b" \
+  2>/dev/null || echo "JWT credentials may already exist for test-tenant-b"
+
 # Tenant 3: Test Tenant C
 echo "  Creating tenant: test-tenant-c"
 CONSUMER_C=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
   --data-urlencode "username=test-tenant-c" \
-  --data-urlencode "custom_id=tenant-c" \
+  --data-urlencode "custom_id=test-client-c" \
   2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 
 if [ -z "$CONSUMER_C" ]; then
@@ -315,6 +359,13 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/oauth2" \
   --data-urlencode "client_secret=test-client-secret-c-11111111111111111111" \
   --data-urlencode "redirect_uris=http://localhost:3000/callback" \
   2>/dev/null || echo "OAuth2 credentials may already exist for test-tenant-c"
+
+# Create JWT credentials for Tenant C
+echo "    Creating JWT credentials for test-tenant-c"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/test-tenant-c/jwt" \
+  --data "key=test-client-c" \
+  --data "secret=test-secret-c" \
+  2>/dev/null || echo "JWT credentials may already exist for test-tenant-c"
 
 echo ""
 echo "✅ Kong seeding complete!"
@@ -345,6 +396,13 @@ echo "   Test credentials:"
 echo "     Tenant A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890"
 echo "     Tenant B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210"
 echo "     Tenant C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111"
+echo ""
+echo "✅ Header Injection"
+echo "   Kong automatically injects tenant headers after authentication:"
+echo "     X-Consumer-Username: <authenticated consumer username>"
+echo "     X-Consumer-ID: <Kong internal consumer ID (UUID)>"
+echo "     X-Credential-ID: <API key credential ID>"
+echo "   These headers are forwarded to the backend for tenant identification"
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 echo "QUICK START EXAMPLES"

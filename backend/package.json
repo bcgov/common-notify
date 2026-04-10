@@ -16,8 +16,12 @@
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",
     "make-badges:ci": "npm run make-badges -- --ci",
     "test": "vitest --dir src",
-    "test:cov": "vitest run --coverage",
-    "test:e2e": "vitest --dir test"
+    "test:unit": "vitest --dir src",
+    "test:unit:cov": "vitest run --coverage",
+    "test:integration": "vitest --dir test",
+    "test:e2e": "playwright test",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.2",
@@ -36,7 +40,6 @@
     "class-validator": "^0.14.1",
     "dotenv": "^17.0.0",
     "express-prom-bundle": "^8.0.0",
-    "express-prom-bundle": "^8.0.0",
     "helmet": "^8.0.0",
     "jwks-rsa": "^4.0.1",
     "jose": "^6.2.2",
@@ -53,6 +56,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",
+    "@playwright/test": "^1.59.1",
     "@swc/cli": "^0.7.0",
     "@swc/core": "^1.10.12",
     "@types/express": "^5.0.0",
@@ -63,7 +67,6 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.2.3",
     "istanbul-badges-readme": "^1.9.0",
-    "prettier": "^3.5.3",
     "prettier": "^3.5.3",
     "supertest": "^7.0.0",
     "typescript": "^5.2.2",

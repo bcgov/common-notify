@@ -94,82 +94,15 @@ export class TenantsController {
 
   /**
    * Delete a tenant
-   * This also revokes all API keys for the tenant in Kong
    */
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({
     summary: 'Delete a tenant',
-    description: 'Deletes the tenant and revokes all API keys',
   })
   async delete(@Param('id') id: string) {
     try {
       await this.tenantsService.delete(+id)
-    } catch (error) {
-      throw new HttpException(error.message, 400)
-    }
-  }
-
-  /**
-   * Generate a new API key for a tenant
-   */
-  @Post(':id/keys')
-  @ApiOperation({
-    summary: 'Generate a new API key for a tenant',
-  })
-  @ApiCreatedResponse({
-    schema: {
-      properties: {
-        apiKey: { type: 'string' },
-        note: { type: 'string' },
-      },
-    },
-  })
-  async generateApiKey(@Param('id') id: string) {
-    try {
-      return await this.tenantsService.generateApiKey(+id)
-    } catch (error) {
-      throw new HttpException(error.message, 400)
-    }
-  }
-
-  /**
-   * List API keys for a tenant
-   * Returns metadata only (not the actual key values)
-   */
-  @Get(':id/keys')
-  @ApiOperation({
-    summary: 'List API keys for a tenant',
-    description: 'Returns key IDs and creation dates, but not the actual key values',
-  })
-  @ApiOkResponse({
-    isArray: true,
-    schema: {
-      properties: {
-        id: { type: 'string' },
-        createdAt: { type: 'string', format: 'date-time' },
-      },
-    },
-  })
-  async listApiKeys(@Param('id') id: string) {
-    try {
-      return await this.tenantsService.listApiKeys(+id)
-    } catch (error) {
-      throw new HttpException(error.message, 400)
-    }
-  }
-
-  /**
-   * Revoke an API key for a tenant
-   */
-  @Delete(':id/keys/:keyId')
-  @HttpCode(204)
-  @ApiOperation({
-    summary: 'Revoke an API key for a tenant',
-  })
-  async revokeApiKey(@Param('id') id: string, @Param('keyId') keyId: string) {
-    try {
-      await this.tenantsService.revokeApiKey(+id, keyId)
     } catch (error) {
       throw new HttpException(error.message, 400)
     }

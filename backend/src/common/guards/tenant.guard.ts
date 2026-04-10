@@ -34,15 +34,40 @@ export class TenantGuard implements CanActivate {
     const kongUsername = request.headers['x-consumer-username']
     const kongConsumerId = request.headers['x-consumer-id']
 
+    this.logger.log(
+      `Incoming request: method=${request.method}, url=${request.url}, KongUsername=${kongUsername}, KongConsumerId=${kongConsumerId}, request.headers=${JSON.stringify(request.headers, null, 2)}`,
+    )
+
     if (kongUsername) {
       this.logger.log(
         `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
       )
 
-      const tenant = await this.tenantsService.findByKongUsername(kongUsername as string)
+      let tenant = await this.tenantsService.findByKongUsername(kongUsername as string)
+
       if (!tenant) {
-        this.logger.error(`Tenant lookup failed for Kong username: ${kongUsername}`)
-        throw new BadRequestException(`Tenant not found for Kong username: ${kongUsername}`)
+        this.logger.log(
+          `Tenant not found for Kong username: ${kongUsername}. Creating new tenant...`,
+        )
+        try {
+          const createResult = await this.tenantsService.create(
+            {
+              name: kongUsername as string,
+            },
+            {
+              kongUsername: kongUsername as string,
+            },
+          )
+          tenant = createResult.tenant
+          this.logger.log(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
+        } catch (error) {
+          this.logger.error(
+            `Failed to create tenant for Kong username ${kongUsername}: ${error.message}`,
+          )
+          throw new BadRequestException(
+            `Failed to create tenant for Kong username: ${kongUsername}`,
+          )
+        }
       }
 
       this.logger.log(
@@ -82,15 +107,31 @@ export class TenantGuard implements CanActivate {
         this.logger.log(`JWT client_id from 'sub' claim: ${clientId}`)
 
         // Look up tenant by OAuth2 client ID
-        const tenant = await this.tenantsService.findByOAuth2ClientId(clientId).catch(() => null)
+        let tenant = await this.tenantsService.findByOAuth2ClientId(clientId).catch(() => null)
 
         if (!tenant) {
-          this.logger.error(
-            `Tenant not found for OAuth2 client_id "${clientId}". Ensure tenant is registered in database.`,
+          this.logger.log(
+            `Tenant not found for OAuth2 client_id: ${clientId}. Creating new tenant...`,
           )
-          throw new UnauthorizedException(
-            `Tenant not found for OAuth2 client_id: ${clientId}. Please create the tenant first.`,
-          )
+          try {
+            const createResult = await this.tenantsService.create(
+              {
+                name: clientId,
+              },
+              {
+                oauth2ClientId: clientId,
+              },
+            )
+            tenant = createResult.tenant
+            this.logger.log(`Created new tenant: ${tenant.name} (Client ID: ${clientId})`)
+          } catch (error) {
+            this.logger.error(
+              `Failed to create tenant for OAuth2 client_id ${clientId}: ${error.message}`,
+            )
+            throw new UnauthorizedException(
+              `Failed to create tenant for OAuth2 client_id: ${clientId}`,
+            )
+          }
         }
 
         this.logger.log(`Tenant authenticated via JWT: ${tenant.name} (Client ID: ${clientId})`)

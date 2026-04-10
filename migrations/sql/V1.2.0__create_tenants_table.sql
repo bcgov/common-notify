@@ -1,6 +1,6 @@
 -- Create tenants table for multi-tenant management
 CREATE TABLE
-  IF NOT EXISTS users.tenants (
+  IF NOT EXISTS notify.tenants (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -15,7 +15,7 @@ CREATE TABLE
   );
 
 -- Create index on kong_username for faster lookups
-CREATE INDEX IF NOT EXISTS idx_tenants_kong_username ON users.tenants (kong_username);
+CREATE INDEX IF NOT EXISTS idx_tenants_kong_username ON notify.tenants (kong_username);
 
 -- Create index on status for filtering
-CREATE INDEX IF NOT EXISTS idx_tenants_status ON users.tenants (status);
+CREATE INDEX IF NOT EXISTS idx_tenants_status ON notify.tenants (status);
