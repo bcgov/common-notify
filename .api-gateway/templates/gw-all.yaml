@@ -1098,6 +1098,16 @@ clientAuthenticator: client-secret
 clientRoles: []
 inheritFrom: Gold Shared IdP
 ---
+kind: CredentialIssuer
+name: gw-fe8c5 default prod
+description: Default Authorization Profile for gw-fe8c5 Gateway
+flow: client-credentials
+mode: auto
+authPlugin: jwt-keycloak
+clientAuthenticator: client-secret
+clientRoles: []
+inheritFrom: Gold Shared IdP
+---
 kind: DraftDataset
 name: gw-fe8c5-notify-dataset
 title: gw-fe8c5-notify
@@ -1126,3 +1136,9 @@ environments:
     flow: client-credentials
     credentialIssuer: gw-fe8c5 default test
     services: [gw-fe8c5-notify-test]
+  - name: prod
+    active: true
+    approval: false
+    flow: client-credentials
+    credentialIssuer: gw-fe8c5 default prod
+    services: [gw-fe8c5-notify-prod]
