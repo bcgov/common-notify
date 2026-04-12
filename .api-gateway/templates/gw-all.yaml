@@ -1129,16 +1129,19 @@ environments:
     approval: false
     flow: client-credentials
     credentialIssuer: gw-fe8c5 default dev
-    services: [gw-fe8c5-notify-dev]
+    services:
+      - gw-fe8c5-notify-dev
   - name: test
     active: true
     approval: false
     flow: client-credentials
     credentialIssuer: gw-fe8c5 default test
-    services: [gw-fe8c5-notify-test]
+    services:
+      - gw-fe8c5-notify-test
   - name: prod
     active: true
     approval: false
     flow: client-credentials
     credentialIssuer: gw-fe8c5 default prod
-    services: [gw-fe8c5-notify-prod]
+    services:
+      - gw-fe8c5-notify-prod
