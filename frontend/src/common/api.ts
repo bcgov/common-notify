@@ -1,4 +1,5 @@
-import axios, { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios'
+import type { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
 
