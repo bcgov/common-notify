@@ -37,19 +37,29 @@ if [ -z "$ADMIN_ROUTE" ]; then
   ADMIN_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-admin-route" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
 fi
 
-# Create CHES email route
-echo "Setting up CHES email route..."
-CHES_EMAIL_ROUTE=$(curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
-  --data-urlencode "name=notify-ches-email-route" \
-  --data-urlencode "paths[]=/ches/api/v1/email" \
-  --data-urlencode "strip_path=false" \
-  2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
+# Create CHES API routes
+echo "Setting up CHES API routes..."
 
-if [ -z "$CHES_EMAIL_ROUTE" ]; then
-  echo "  CHES email route creation may have failed, fetching existing..."
-  CHES_EMAIL_ROUTE=$(curl -s "$KONG_ADMIN_URL/routes?name=notify-ches-email-route" 2>/dev/null | grep -o '"id":"[a-f0-9-]*"' | tail -1 | cut -d'"' -f4)
-fi
+CHES_ROUTE_CONFIGS="
+ches-email:/api/v1/ches/email
+ches-emailmerge:/api/v1/ches/emailMerge
+ches-status:/api/v1/ches/status
+ches-promote:/api/v1/ches/promote
+ches-cancel:/api/v1/ches/cancel
+ches-health:/api/v1/ches/health
+"
 
+echo "$CHES_ROUTE_CONFIGS" | while read -r route_config; do
+  [ -z "$route_config" ] && continue
+  route_key="${route_config%%:*}"
+  route_path="${route_config##*:}"
+  echo "  Creating route: $route_key ($route_path)"
+  curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+    --data-urlencode "name=notify-$route_key-route" \
+    --data-urlencode "paths[]=$route_path" \
+    --data-urlencode "strip_path=false" \
+    2>/dev/null || echo "    Route $route_key may already exist"
+done
 # Create Notify API routes
 echo "Setting up Notify API routes..."
 

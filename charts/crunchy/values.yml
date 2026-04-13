@@ -68,7 +68,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
       fullBackupSchedule: 0 8 * * *
       incrementalBackupSchedule: 0 0-7,9-23 * * * # every hour incremental
       volume:
-        accessModes: "ReadWriteOnce"
+        accessModes: 'ReadWriteOnce'
         storage: 5Gi
         storageClassName: netapp-file-backup
 
@@ -96,7 +96,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
         - 'host all all ::1/128 scram-sha-256'
       parameters:
         shared_buffers: 1GB # 25% of the 4Gi memory allocated to the pod
-        wal_buffers: "-1" # automatically set as 1/32 of shared_buffers (32MB)
+        wal_buffers: '-1' # automatically set as 1/32 of shared_buffers (32MB)
         min_wal_size: 128MB
         max_wal_size: 512MB # increased from 64MB for better write performance
         max_slot_wal_keep_size: 1GB # increased to prevent replica lag issues

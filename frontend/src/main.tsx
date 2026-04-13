@@ -2,6 +2,7 @@ import '@bcgov/bc-sans/css/BC_Sans.css'
 import { StrictMode } from 'react'
 import * as ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
+import UserService from './service/user-service'
 
 // Import bootstrap styles
 import '@/scss/styles.scss'
@@ -19,8 +20,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-)
+const renderApp = () => {
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+    <StrictMode>
+      <RouterProvider router={router} />
+    </StrictMode>,
+  )
+}
+
+UserService.initKeycloak(renderApp)

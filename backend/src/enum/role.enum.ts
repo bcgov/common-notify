@@ -1,0 +1,4 @@
+export enum Role {
+  NOTIFY_ADMIN = 'NOTIFY_ADMIN',
+  NOTIFY_USER = 'NOTIFY_USER',
+}
