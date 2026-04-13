@@ -96,10 +96,7 @@ describe('Notify Controllers', () => {
       })
 
       it('should return 400 when no channel is provided', async () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple')
-          .send({})
-          .expect(400)
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
       })
     })
   })
