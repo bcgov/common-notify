@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { NotifyService } from './notify.service'
+import { NotifySimpleRequest } from './schemas'
+import { ChesTransactionResponse } from '../../ches/schemas/ches-transaction-response'
 
 @Controller('notifysimple')
 @UseGuards(TenantGuard)
@@ -21,9 +23,9 @@ export class NotifySimpleController {
 
   @Version('1')
   @Post()
-  @HttpCode(501)
-  simpleSend(@Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(201)
+  simpleSend(@Body() _body: NotifySimpleRequest): Promise<ChesTransactionResponse> {
+    return this.notifyService.simpleSend(_body)
   }
 }
 

@@ -10,7 +10,7 @@ type Props = {
 const Layout: FC<Props> = ({ children }) => {
   return (
     <div className="d-flex flex-column min-vh-100">
-      <Header title={'QuickStart OpenShift'}>
+      <Header title={'Notify'}>
         {' '}
         <Link to="/">
           <Button variant="light" size="lg">
