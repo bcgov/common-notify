@@ -1,41 +1,60 @@
 import type { FC } from 'react'
-import { useEffect, useState } from 'react'
+import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
-import { Link } from '@tanstack/react-router'
+import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
+import LoadingSpinner from './LoadingSpinner'
+import 'react-toastify/dist/ReactToastify.css'
 import '@/scss/components/layout.scss'
+import '@/scss/components/toasts.scss'
 
 type Props = {
   children: React.ReactNode
 }
 
 const Layout: FC<Props> = ({ children }) => {
-  const [username, setUsername] = useState<string | null>(null)
-
-  useEffect(() => {
-    setUsername(UserService.getUsername() || null)
-  }, [])
+  // Get user from Redux store (populated from JWT token)
+  const user = useAppSelector((state) => state.auth.user)
 
   const handleLogout = () => {
     UserService.doLogout()
   }
 
   return (
-    <div className="layout-container">
-      <Header title={'Notify'} className="layout-header">
-        <div className="layout-header-nav">
-          <div className="layout-header-user">
-            {username && <span className="username">{username}</span>}
-            <button className="logout-button" onClick={handleLogout} title="Logout">
-              <i className="bi bi-box-arrow-right" />
-              <span>Logout</span>
-            </button>
-          </div>
+    <>
+      <LoadingSpinner />
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      <div className="layout-container">
+        <div className="layout-header">
+          <Header title={'Notify'}>
+            <div className="layout-header-nav">
+              <div className="layout-header-user">
+                {user && <span className="username">{user.displayName}</span>}
+                <button className="logout-button" onClick={handleLogout} title="Logout">
+                  <i className="bi bi-box-arrow-right" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </Header>
         </div>
-      </Header>
-      <div className="layout-content">{children}</div>
-      <Footer className="layout-footer" />
-    </div>
+        <div className="layout-content">{children}</div>
+        <div className="layout-footer">
+          <Footer />
+        </div>
+      </div>
+    </>
   )
 }
 
