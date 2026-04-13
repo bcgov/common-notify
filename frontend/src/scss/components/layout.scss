@@ -112,4 +112,13 @@
 
 .layout-footer {
   margin-top: auto;
+  position: relative;
+
+  .footer-version {
+    position: absolute;
+    bottom: $spacing-sm;
+    right: $spacing-md;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
 }
