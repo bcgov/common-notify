@@ -1,5 +1,5 @@
-// Import version from frontend package.json
-import packageJson from '../../package.json'
+// Version is injected by Vite at build time from root package.json
+declare const __APP_VERSION__: string
 
-export const APP_VERSION = packageJson.version
-export const APP_NAME = packageJson.name
+export const APP_VERSION = __APP_VERSION__
+export const APP_NAME = 'notify'
