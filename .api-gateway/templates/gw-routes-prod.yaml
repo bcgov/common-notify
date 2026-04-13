@@ -1,0 +1,359 @@
+kind: GatewayService
+name: gw-fe8c5-notify-prod
+tags: [ns.gw-fe8c5]
+host: common-notify-prod-backend.f6bc3f-prod.svc.cluster.local
+port: 80
+protocol: http
+retries: 0
+routes:
+  - name: gw-fe8c5-prod-notify-health
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /health
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-ches-email
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /ches/api/v1/email
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-simple
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notifysimple
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-event
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-event-preview
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent/preview
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-event-types
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent/types
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-list
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notify
+    methods:
+      - GET
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-status
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notify/status
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-notify-callbacks
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notify/registerCallback
+    methods:
+      - POST
+      - PATCH
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-prod-templates
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/templates
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+plugins:
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-ches-email
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-simple
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-event
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-event-preview
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-list
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-status
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-callbacks
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-templates
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: request-transformer
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    config:
+      http_method: null
+      add:
+        headers:
+          - X-Consumer-Username:$(consumer_username)
+          - X-Consumer-ID:$(consumer_id)

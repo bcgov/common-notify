@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "6ba17d35-c99c-4a29-bab2-86b021f45e45",
+    "_postman_id": "39bc7ac4-66b0-42f2-8d5d-a0949990ff17",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -173,7 +173,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": {\n    \"to\": [\"user@example.com\"],\n    \"subject\": \"Test Notification\",\n    \"body\": \"This is a test notification\"\n  }\n}"
+              "raw": "{\n  \"email\": {\n    \"to\": [\"bfalk@salussystems.com\"],\n    \"subject\": \"Test Notification\",\n    \"body\": \"This is a test notification\"\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -542,10 +542,8 @@
               "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"to\": [\n    \"{{recipient_email}}\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Test Email\",\n  \"body\": \"<h1>Hello</h1><p>This is a test email sent with Bearer token authentication.</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"UTF-8\",\n  \"priority\": \"normal\",\n  \"attachments\": [],\n  \"tag\": \"test\",\n  \"delayTs\": null,\n  \"mergeData\": {}\n}"
             },
             "url": {
-              "raw": "http://localhost:3000/ches/api/v1/email",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
+              "raw": "{{gateway_url}}/ches/api/v1/email",
+              "host": ["{{gateway_url}}"],
               "path": ["ches", "api", "v1", "email"]
             },
             "description": "Send an email using Bearer token authentication (OAuth2 or JWT) via CHES compatibility endpoint.\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
