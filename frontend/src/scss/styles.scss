@@ -4,6 +4,13 @@
 // Import component styles
 @import './components/layout.scss';
 @import './components/loading-spinner.scss';
+@import './components/toasts.scss';
+
+// Global font family
+html,
+body {
+  font-family: 'BCSans', sans-serif;
+}
 
 // Import Bootstrap and Bootstrap Icons
 @import '../../node_modules/bootstrap/scss/bootstrap';

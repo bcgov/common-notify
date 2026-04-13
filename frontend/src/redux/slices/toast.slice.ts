@@ -12,7 +12,7 @@ interface ToastState {
 }
 
 const initialState: ToastState = {
-  toasts: [],
+  toasts: [] as Toast[],
 }
 
 export const toastSlice = createSlice({

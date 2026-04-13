@@ -2,7 +2,6 @@
 
 // Override react-toastify defaults with BC Gov styling
 .Toastify__toast {
-  font-family: 'BCSans', sans-serif;
   border-radius: $border-radius;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: $spacing-16;
