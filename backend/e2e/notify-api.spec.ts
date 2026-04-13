@@ -62,7 +62,11 @@ test.describe('Notify API E2E Tests', () => {
         },
       })
 
-      expect(response.status()).toBe(501)
+      expect(response.status()).toBe(201)
+      const body = await response.json()
+      expect(body).toHaveProperty('txId')
+      expect(body).toHaveProperty('messages')
+      expect(Array.isArray(body.messages)).toBe(true)
       await context.dispose()
     })
 
@@ -106,7 +110,10 @@ test.describe('Notify API E2E Tests', () => {
         },
       })
 
-      expect(response.status()).toBe(501)
+      expect(response.status()).toBe(201)
+      const body = await response.json()
+      expect(body).toHaveProperty('txId')
+      expect(body).toHaveProperty('messages')
       await context.dispose()
     })
   })
