@@ -2,15 +2,15 @@
 
 // Override react-toastify defaults with BC Gov styling
 .Toastify__toast {
-  border-radius: $border-radius;
+  border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: $spacing-16;
+  padding: $spacing-lg;
   min-height: 64px;
 }
 
 // Success toast
 .Toastify__toast--success {
-  background-color: $bc-success;
+  background-color: $success-color;
   color: white;
 
   .Toastify__toast-icon {
@@ -20,7 +20,7 @@
 
 // Error toast
 .Toastify__toast--error {
-  background-color: $bc-error;
+  background-color: $danger-color;
   color: white;
 
   .Toastify__toast-icon {
@@ -30,7 +30,7 @@
 
 // Info toast
 .Toastify__toast--info {
-  background-color: $bc-info;
+  background-color: $primary-color;
   color: white;
 
   .Toastify__toast-icon {
@@ -40,17 +40,17 @@
 
 // Warning toast
 .Toastify__toast--warning {
-  background-color: $bc-warning;
-  color: white;
+  background-color: $warning-color;
+  color: #2d2d2d;
 
   .Toastify__toast-icon {
-    color: white;
+    color: #2d2d2d;
   }
 }
 
 // Close button
 .Toastify__close-button {
-  color: white;
+  color: inherit;
   opacity: 0.7;
 
   &:hover {
@@ -65,7 +65,7 @@
 
 // Container positioning
 .Toastify__toast-container {
-  padding: $spacing-16;
+  padding: $spacing-lg;
   width: auto;
   max-width: 500px;
 }
