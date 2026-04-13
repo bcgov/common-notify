@@ -40,6 +40,28 @@ spec:
               value: "http://{{ .Release.Name }}-backend"
             - name: LOG_LEVEL
               value: "info"
+            {{- if .Values.frontend.secrets.enabled }}
+            - name: VITE_API_GATEWAY_NOTIFY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
+                  key: api-gateway-notify-url
+            - name: VITE_KEYCLOAK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
+                  key: keycloak-url
+            - name: VITE_KEYCLOAK_REALM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
+                  key: keycloak-realm
+            - name: VITE_KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
+                  key: keycloak-client-id
+            {{- else }}
             - name: VITE_API_GATEWAY_NOTIFY_URL
               value: {{ .Values.frontend.apiGatewayNotifyUrl | default "https://coco-notify-gateway.dev.api.gov.bc.ca" | quote }}
             - name: VITE_KEYCLOAK_URL
@@ -48,6 +70,7 @@ spec:
               value: {{ .Values.frontend.keycloakRealm | default "standard" | quote }}
             - name: VITE_KEYCLOAK_CLIENT_ID
               value: {{ .Values.frontend.keycloakClientId | default "notify-6388" | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 3000
