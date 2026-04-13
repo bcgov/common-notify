@@ -3,7 +3,7 @@ import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
 
-export interface ApiRequestParameters<T = {}> {
+export interface ApiRequestParameters<T = object> {
   url: string
   params?: T
   requiresAuthentication?: boolean
@@ -45,7 +45,7 @@ const setAuthHeader = () => {
   axios.defaults.headers.common['Authorization'] = `Bearer ${UserService.getToken()}`
 }
 
-export const generateApiParameters = <T = {}>(
+export const generateApiParameters = <T = object>(
   url: string,
   params?: T,
   enableNotification: boolean = false,
@@ -56,7 +56,10 @@ export const generateApiParameters = <T = {}>(
   return result
 }
 
-export const get = <T, M = {}>(parameters: ApiRequestParameters<M>, headers?: {}): Promise<T> => {
+export const get = <T, M = object>(
+  parameters: ApiRequestParameters<M>,
+  headers?: object,
+): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
   if (requiresAuthentication) setAuthHeader()
@@ -69,9 +72,9 @@ export const get = <T, M = {}>(parameters: ApiRequestParameters<M>, headers?: {}
 }
 
 // named deleteMethod because 'delete' is a reserved word in JavaScript
-export const deleteMethod = <T, M = {}>(
+export const deleteMethod = <T, M = object>(
   parameters: ApiRequestParameters<M>,
-  headers?: {},
+  headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
@@ -83,15 +86,15 @@ export const deleteMethod = <T, M = {}>(
   })
 }
 
-export const post = <T, M = {}>(parameters: ApiRequestParameters<M>): Promise<T> => {
+export const post = <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   if (requiresAuthentication) setAuthHeader()
   return axios.post(url, params).then((response: AxiosResponse) => response.data as T)
 }
 
-export const patch = <T, M = {}>(
+export const patch = <T, M = object>(
   parameters: ApiRequestParameters<M>,
-  headers: {} = {},
+  headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
   if (requiresAuthentication) setAuthHeader()
@@ -101,9 +104,9 @@ export const patch = <T, M = {}>(
   })
 }
 
-export const put = <T, M = {}>(
+export const put = <T, M = object>(
   parameters: ApiRequestParameters<M>,
-  headers: {} = {},
+  headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
   if (requiresAuthentication) setAuthHeader()
@@ -115,7 +118,7 @@ export const put = <T, M = {}>(
 
 export const putFile = <T>(
   parameters: ApiRequestParameters,
-  headers: {},
+  headers: object,
   file: File,
 ): Promise<T> => {
   const { url, requiresAuthentication } = parameters
