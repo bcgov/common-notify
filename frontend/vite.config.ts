@@ -3,10 +3,11 @@ import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+import { dirname, resolve } from 'path'
 
 // Read root package.json for version
-const rootPackageJson = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf-8'))
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const rootPackageJson = JSON.parse(readFileSync(resolve(currentDir, '../package.json'), 'utf-8'))
 
 // https://vitejs.dev/config/
 export default defineConfig({
