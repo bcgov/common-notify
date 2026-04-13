@@ -84,11 +84,17 @@ frontend:
   # -- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
 
-  # -- Keycloak configuration
-  keycloakUrl: ~ # default: https://dev.loginproxy.gov.bc.ca/auth
-  keycloakRealm: ~ # default: standard
-  keycloakClientId: ~ # default: notify-6388
-  apiGatewayNotifyUrl: ~ # default: https://coco-notify-gateway.dev.api.gov.bc.ca
+  # -- Kubernetes Secret containing Keycloak and API Gateway configuration
+  secrets:
+    #-- enable or disable secret-based config. set to true to use existing secrets. set to false to use values directly.
+    enabled: true
+    #-- the name of the existing secret. should be notify-frontend-config for all environments (dev/test/prod).
+    name: notify-frontend-config
+    #-- Keycloak configuration - only used if secrets.enabled=false AND you want Helm to create the secret. otherwise leave null.
+    keycloakUrl: ~
+    keycloakRealm: ~
+    keycloakClientId: ~
+    apiGatewayNotifyUrl: ~
 
   #-- autoscaling for the component. it is optional and is an object.
   autoscaling:
