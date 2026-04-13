@@ -19,6 +19,16 @@
 		`
 	}
 
+	# Serve dynamic runtime configuration
+	handle /static/config.js {
+		header Content-Type text/javascript
+		respond `window.VITE_KEYCLOAK_URL="{$VITE_KEYCLOAK_URL}";
+window.VITE_KEYCLOAK_REALM="{$VITE_KEYCLOAK_REALM}";
+window.VITE_KEYCLOAK_CLIENT_ID="{$VITE_KEYCLOAK_CLIENT_ID}";
+window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";
+window.VITE_API_URL="{$BACKEND_URL}";`
+	}
+
 	root * /srv
 	encode zstd gzip
 	file_server
