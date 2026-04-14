@@ -1,0 +1,61 @@
+// BC Government Official Colors
+$primary-color: #013366; // BC Blue
+$primary-color-hover: #1e5189; // BC Blue Hover
+$primary-color-pressed: #01264c; // BC Blue Pressed
+$dark-blue: #053662; // Dark Blue
+$secondary-color: #ffffff; // White
+$success-color: #42814a; // Success Green
+$warning-color: #f8bb47; // Warning Yellow
+$danger-color: #ce3e39; // Danger Red
+$light-bg: #faf9f8; // Light Gray Background
+$dark-text: #2d2d2d; // Dark Text / Primary Icons
+$text-secondary: #474543; // Secondary Text / Icons
+$text-disabled: #9f9d9c; // Disabled Text
+$border-default: #d8d8d8; // Light Border
+$border-medium: #898785; // Medium Border
+$border-dark: #353433; // Dark Border
+$border-active: #2e5dd7; // Active Border
+$white: #ffffff;
+
+// Spacing
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+
+// Font sizes
+$font-size-sm: 0.875rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.25rem;
+
+// Breakpoints
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+
+// Mixins
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin button-reset {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+
+  &:focus {
+    outline: 2px solid $primary-color;
+  }
+}
