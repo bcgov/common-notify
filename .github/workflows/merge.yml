@@ -63,6 +63,19 @@ jobs:
             # Tag as test for TEST environment
             oc tag ${{ matrix.package }}:dev ${{ matrix.package }}:test
 
+  deploy-dev:
+    name: Deploy (DEV)
+    needs: [import]
+    uses: ./.github/workflows/.deployer.yml
+    secrets:
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
+    with:
+      oc_server: ${{ vars.oc_server }}
+      db_user: appproxy # appproxy is the user which works with pgbouncer.
+      params: --set frontend.secrets.enabled=false
+      tag: dev
+
   deploy-test:
     name: Deploy (TEST)
     needs: [import]
@@ -74,6 +87,7 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
+      params: --set frontend.secrets.enabled=false
       tag: test
 
   promote-test:
