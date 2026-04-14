@@ -71,8 +71,9 @@ jobs:
       oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
       oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
-      environment: DEV
+      oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
+      params: --set frontend.secrets.enabled=false
       tag: dev
 
   deploy-test:
@@ -84,7 +85,9 @@ jobs:
       oc_token: ${{ secrets.OC_TEST_TOKEN }}
     with:
       environment: TEST
+      oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
+      params: --set frontend.secrets.enabled=false
       tag: test
 
   # tests:
