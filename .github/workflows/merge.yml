@@ -119,5 +119,5 @@ jobs:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      params: --set frontend.secrets.enabled=false
       tag: prod
