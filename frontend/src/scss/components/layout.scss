@@ -1,0 +1,124 @@
+@import '../variables.scss';
+
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.layout-header {
+  @include flex-between;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  background-color: $secondary-color;
+  color: $white;
+}
+
+.layout-header-nav {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+
+  .home-button {
+    background-color: $white;
+    color: $primary-color;
+    border: none;
+    border-radius: 0.25rem;
+    padding: $spacing-md;
+    cursor: pointer;
+    font-size: $font-size-lg;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: $light-bg;
+      color: $primary-color-hover;
+      transform: scale(1.05);
+    }
+
+    &:focus {
+      outline: 2px solid $white;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.layout-header-user {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-left: auto;
+
+  .username {
+    color: $primary-color;
+    font-weight: 700;
+    font-size: $font-size-lg;
+    white-space: nowrap;
+
+    @media (max-width: $breakpoint-sm) {
+      display: none;
+    }
+  }
+
+  .logout-button {
+    background-color: $white;
+    color: $primary-color;
+    border: none;
+    border-radius: 0.25rem;
+    padding: $spacing-sm $spacing-md;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: $light-bg;
+      color: $primary-color-hover;
+      transform: scale(1.02);
+    }
+
+    &:focus {
+      outline: 2px solid $white;
+      outline-offset: 2px;
+    }
+
+    i {
+      font-size: $font-size-lg;
+    }
+
+    @media (max-width: $breakpoint-sm) {
+      padding: $spacing-sm;
+
+      span {
+        display: none;
+      }
+    }
+  }
+}
+
+.layout-content {
+  display: flex;
+  flex-grow: 1;
+  align-items: flex-start;
+  justify-content: center;
+  margin-top: $spacing-xl;
+  margin-bottom: $spacing-xl;
+  margin-left: $spacing-sm;
+  margin-right: $spacing-sm;
+  padding: $spacing-md;
+}
+
+.layout-footer {
+  margin-top: auto;
+  position: relative;
+
+  .footer-version {
+    position: absolute;
+    bottom: $spacing-sm;
+    right: $spacing-md;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
+}
