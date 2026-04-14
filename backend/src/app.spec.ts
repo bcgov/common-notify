@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { vi } from 'vitest'
+import supertest from 'supertest'
 import { bootstrap } from './app'
 
 // Mock external modules
@@ -112,13 +113,13 @@ describe('bootstrap', () => {
 
       try {
         const httpServer = app.getHttpServer()
-        const request = require('supertest')(httpServer)
+        const request = supertest(httpServer)
         const response = await request.get('/').set('Accept', 'application/json')
 
         expect(response.status).toBe(200)
         expect(response.body).toHaveProperty('status')
         expect(response.body.status).toBe('ok')
-      } catch (error) {
+      } catch {
         // Health check might be blocked by middleware, which is ok
         console.log('Health check endpoint test skipped')
       }
