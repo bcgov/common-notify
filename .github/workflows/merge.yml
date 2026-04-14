@@ -74,6 +74,7 @@ jobs:
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
+      db_triggers: ('charts/crunchy/')
       tag: dev
 
   deploy-test:
@@ -81,13 +82,14 @@ jobs:
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TEST_TOKEN }}
     with:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
+      db_triggers: ('charts/crunchy/')
       tag: test
 
   promote-test:
@@ -113,11 +115,12 @@ jobs:
     needs: [promote-test]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
+      oc_token: ${{ secrets.OC_PROD_TOKEN }}
     with:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true --set frontend.secrets.enabled=false
+      db_triggers: ('charts/crunchy/')
       tag: prod
