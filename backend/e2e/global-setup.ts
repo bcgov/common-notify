@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import { FullConfig } from '@playwright/test'
 import { join } from 'path'
+import { writeFileSync } from 'fs'
 
 // Load environment variables from .env file at project root
 config({ path: join(__dirname, '../../.env') })
@@ -17,7 +18,7 @@ config({ path: join(__dirname, '../../.env') })
  * - E2E_TEST_KEYCLOAK_REALM: Keycloak realm for DEV environment (defaults to 'apigw')
  * - VITE_API_GATEWAY_NOTIFY_URL: API Gateway URL (defaults to 'http://localhost:8000' for local)
  */
-async function globalSetup(config: FullConfig) {
+async function globalSetup(_config: FullConfig) {
   const environment = process.env.ENVIRONMENT || 'local'
   const clientId = process.env.E2E_TEST_CLIENT_ID
   const clientSecret = process.env.E2E_TEST_CLIENT_SECRET
@@ -66,40 +67,59 @@ async function globalSetup(config: FullConfig) {
       formData.append('scope', 'notify')
     }
 
-    // Fetch token directly using Node's fetch (no browser needed)
-    const tokenResponse = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    })
+    // Fetch token with timeout to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text()
-      throw new Error(
-        `Failed to fetch token: ${tokenResponse.status} ${tokenResponse.statusText}\n${errorText}`,
-      )
+    try {
+      const tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text()
+        throw new Error(
+          `Failed to fetch token: ${tokenResponse.status} ${tokenResponse.statusText}\n${errorText}`,
+        )
+      }
+
+      const tokenData = (await tokenResponse.json()) as {
+        access_token: string
+        expires_in?: number
+      }
+      const accessToken = tokenData.access_token
+      const expiresIn = tokenData.expires_in || 3600
+
+      if (!accessToken) {
+        throw new Error('No access_token in response')
+      }
+
+      // Store token in environment for tests to access
+      process.env.E2E_TEST_AUTH_TOKEN = accessToken
+      process.env.E2E_TEST_TOKEN_EXPIRES_IN = String(expiresIn)
+
+      // Also save token to a file so test workers can access it
+      // (process.env changes in globalSetup don't persist to test workers)
+      const tokenFile = join(__dirname, '.playwright-token')
+      writeFileSync(tokenFile, JSON.stringify({ accessToken, expiresIn }), 'utf-8')
+
+      console.log(`✅ Token fetched successfully`)
+      console.log(`   Token expires in: ${expiresIn}s`)
+      console.log(`   Token (first 20 chars): ${accessToken.substring(0, 20)}...`)
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        throw new Error(`Token fetch timeout: exceeded 30 second limit`)
+      }
+      throw fetchError
     }
-
-    const tokenData = (await tokenResponse.json()) as {
-      access_token: string
-      expires_in?: number
-    }
-    const accessToken = tokenData.access_token
-    const expiresIn = tokenData.expires_in || 3600
-
-    if (!accessToken) {
-      throw new Error('No access_token in response')
-    }
-
-    // Store token in environment for tests to access
-    process.env.E2E_TEST_AUTH_TOKEN = accessToken
-    process.env.E2E_TEST_TOKEN_EXPIRES_IN = String(expiresIn)
-
-    console.log(`✅ Token fetched successfully`)
-    console.log(`   Token expires in: ${expiresIn}s`)
-    console.log(`   Token (first 20 chars): ${accessToken.substring(0, 20)}...`)
   } catch (error) {
     console.error('❌ Failed to fetch token:', error)
     throw error
