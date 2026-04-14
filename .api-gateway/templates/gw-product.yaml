@@ -3,12 +3,14 @@ name: gw-fe8c5-notify-dataset
 title: gw-fe8c5-notify
 organization: ministry-of-citizens-services
 organizationUnit: devops-and-cloud-services
-notes: Some information about the gw-fe8c5-notify service
+notes:
+  A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
+  a unified API.
 tags: [gw-fe8c5-notify, openapi]
 license_title: Access Only
 view_audience: Government
 security_class: PUBLIC
-record_publish_date: '2021-05-27'
+record_publish_date: '2026-04-10'
 ---
 kind: CredentialIssuer
 name: gw-fe8c5 default dev

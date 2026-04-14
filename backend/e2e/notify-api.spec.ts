@@ -1,4 +1,6 @@
 import { test, expect, request } from '@playwright/test'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 /**
  * E2E Tests for Notify API using Playwright
@@ -26,9 +28,24 @@ const API_VERSION = 'v1'
 let JWT_TOKEN = ''
 
 test.beforeAll(() => {
-  JWT_TOKEN = process.env.E2E_TEST_AUTH_TOKEN || ''
+  // Try to read token from file first (set by global-setup.ts)
+  // This is needed because process.env changes in globalSetup don't persist to test workers
+  try {
+    const tokenFile = join(__dirname, '.playwright-token')
+    const tokenData = JSON.parse(readFileSync(tokenFile, 'utf-8')) as {
+      accessToken: string
+      expiresIn: number
+    }
+    JWT_TOKEN = tokenData.accessToken
+    console.log('✅ Loaded token from file')
+  } catch {
+    // Fallback to environment variable if file doesn't exist
+    JWT_TOKEN = process.env.E2E_TEST_AUTH_TOKEN || ''
+    console.warn('⚠️  Could not read token file, falling back to E2E_TEST_AUTH_TOKEN')
+  }
+
   if (!JWT_TOKEN) {
-    console.warn('⚠️  E2E_TEST_AUTH_TOKEN not available in tests.')
+    console.warn('⚠️  JWT_TOKEN not available in tests.')
     console.warn('    Ensure global-setup.ts completed successfully.')
     console.warn('    Set credentials and retry: CLIENT_ID, CLIENT_SECRET')
   } else {

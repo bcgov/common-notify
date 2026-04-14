@@ -378,7 +378,7 @@ tags: [gw-fe8c5-notify, openapi]
 license_title: Access Only
 view_audience: Government
 security_class: PUBLIC
-record_publish_date: '2021-05-27'
+record_publish_date: '2026-04-10'
 ---
 kind: Product
 name: gw-fe8c5-notify API

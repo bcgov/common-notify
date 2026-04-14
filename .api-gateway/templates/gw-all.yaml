@@ -867,7 +867,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -893,7 +893,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -919,7 +919,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -945,7 +945,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -971,7 +971,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -997,7 +997,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -1023,7 +1023,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -1049,7 +1049,7 @@ plugins:
     config:
       allowed_iss:
         - https://loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-prod-prod
+      allowed_aud: ap-gw-fe8c5-default-prod
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -1113,12 +1113,14 @@ name: gw-fe8c5-notify-dataset
 title: gw-fe8c5-notify
 organization: ministry-of-citizens-services
 organizationUnit: devops-and-cloud-services
-notes: Some information about the gw-fe8c5-notify service
+notes:
+  A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
+  a unified API.
 tags: [gw-fe8c5-notify, openapi]
 license_title: Access Only
 view_audience: Government
 security_class: PUBLIC
-record_publish_date: '2021-05-27'
+record_publish_date: '2026-04-10'
 ---
 kind: Product
 name: Notify API
