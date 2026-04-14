@@ -81,8 +81,8 @@ jobs:
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
     secrets:
-      oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TEST_TOKEN }}
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
     with:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
@@ -90,45 +90,34 @@ jobs:
       params: --set frontend.secrets.enabled=false
       tag: test
 
-  # tests:
-  #   name: Tests
-  #   needs: [deploy-test]
-  #   uses: ./.github/workflows/.tests.yml
-  #   with:
-  #     target: test
+  promote-test:
+    name: Promote Images to PROD
+    needs: [deploy-test]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        package: [backend, frontend, migrations]
+    steps:
+      - name: Tag images for PROD
+        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        with:
+          oc_namespace: f6bc3f-tools
+          oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
+          commands: |
+            # Tag test images as prod for PROD environment
+            oc tag ${{ matrix.package }}:test ${{ matrix.package }}:prod
 
-  # deploy-prod:
-  #   name: Deploy (PROD)
-  #   needs: [tests]
-  #   uses: ./.github/workflows/.deployer.yml
-  #   secrets:
-  #     oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
-  #     oc_token: ${{ secrets.OC_PROD_TOKEN }}
-  #   with:
-  #     environment: PROD
-  #     db_user: appproxy # appproxy is the user which works with pgbouncer.
-  #     params:
-  #       --set backend.deploymentStrategy=RollingUpdate
-  #       --set frontend.deploymentStrategy=RollingUpdate
-  #       --set global.autoscaling=true
-  #       --set frontend.pdb.enabled=true
-  #       --set backend.pdb.enabled=true
-  #     tag: prod
-
-  # promote:
-  #   name: Promote Images
-  #   needs: [deploy-prod]
-  #   runs-on: ubuntu-slim
-  #   permissions:
-  #     packages: write
-  #   strategy:
-  #     matrix:
-  #       package: [migrations, backend, frontend]
-  #   timeout-minutes: 1
-  #   steps:
-  #     - uses: shrink/actions-docker-registry-tag@f04afd0559f66b288586792eb150f45136a927fa # v4
-  #       with:
-  #         registry: ghcr.io
-  #         repository: ${{ github.repository }}/${{ matrix.package }}
-  #         target: ${{ needs.deploy-prod.outputs.tag }}
-  #         tags: prod
+  deploy-prod:
+    name: Deploy (PROD)
+    needs: [promote-test]
+    uses: ./.github/workflows/.deployer.yml
+    secrets:
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
+    with:
+      environment: PROD
+      oc_server: ${{ vars.oc_server }}
+      db_user: appproxy # appproxy is the user which works with pgbouncer.
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      tag: prod
