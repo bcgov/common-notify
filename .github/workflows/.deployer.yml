@@ -85,7 +85,6 @@ permissions: {}
 
 jobs:
   deploy:
-    name: Stack
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-24.04
     outputs:
@@ -139,7 +138,7 @@ jobs:
         with:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_token: ${{ secrets.oc_token }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: ${{ inputs.oc_server }}
           triggers: ${{ inputs.triggers }}
           commands: |
             # Interrupt any previous deployments (PR only)
@@ -161,7 +160,7 @@ jobs:
         with:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_token: ${{ secrets.oc_token }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: ${{ inputs.oc_server }}
           triggers: ${{ inputs.triggers }}
           ref: ${{ github.ref }}
           commands: |
