@@ -67,9 +67,7 @@ jobs:
     name: Deploy (DEV)
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+    secrets: inherit
     with:
       environment: DEV
       oc_server: ${{ vars.oc_server }}
@@ -82,9 +80,7 @@ jobs:
     name: Deploy (TEST)
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+    secrets: inherit
     with:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
@@ -115,9 +111,7 @@ jobs:
     name: Deploy (PROD)
     needs: [promote-test]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
-      oc_token: ${{ secrets.OC_PROD_TOKEN }}
+    secrets: inherit
     with:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
