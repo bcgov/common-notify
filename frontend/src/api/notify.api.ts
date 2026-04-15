@@ -79,8 +79,12 @@ export const notifyApi = {
     sms?: { to: string[]; body: string }
   }) {
     try {
-      // Just send the request - axios interceptor adds Authorization header with Bearer token
-      const response = await axios.post('/api/v1/notifysimple', payload)
+      // Send request with X-Realm header to route to user auth path
+      const response = await axios.post('/api/v1/notifysimple', payload, {
+        headers: {
+          'X-Realm': 'standard',
+        },
+      })
       return response.data
     } catch (error) {
       throw new Error(
