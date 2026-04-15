@@ -26,7 +26,7 @@ export class NotifyService {
     throw new BadRequestException('SMS and msgApp channels are not yet implemented')
   }
 
-  private sendEmail(email: NotifyEmailChannel): Promise<ChesTransactionResponse> {
+  private async sendEmail(email: NotifyEmailChannel): Promise<ChesTransactionResponse> {
     const from = this.configService.get<string>('ches.from') ?? 'noreply@notify-test.gov.bc.ca'
     const chesMessage: ChesMessageObject = {
       from,

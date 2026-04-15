@@ -66,11 +66,8 @@ export const notifyApi = {
     sms?: { to: string[]; body: string }
   }) {
     try {
-      const response = await axios.post('/api/v1/notifysimple', payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      // Just send the request - axios interceptor adds Authorization header with Bearer token
+      const response = await axios.post('/api/v1/notifysimple', payload)
       return response.data
     } catch (error) {
       throw new Error(
