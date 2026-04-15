@@ -26,7 +26,6 @@
 window.VITE_KEYCLOAK_REALM="{$VITE_KEYCLOAK_REALM}";
 window.VITE_KEYCLOAK_CLIENT_ID="{$VITE_KEYCLOAK_CLIENT_ID}";
 window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";
-window.VITE_API_URL="{$BACKEND_URL}";`
 	}
 
 	root * /srv
@@ -39,8 +38,8 @@ window.VITE_API_URL="{$BACKEND_URL}";`
 		}
 	}
 	rewrite @spa_router {http.matchers.file.relative}
-	# Proxy requests to API service
-	reverse_proxy /api* {$BACKEND_URL} {
+	# Proxy requests to API Gateway (Kong)
+	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
 	}
