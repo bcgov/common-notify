@@ -1,7 +1,7 @@
 kind: GatewayService
 name: gw-fe8c5-notify-dev
 tags: [ns.gw-fe8c5]
-host: common-notify-15-backend.f6bc3f-dev.svc.cluster.local
+host: common-notify-18-backend.f6bc3f-dev.svc.cluster.local
 port: 80
 protocol: http
 retries: 0
@@ -173,7 +173,7 @@ plugins:
     config:
       allowed_iss:
         - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev-dev
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/standard
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -191,7 +191,7 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
