@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common'
+import { NotificationStatus } from 'src/enum/notification-status.enum'
 import { v4 as uuid } from 'uuid'
 
 /**
@@ -40,7 +41,7 @@ export function Queueable(queueName: string = 'ingestion') {
         logger.log(`Notification request created: ${notifyId}`, {
           correlationId,
           tenantId,
-          status: 'queued',
+          status: NotificationStatus.QUEUED,
         })
 
         // Enqueue to ingestion queue
@@ -88,7 +89,7 @@ export function Queueable(queueName: string = 'ingestion') {
         return {
           notifyId,
           correlationId,
-          status: 'queued',
+          status: NotificationStatus.QUEUED,
           message: 'Notification queued for processing',
         }
       } catch (error) {

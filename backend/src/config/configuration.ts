@@ -22,6 +22,14 @@ export default () => {
       url: process.env.DATABASE_URL,
     },
 
+    // Redis & Job Queues
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+    },
+
     // System defaults (used when sender store or provider override not set)
     defaults: {
       email: { from: defaultEmailFrom },
