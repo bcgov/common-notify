@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common'
+import { Module, OnModuleInit, Inject, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Bull from 'bull'
 import Redis from 'ioredis'
 import { QueueName } from '../enum/queue-name.enum'
 import { ProviderToken } from '../enum/provider-token.enum'
+import { IngestionWorker } from './workers/ingestion.worker'
 
 /**
  * Queue Module
@@ -14,8 +15,6 @@ import { ProviderToken } from '../enum/provider-token.enum'
  * Queues: - Ingestion: For processing incoming notifications and orchestrating delivery
  *         - Email Delivery: For handling email sending jobs
  *         - SMS Delivery: For handling SMS sending jobs
- *
- * Future queues can be added here (e.g. MsgApp Delivery) following the same pattern.
  */
 @Module({
   providers: [
@@ -103,4 +102,26 @@ import { ProviderToken } from '../enum/provider-token.enum'
     QueueName.SMS_DELIVERY,
   ],
 })
-export class QueueModule {}
+export class QueueModule implements OnModuleInit {
+  private readonly logger = new Logger(QueueModule.name)
+
+  constructor(
+    @Inject(QueueName.INGESTION) private ingestionQueue: Bull.Queue,
+    @Inject(QueueName.EMAIL_DELIVERY) private emailQueue: Bull.Queue,
+    @Inject(QueueName.SMS_DELIVERY) private smsQueue: Bull.Queue,
+  ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing queue workers...')
+
+    try {
+      // Initialize ingestion worker to orchestrate notification processing
+      await IngestionWorker.initialize(this.ingestionQueue, this.emailQueue, this.smsQueue)
+
+      this.logger.log('All queue workers initialized successfully')
+    } catch (error) {
+      this.logger.error('Failed to initialize queue workers:', error)
+      throw error
+    }
+  }
+}

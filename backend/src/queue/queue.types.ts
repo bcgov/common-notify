@@ -1,11 +1,6 @@
 import { NotificationStatus } from '../enum/notification-status.enum'
 import { NotificationChannel } from '../enum/notification-channel.enum'
-import {
-  NotifySimpleRequest,
-  NotifyEmailChannel,
-  NotifySmsChannel,
-  NotifyMsgAppChannel,
-} from '../api/notify/schemas'
+import { NotifySimpleRequest, NotifyEmailChannel, NotifySmsChannel } from '../api/notify/schemas'
 
 /**
  * Union type for all supported request payloads
@@ -15,7 +10,7 @@ export type NotifyRequest = NotifySimpleRequest
 /**
  * Union type for all supported delivery payloads
  */
-export type DeliveryPayload = NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel
+export type DeliveryPayload = NotifyEmailChannel | NotifySmsChannel
 
 /**
  * Notification Request record stored in database
@@ -40,6 +35,7 @@ export interface IngestionJobPayload {
   tenantId: string
   request: NotifyRequest
   requestedAt: string
+  scheduledFor?: string // ISO datetime for delayed sends (optional).  Works by delaying the ingestion job, which in turn delays all downstream delivery jobs.  This simplifies handling of scheduled notifications by centralizing the scheduling logic in one place (ingestion worker) rather than needing to handle scheduling in each delivery worker.
 }
 
 /**

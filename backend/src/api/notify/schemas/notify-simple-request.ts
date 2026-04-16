@@ -3,7 +3,6 @@ import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
-import { NotifyMsgAppChannel } from './notify-msg-app-channel'
 
 export class NotifySimpleRequest {
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
@@ -22,10 +21,4 @@ export class NotifySimpleRequest {
   @ValidateNested()
   @Type(() => NotifySmsChannel)
   sms?: NotifySmsChannel
-
-  @ApiPropertyOptional({ type: NotifyMsgAppChannel })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => NotifyMsgAppChannel)
-  msgApp?: NotifyMsgAppChannel
 }
