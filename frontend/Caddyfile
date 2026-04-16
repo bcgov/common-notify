@@ -19,8 +19,14 @@
 		`
 	}
 
-	# Serve dynamic runtime configuration
-	handle /static/config.js {
+	# Proxy requests to API Gateway (Kong)
+	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
+		header_up Host {http.reverse_proxy.upstream.hostport}
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Serve dynamic runtime configuration - MUST come before file_server
+	handle_path /static/config.js {
 		header Content-Type text/javascript
 		respond `window.VITE_KEYCLOAK_URL="{$VITE_KEYCLOAK_URL}";
 window.VITE_KEYCLOAK_REALM="{$VITE_KEYCLOAK_REALM}";
@@ -33,16 +39,12 @@ window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";`
 	file_server
 	@spa_router {
 		not path /api*
+		not path /static/config.js
 		file {
 			try_files {path} /index.html
 		}
 	}
 	rewrite @spa_router {http.matchers.file.relative}
-	# Proxy requests to API Gateway
-	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
-		header_up Host {http.reverse_proxy.upstream.hostport}
-		header_up X-Real-IP {remote_host}
-	}
 	header {
 		-Server
 		X-Frame-Options "SAMEORIGIN"
