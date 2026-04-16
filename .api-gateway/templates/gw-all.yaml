@@ -32,6 +32,22 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: gw-fe8c5-dev-notify-simple-user
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notifysimple
+    headers:
+      X-Realm:
+        - standard
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: gw-fe8c5-dev-notify-simple
     tags: [ns.gw-fe8c5]
     hosts:
@@ -169,11 +185,34 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
+    route: gw-fe8c5-dev-notify-simple-user
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+      allowed_aud: notify-6388
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
     route: gw-fe8c5-dev-notify-simple
     config:
       allowed_iss:
         - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+      allowed_aud: ap-gw-fe8c5-default-dev-dev
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -191,7 +230,7 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: true
+      consumer_match_ignore_not_found: false
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
@@ -392,6 +431,22 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: gw-fe8c5-test-notify-simple-user
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.test.api.gov.bc.ca
+    paths:
+      - /api/v1/notifysimple
+    headers:
+      X-Realm:
+        - standard
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: gw-fe8c5-test-notify-simple
     tags: [ns.gw-fe8c5]
     hosts:
@@ -526,6 +581,29 @@ plugins:
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-test-notify-simple-user
+    config:
+      allowed_iss:
+        - https://test.loginproxy.gov.bc.ca/auth/realms/standard
+      allowed_aud: notify-6388
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: false
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
@@ -752,6 +830,22 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: gw-fe8c5-prod-notify-simple-user
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.api.gov.bc.ca
+    paths:
+      - /api/v1/notifysimple
+    headers:
+      X-Realm:
+        - standard
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: gw-fe8c5-prod-notify-simple
     tags: [ns.gw-fe8c5]
     hosts:
@@ -886,6 +980,29 @@ plugins:
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-prod-notify-simple-user
+    config:
+      allowed_iss:
+        - https://loginproxy.gov.bc.ca/auth/realms/standard
+      allowed_aud: notify-6388
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: false
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
