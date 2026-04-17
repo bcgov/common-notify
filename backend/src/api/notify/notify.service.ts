@@ -4,8 +4,6 @@ import { ChesApiClient } from '../../ches/ches-api.client'
 import { ChesMessageObject } from '../../ches/schemas/ches-message-object'
 import { ChesTransactionResponse } from '../../ches/schemas/ches-transaction-response'
 import { NotifySimpleRequest, NotifyEmailChannel } from './schemas'
-import { NotificationService } from '../../notification/notification.service'
-import { NotificationStatus } from '../../notification/schemas'
 
 @Injectable()
 export class NotifyService {
@@ -14,21 +12,9 @@ export class NotifyService {
   constructor(
     private readonly chesApiClient: ChesApiClient,
     private readonly configService: ConfigService,
-    private readonly notificationService: NotificationService,
   ) {}
 
-  async simpleSend(
-    request: NotifySimpleRequest,
-    tenantId: string,
-  ): Promise<ChesTransactionResponse> {
-    const notificationRequest = await this.notificationService.create({
-      tenantId,
-      status: NotificationStatus.PROCESSING,
-    })
-    this.logger.debug(
-      `Created notification request: ${notificationRequest.id} for tenant: ${tenantId}`,
-    )
-
+  async simpleSend(request: NotifySimpleRequest): Promise<ChesTransactionResponse> {
     if (!request.email && !request.sms && !request.msgApp) {
       throw new BadRequestException('At least one channel (email, sms, or msgApp) must be provided')
     }

@@ -48,7 +48,6 @@ export class NotificationService {
     const notification = await this.findOne(id, tenantId)
     if (dto.status !== undefined) notification.status = dto.status
     if (dto.updatedBy !== undefined) notification.updatedBy = dto.updatedBy
-    notification.updatedAt = new Date()
     const updated = await this.notificationRepository.save(notification)
     this.logger.debug(`Updated notification request: ${id}`)
     return updated

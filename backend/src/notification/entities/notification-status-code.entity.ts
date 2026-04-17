@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm'
+import { Entity, Column, PrimaryColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm'
 
 @Entity('notification_status_code')
 export class NotificationStatusCode {
@@ -8,13 +8,13 @@ export class NotificationStatusCode {
   @Column({ length: 255 })
   description: string
 
-  @Column({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 
   @Column({ nullable: true, name: 'created_by' })
   createdBy: string
 
-  @Column({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date
 
   @Column({ nullable: true, name: 'updated_by' })
