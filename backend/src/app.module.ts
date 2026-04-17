@@ -12,7 +12,7 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ChesModule } from './ches/ches.module'
-import { NotificationModule } from './notification/notification.module';
+import { NotificationModule } from './notification/notification.module'
 import configuration from './config/configuration'
 
 @Module({
