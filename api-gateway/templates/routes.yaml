@@ -1,15 +1,15 @@
 kind: GatewayService
-name: gw-fe8c5-notify-dev
+name: ${GATEWAY_SERVICE_NAME}
 tags: [ns.gw-fe8c5]
-host: common-notify-15-backend.f6bc3f-dev.svc.cluster.local
+host: ${BACKEND_HOST}
 port: 80
 protocol: http
 retries: 0
 routes:
-  - name: gw-fe8c5-notify-health
+  - name: ${ROUTE_PREFIX}notify-health
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /health
     methods:
@@ -19,10 +19,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-ches-email
+  - name: ${ROUTE_PREFIX}ches-email
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /ches/api/v1/email
     methods:
@@ -32,10 +32,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-simple
+  - name: ${ROUTE_PREFIX}notify-simple
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notifysimple
     methods:
@@ -45,10 +45,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-event
+  - name: ${ROUTE_PREFIX}notify-event
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notifyevent
     methods:
@@ -58,10 +58,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-event-preview
+  - name: ${ROUTE_PREFIX}notify-event-preview
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notifyevent/preview
     methods:
@@ -71,10 +71,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-event-types
+  - name: ${ROUTE_PREFIX}notify-event-types
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notifyevent/types
     methods:
@@ -84,10 +84,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-list
+  - name: ${ROUTE_PREFIX}notify-list
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notify
     methods:
@@ -98,10 +98,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-status
+  - name: ${ROUTE_PREFIX}notify-status
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notify/status
     methods:
@@ -111,10 +111,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-notify-callbacks
+  - name: ${ROUTE_PREFIX}notify-callbacks
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/notify/registerCallback
     methods:
@@ -126,10 +126,10 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: gw-fe8c5-templates
+  - name: ${ROUTE_PREFIX}templates
     tags: [ns.gw-fe8c5]
     hosts:
-      - gw-fe8c5-notify.dev.api.gov.bc.ca
+      - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/templates
     methods:
@@ -143,11 +143,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-ches-email
+    route: ${ROUTE_PREFIX}ches-email
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -169,11 +169,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-simple
+    route: ${ROUTE_PREFIX}notify-simple
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -195,11 +195,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-event
+    route: ${ROUTE_PREFIX}notify-event
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -221,11 +221,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-event-preview
+    route: ${ROUTE_PREFIX}notify-event-preview
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -247,11 +247,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-list
+    route: ${ROUTE_PREFIX}notify-list
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -273,11 +273,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-status
+    route: ${ROUTE_PREFIX}notify-status
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -299,11 +299,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-notify-callbacks
+    route: ${ROUTE_PREFIX}notify-callbacks
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -325,11 +325,11 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.gw-fe8c5]
     enabled: true
-    route: gw-fe8c5-templates
+    route: ${ROUTE_PREFIX}templates
     config:
       allowed_iss:
-        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
-      allowed_aud: ap-gw-fe8c5-default-dev
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -357,36 +357,3 @@ plugins:
         headers:
           - X-Consumer-Username:$(consumer_username)
           - X-Consumer-ID:$(consumer_id)
----
-kind: CredentialIssuer
-name: gw-fe8c5 default
-description: Default Authorization Profile for gw-fe8c5 Gateway
-flow: client-credentials
-mode: auto
-authPlugin: jwt-keycloak
-clientAuthenticator: client-secret
-clientRoles: []
-inheritFrom: Gold Shared IdP
----
-kind: DraftDataset
-name: gw-fe8c5-notify-dataset
-title: gw-fe8c5-notify
-organization: ministry-of-citizens-services
-organizationUnit: devops-and-cloud-services
-notes: Some information about the gw-fe8c5-notify service
-tags: [gw-fe8c5-notify, openapi]
-license_title: Access Only
-view_audience: Government
-security_class: PUBLIC
-record_publish_date: '2026-04-10'
----
-kind: Product
-name: gw-fe8c5-notify API
-dataset: gw-fe8c5-notify-dataset
-environments:
-  - name: dev
-    active: false
-    approval: false
-    flow: client-credentials
-    credentialIssuer: gw-fe8c5 default
-    services: [gw-fe8c5-notify-dev]

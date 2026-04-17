@@ -63,9 +63,28 @@ jobs:
             # Tag as test for TEST environment
             oc tag ${{ matrix.package }}:dev ${{ matrix.package }}:test
 
+  gateway-config-dev:
+    name: Apply Gateway Config (DEV)
+    needs: [import]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate gateway config for DEV
+        run: |
+          chmod +x api-gateway/scripts/generate-config.sh
+          api-gateway/scripts/generate-config.sh dev common-notify-dev
+      - name: Apply gateway config
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.1.3/gwa_Linux_x86_64.tgz | tar -xz
+          sudo mv gwa /usr/local/bin/
+          echo "$GWA_ACCT" | gwa login
+          gwa apply -i api-gateway/generated/gw-routes-dev.yaml
+
   deploy-dev:
     name: Deploy (DEV)
-    needs: [import]
+    needs: [gateway-config-dev]
     uses: ./.github/workflows/.deployer.yml
     secrets:
       oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
@@ -76,9 +95,28 @@ jobs:
       params: --set frontend.secrets.enabled=false
       tag: dev
 
+  gateway-config-test:
+    name: Apply Gateway Config (TEST)
+    needs: [import]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate gateway config for TEST
+        run: |
+          chmod +x api-gateway/scripts/generate-config.sh
+          api-gateway/scripts/generate-config.sh test
+      - name: Apply gateway config
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.1.3/gwa_Linux_x86_64.tgz | tar -xz
+          sudo mv gwa /usr/local/bin/
+          echo "$GWA_ACCT" | gwa login
+          gwa apply -i api-gateway/generated/gw-routes-test.yaml
+
   deploy-test:
     name: Deploy (TEST)
-    needs: [import]
+    needs: [gateway-config-test]
     uses: ./.github/workflows/.deployer.yml
     secrets:
       oc_namespace: ${{ secrets.OC_NAMESPACE }}
@@ -108,9 +146,28 @@ jobs:
             # Tag test images as prod for PROD environment
             oc tag ${{ matrix.package }}:test ${{ matrix.package }}:prod
 
+  gateway-config-prod:
+    name: Apply Gateway Config (PROD)
+    needs: [promote-test]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate gateway config for PROD
+        run: |
+          chmod +x api-gateway/scripts/generate-config.sh
+          api-gateway/scripts/generate-config.sh prod
+      - name: Apply gateway config
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.1.3/gwa_Linux_x86_64.tgz | tar -xz
+          sudo mv gwa /usr/local/bin/
+          echo "$GWA_ACCT" | gwa login
+          gwa apply -i api-gateway/generated/gw-routes-prod.yaml
+
   deploy-prod:
     name: Deploy (PROD)
-    needs: [promote-test]
+    needs: [gateway-config-prod]
     uses: ./.github/workflows/.deployer.yml
     secrets:
       oc_namespace: ${{ secrets.OC_NAMESPACE }}

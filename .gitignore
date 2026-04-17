@@ -419,3 +419,6 @@ backend/generated/
 # Postman
 .postman/
 postman/
+
+# API Gateway generated configs
+api-gateway/generated/

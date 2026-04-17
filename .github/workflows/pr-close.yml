@@ -35,3 +35,33 @@ jobs:
           oc_token: ${{ secrets.OC_DEV_TOKEN }}
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           values_file: charts/crunchy/values.yml
+
+  cleanup_gateway:
+    name: Delete PR API Gateway Config
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate PR gateway config for cleanup
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          # Make script executable
+          chmod +x api-gateway/scripts/generate-config.sh
+
+          # Generate PR-specific gateway config (needed for deletion)
+          api-gateway/scripts/generate-config.sh pr common-notify-${{ github.event.number }}
+
+      - name: Delete gateway config
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          # Install gwa CLI
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.1.3/gwa_Linux_x86_64.tgz | tar -xz
+          sudo mv gwa /usr/local/bin/
+
+          # Login to API Gateway
+          echo "$GWA_ACCT" | gwa login
+
+          # Delete gateway configuration
+          gwa destroy -i api-gateway/generated/gw-routes-pr.yaml || echo "Gateway config may not exist or already deleted"
