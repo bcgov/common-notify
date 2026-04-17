@@ -500,3 +500,228 @@ As per 3.4 but add an additional recipient to the CC list. POST to /notifyevent 
   }
 }
 ```
+### 4. Subscriptions
+##### 4.1 Use subscription groups for recipients
+
+**Admin UI**
+Create group "FundingApplicants" and add users
+
+In Notification Event defaults:
+Add group "FundingApplicants" to recipients
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Fund"
+  }
+}
+```
+
+Note
+* Recipients resolved from group
+* Channels resolved per user subscription
+
+##### 4.2 Parameter-based subscription resolution
+
+**Admin UI**
+Create Notification Event with recipient:
+
+```json
+{{groupName}}
+```
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky",
+    "groupName": "FundingApplicants"
+  }
+}
+```
+Note
+* Group resolved from params
+
+##### 4.3 Augment subscription recipients
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky"
+  },
+  "augments": {
+    "email": {
+      "to": ["extrauser@example.com"]
+    }
+  }
+}
+```
+
+### 5. Callbacks
+##### 5.1 Configure callback through tenant defaults
+
+**Admin UI**
+Set callback URL:
+https://api.client.com/webhook
+
+Select events:
+* delivered
+* failed
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky"
+  }
+}
+```
+
+Callback Payload
+
+```json
+{
+  "notifyId": "123e4567",
+  "channel": "email",
+  "status": "delivered",
+  "recipient": "lucky@example.com",
+  "timestamp": "2026-04-17T18:25:43Z",
+  "retryable": false
+}
+```
+
+Note
+* Triggered per channel
+
+##### 5.2 Override callback in request
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky"
+  },
+  "callback": {
+    "url": "https://api.client.com/webhook",
+    "events": ["delivered", "failed"]
+  }
+}
+```
+
+### 6. Attachments
+##### 6.1 Email with attachment
+
+**Admin UI**
+No setup except tenant sender email address
+
+**API** POST to /notifysimple/email **Payload**
+
+```json
+{
+  "to": ["lucky@example.com"],
+  "subject": "Funding Approved",
+  "body": "Please see attached document",
+  "attachments": [
+    {
+      "filename": "approval.pdf",
+      "contentType": "application/pdf",
+      "url": "https://files.server.com/approval.pdf"
+    }
+  ]
+}
+```
+
+##### 6.2 Multiple attachments
+
+**Admin UI**
+No setup except tenant sender email address
+
+**API** POST to /notifysimple/email **Payload**
+
+```json
+{
+  "to": ["lucky@example.com"],
+  "subject": "Funding Approved",
+  "body": "Documents attached",
+  "attachments": [
+    {
+      "filename": "approval.pdf",
+      "contentType": "application/pdf",
+      "url": "https://files.server.com/approval.pdf"
+    },
+    {
+      "filename": "terms.pdf",
+      "contentType": "application/pdf",
+      "url": "https://files.server.com/terms.pdf"
+    }
+  ]
+}
+```
+
+##### 6.3 Attachments using Notification Event defaults
+
+**Admin UI**
+Add attachment under Email defaults:
+
+```json
+{
+  "filename": "approval.pdf",
+  "contentType": "application/pdf",
+  "url": "https://files.server.com/{{program}}.pdf"
+}
+```
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky",
+    "program": "Small Business Fund"
+  }
+}
+```
+
+Note
+* Variables resolved from params
+
+##### 6.4 Override attachments
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approval",
+  "params": {
+    "firstname": "Lucky"
+  },
+  "overrides": {
+    "email": {
+      "attachments": [
+        {
+          "filename": "custom.pdf",
+          "contentType": "application/pdf",
+          "url": "https://files.server.com/custom.pdf"
+        }
+      ]
+    }
+  }
+}
+```
+
+Add examples for subscriptions, callbacks, and attachments
