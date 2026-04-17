@@ -549,6 +549,293 @@
             "description": "Send an email using Bearer token authentication (OAuth2 or JWT) via CHES compatibility endpoint.\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
           },
           "response": []
+        },
+        {
+          "name": "GC Notify (Passthrough)",
+          "item": [
+            {
+              "name": "GC Notify - Send Email",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/email",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "notifications", "email"]
+                },
+                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send SMS",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone_number\": \"+15005550006\",\n  \"template_id\": \"{{gc_notify_sms_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/sms",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "notifications", "sms"]
+                },
+                "description": "Send an SMS notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_sms_template_id` to a valid SMS template ID"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send Bulk",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Test Bulk Job\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"rows\": [\n    [\"email address\", \"name\"],\n    [\"{{recipient_email}}\", \"Test User\"]\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/bulk",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "notifications", "bulk"]
+                },
+                "description": "Send a bulk batch of notifications via GC Notify passthrough. Rows must include a header row followed by data rows (max 50,000 recipients)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notifications",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "notifications"],
+                  "query": [
+                    {
+                      "key": "template_type",
+                      "value": "email",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "delivered",
+                      "disabled": true
+                    },
+                    {
+                      "key": "reference",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List notifications from GC Notify. Optional query params: `template_type` (email|sms), `status`, `reference`, `older_than`, `include_jobs`."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notification by ID",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/{{gc_notify_notification_id}}",
+                  "host": ["{{gateway_url}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "gcnotify",
+                    "notifications",
+                    "{{gc_notify_notification_id}}"
+                  ]
+                },
+                "description": "Get a specific notification by ID from GC Notify. Set `gc_notify_notification_id` to the notification UUID returned by a previous Send response."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Templates",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/templates",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "templates"],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "email",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List all templates from your GC Notify account. Optional query param: `type` (email|sms)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Template by ID",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-GC-Notify-Api-Key",
+                    "value": "{{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/api/gcnotify/v2/template/{{gc_notify_template_id}}",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "gcnotify", "template", "{{gc_notify_template_id}}"]
+                },
+                "description": "Get a specific template by ID from your GC Notify account. Set `gc_notify_template_id` to the template UUID."
+              },
+              "response": []
+            }
+          ]
         }
       ]
     }
@@ -601,6 +888,26 @@
     },
     {
       "key": "recipient_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gc_notify_api_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gc_notify_template_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gc_notify_sms_template_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gc_notify_notification_id",
       "value": "",
       "type": "string"
     }

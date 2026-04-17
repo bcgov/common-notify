@@ -66,6 +66,7 @@ services:
       <<: *postgres-vars
       NODE_ENV: development
       KONG_ADMIN_URL: http://kong:8001
+      GC_NOTIFY_BASE_URL: ${GC_NOTIFY_BASE_URL:-https://api.notification.canada.ca}
     image: *node-image
     ports: ['3001:3000']
     healthcheck:

@@ -12,6 +12,7 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ChesModule } from './ches/ches.module'
+import { GcNotifyModule } from './gc-notify/gc-notify.module'
 import configuration from './config/configuration'
 
 @Module({
@@ -27,6 +28,7 @@ import configuration from './config/configuration'
     ApiModule,
     AuthModule,
     ChesModule,
+    GcNotifyModule.forRoot(),
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],

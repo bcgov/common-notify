@@ -44,5 +44,9 @@ export default () => {
       tokenUrl: process.env.CHES_TOKEN_URL,
       from: process.env.CHES_FROM || defaultEmailFrom,
     },
+
+    gcNotify: {
+      baseUrl: process.env.GC_NOTIFY_BASE_URL,
+    },
   }
 }
