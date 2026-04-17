@@ -44,10 +44,10 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('Users example')
-    .setDescription('The user API description')
+    .setTitle('Notify API')
+    .setDescription('The Notify API for sending notifications via email and SMS')
     .setVersion('1.0')
-    .addTag('users')
+    .addTag('notify')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

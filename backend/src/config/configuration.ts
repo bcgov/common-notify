@@ -52,5 +52,10 @@ export default () => {
       tokenUrl: process.env.CHES_TOKEN_URL,
       from: process.env.CHES_FROM || defaultEmailFrom,
     },
+
+    // Job Queue Worker Configuration
+    queue: {
+      ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+    },
   }
 }

@@ -1,10 +1,39 @@
+import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
+import { vi } from 'vitest'
 import { NotifyService } from './notify.service'
+import { ChesApiClient } from '../../ches/ches-api.client'
 
 describe('NotifyService', () => {
   let service: NotifyService
+  let configService: ConfigService
+  let chesApiClient: ChesApiClient
 
-  beforeEach(() => {
-    service = new NotifyService()
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        NotifyService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) => {
+              if (key === 'ches.from') return 'test@example.com'
+              return undefined
+            },
+          },
+        },
+        {
+          provide: ChesApiClient,
+          useValue: {
+            sendEmail: vi.fn().mockResolvedValue({}),
+          },
+        },
+      ],
+    }).compile()
+
+    service = module.get<NotifyService>(NotifyService)
+    configService = module.get<ConfigService>(ConfigService)
+    chesApiClient = module.get<ChesApiClient>(ChesApiClient)
   })
 
   it('should be defined', () => {

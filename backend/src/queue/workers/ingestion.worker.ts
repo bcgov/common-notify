@@ -23,16 +23,18 @@ export class IngestionWorker {
    * @param ingestionQueue The BullMQ queue instance for ingestion jobs
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
+   * @param concurrency Number of jobs to process in parallel (default: 1)
    */
   static async initialize(
     ingestionQueue: Bull.Queue<IngestionJobPayload>,
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
+    concurrency: number = 1,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
-    // Register the job processor
-    await ingestionQueue.process(async (job: Bull.Job<IngestionJobPayload>) => {
+    // Register the job processor with configurable concurrency
+    await ingestionQueue.process(concurrency, async (job: Bull.Job<IngestionJobPayload>) => {
       const { notifyId, correlationId, tenantId, request, scheduledFor } = job.data
 
       logger.debug(
@@ -146,11 +148,13 @@ export class IngestionWorker {
     // Event listeners for job lifecycle
     ingestionQueue.on('completed', (job: Bull.Job<IngestionJobPayload>) => {
       const { correlationId, notifyId } = job.data
+      // TODO: Update notification_request status to COMPLETED in database (if not already updated by delivery workers)
       logger.debug(`[${correlationId}] Ingestion job completed: notifyId=${notifyId}`)
     })
 
     ingestionQueue.on('failed', (job: Bull.Job<IngestionJobPayload>, err: Error) => {
       const { correlationId, notifyId } = job.data
+      // TODO: Update notification_request status to FAILED in database (if not already updated in catch block)
       logger.error(
         `[${correlationId}] Ingestion job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): notifyId=${notifyId}, error=${err.message}`,
       )

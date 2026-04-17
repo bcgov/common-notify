@@ -15,15 +15,15 @@ export class NotifyService {
   ) {}
 
   async simpleSend(request: NotifySimpleRequest): Promise<ChesTransactionResponse> {
-    if (!request.email && !request.sms && !request.msgApp) {
-      throw new BadRequestException('At least one channel (email, sms, or msgApp) must be provided')
+    if (!request.email && !request.sms) {
+      throw new BadRequestException('At least one channel (email or sms) must be provided')
     }
 
     if (request.email) {
       return this.sendEmail(request.email)
     }
 
-    throw new BadRequestException('SMS and msgApp channels are not yet implemented')
+    throw new BadRequestException('SMS channel is not yet implemented')
   }
 
   private sendEmail(email: NotifyEmailChannel): Promise<ChesTransactionResponse> {
