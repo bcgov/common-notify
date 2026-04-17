@@ -100,6 +100,7 @@ callbacks
 > [!NOTE]  
 > 
 > **Notification Event** - The application-specific description of the event for which the notification is required
+> 
 >  **Notification Event Type** - The user-defined unique shortname for the notification event. This is the "hook" on which the notification defaults are hung, and what is passed into the API.
 > 
 > Examples : 
