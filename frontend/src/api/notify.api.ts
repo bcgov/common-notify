@@ -40,25 +40,12 @@ const configureAxios = () => {
   axios.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-      const { response, config } = error
-
-      // Only redirect to login if there's truly no token (not just API rejection)
+      const { response } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
-        const token = UserService.getToken()
-
-        if (!token) {
-          // No token at all: redirect to Keycloak login
-          UserService.doLogin()
-        } else if (config?.url?.startsWith('/api')) {
-          // API call with valid token was rejected: let it propagate as error
-          // so Redux/component can show error toast instead of redirecting
-          return Promise.reject(error)
-        } else {
-          // Non-API request was rejected: redirect to login
-          UserService.doLogin()
-        }
+        // 401 = unauthenticated: redirect to Keycloak login
+        UserService.doLogin()
       } else if (response && response.status === STATUS_CODES.Forbidden) {
-        // 403 = authenticated but lacks permission.  Handles the case where user has a token but the gateway rejects it due to missing role/permission. Redirect to a "Not Authorized" page instead of login.
+        // 403 = authenticated but lacks permission
         globalThis.location.href = '/not-authorized'
       }
       return Promise.reject(error)
@@ -79,10 +66,9 @@ export const notifyApi = {
     sms?: { to: string[]; body: string }
   }) {
     try {
-      // Send request with X-Realm header to route to user auth path
       const response = await axios.post('/api/v1/notifysimple', payload, {
         headers: {
-          'X-Realm': 'standard',
+          'Content-Type': 'application/json',
         },
       })
       return response.data

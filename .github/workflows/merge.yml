@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag set to deploy; e.g. PR number or prod"
+        description: 'Image tag set to deploy; e.g. PR number or prod'
         type: string
         default: 'prod'
 
@@ -69,24 +69,23 @@ jobs:
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
-      environment: DEV
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
-      db_triggers: ('charts/crunchy/')
       tag: dev
 
   deploy-test:
     name: Deploy (TEST)
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
-    secrets: inherit
+    secrets:
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
     with:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
-      db_triggers: ('charts/crunchy/')
       tag: test
 
   promote-test:
@@ -111,12 +110,13 @@ jobs:
     name: Deploy (PROD)
     needs: [promote-test]
     uses: ./.github/workflows/.deployer.yml
-    secrets: inherit
+    secrets:
+      oc_namespace: ${{ secrets.OC_NAMESPACE }}
+      oc_token: ${{ secrets.OC_TOKEN }}
     with:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
-      db_triggers: ('charts/crunchy/')
-      tag: prod
+      params: --set frontend.secrets.enabled=false
       timeout-minutes: 15
+      tag: prod
