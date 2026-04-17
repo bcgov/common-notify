@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag set to deploy; e.g. PR number or prod"
+        description: 'Image tag set to deploy; e.g. PR number or prod'
         type: string
         default: 'prod'
 
@@ -67,9 +67,7 @@ jobs:
     name: Deploy (DEV)
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
-      oc_token: ${{ secrets.OC_DEV_TOKEN }}
+    secrets: inherit
     with:
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
