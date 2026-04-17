@@ -19,7 +19,7 @@ global:
   config:
     databaseUser: ~
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
-  domain: "apps.silver.devops.gov.bc.ca" # it is apps.gold.devops.gov.bc.ca for gold cluster
+  domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
 
 #-- the components of the application, backend.
@@ -69,12 +69,32 @@ backend:
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+  networkPolicy:
+    enabled: true # enable NetworkPolicy to restrict traffic to backend
+    # Allows traffic from:
+    # 1. OpenShift Router (ingress policy-group)
+    # 2. Frontend pods in same release
+    # 3. Monitoring namespace (monitoring policy-group)
+    # 4. Any namespace on port 3000 (for Kong API Gateway)
+    # NOTE: More restrictive namespace selector needed from platform team
 
 frontend:
   # -- enable or disable a component deployment.
   enabled: true
   # -- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
+
+  # -- Kubernetes Secret containing Keycloak and API Gateway configuration
+  secrets:
+    #-- enable or disable secret-based config. set to true to use existing secrets. set to false to use values directly.
+    enabled: true
+    #-- the name of the existing secret. should be notify-frontend-config for all environments (dev/test/prod).
+    name: notify-frontend-config
+    #-- Keycloak configuration - only used if secrets.enabled=false AND you want Helm to create the secret. otherwise leave null.
+    keycloakUrl: ~
+    keycloakRealm: ~
+    keycloakClientId: ~
+    apiGatewayNotifyUrl: ~
 
   #-- autoscaling for the component. it is optional and is an object.
   autoscaling:
@@ -107,13 +127,13 @@ frontend:
         name: metrics
   ingress:
     annotations:
-      haproxy.router.openshift.io/balance: "roundrobin"
-      route.openshift.io/termination: "edge"
-      haproxy.router.openshift.io/rate-limit-connections: "true"
-      haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: "10"
-      haproxy.router.openshift.io/rate-limit-connections.rate-http: "20"
-      haproxy.router.openshift.io/rate-limit-connections.rate-tcp: "50"
-      haproxy.router.openshift.io/disable_cookies: "true"
+      haproxy.router.openshift.io/balance: 'roundrobin'
+      route.openshift.io/termination: 'edge'
+      haproxy.router.openshift.io/rate-limit-connections: 'true'
+      haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: '10'
+      haproxy.router.openshift.io/rate-limit-connections.rate-http: '20'
+      haproxy.router.openshift.io/rate-limit-connections.rate-tcp: '50'
+      haproxy.router.openshift.io/disable_cookies: 'true'
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.

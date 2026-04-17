@@ -1,0 +1,50 @@
+// Loading spinner overlay and animation
+
+.loading-spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  background-color: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+  p {
+    margin: 0;
+    color: #333;
+    font-weight: 500;
+  }
+}
+
+// Spinner animation
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid #f0f0f0;
+  border-top: 3px solid #013366; // BC Blue
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

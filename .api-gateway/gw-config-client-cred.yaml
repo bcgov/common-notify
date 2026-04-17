@@ -1,0 +1,392 @@
+kind: GatewayService
+name: gw-fe8c5-notify-dev
+tags: [ns.gw-fe8c5]
+host: common-notify-15-backend.f6bc3f-dev.svc.cluster.local
+port: 80
+protocol: http
+retries: 0
+routes:
+  - name: gw-fe8c5-notify-health
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /health
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-ches-email
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /ches/api/v1/email
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-simple
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notifysimple
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-event
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-event-preview
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent/preview
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-event-types
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notifyevent/types
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-list
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notify
+    methods:
+      - GET
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-status
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notify/status
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-notify-callbacks
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/notify/registerCallback
+    methods:
+      - POST
+      - PATCH
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: gw-fe8c5-templates
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - gw-fe8c5-notify.dev.api.gov.bc.ca
+    paths:
+      - /api/v1/templates
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+plugins:
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-ches-email
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-simple
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-event
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-event-preview
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-list
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-status
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-notify-callbacks
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    route: gw-fe8c5-templates
+    config:
+      allowed_iss:
+        - https://dev.loginproxy.gov.bc.ca/auth/realms/apigw
+      allowed_aud: ap-gw-fe8c5-default-dev
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: request-transformer
+    tags: [ns.gw-fe8c5]
+    enabled: true
+    config:
+      http_method: null
+      add:
+        headers:
+          - X-Consumer-Username:$(consumer_username)
+          - X-Consumer-ID:$(consumer_id)
+---
+kind: CredentialIssuer
+name: gw-fe8c5 default
+description: Default Authorization Profile for gw-fe8c5 Gateway
+flow: client-credentials
+mode: auto
+authPlugin: jwt-keycloak
+clientAuthenticator: client-secret
+clientRoles: []
+inheritFrom: Gold Shared IdP
+---
+kind: DraftDataset
+name: gw-fe8c5-notify-dataset
+title: gw-fe8c5-notify
+organization: ministry-of-citizens-services
+organizationUnit: devops-and-cloud-services
+notes: Some information about the gw-fe8c5-notify service
+tags: [gw-fe8c5-notify, openapi]
+license_title: Access Only
+view_audience: Government
+security_class: PUBLIC
+record_publish_date: '2026-04-10'
+---
+kind: Product
+name: gw-fe8c5-notify API
+dataset: gw-fe8c5-notify-dataset
+environments:
+  - name: dev
+    active: false
+    approval: false
+    flow: client-credentials
+    credentialIssuer: gw-fe8c5 default
+    services: [gw-fe8c5-notify-dev]

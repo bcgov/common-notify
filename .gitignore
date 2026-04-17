@@ -132,6 +132,8 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+.env.postman.*
+.env.notify-dev.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -247,6 +249,11 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Playwright E2E test reports
+test-results/
+playwright-report/
+.auth/
 
 # Translations
 *.mo
