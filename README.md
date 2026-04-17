@@ -13,7 +13,7 @@ The Notify service is a **multi-channel, multi-tenanted, notification service**.
 * integration with multiple service providers (SMPT Gateways, SMS providers, 3rd-party messaging providers)
 * test notification capabilites
   
-This means your application does not have to integrate directly with SMTP gateways, SMS providers or 3rd-party messaging applications - in fact it can be completely abstracted from the message channel, recipients, format or even content - in its simplest form only calling a REST API with a single "notification event" - and the service takes care of the rest. 
+This means your application does not have to integrate directly with SMTP gateways, SMS providers or 3rd-party messaging applications - in fact it can be completely abstracted from the message channel, recipients, format or even content - in its simplest form only calling a REST API with a single **notification event** - and the service takes care of the rest. 
 
 ### Multi-tenancy
 
@@ -32,9 +32,9 @@ The second advantage of using CSTAR to manage your tenancy is that you are able 
 
 1. The first design princple revolves around the ***REST API***. While the API follows REST principles, there are fundamental differences between a traditional "CRUD" REST API and the Notification API. Traditional REST API's typically manage resources (like files and folders, or online store items, or social media posts), where the resource can be created, deleted, updated or read atomically and synchronously. Notifications are a bit different in that a single notification invariably calls one or more sub-systems, each of which may have internal queues, retry logic, failures or delays. So, although it is possible to think of a notification as an entry on a notification queue (and this is exactly what the REST API manages - the status and validity of the entry on the notification queue ) , it is not possible to determine whether a notification was succesful or not synchronously. For this reason, there are 2 mechanisms whereby the delayed, or asynchronous nature of the notification request are managed. The first is through the polling or querying of a notification request, the second is through a callback mechanism whereby an API you define is called whenever an email/SMS/message can or cannot be delivered (as configured in the callback mechanism).  
 
-1. The second design principle revolves around ***separation of concerns***. Specifically, how much the calling application needs to know about the mechanics of the notification it is required to send (recipients, content, channels etc.) and how much is actually the concern of others. In most cases, the calling application (and by extension, the developer of the calling application) really only knows and cares that an event has occurred and a notification needs to be sent to inform people (or channels) of this event - with the targetted, specific details of the event. It is usually the responsibility of a completely separate authority to determine the exact wording of the email, the branding, who it should be sent to and through what channel. The design specifically addresses this through the use of "Notification Event Types". The notification caller simply needs to specify the notification event type in the call, and all the mechanics are taken care of by preconfigured settings in the system. These settings are configured (and remain configurable through the lifetime of the initiative ) by a well-defined group of users responsible for the details of the notification.
+1. The second design principle revolves around ***separation of concerns***. Specifically, how much the calling application needs to know about the mechanics of the notification it is required to send (recipients, content, channels etc.) and how much is actually the concern of others. In most cases, the calling application (and by extension, the developer of the calling application) really only knows and cares that an event has occurred and a notification needs to be sent to inform people (or channels) of this event - with the targetted, specific details of the event. It is usually the responsibility of a completely separate authority to determine the exact wording of the email, the branding, who it should be sent to and through what channel. The design specifically addresses this through the use of **Notification Events**. The notification caller simply needs to specify the unique **notification event type** in the call, and all the mechanics are taken care of by preconfigured settings in the system. These settings are configured (and remain configurable through the lifetime of the initiative ) by a well-defined group of users responsible for the details of the notification.
 
-1. The third design principle caters to the invariable ***extensions and exceptions*** . By recognising that not all notification users fall into the category of the second design principle (for example, applications which have, as part of their core functionality, the maintenance of user groups and their channels, or applications which only want to send simple and direct messages with their own content and known users ) we have created a system of cascading defaults where replacement and augmentation of any and all settings configured through notification event types in the UI are able to overriden or augmented. In fact there is even a separate notification call which does not even use notification event types - you provide everything in the call. 
+1. The third design principle caters to the invariable ***extensions and exceptions*** . By recognising that not all notification users fall into the category of the second design principle (for example, applications which have, as part of their core functionality, the maintenance of user groups and their channels, or applications which only want to send simple and direct messages with their own content and known users ) we have created a system of cascading defaults where replacement and augmentation of any and all settings which may have been configured through notification event types in the UI are able to overriden or augmented. In fact there is even a separate notification call which does not even use notification event types - you provide everything in the call. 
 
 1. The fourth design principle tackles the issue of ***idempotency** - which really means that if your app (mistakenly) sends exactly the same notification multiple times in a certain time period, the system only sends it once. This is provided through an internal comparison of notification payload (after all defaults have been resolved). If this is identical to a notification on the queue within a configurable time period, no action is taken UNLESS an override switch is set in the call. 
 
@@ -44,7 +44,7 @@ The second advantage of using CSTAR to manage your tenancy is that you are able 
 
 ## Flexibility by design: a layered defaults system
 
-Notifications cascade through four layers of configuration, the lower 3 being customisable by service administrators (defined during tenant creation) through the UI if needed :
+Notifications cascade through four layers of configuration, the lower 3 being customisable by service administrators (defined during tenant creation) through the UI as required :
 
 **System Default → Tenant Default → Notification Event → Notification Request**
 
@@ -52,15 +52,26 @@ Notifications cascade through four layers of configuration, the lower 3 being cu
 
 **Tenant Default** . Tenant Admins may change the settings of these and/or select different providers (where integrated). This is particularly useful for 3rd-party messaging providers like Teams, Rocketchat, Slack etc. In addition Tenants can specify templates, subscription providers and callbacks
 
- **Notification Event** is a powerful feature which completely removes the need for the calling application to manage the details of the notification. The defaults for a Notification Event can be defined within the tenancy through the UI by Tenant Admins. Every aspect of the notification can be defined, including channels (email, SMS, 3rd party messaging), and for each channel, recipients, templates, subject, body, sender, attachments and more. 
- 
- It is anticipated that most notification requests to the API will contain a Notification Event, a handful of substitutable parameters and nothing else - after all, the calling application mostly should not care particularly about message format, recipients, templates and so on, but only that a notification event has occurred and should be triggered. These details are typically the province of an administrator, a subscription service or a team service (CSTAR)
+ **Notification Event** is a powerful feature which completely removes the need for the calling application to manage the details of the notification. The defaults for a Notification Event can be defined within the tenancy through the UI by notification designers/admins (who are specified in CSTAR) .  Every aspect of the notification can be defined, including channels (email, SMS, 3rd party messaging), and for each channel, recipients, templates, subject, body, sender, attachments and more. It is anticipated that most notification requests to the API will contain a Notification Event Type, a handful of substitutable parameters and nothing else - after all, the calling application mostly should not care particularly about message format, recipients, templates and so on, but only that a notification event has occurred and should be triggered. These details are typically the province of an administrator, a subscription service or a team service (CSTAR)
   **HOWEVER** - the design caters to complete or partial overriding of any or all defaults configured in Notification Events through the last element of the cascade, the Notification Request.
   
+ 
   **Notification Request**. This is what is sent into the API from the calling application - mostly via a POST request. Every aspect of the notification can be specified here - there is no need to use Notification Events if not required - however the capability to OVERRIDDE or AUGMENT any or all defaults specified in any supplied Notification Event provides ultimate flexibility if a combination of Notification Event and Notification Requests are combined. . 
 
 
  The rule is simple: **if the request specifies it, that wins; if not, it inherits from the layer above**. This means a tenant can set sensible defaults once and individual requests only need to specify what's different.
+
+> [!NOTE]  
+> 
+> **Notification Event** - The application-specific description of the event for which the notification is required
+>  **Notification Event Type** - The user-defined unique shortname for the notification event. This is the "hook" on which the notification defaults are hung, and what is passed into the API.
+> 
+> Examples : 
+> | Notification Event | Notification Event Type |
+> | --- | --- |
+> |Application Received | AppRec |
+> |Permit Issued| PermitIssued | 
+> | Payment Received | PaymentRec | 
 
 ---
 ## Other key features
@@ -265,7 +276,7 @@ The template might look like the following
     "message" : "Hey {{firstname}} {{lastname}} You just got awarded ${{amount}} for {{program}}"
 }
 ```
-* Create a **Notification Event** called  "funding-approved". 
+* Create a **Notification Event Type** called  "funding-approved". 
 * Under **Email defaults**  
   * Add the **Funding Approved Email** template to the "**template**" field
   * Add recipient "**{{emailaddress}}**" to the "**to**" field. 
