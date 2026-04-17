@@ -74,8 +74,10 @@ jobs:
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
 
-          # Login to API Gateway
-          echo "$GWA_ACCT" | gwa login
+          # Login to API Gateway with service account credentials
+          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
+          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
           # Apply gateway configuration
           gwa apply -i api-gateway/generated/gw-routes-pr.yaml
