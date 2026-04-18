@@ -1,1 +1,3 @@
 flyway_schema_history
+notification_request
+notification_status_code
