@@ -65,5 +65,8 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
+          # Set gateway context
+          gwa config set gateway gw-fe8c5
+
           # Delete gateway configuration
           gwa destroy -i api-gateway/generated/gw-routes-pr.yaml || echo "Gateway config may not exist or already deleted"
