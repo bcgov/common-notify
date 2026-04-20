@@ -175,7 +175,7 @@ jobs:
             # print the values.yaml file to see the values being used
             # Helm upgrade/rollout
             # Extract license plate from namespace (e.g., f6bc3f-dev -> f6bc3f)
-            LICENSE_PLATE=$(echo "${{ secrets.oc_namespace || secrets.OC_NAMESPACE }}" | cut -d'-' -f1)
+            LICENSE_PLATE=$(echo "${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}" | cut -d'-' -f1)
 
             helm upgrade \
               --set-string global.registry="image-registry.apps.silver.devops.gov.bc.ca" \
