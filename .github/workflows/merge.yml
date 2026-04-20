@@ -88,13 +88,13 @@ jobs:
     name: Deploy (DEV)
     needs: [gateway-config-dev]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
-      oc_token: ${{ secrets.OC_DEV_TOKEN }}
+    secrets: inherit
     with:
+      environment: DEV
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
+      db_triggers: ('charts/crunchy/')
       tag: dev
 
   gateway-config-test:
@@ -122,14 +122,13 @@ jobs:
     name: Deploy (TEST)
     needs: [gateway-config-test]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+    secrets: inherit
     with:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
+      db_triggers: ('charts/crunchy/')
       tag: test
 
   promote-test:
@@ -175,13 +174,12 @@ jobs:
     name: Deploy (PROD)
     needs: [gateway-config-prod]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+    secrets: inherit
     with:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set frontend.secrets.enabled=false
-      timeout-minutes: 15
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      db_triggers: ('charts/crunchy/')
       tag: prod
+      timeout-minutes: 15

@@ -86,9 +86,7 @@ jobs:
     name: Deploys (${{ github.event.number }})
     needs: [gateway-config]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
-      oc_token: ${{ secrets.OC_DEV_TOKEN }}
+    secrets: inherit
     with:
       oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
