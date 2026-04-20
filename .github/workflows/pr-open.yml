@@ -45,7 +45,7 @@ jobs:
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
           commands: |
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:${{ github.event.number }} ${{ matrix.package }}:${{ github.event.number }} --source=docker --reference-policy=local
 
@@ -53,21 +53,23 @@ jobs:
     name: Deploys (${{ github.event.number }})
     needs: [import]
     uses: ./.github/workflows/.deployer.yml
-    secrets:
-      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
-      oc_token: ${{ secrets.OC_DEV_TOKEN }}
+    secrets: inherit
     with:
+      oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
-      params: --set global.secrets.persist=false
+      params: --set global.secrets.persist=false --set frontend.secrets.enabled=false
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
 
   tests:
-     name: Tests
-     if: needs.deploys.outputs.triggered == 'true'
-     needs: [deploys]
-     uses: ./.github/workflows/.tests.yml
+    name: Tests
+    if: needs.deploys.outputs.triggered == 'true'
+    needs: [deploys]
+    uses: ./.github/workflows/.tests.yml
+    secrets:
+      E2E_TEST_CLIENT_ID: ${{ secrets.E2E_TEST_CLIENT_ID }}
+      E2E_TEST_CLIENT_SECRET: ${{ secrets.E2E_TEST_CLIENT_SECRET }}
 
   results:
     name: PR Results

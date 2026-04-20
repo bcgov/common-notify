@@ -4,56 +4,29 @@
   "base_url": "${BASE_URL}",
   "tests": [
     {
-      "name": "User Endpoint TEST",
-      "methods": [
-        "GET",
-        "POST",
-        "PUT",
-        "GET",
-        "DELETE"
-      ],
-      "path": "/api/v1/users",
+      "name": "Health Check",
+      "methods": ["GET"],
+      "path": "/health",
       "headers": {
-        "Content-Type": "application/json"
-      },
-      "data": {
-        "id_field": "id",
-        "post_payload": {
-          "name": "John",
-          "email": "John.ipsum@test.com"
-        },
-        "put_payload": {
-          "name": "Jane",
-          "email": "Jane.ipsum@test.com"
-        },
-        "patch_payload": {
-          "name": "Jane",
-          "email": "Jane.ipsum@test.com"
-        }
+        "accept": "application/json"
       },
       "assertions": [
         {
-          "method": "POST",
-          "status_code": 201,
-          "body": {
-            "name": "John",
-            "email": "John.ipsum@test.com"
-          }
-        },
-        {
           "method": "GET",
           "status_code": 200
-        },
+        }
+      ]
+    },
+    {
+      "name": "API Health Check",
+      "methods": ["GET"],
+      "path": "/api/health",
+      "headers": {
+        "accept": "application/json"
+      },
+      "assertions": [
         {
-          "method": "PUT",
-          "status_code": 200,
-          "body": {
-            "name": "Jane",
-            "email": "Jane.ipsum@test.com"
-          }
-        },
-        {
-          "method": "DELETE",
+          "method": "GET",
           "status_code": 200
         }
       ]

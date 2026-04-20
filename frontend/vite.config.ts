@@ -2,6 +2,11 @@ import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// Read frontend package.json for version
+const frontendPackageJson = JSON.parse(readFileSync(resolve(__dirname, './package.json'), 'utf-8'))
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -12,6 +17,9 @@ export default defineConfig({
     }),
     react(),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(frontendPackageJson.version),
+  },
   server: {
     port: parseInt(process.env.PORT),
     fs: {
@@ -19,9 +27,9 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
-      // Proxy API requests to the backend
+      // Proxy API requests to Kong API Gateway (or local Kong in development)
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_API_GATEWAY_NOTIFY_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
@@ -31,9 +39,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '~': fileURLToPath(new URL('./node_modules', import.meta.url)),
-      '~bootstrap': fileURLToPath(
-        new URL('./node_modules/bootstrap', import.meta.url),
-      ),
+      '~bootstrap': fileURLToPath(new URL('./node_modules/bootstrap', import.meta.url)),
     },
     extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue'],
   },
@@ -51,7 +57,6 @@ export default defineConfig({
         manualChunks: {
           // Split external library from transpiled code.
           react: ['react', 'react-dom'],
-          axios: ['axios'],
         },
       },
     },
@@ -66,6 +71,7 @@ export default defineConfig({
           'color-functions',
           'global-builtin',
           'import',
+          'if-function',
         ],
       },
     },

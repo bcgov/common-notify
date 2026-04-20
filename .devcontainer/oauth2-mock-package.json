@@ -1,0 +1,12 @@
+{
+  "name": "oauth2-mock-server",
+  "version": "1.0.0",
+  "description": "Mock OAuth2 token server for local development",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

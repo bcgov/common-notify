@@ -1,15 +1,20 @@
-// A custom theme for this app, see: https://getbootstrap.com/docs/5.3/customize/sass/#maps-and-loops
-$primary: #ffffff;
-$secondary: #385a8a;
-$success: #234720;
-$warning: #81692c;
-$danger: #712024;
+// Import variables first
+@import './variables.scss';
+
+// Import component styles
+@import './components/layout.scss';
+@import './components/loading-spinner.scss';
+@import './components/toasts.scss';
+
+// Global font family
+html,
+body {
+  font-family: 'BCSans', sans-serif;
+}
 
 // Import Bootstrap and Bootstrap Icons
 @import '../../node_modules/bootstrap/scss/bootstrap';
 $bootstrap-icons-font-src:
-  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2')
-    format('woff2'),
-  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff')
-    format('woff');
+  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2') format('woff2'),
+  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff') format('woff');
 @import '../../node_modules/bootstrap-icons/font/bootstrap-icons.scss';

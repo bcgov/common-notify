@@ -76,16 +76,15 @@ on:
     secrets:
       oc_namespace:
         description: OpenShift namespace
-        required: true
+        required: false
       oc_token:
         description: OpenShift token
-        required: true
+        required: false
 
 permissions: {}
 
 jobs:
   deploy:
-    name: Stack
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-24.04
     outputs:
@@ -96,8 +95,8 @@ jobs:
         name: Deploy Crunchy
         id: deploy_crunchy
         with:
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_token: ${{ secrets.oc_token }}
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
           environment: ${{ inputs.environment }}
           values_file: charts/crunchy/values.yml
@@ -137,9 +136,9 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
         with:
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_token: ${{ secrets.oc_token }}
-          oc_server: ${{ vars.oc_server }}
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN }}
+          oc_server: ${{ inputs.oc_server }}
           triggers: ${{ inputs.triggers }}
           commands: |
             # Interrupt any previous deployments (PR only)
@@ -159,9 +158,9 @@ jobs:
         id: deploy
         uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
         with:
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_token: ${{ secrets.oc_token }}
-          oc_server: ${{ vars.oc_server }}
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN }}
+          oc_server: ${{ inputs.oc_server }}
           triggers: ${{ inputs.triggers }}
           ref: ${{ github.ref }}
           commands: |
@@ -176,7 +175,7 @@ jobs:
             # print the values.yaml file to see the values being used
             # Helm upgrade/rollout
             # Extract license plate from namespace (e.g., f6bc3f-dev -> f6bc3f)
-            LICENSE_PLATE=$(echo "${{ secrets.oc_namespace }}" | cut -d'-' -f1)
+            LICENSE_PLATE=$(echo "${{ secrets.oc_namespace || secrets.OC_NAMESPACE }}" | cut -d'-' -f1)
 
             helm upgrade \
               --set-string global.registry="image-registry.apps.silver.devops.gov.bc.ca" \

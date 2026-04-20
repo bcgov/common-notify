@@ -1,0 +1,707 @@
+{
+  "info": {
+    "_postman_id": "f3394bca-71fe-4e58-9ac2-aed110fcdb7e",
+    "name": "Notify Gateway API",
+    "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "9083839"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get JWT Token (Client Credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('jwt_token', jsonData.access_token);",
+                  "    pm.environment.set('token_expires_in', jsonData.expires_in || 3600);",
+                  "    pm.test('JWT Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ JWT Token saved to {{jwt_token}}');",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "} else {",
+                  "    pm.test('Failed to get JWT token', function() {",
+                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{client_secret}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloak_realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "description": "Get a JWT access token from Keycloak using client credentials flow (DEV environment).\n\n**Setup Required:**\n1. Load .env.notify-dev.json as environment\n2. Set Keycloak environment variables:\n   - `keycloak_url`: Keycloak instance URL\n   - `client_id`: Your OAuth2 client ID\n   - `client_secret`: Your OAuth2 client secret\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Get OAuth2 Token (Kong - Local)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('jwt_token', jsonData.access_token);",
+                  "    pm.environment.set('token_expires_in', jsonData.expires_in || 3600);",
+                  "    pm.test('OAuth2 Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ OAuth2 Token saved to {{jwt_token}}');",
+                  "    console.log('Token type:', jsonData.token_type);",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "} else {",
+                  "    pm.test('Failed to get OAuth2 token', function() {",
+                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{client_secret}}",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "notify",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{kong_token_url}}",
+              "host": [
+                "{{kong_token_url}}"
+              ]
+            },
+            "description": "Get an OAuth2 access token from Kong's OAuth2 plugin (DEV environment with Kong).\n\n**Prerequisites:**\n1. Kong is running in DEV environment\n2. Load .env.notify-dev.json as environment\n3. Set kong_token_url environment variable\n4. Kong seed script has created test credentials\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890\n- Client B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Client C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "API Endpoints",
+      "item": [
+        {
+          "name": "Notify - Simple Send",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"to\": [\"bfalk@salussystems.com\"],\n    \"subject\": \"Hello from Notify\",\n    \"body\": \"If you’re seeing this, everything is working as expected\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Event Type Send",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventTypeId\": \"welcome-email\",\n  \"recipients\": [\"user@example.com\"],\n  \"params\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notifyevent",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notifyevent"
+              ]
+            },
+            "description": "Send notification using event type configuration"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Event Type Preview",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventTypeId\": \"welcome-email\",\n  \"recipients\": [\"user@example.com\"],\n  \"params\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notifyevent/preview",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "preview"
+              ]
+            },
+            "description": "Preview resolved notification payloads without sending"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - List Event Types",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notifyevent/types",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "types"
+              ]
+            },
+            "description": "Get list of available notification event types"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Get Event Type",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notifyevent/types/welcome-email",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "types",
+                "welcome-email"
+              ]
+            },
+            "description": "Get a specific notification event type"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - List Notifications",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notify?limit=10",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notify"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List notification history"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Get Notification Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notify/status/12345",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "status",
+                "12345"
+              ]
+            },
+            "description": "Get status of a specific notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Register Callback",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/webhook\",\n  \"events\": [\"notification.sent\", \"notification.failed\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notify/registerCallback",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback"
+              ]
+            },
+            "description": "Register a callback webhook for notification events"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Update Callback",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/webhook/updated\",\n  \"events\": [\"notification.sent\"]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback",
+                "callback-id-123"
+              ]
+            },
+            "description": "Update a registered callback"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Delete Callback",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback",
+                "callback-id-123"
+              ]
+            },
+            "description": "Delete a registered callback"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - List Templates",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/templates",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "templates"
+              ]
+            },
+            "description": "List all notification templates"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Get Template",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/templates/template-id-123",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "v1",
+                "templates",
+                "template-id-123"
+              ]
+            },
+            "description": "Get a specific notification template"
+          },
+          "response": []
+        },
+        {
+          "name": "CHES - Send Email (Bearer Token)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"to\": [\n    \"{{recipient_email}}\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Test Email\",\n  \"body\": \"<h1>Hello</h1><p>This is a test email sent with Bearer token authentication.</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"UTF-8\",\n  \"priority\": \"normal\",\n  \"attachments\": [],\n  \"tag\": \"test\",\n  \"delayTs\": null,\n  \"mergeData\": {}\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/ches/api/v1/email",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "ches",
+                "api",
+                "v1",
+                "email"
+              ]
+            },
+            "description": "Send an email using Bearer token authentication (OAuth2 or JWT) via CHES compatibility endpoint.\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "https://gw-fe8c5-notify.dev.api.gov.bc.ca",
+      "type": "string"
+    },
+    {
+      "key": "kong_token_url",
+      "value": "http://localhost:8000/oauth2/token",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_url",
+      "value": "https://dev.loginproxy.gov.bc.ca/auth",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_realm",
+      "value": "apigw",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "test-api-key-a-12345678901234567890",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_expires_in",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recipient_email",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

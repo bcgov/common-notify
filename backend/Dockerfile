@@ -4,8 +4,7 @@ FROM node:24.14.0-slim AS build
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
 COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm run deploy
+RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
 FROM node:24.14.0-slim AS dependencies
@@ -13,7 +12,6 @@ FROM node:24.14.0-slim AS dependencies
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
 COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
 # Deploy using minimal Distroless image
@@ -23,7 +21,6 @@ ENV NODE_ENV=production
 # Copy app and dependencies
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=build /app/generated ./generated
 COPY --from=build /app/dist ./dist
 
 # Boilerplate, not used in OpenShift/Kubernetes
