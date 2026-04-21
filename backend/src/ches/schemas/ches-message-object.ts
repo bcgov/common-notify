@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsEnum,
   ValidateNested,
+  ArrayMinSize,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -26,6 +27,7 @@ export class ChesMessageObject {
   @ApiProperty() @IsEmail() from: string
   @ApiProperty({ type: [String] })
   @IsArray()
+  @ArrayMinSize(1)
   @IsEmail({}, { each: true })
   to: string[]
   @ApiProperty() @IsString() subject: string

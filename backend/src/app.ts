@@ -26,7 +26,12 @@ export async function bootstrap() {
   app.use(bodyParser.json())
 
   app.useGlobalPipes(
-    new ValidationPipe({ errorHttpStatusCode: 422, whitelist: true, transform: true }),
+    new ValidationPipe({
+      errorHttpStatusCode: 422,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   )
 
   app.use(helmet())

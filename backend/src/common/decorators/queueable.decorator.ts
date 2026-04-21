@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common'
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
@@ -96,11 +96,11 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
       try {
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
-          throw new Error('Decorator context is invalid')
+          throw new InternalServerErrorException('Decorator context is invalid')
         }
 
         if (!(this as QueueableContext).notificationService) {
-          throw new Error(
+          throw new InternalServerErrorException(
             'NotificationService not injected. Ensure controller constructor includes: private readonly notificationService: NotificationService',
           )
         }
@@ -108,7 +108,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Validate queueMap exists and is a Map
         const queueMap = (this as QueueableContext).queueMap
         if (!(queueMap instanceof Map)) {
-          throw new Error(
+          throw new InternalServerErrorException(
             `Queue map not initialized. Ensure controller initializes queueMap with: this.queueMap = new Map([[${queueName}, this.<queueProperty>]])`,
           )
         }
@@ -116,21 +116,23 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Get the queue from the controller's queueMap with type safety
         const queue = queueMap.get(queueName)
         if (!queue) {
-          throw new Error(
+          throw new InternalServerErrorException(
             `Queue "${queueName}" not available in queueMap. Available queues: ${Array.from(queueMap.keys()).join(', ')}`,
           )
         }
 
         // Validate tenant context with type guard
         if (!isValidTenantContext(tenant)) {
-          throw new Error('Tenant information is required but was not provided or invalid')
+          throw new BadRequestException(
+            'Tenant information is required but was not provided or invalid',
+          )
         }
 
         const tenantId = tenant.id
 
         // Validate payload with type guard
         if (!isValidNotifyRequest(payload)) {
-          throw new Error(
+          throw new BadRequestException(
             'Request payload is invalid. Must include NotifySimpleRequest with email or sms channel: email requires {to: string[], subject: string, body: string}, sms requires {to: string[], body: string}',
           )
         }

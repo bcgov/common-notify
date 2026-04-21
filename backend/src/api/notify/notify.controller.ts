@@ -11,6 +11,7 @@ import {
   Version,
   UseGuards,
   Inject,
+  UsePipes,
 } from '@nestjs/common'
 import Bull from 'bull'
 import { TenantGuard } from '../../common/guards/tenant.guard'
@@ -22,6 +23,7 @@ import { NotifySimpleRequest } from './schemas'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { ValidateNotifyChannelPipe } from './pipes/validate-notify-channel.pipe'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -45,6 +47,7 @@ export class NotifySimpleController {
   @Post()
   @HttpCode(202)
   @Queueable(QueueName.INGESTION)
+  @UsePipes(ValidateNotifyChannelPipe)
   simpleSend(
     @GetTenant() _tenant: Tenant,
     @Body() _body: NotifySimpleRequest,
