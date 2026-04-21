@@ -40,6 +40,13 @@ if [ -z "$RELEASE_NAME" ]; then
   RELEASE_NAME="common-notify-${ENVIRONMENT}"
 fi
 
+# For PR environment, extract PR number from release name
+# Example: common-notify-15 -> PR_NUMBER=15
+if [ "$ENVIRONMENT" == "pr" ]; then
+  PR_NUMBER=$(echo "$RELEASE_NAME" | sed 's/common-notify-//')
+  export PR_NUMBER
+fi
+
 # Get script directory (scripts/ is inside api-gateway/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${SCRIPT_DIR}/config/${ENVIRONMENT}.env"
@@ -60,8 +67,9 @@ fi
 # Create generated directory if it doesn't exist
 mkdir -p "${SCRIPT_DIR}/generated"
 
-# Export RELEASE_NAME so it's available to envsubst
+# Export variables so they're available to envsubst
 export RELEASE_NAME
+export ENVIRONMENT
 
 # Load environment variables
 echo "Loading environment variables from: $ENV_FILE"
@@ -79,15 +87,19 @@ echo "  Output: $OUTPUT_FILE"
 # Use envsubst to substitute environment variables in template
 envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 
-# For PR environments, remove the Product and CredentialIssuer sections
-# These should only be published once for the main environments (dev/test/prod)
-if [ "$ENVIRONMENT" == "pr" ]; then
-  echo "Removing Product and CredentialIssuer sections for PR environment..."
+# For non-PROD environments, remove the DraftDataset, Product and CredentialIssuer sections
+# These should only be published from the PROD config to avoid conflicts
+if [ "$ENVIRONMENT" != "prod" ]; then
+  echo "Removing DraftDataset, Product and CredentialIssuer sections (only published from PROD)..."
   # Create a temporary file
   TMP_FILE="${OUTPUT_FILE}.tmp"
 
-  # Remove everything from "kind: CredentialIssuer" to the end of the file
-  sed '/^kind: CredentialIssuer$/,$d' "$OUTPUT_FILE" > "$TMP_FILE"
+  # Remove everything from the first "kind: DraftDataset" to the first "kind: GatewayService"
+  # This removes the DraftDataset section
+  sed '/^kind: DraftDataset$/,/^kind: GatewayService$/{ /^kind: GatewayService$/!d; }' "$OUTPUT_FILE" > "$TMP_FILE"
+
+  # Then remove everything from "kind: CredentialIssuer" to the end
+  sed -i.bak '/^kind: CredentialIssuer$/,$d' "$TMP_FILE" && rm -f "$TMP_FILE.bak"
 
   # Replace the original file
   mv "$TMP_FILE" "$OUTPUT_FILE"
