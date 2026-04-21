@@ -46,13 +46,35 @@ export class EmailDeliveryWorker {
       )
 
       try {
-        // Validate job data
-        if (!payload) {
-          throw new Error('Invalid delivery job: email payload is missing')
+        // Validate DeliveryJobPayload structure
+        if (!notifyId || typeof notifyId !== 'string') {
+          throw new Error('Invalid delivery job: notifyId is missing or invalid')
+        }
+        if (!recordId || typeof recordId !== 'string') {
+          throw new Error('Invalid delivery job: recordId is missing or invalid')
+        }
+        if (!tenantId || typeof tenantId !== 'string') {
+          throw new Error('Invalid delivery job: tenantId is missing or invalid')
+        }
+        if (typeof attempt !== 'number' || attempt < 0) {
+          throw new Error('Invalid delivery job: attempt is missing or invalid')
         }
 
-        if (!payload.to || payload.to.length === 0) {
-          throw new Error('Invalid email payload: recipient email address is missing')
+        // Validate job data
+        if (!payload || typeof payload !== 'object') {
+          throw new Error('Invalid delivery job: email payload is missing or invalid')
+        }
+
+        if (!payload.to || !Array.isArray(payload.to) || payload.to.length === 0) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        if (!payload.subject || typeof payload.subject !== 'string') {
+          throw new Error('Invalid email payload: subject is missing or invalid')
+        }
+
+        if (!payload.body || typeof payload.body !== 'string') {
+          throw new Error('Invalid email payload: body is missing or invalid')
         }
 
         // Update status to SENDING
@@ -140,9 +162,6 @@ export class EmailDeliveryWorker {
     logger.debug(
       `[${recordId}] Simulating email send to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
     )
-
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 100))
 
     return {
       externalId: `ches-${Date.now()}`,

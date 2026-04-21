@@ -45,7 +45,7 @@ export class IngestionWorker {
 
     // Register the job processor with configurable concurrency
     ingestionQueue.process(concurrency, async (job: Bull.Job<IngestionJobPayload>) => {
-      const { notifyId, recordId, tenantId, request, scheduledFor } = job.data
+      const { notifyId, recordId, tenantId, request, scheduledFor, requestedAt } = job.data
 
       logger.debug(
         `[${recordId}] Processing ingestion job for notifyId=${notifyId}, tenant=${tenantId}`,
@@ -54,9 +54,23 @@ export class IngestionWorker {
       try {
         logger.log(`[${recordId}] [IngestionWorker] Starting to process job ${job.id}`)
 
+        // Validate IngestionJobPayload structure
+        if (!notifyId || typeof notifyId !== 'string') {
+          throw new Error('Invalid ingestion job: notifyId is missing or invalid')
+        }
+        if (!recordId || typeof recordId !== 'string') {
+          throw new Error('Invalid ingestion job: recordId is missing or invalid')
+        }
+        if (!tenantId || typeof tenantId !== 'string') {
+          throw new Error('Invalid ingestion job: tenantId is missing or invalid')
+        }
+        if (!requestedAt || typeof requestedAt !== 'string') {
+          throw new Error('Invalid ingestion job: requestedAt is missing or invalid')
+        }
+
         // Validate request structure
-        if (!request) {
-          throw new Error('Invalid request: request payload is missing')
+        if (!request || typeof request !== 'object') {
+          throw new Error('Invalid request: request payload is missing or invalid')
         }
 
         // Determine channels and fan-out to delivery queues

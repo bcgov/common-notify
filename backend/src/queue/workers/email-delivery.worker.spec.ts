@@ -162,7 +162,7 @@ describe('EmailDeliveryWorker', () => {
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Invalid delivery job: email payload is missing',
+        'Invalid delivery job: email payload is missing or invalid',
       )
 
       // Should mark as FAILED after attempt 2 (final attempt)
@@ -190,7 +190,161 @@ describe('EmailDeliveryWorker', () => {
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Invalid email payload: recipient email address is missing',
+        'Invalid email payload: recipient email address is missing or invalid',
+      )
+    })
+
+    it('should throw error when email subject is missing', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            body: 'Test body',
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid email payload: subject is missing or invalid',
+      )
+    })
+
+    it('should throw error when email body is missing', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            subject: 'Test',
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid email payload: body is missing or invalid',
+      )
+    })
+
+    it('should throw error when notifyId is missing', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: undefined as any,
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            subject: 'Test',
+            body: 'Test body',
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid delivery job: notifyId is missing or invalid',
+      )
+    })
+
+    it('should throw error when recordId is missing', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: '' as any,
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            subject: 'Test',
+            body: 'Test body',
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid delivery job: recordId is missing or invalid',
+      )
+    })
+
+    it('should throw error when tenantId is missing', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: null as any,
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            subject: 'Test',
+            body: 'Test body',
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid delivery job: tenantId is missing or invalid',
+      )
+    })
+
+    it('should throw error when attempt is invalid', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          payload: {
+            to: ['test@example.com'],
+            subject: 'Test',
+            body: 'Test body',
+          },
+          attempt: -1,
+        } as DeliveryJobPayload,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Invalid delivery job: attempt is missing or invalid',
       )
     })
 

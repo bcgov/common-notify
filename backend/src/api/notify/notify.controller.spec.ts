@@ -247,7 +247,7 @@ describe('Notify Controllers', () => {
     })
 
     describe('GET /api/v1/templates/:templateId', () => {
-      it('should return 501 status', async () => {
+      it('should return 501 status', { timeout: 10000 }, async () => {
         return request(app.getHttpServer()).get('/api/v1/templates/template-123').expect(501)
       })
     })

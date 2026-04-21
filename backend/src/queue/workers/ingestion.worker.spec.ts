@@ -258,7 +258,107 @@ describe('IngestionWorker', () => {
       }
 
       await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
-        'Invalid request: request payload is missing',
+        'Invalid request: request payload is missing or invalid',
+      )
+    })
+
+    it('should throw error when notifyId is missing', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: undefined as any,
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          request: {
+            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Invalid ingestion job: notifyId is missing or invalid',
+      )
+    })
+
+    it('should throw error when recordId is missing', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: '' as any,
+          tenantId: 'tenant-123',
+          request: {
+            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Invalid ingestion job: recordId is missing or invalid',
+      )
+    })
+
+    it('should throw error when tenantId is missing', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: null as any,
+          request: {
+            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Invalid ingestion job: tenantId is missing or invalid',
+      )
+    })
+
+    it('should throw error when requestedAt is missing', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-123',
+          recordId: 'record-123',
+          tenantId: 'tenant-123',
+          request: {
+            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+          },
+          requestedAt: undefined as any,
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Invalid ingestion job: requestedAt is missing or invalid',
       )
     })
 
@@ -375,6 +475,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
+          recordId: 'record-retry',
           tenantId: 'tenant-retry',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },

@@ -46,13 +46,31 @@ export class SmsDeliveryWorker {
       )
 
       try {
-        // Validate job data
-        if (!payload) {
-          throw new Error('Invalid delivery job: SMS payload is missing')
+        // Validate DeliveryJobPayload structure
+        if (!notifyId || typeof notifyId !== 'string') {
+          throw new Error('Invalid delivery job: notifyId is missing or invalid')
+        }
+        if (!recordId || typeof recordId !== 'string') {
+          throw new Error('Invalid delivery job: recordId is missing or invalid')
+        }
+        if (!tenantId || typeof tenantId !== 'string') {
+          throw new Error('Invalid delivery job: tenantId is missing or invalid')
+        }
+        if (typeof attempt !== 'number' || attempt < 0) {
+          throw new Error('Invalid delivery job: attempt is missing or invalid')
         }
 
-        if (!payload.to || payload.to.length === 0) {
-          throw new Error('Invalid SMS payload: recipient phone number is missing')
+        // Validate job data
+        if (!payload || typeof payload !== 'object') {
+          throw new Error('Invalid delivery job: SMS payload is missing or invalid')
+        }
+
+        if (!payload.to || !Array.isArray(payload.to) || payload.to.length === 0) {
+          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
+        }
+
+        if (!payload.body || typeof payload.body !== 'string') {
+          throw new Error('Invalid SMS payload: body is missing or invalid')
         }
 
         // Update status to SENDING
