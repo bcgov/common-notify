@@ -14,14 +14,14 @@ record_publish_date: '2026-04-10'
 ---
 kind: GatewayService
 name: ${GATEWAY_SERVICE_NAME}
-tags: [ns.gw-fe8c5]
+tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
 host: ${BACKEND_HOST}
 port: 80
 protocol: http
 retries: 0
 routes:
   - name: ${ROUTE_PREFIX}notify-health
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -34,7 +34,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-api-health
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -47,7 +47,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}ches-email
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -60,7 +60,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -73,7 +73,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -86,7 +86,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-preview
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -99,7 +99,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-types
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -112,7 +112,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-list
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -126,7 +126,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-status
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -139,7 +139,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-callbacks
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -154,7 +154,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}templates
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -168,7 +168,7 @@ routes:
     response_buffering: true
 plugins:
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
@@ -194,7 +194,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
@@ -220,7 +220,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
@@ -246,7 +246,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
@@ -272,7 +272,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
@@ -298,7 +298,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
@@ -324,7 +324,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
@@ -350,7 +350,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
@@ -376,7 +376,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: request-transformer
-    tags: [ns.gw-fe8c5]
+    tags: [ns.gw-fe8c5, env.${ENVIRONMENT}]
     enabled: true
     config:
       http_method: null
