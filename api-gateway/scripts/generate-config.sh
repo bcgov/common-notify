@@ -79,5 +79,19 @@ echo "  Output: $OUTPUT_FILE"
 # Use envsubst to substitute environment variables in template
 envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 
+# For PR environments, remove the Product and CredentialIssuer sections
+# These should only be published once for the main environments (dev/test/prod)
+if [ "$ENVIRONMENT" == "pr" ]; then
+  echo "Removing Product and CredentialIssuer sections for PR environment..."
+  # Create a temporary file
+  TMP_FILE="${OUTPUT_FILE}.tmp"
+
+  # Remove everything from "kind: CredentialIssuer" to the end of the file
+  sed '/^kind: CredentialIssuer$/,$d' "$OUTPUT_FILE" > "$TMP_FILE"
+
+  # Replace the original file
+  mv "$TMP_FILE" "$OUTPUT_FILE"
+fi
+
 echo "✅ Gateway configuration generated successfully!"
 echo "   File: $OUTPUT_FILE"
