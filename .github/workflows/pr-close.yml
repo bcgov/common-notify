@@ -18,8 +18,8 @@ jobs:
     permissions:
       packages: write
     secrets:
-      oc_namespace: ${{ secrets.OC_NAMESPACE }}
-      oc_token: ${{ secrets.OC_TOKEN }}
+      oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+      oc_token: ${{ secrets.OC_DEV_TOKEN }}
     with:
       cleanup: helm
       packages: backend frontend migrations
@@ -31,7 +31,42 @@ jobs:
       - uses: bcgov/action-crunchy@v1.2.6
         name: Remove PR Specific User
         with:
-          oc_namespace: ${{ secrets.OC_NAMESPACE }}
-          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           values_file: charts/crunchy/values.yml
+
+  cleanup_gateway:
+    name: Delete PR API Gateway Config
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate PR gateway config for cleanup
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          # Make script executable
+          chmod +x api-gateway/scripts/generate-config.sh
+
+          # Generate PR-specific gateway config (needed for deletion)
+          api-gateway/scripts/generate-config.sh pr common-notify-${{ github.event.number }}
+
+      - name: Delete gateway config
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          # Install gwa CLI
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
+          sudo mv gwa /usr/local/bin/
+
+          # Login to API Gateway with service account credentials
+          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
+          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
+
+          # Set gateway context
+          gwa config set gateway gw-fe8c5
+
+          # Delete gateway configuration
+          gwa destroy -i api-gateway/generated/gw-routes-pr.yaml || echo "Gateway config may not exist or already deleted"
