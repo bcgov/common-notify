@@ -4,6 +4,7 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { v4 as uuid } from 'uuid'
+import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
 
 /**
  * Context required by the Queueable decorator.
@@ -15,9 +16,67 @@ export interface QueueableContext {
 }
 
 /**
+ * Type guard to validate if payload is a valid NotifySimpleRequest
+ * Ensures payload has the expected structure with at least one channel (email or SMS)
+ * This validation is redundant with NestJS's class-validator but provides safety
+ * if the decorator is used incorrectly or with incompatible payloads.
+ */
+function isValidNotifyRequest(payload: unknown): payload is NotifySimpleRequest {
+  if (typeof payload !== 'object' || payload === null) {
+    return false
+  }
+
+  const p = payload as Record<string, unknown>
+
+  // Must have at least email or sms
+  const hasEmail = typeof p.email === 'object' && p.email !== null
+  const hasSms = typeof p.sms === 'object' && p.sms !== null
+
+  if (!hasEmail && !hasSms) {
+    return false
+  }
+
+  // Validate email structure if present (NotifyEmailChannel has required: to, subject, body)
+  if (hasEmail) {
+    const email = p.email as Record<string, unknown>
+    if (
+      !Array.isArray(email.to) ||
+      email.to.length === 0 ||
+      typeof email.subject !== 'string' ||
+      typeof email.body !== 'string'
+    ) {
+      return false
+    }
+  }
+
+  // Validate SMS structure if present (NotifySmsChannel has required: to, body)
+  if (hasSms) {
+    const sms = p.sms as Record<string, unknown>
+    if (!Array.isArray(sms.to) || sms.to.length === 0 || typeof sms.body !== 'string') {
+      return false
+    }
+  }
+
+  return true
+}
+
+/**
+ * Type guard to validate tenant context
+ * Ensures tenant has a valid string ID
+ */
+function isValidTenantContext(tenant: unknown): tenant is { id: string } {
+  return (
+    typeof tenant === 'object' &&
+    tenant !== null &&
+    typeof (tenant as Record<string, unknown>).id === 'string'
+  )
+}
+
+/**
  * @Queueable Decorator
  *
- * This decorator handles the queuing logic for notifications.  Adding this decorator to a controller method will write the request and payload to the notification_request table.
+ * This decorator handles the queuing logic for notifications with strong type safety.
+ * Adding this decorator to a controller method will write the request and payload to the notification_request table.
  * We do this to ensure durability of the request (in case Redis is unavailable) and to have a record of all incoming requests for retry purposes.
  * The decorator will attempt to queue the notification to the specified Bull queue. If queuing fails (e.g. Redis is down), the notification remains in PENDING status and will be retried by a scheduled job.
  *
@@ -29,75 +88,63 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
     descriptor.value = async function (
       this: QueueableContext,
-      tenant?: { id?: string },
-      payload?: Record<string, unknown>,
+      tenant?: unknown,
+      payload?: unknown,
     ) {
       const notifyId = uuid()
 
       try {
         // Validate required dependencies
-        if (!this.notificationService) {
+        if (!this || typeof this !== 'object') {
+          throw new Error('Decorator context is invalid')
+        }
+
+        if (!(this as QueueableContext).notificationService) {
           throw new Error(
             'NotificationService not injected. Ensure controller constructor includes: private readonly notificationService: NotificationService',
           )
         }
 
-        // Get the queue from the controller's queueMap
-        const queue = (this as any).queueMap?.get(queueName)
-        if (!queue) {
+        // Validate queueMap exists and is a Map
+        const queueMap = (this as QueueableContext).queueMap
+        if (!(queueMap instanceof Map)) {
           throw new Error(
-            `Queue "${queueName}" not available. Ensure controller initializes queueMap with: this.queueMap = new Map([[${queueName}, this.<queueProperty>]])`,
+            `Queue map not initialized. Ensure controller initializes queueMap with: this.queueMap = new Map([[${queueName}, this.<queueProperty>]])`,
           )
         }
 
-        // Parameters come in decorator order: tenant (from @GetTenant), payload (from @Body)
-        // Both should be present - tenant provides tenant ID, payload provides request data
-        if (!tenant || !tenant.id) {
-          throw new Error('Tenant information is required but was not provided')
+        // Get the queue from the controller's queueMap with type safety
+        const queue = queueMap.get(queueName)
+        if (!queue) {
+          throw new Error(
+            `Queue "${queueName}" not available in queueMap. Available queues: ${Array.from(queueMap.keys()).join(', ')}`,
+          )
         }
 
-        if (!payload) {
-          throw new Error('Request payload is required but was not provided')
+        // Validate tenant context with type guard
+        if (!isValidTenantContext(tenant)) {
+          throw new Error('Tenant information is required but was not provided or invalid')
         }
 
         const tenantId = tenant.id
-        const resolvedPayload = payload as any
 
-        // Validate that at least one channel is provided
-        if (!resolvedPayload.email && !resolvedPayload.sms) {
-          throw new Error('At least one channel (email or sms) must be provided')
+        // Validate payload with type guard
+        if (!isValidNotifyRequest(payload)) {
+          throw new Error(
+            'Request payload is invalid. Must include NotifySimpleRequest with email or sms channel: email requires {to: string[], subject: string, body: string}, sms requires {to: string[], body: string}',
+          )
         }
 
-        // Validate email channel if present
-        if (resolvedPayload.email) {
-          if (!resolvedPayload.email.to || resolvedPayload.email.to.length === 0) {
-            throw new Error('Email channel requires at least one recipient')
-          }
-          if (!resolvedPayload.email.subject) {
-            throw new Error('Email channel requires a subject')
-          }
-          if (!resolvedPayload.email.body) {
-            throw new Error('Email channel requires a body')
-          }
-        }
+        const validatedPayload: NotifySimpleRequest = payload
 
-        // Validate SMS channel if present
-        if (resolvedPayload.sms) {
-          if (!resolvedPayload.sms.to || resolvedPayload.sms.to.length === 0) {
-            throw new Error('SMS channel requires at least one recipient')
-          }
-          if (!resolvedPayload.sms.body) {
-            throw new Error('SMS channel requires a body')
-          }
-        }
-        // Create DB record with PENDING status.  If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
+        // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         let notificationRecord
         try {
-          notificationRecord = await this.notificationService.create({
+          notificationRecord = await (this as QueueableContext).notificationService.create({
             tenantId,
             status: NotificationStatus.PENDING,
-            createdBy: tenant?.id || 'system',
-            payload: resolvedPayload, // Store request payload for retry purposes
+            createdBy: tenantId,
+            payload: validatedPayload, // Store request payload for retry purposes
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id}`,
@@ -105,14 +152,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               notifyId,
               tenantId,
               recordId: notificationRecord.id,
-            },
-          )
-          logger.log(
-            `[DEBUG] Created notification with ID: ${notificationRecord.id} for tenant: ${tenantId}`,
-            {
-              idType: typeof notificationRecord.id,
-              tenantIdType: typeof tenantId,
-              tenantIdValue: tenantId,
             },
           )
         } catch (dbError) {
@@ -123,14 +162,15 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           throw dbError
         }
 
-        // Try to queue to Redis.  If Redis is unavailable, this will throw and we catch it to avoid failing the request.  It will remain PENDING for retry job to process.
+        // Try to queue to Redis. If Redis is unavailable, this will throw and we catch it to avoid failing the request.
+        // It will remain PENDING for retry job to process.
         let queueSucceeded = false
         try {
           const jobPayload = {
             notifyId,
             recordId: notificationRecord.id,
             tenantId,
-            request: resolvedPayload,
+            request: validatedPayload,
             requestedAt: new Date().toISOString(),
           }
 
@@ -163,10 +203,14 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Update status to QUEUED only if Redis accepted the job
         if (queueSucceeded) {
           try {
-            await this.notificationService.update(notificationRecord.id, tenantId, {
-              status: NotificationStatus.QUEUED,
-              updatedBy: 'system',
-            })
+            await (this as QueueableContext).notificationService.update(
+              notificationRecord.id,
+              tenantId,
+              {
+                status: NotificationStatus.QUEUED,
+                updatedBy: 'system',
+              },
+            )
           } catch (updateError) {
             logger.error(`Failed to update status to QUEUED: ${notifyId}`, {
               tenantId,
