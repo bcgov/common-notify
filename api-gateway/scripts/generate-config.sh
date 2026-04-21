@@ -101,6 +101,9 @@ if [ "$ENVIRONMENT" != "prod" ]; then
   # Then remove everything from "kind: CredentialIssuer" to the end
   sed -i.bak '/^kind: CredentialIssuer$/,$d' "$TMP_FILE" && rm -f "$TMP_FILE.bak"
 
+  # Remove trailing YAML document separators (---)
+  sed -i.bak '/^---$/d' "$TMP_FILE" && rm -f "$TMP_FILE.bak"
+
   # Replace the original file
   mv "$TMP_FILE" "$OUTPUT_FILE"
 fi
