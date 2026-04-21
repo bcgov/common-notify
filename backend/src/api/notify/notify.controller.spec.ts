@@ -1,7 +1,7 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
+import { VersioningType, CanActivate, ExecutionContext, ValidationPipe } from '@nestjs/common'
 import { vi } from 'vitest'
 import request from 'supertest'
 import {
@@ -81,6 +81,14 @@ describe('Notify Controllers', () => {
 
     service = module.get<NotifyService>(NotifyService)
     app = module.createNestApplication()
+    app.useGlobalPipes(
+      new ValidationPipe({
+        errorHttpStatusCode: 422,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    )
     app.enableVersioning({
       type: VersioningType.URI,
       prefix: 'api/v',
@@ -114,8 +122,8 @@ describe('Notify Controllers', () => {
           .expect(202)
       })
 
-      it('should return 400 when no channel is provided', async () => {
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(500)
+      it('should return 422 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
       })
     })
   })

@@ -1,4 +1,9 @@
-import { Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common'
+import {
+  Logger,
+  UnprocessableEntityException,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common'
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
@@ -17,7 +22,7 @@ export interface QueueableContext {
 
 /**
  * Type guard to validate if payload is a valid NotifySimpleRequest
- * Ensures payload has the expected structure with at least one channel (email or SMS)
+ * Ensures payload has the expected structure with at least one channel (email, SMS, or msgApp)
  * This validation is redundant with NestJS's class-validator but provides safety
  * if the decorator is used incorrectly or with incompatible payloads.
  */
@@ -28,11 +33,12 @@ function isValidNotifyRequest(payload: unknown): payload is NotifySimpleRequest 
 
   const p = payload as Record<string, unknown>
 
-  // Must have at least email or sms
+  // Must have at least email, sms, or msgApp
   const hasEmail = typeof p.email === 'object' && p.email !== null
   const hasSms = typeof p.sms === 'object' && p.sms !== null
+  const hasMsgApp = typeof p.msgApp === 'object' && p.msgApp !== null
 
-  if (!hasEmail && !hasSms) {
+  if (!hasEmail && !hasSms && !hasMsgApp) {
     return false
   }
 
@@ -53,6 +59,14 @@ function isValidNotifyRequest(payload: unknown): payload is NotifySimpleRequest 
   if (hasSms) {
     const sms = p.sms as Record<string, unknown>
     if (!Array.isArray(sms.to) || sms.to.length === 0 || typeof sms.body !== 'string') {
+      return false
+    }
+  }
+
+  // Validate msgApp structure if present (NotifyMsgAppChannel has required: to, body)
+  if (hasMsgApp) {
+    const msgApp = p.msgApp as Record<string, unknown>
+    if (!Array.isArray(msgApp.to) || msgApp.to.length === 0 || typeof msgApp.body !== 'string') {
       return false
     }
   }
@@ -132,8 +146,8 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         // Validate payload with type guard
         if (!isValidNotifyRequest(payload)) {
-          throw new BadRequestException(
-            'Request payload is invalid. Must include NotifySimpleRequest with email or sms channel: email requires {to: string[], subject: string, body: string}, sms requires {to: string[], body: string}',
+          throw new UnprocessableEntityException(
+            'Request payload is invalid. Must include NotifySimpleRequest with at least one channel (email, sms, or msgApp): email requires {to: string[], subject: string, body: string}, sms requires {to: string[], body: string}, msgApp requires {to: string[], body: string}',
           )
         }
 
