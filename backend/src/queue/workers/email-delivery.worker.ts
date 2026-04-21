@@ -87,7 +87,7 @@ export class EmailDeliveryWorker {
         // TODO: Get adapter instance from factory
         // const adapter = NotificationAdapterFactory.getAdapter(request)
         // For now, we'll return a success response to allow testing
-        const result = await EmailDeliveryWorker.sendEmailViaAdapter(payload, logger, recordId)
+        const result = await EmailDeliveryWorker.sendEmail(payload, logger, recordId)
 
         logger.debug(`[${recordId}] Email sent successfully: ${JSON.stringify(result)}`)
 
@@ -147,7 +147,7 @@ export class EmailDeliveryWorker {
    * @param recordId Record ID for tracing
    * @returns Promise with send result
    */
-  private static async sendEmailViaAdapter(
+  private static async sendEmail(
     payload: any,
     logger: Logger,
     recordId: string,
