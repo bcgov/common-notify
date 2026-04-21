@@ -3,7 +3,9 @@ name: gw-fe8c5-notify-dataset
 title: Notify
 organization: ministry-of-citizens-services
 organizationUnit: devops-and-cloud-services
-notes: A multi-tenant notification service for sending and scheduling email, SMS, and other messages via a unified API.
+notes:
+  A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
+  a unified API.
 tags: [notify, openapi, notifications, email, sms]
 license_title: Access Only
 view_audience: Government
@@ -24,6 +26,19 @@ routes:
       - ${GATEWAY_HOSTNAME}
     paths:
       - /health
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-api-health
+    tags: [ns.gw-fe8c5]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/health
     methods:
       - GET
     strip_path: false
