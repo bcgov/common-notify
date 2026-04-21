@@ -134,8 +134,8 @@ try {
 } catch (e) {
   if (e instanceof assert.AssertionError) {
     console.error(e)
-    process.exit(137)
+    process.exit(1)
   }
   console.error(e)
-  process.exit(137)
+  process.exit(1)
 }
