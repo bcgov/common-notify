@@ -15,7 +15,7 @@ const config = {
   API_GATEWAY_NOTIFY_URL:
     window.VITE_API_GATEWAY_NOTIFY_URL ||
     import.meta.env.VITE_API_GATEWAY_NOTIFY_URL ||
-    'https://coco-notify-gateway.dev.api.gov.bc.ca',
+    'https://gw-fe8c5-notify.dev.api.gov.bc.ca',
 }
 
 export default config
