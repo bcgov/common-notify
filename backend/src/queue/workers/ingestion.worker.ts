@@ -1,10 +1,10 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
-import { Repository } from 'typeorm'
+import { ConfigService } from '@nestjs/config'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { NotificationRequest } from '../../notification/entities/notification-request.entity'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { NotificationService } from '../../notification/notification.service'
 
 /**
  * Ingestion Worker
@@ -26,14 +26,16 @@ export class IngestionWorker {
    * @param ingestionQueue The BullMQ queue instance for ingestion jobs
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
-   * @param notificationRepository TypeORM repository for notification updates
+   * @param notificationService Service for database updates
+   * @param configService Configuration service for queue settings
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
   static async initialize(
     ingestionQueue: Bull.Queue<IngestionJobPayload>,
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
-    notificationRepository: Repository<NotificationRequest>,
+    notificationService: NotificationService,
+    configService: ConfigService,
     concurrency: number = 1,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
@@ -150,10 +152,10 @@ export class IngestionWorker {
         )
 
         // Update notification_request status to PROCESSING in database
-        await notificationRepository.update(
-          { id: recordId },
-          { status: NotificationStatus.PROCESSING },
-        )
+        await notificationService.update(recordId, tenantId, {
+          status: NotificationStatus.PROCESSING,
+          updatedBy: 'ingestion-worker',
+        })
 
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
@@ -164,12 +166,10 @@ export class IngestionWorker {
         )
 
         // Update notification_request status to FAILED in database
-        await notificationRepository.update(
-          { id: recordId },
-          {
-            status: NotificationStatus.FAILED,
-          },
-        )
+        await notificationService.update(recordId, tenantId, {
+          status: NotificationStatus.FAILED,
+          updatedBy: 'ingestion-worker',
+        })
 
         // Re-throw to trigger BullMQ retry logic
         throw error

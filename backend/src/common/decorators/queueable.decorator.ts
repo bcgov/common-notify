@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
-import { NotificationStatus } from 'src/enum/notification-status.enum'
-import { NotificationService } from 'src/notification/notification.service'
-import { QueueName } from 'src/enum/queue-name.enum'
+import { NotificationStatus } from '../../enum/notification-status.enum'
+import { NotificationService } from '../../notification/notification.service'
+import { QueueName } from '../../enum/queue-name.enum'
 import { v4 as uuid } from 'uuid'
 
 /**

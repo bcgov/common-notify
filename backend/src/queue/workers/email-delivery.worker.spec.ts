@@ -9,6 +9,7 @@ import { NotificationStatus } from '../../notification/schemas'
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
+  let mockConfigService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
@@ -19,6 +20,17 @@ describe('EmailDeliveryWorker', () => {
       update: vi.fn().mockResolvedValue({
         id: 'record-123',
         status: NotificationStatus.COMPLETED,
+      }),
+    }
+
+    // Mock the config service
+    mockConfigService = {
+      get: vi.fn((key: string) => {
+        const config: Record<string, any> = {
+          'queue.jobRetries': 3,
+          'queue.jobBackoffDelay': 2000,
+        }
+        return config[key]
       }),
     }
 
@@ -55,6 +67,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       expect(mockEmailQueue.process).toHaveBeenCalled()
@@ -64,6 +77,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       expect(mockEmailQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -74,6 +88,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -121,6 +136,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -148,6 +164,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -173,6 +190,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -198,6 +216,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -223,6 +242,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -248,6 +268,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -274,6 +295,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -300,6 +322,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -326,6 +349,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -352,6 +376,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       // Simulate final attempt
@@ -388,6 +413,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -440,6 +466,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -470,6 +497,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -500,6 +528,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -532,6 +561,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -565,6 +595,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -596,6 +627,7 @@ describe('EmailDeliveryWorker', () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
         5, // Custom concurrency
       )
 

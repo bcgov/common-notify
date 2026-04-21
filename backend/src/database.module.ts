@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { Tenant } from 'src/admin/tenants/entities/tenant.entity'
-import { TenantStatusCode } from 'src/admin/tenants/entities/tenant-status-code.entity'
-import { NotificationRequest } from 'src/notification/entities/notification-request.entity'
-import { NotificationStatusCode } from 'src/notification/entities/notification-status-code.entity'
+import { Tenant } from './admin/tenants/entities/tenant.entity'
+import { TenantStatusCode } from './admin/tenants/entities/tenant-status-code.entity'
+import { NotificationRequest } from './notification/entities/notification-request.entity'
+import { NotificationStatusCode } from './notification/entities/notification-status-code.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'

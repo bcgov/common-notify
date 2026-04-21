@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
+import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../notification/notification.service'
-import { NotificationStatus } from '../../notification/schemas'
+import { NotificationStatus } from '../../enum/notification-status.enum'
+import { NotifyEmailChannel } from '../../api/notify/schemas'
 
 /**
  * Email Delivery Worker
@@ -25,11 +27,13 @@ export class EmailDeliveryWorker {
    * Initialize the email delivery worker on a queue
    * @param emailQueue The BullMQ queue instance for email delivery jobs
    * @param notificationService Service for database updates
+   * @param configService Configuration service for queue settings
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
   static async initialize(
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    configService: ConfigService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -65,15 +69,18 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: email payload is missing or invalid')
         }
 
-        if (!payload.to || !Array.isArray(payload.to) || payload.to.length === 0) {
+        // Cast payload to email channel type for type safety
+        const emailPayload = payload as NotifyEmailChannel
+
+        if (!emailPayload.to || !Array.isArray(emailPayload.to) || emailPayload.to.length === 0) {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
-        if (!payload.subject || typeof payload.subject !== 'string') {
+        if (!emailPayload.subject || typeof emailPayload.subject !== 'string') {
           throw new Error('Invalid email payload: subject is missing or invalid')
         }
 
-        if (!payload.body || typeof payload.body !== 'string') {
+        if (!emailPayload.body || typeof emailPayload.body !== 'string') {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
@@ -87,7 +94,7 @@ export class EmailDeliveryWorker {
         // TODO: Get adapter instance from factory
         // const adapter = NotificationAdapterFactory.getAdapter(request)
         // For now, we'll return a success response to allow testing
-        const result = await EmailDeliveryWorker.sendEmail(payload, logger, recordId)
+        const result = await EmailDeliveryWorker.sendEmail(emailPayload, logger, recordId)
 
         logger.debug(`[${recordId}] Email sent successfully: ${JSON.stringify(result)}`)
 
@@ -148,7 +155,7 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: any,
+    payload: NotifyEmailChannel,
     logger: Logger,
     recordId: string,
   ): Promise<{ externalId: string; provider: string }> {

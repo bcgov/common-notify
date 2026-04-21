@@ -9,8 +9,8 @@ import { NotificationStatus } from '../../notification/schemas'
 describe('SmsDeliveryWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
+  let mockConfigService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
-  let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
   beforeEach(() => {
@@ -22,6 +22,17 @@ describe('SmsDeliveryWorker', () => {
       }),
     }
 
+    // Mock the config service
+    mockConfigService = {
+      get: vi.fn((key: string) => {
+        const config: Record<string, any> = {
+          'queue.jobRetries': 3,
+          'queue.jobBackoffDelay': 2000,
+        }
+        return config[key]
+      }),
+    }
+
     // Mock the SMS queue
     mockSmsQueue = {
       process: vi.fn().mockImplementation((...args) => {
@@ -30,11 +41,10 @@ describe('SmsDeliveryWorker', () => {
         processHandler = handler
       }),
       on: vi.fn().mockImplementation((event, callback) => {
-        if (event === 'completed') {
-          completedCallback = callback
-        } else if (event === 'failed') {
+        if (event === 'failed') {
           failedCallback = callback
         }
+        // Don't capture 'completed' event - only tracking failures in tests
       }),
     }
 
@@ -52,6 +62,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       expect(mockSmsQueue.process).toHaveBeenCalled()
@@ -61,6 +72,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       expect(mockSmsQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -73,6 +85,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -118,6 +131,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -142,6 +156,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -166,6 +181,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -190,6 +206,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -215,6 +232,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -240,6 +258,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -265,6 +284,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -290,6 +310,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('DB Error'))
@@ -324,6 +345,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -366,6 +388,7 @@ describe('SmsDeliveryWorker', () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockConfigService,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('Send failed'))
@@ -389,7 +412,7 @@ describe('SmsDeliveryWorker', () => {
       const error = new Error('Send failed')
       try {
         await processHandler(job as Bull.Job<DeliveryJobPayload>)
-      } catch (e) {
+      } catch {
         // Expected
       }
 

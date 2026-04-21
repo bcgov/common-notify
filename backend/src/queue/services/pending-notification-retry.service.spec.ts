@@ -1,7 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
-import Bull from 'bull'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { PendingNotificationRetryService } from './pending-notification-retry.service'
 import { NotificationRequest } from '../../notification/entities/notification-request.entity'
@@ -31,10 +29,10 @@ describe('PendingNotificationRetryService', () => {
     }).compile()
 
     service = module.get<PendingNotificationRetryService>(PendingNotificationRetryService)
-    vi.spyOn(service['logger'], 'debug').mockImplementation()
-    vi.spyOn(service['logger'], 'log').mockImplementation()
-    vi.spyOn(service['logger'], 'warn').mockImplementation()
-    vi.spyOn(service['logger'], 'error').mockImplementation()
+    vi.spyOn(service['logger'], 'debug').mockImplementation(() => {})
+    vi.spyOn(service['logger'], 'log').mockImplementation(() => {})
+    vi.spyOn(service['logger'], 'warn').mockImplementation(() => {})
+    vi.spyOn(service['logger'], 'error').mockImplementation(() => {})
   })
 
   afterEach(async () => {

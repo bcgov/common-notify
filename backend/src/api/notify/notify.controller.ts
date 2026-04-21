@@ -20,8 +20,8 @@ import { NotifyService } from './notify.service'
 import { NotificationService } from '../../notification/notification.service'
 import { NotifySimpleRequest } from './schemas'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
-import { Queueable } from 'src/common/decorators/queueable.decorator'
-import { QueueName } from 'src/enum/queue-name.enum'
+import { Queueable } from '../../common/decorators/queueable.decorator'
+import { QueueName } from '../../enum/queue-name.enum'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental

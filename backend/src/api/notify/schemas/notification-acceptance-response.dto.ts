@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { NotificationStatus } from 'src/enum/notification-status.enum'
+import { NotificationStatus } from '../../../enum/notification-status.enum'
 
 /**
  * Response when a notification request is accepted for processing.

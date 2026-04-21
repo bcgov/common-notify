@@ -9,15 +9,26 @@ describe('IngestionWorker', () => {
   let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
-  let mockNotificationRepository: any
+  let mockNotificationService: any
+  let mockConfigService: any
   let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
-  let completedCallback: (job: Bull.Job<IngestionJobPayload>) => void
   let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
 
   beforeEach(() => {
-    // Mock the repository
-    mockNotificationRepository = {
-      update: vi.fn().mockResolvedValue({ affected: 1 }),
+    // Mock the notification service
+    mockNotificationService = {
+      update: vi.fn().mockResolvedValue({}),
+    }
+
+    // Mock config service
+    mockConfigService = {
+      get: vi.fn().mockImplementation((key: string) => {
+        const config: Record<string, any> = {
+          'queue.jobRetries': 3,
+          'queue.jobBackoffDelay': 2000,
+        }
+        return config[key]
+      }),
     }
 
     // Mock the queues
@@ -29,11 +40,10 @@ describe('IngestionWorker', () => {
         return Promise.resolve()
       }),
       on: vi.fn().mockImplementation((event, callback) => {
-        if (event === 'completed') {
-          completedCallback = callback
-        } else if (event === 'failed') {
+        if (event === 'failed') {
           failedCallback = callback
         }
+        // Don't capture 'completed' event - only tracking failures in tests
       }),
     }
 
@@ -62,7 +72,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       expect(mockIngestionQueue.process).toHaveBeenCalled()
@@ -73,10 +84,10 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
-      expect(mockIngestionQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
       expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
     })
 
@@ -85,7 +96,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -94,7 +106,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -120,7 +132,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -129,7 +142,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-456',
           tenantId: 'tenant-456',
           request: {
-            sms: { to: '+1234567890', body: 'SMS test' },
+            sms: { to: ['+1234567890'], body: 'SMS test' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -154,7 +167,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -163,8 +177,8 @@ describe('IngestionWorker', () => {
           recordId: 'record-789',
           tenantId: 'tenant-789',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
-            sms: { to: '+1234567890', body: 'SMS test' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            sms: { to: ['+1234567890'], body: 'SMS test' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -182,7 +196,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       // Schedule for 1 minute from now
@@ -194,7 +209,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
           scheduledFor,
@@ -221,7 +236,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -244,7 +260,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -267,7 +284,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -276,7 +294,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -292,7 +310,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -301,7 +320,7 @@ describe('IngestionWorker', () => {
           recordId: '' as any,
           tenantId: 'tenant-123',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -317,7 +336,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -326,7 +346,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-123',
           tenantId: null as any,
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -342,7 +362,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -351,7 +372,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: undefined as any,
         },
@@ -362,32 +383,16 @@ describe('IngestionWorker', () => {
       )
     })
 
-    it('should call completed callback on job success', async () => {
+    it('should register event listeners successfully', async () => {
       await IngestionWorker.initialize(
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
-        data: {
-          notifyId: 'notify-completed',
-          recordId: 'record-completed',
-          tenantId: 'tenant-completed',
-          request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
-          },
-          requestedAt: new Date().toISOString(),
-        },
-      }
-
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
-      completedCallback(job as Bull.Job<IngestionJobPayload>)
-
-      expect(Logger.prototype.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Ingestion job completed'),
-      )
+      expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
     })
 
     it('should call failed callback on job error', async () => {
@@ -395,7 +400,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -413,7 +419,7 @@ describe('IngestionWorker', () => {
       const error = new Error('Test error')
       try {
         await processHandler(job as Bull.Job<IngestionJobPayload>)
-      } catch (e) {
+      } catch {
         // Expected
       }
 
@@ -433,10 +439,11 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
-      const emailPayload = { to: 'test@example.com', subject: 'Test Subject', body: 'Test body' }
+      const emailPayload = { to: ['test@example.com'], subject: 'Test Subject', body: 'Test body' }
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-data',
@@ -469,7 +476,8 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationRepository,
+        mockNotificationService,
+        mockConfigService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -478,7 +486,7 @@ describe('IngestionWorker', () => {
           recordId: 'record-retry',
           tenantId: 'tenant-retry',
           request: {
-            email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
+            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },

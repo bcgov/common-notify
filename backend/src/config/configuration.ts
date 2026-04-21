@@ -56,6 +56,17 @@ export default () => {
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      emailDeliveryWorkerConcurrency: parseInt(
+        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      smsDeliveryWorkerConcurrency: parseInt(
+        process.env.SMS_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
+      jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
   }
 }

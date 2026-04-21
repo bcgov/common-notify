@@ -6,7 +6,7 @@ import { customLogger } from './common/logger.config'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { VersioningType, ValidationPipe } from '@nestjs/common'
-import { metricsMiddleware } from 'src/middleware/prom'
+import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
 

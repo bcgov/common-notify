@@ -1,8 +1,9 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
+import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../notification/notification.service'
-import { NotificationStatus } from '../../notification/schemas'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 
 /**
  * SMS Delivery Worker
@@ -25,11 +26,13 @@ export class SmsDeliveryWorker {
    * Initialize the SMS delivery worker on a queue
    * @param smsQueue The BullMQ queue instance for SMS delivery jobs
    * @param notificationService Service for database updates
+   * @param configService Configuration service for queue settings
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
   static async initialize(
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    configService: ConfigService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)

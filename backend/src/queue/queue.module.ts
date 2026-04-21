@@ -10,6 +10,7 @@ import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
+import { QueueMetricsService } from './services/queue-metrics.service'
 import { NotificationRequest } from '../notification/entities/notification-request.entity'
 import { NotificationService } from '../notification/notification.service'
 
@@ -31,6 +32,7 @@ import { NotificationService } from '../notification/notification.service'
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    QueueMetricsService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -148,6 +150,7 @@ import { NotificationService } from '../notification/notification.service'
     QueueName.INGESTION,
     QueueName.EMAIL_DELIVERY,
     QueueName.SMS_DELIVERY,
+    QueueMetricsService,
   ],
 })
 export class QueueModule implements OnModuleInit {
@@ -161,6 +164,7 @@ export class QueueModule implements OnModuleInit {
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
     private readonly notificationService?: NotificationService,
+    private readonly metricsService?: QueueMetricsService,
   ) {}
 
   async onModuleInit() {
@@ -188,7 +192,8 @@ export class QueueModule implements OnModuleInit {
         this.ingestionQueue,
         this.emailQueue,
         this.smsQueue,
-        this.notificationRepository,
+        this.notificationService,
+        this.configService,
         concurrency,
       )
       this.logger.log('Ingestion worker initialization started')
@@ -197,12 +202,26 @@ export class QueueModule implements OnModuleInit {
       // Initialize email delivery worker - handles email sending
       // IMPORTANT: Do NOT await these - initialize() does not await process()
       // and returns immediately after setting up listeners
-      EmailDeliveryWorker.initialize(this.emailQueue, this.notificationService, 2)
+      const emailConcurrency =
+        this.configService?.get<number>('queue.emailDeliveryWorkerConcurrency') || 2
+      EmailDeliveryWorker.initialize(
+        this.emailQueue,
+        this.notificationService,
+        this.configService,
+        emailConcurrency,
+      )
       this.logger.log('Email delivery worker initialization started')
 
       this.logger.log('About to initialize SMS delivery worker...')
       // Initialize SMS delivery worker - handles SMS sending
-      SmsDeliveryWorker.initialize(this.smsQueue, this.notificationService, 2)
+      const smsConcurrency =
+        this.configService?.get<number>('queue.smsDeliveryWorkerConcurrency') || 2
+      SmsDeliveryWorker.initialize(
+        this.smsQueue,
+        this.notificationService,
+        this.configService,
+        smsConcurrency,
+      )
       this.logger.log('SMS delivery worker initialization started')
 
       this.logger.log('Queue workers initialized successfully')
