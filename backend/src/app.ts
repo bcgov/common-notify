@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { ModuleRef } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { customLogger } from './common/logger.config'
 import type { NestExpressApplication } from '@nestjs/platform-express'
@@ -16,6 +17,9 @@ export async function bootstrap() {
   const app: NestExpressApplication = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: customLogger,
   })
+
+  // Store ModuleRef globally for decorator access (used by @Queueable)
+  ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
   // Add body parsers for form data
   app.use(bodyParser.urlencoded({ extended: true }))

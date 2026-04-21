@@ -82,7 +82,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          correlationId: 'corr-123',
+          recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
@@ -97,7 +97,6 @@ describe('IngestionWorker', () => {
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({
           notifyId: 'notify-123',
-          correlationId: 'corr-123',
           channel: NotificationChannel.EMAIL,
         }),
         expect.objectContaining({
@@ -117,7 +116,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-456',
-          correlationId: 'corr-456',
+          recordId: 'record-456',
           tenantId: 'tenant-456',
           request: {
             sms: { to: '+1234567890', body: 'SMS test' },
@@ -150,7 +149,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-789',
-          correlationId: 'corr-789',
+          recordId: 'record-789',
           tenantId: 'tenant-789',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
@@ -180,7 +179,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-scheduled',
-          correlationId: 'corr-scheduled',
+          recordId: 'record-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
@@ -215,7 +214,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-channel',
-          correlationId: 'corr-no-channel',
+          recordId: 'record-no-channel',
           tenantId: 'tenant-no-channel',
           request: {}, // No email or sms
           requestedAt: new Date().toISOString(),
@@ -237,7 +236,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-request',
-          correlationId: 'corr-no-request',
+          recordId: 'record-no-request',
           tenantId: 'tenant-no-request',
           request: undefined as any,
           requestedAt: new Date().toISOString(),
@@ -259,7 +258,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-completed',
-          correlationId: 'corr-completed',
+          recordId: 'record-completed',
           tenantId: 'tenant-completed',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },
@@ -286,7 +285,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-failed',
-          correlationId: 'corr-failed',
+          recordId: 'record-failed',
           tenantId: 'tenant-failed',
           request: {}, // Will cause error: no channels
           requestedAt: new Date().toISOString(),
@@ -324,7 +323,7 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-data',
-          correlationId: 'corr-data',
+          recordId: 'record-data',
           tenantId: 'tenant-data',
           request: {
             email: emailPayload,
@@ -338,7 +337,7 @@ describe('IngestionWorker', () => {
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({
           notifyId: 'notify-data',
-          correlationId: 'corr-data',
+          recordId: 'record-data',
           tenantId: 'tenant-data',
           channel: NotificationChannel.EMAIL,
           payload: emailPayload,
@@ -358,7 +357,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
-          correlationId: 'corr-retry',
           tenantId: 'tenant-retry',
           request: {
             email: { to: 'test@example.com', subject: 'Test', body: 'Test body' },

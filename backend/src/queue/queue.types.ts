@@ -31,7 +31,7 @@ export interface NotificationRequest {
  */
 export interface IngestionJobPayload {
   notifyId: string
-  correlationId: string
+  recordId: string // Database notification_request.id for status updates and tracing
   tenantId: string
   request: NotifyRequest
   requestedAt: string
@@ -43,7 +43,7 @@ export interface IngestionJobPayload {
  */
 export interface DeliveryJobPayload {
   notifyId: string
-  correlationId: string
+  recordId: string // Database notification_request.id for status updates and tracing
   tenantId: string
   channel: NotificationChannel
   payload: DeliveryPayload

@@ -1,7 +1,10 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
+import { Repository } from 'typeorm'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { NotificationRequest } from '../../notification/entities/notification-request.entity'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 
 /**
  * Ingestion Worker
@@ -23,25 +26,34 @@ export class IngestionWorker {
    * @param ingestionQueue The BullMQ queue instance for ingestion jobs
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
+   * @param notificationRepository TypeORM repository for notification updates
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
   static async initialize(
     ingestionQueue: Bull.Queue<IngestionJobPayload>,
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
+    notificationRepository: Repository<NotificationRequest>,
     concurrency: number = 1,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
+    logger.log(`Registering ingestion worker processor (concurrency=${concurrency})`)
+    logger.log(
+      `Queue check - ingestion: ${!!ingestionQueue}, email: ${!!emailQueue}, sms: ${!!smsQueue}`,
+    )
+
     // Register the job processor with configurable concurrency
-    await ingestionQueue.process(concurrency, async (job: Bull.Job<IngestionJobPayload>) => {
-      const { notifyId, correlationId, tenantId, request, scheduledFor } = job.data
+    ingestionQueue.process(concurrency, async (job: Bull.Job<IngestionJobPayload>) => {
+      const { notifyId, recordId, tenantId, request, scheduledFor } = job.data
 
       logger.debug(
-        `[${correlationId}] Processing ingestion job for notifyId=${notifyId}, tenant=${tenantId}`,
+        `[${recordId}] Processing ingestion job for notifyId=${notifyId}, tenant=${tenantId}`,
       )
 
       try {
+        logger.log(`[${recordId}] [IngestionWorker] Starting to process job ${job.id}`)
+
         // Validate request structure
         if (!request) {
           throw new Error('Invalid request: request payload is missing')
@@ -56,7 +68,7 @@ export class IngestionWorker {
 
         // Email channel
         if (request.email) {
-          logger.debug(`[${correlationId}] Adding email delivery job for notifyId=${notifyId}`)
+          logger.log(`[${recordId}] Adding email delivery job for notifyId=${notifyId}`)
           deliveryJobs.push({
             queue: emailQueue,
             channel: NotificationChannel.EMAIL,
@@ -66,7 +78,7 @@ export class IngestionWorker {
 
         // SMS channel
         if (request.sms) {
-          logger.debug(`[${correlationId}] Adding SMS delivery job for notifyId=${notifyId}`)
+          logger.log(`[${recordId}] Adding SMS delivery job for notifyId=${notifyId}`)
           deliveryJobs.push({
             queue: smsQueue,
             channel: NotificationChannel.SMS,
@@ -83,7 +95,7 @@ export class IngestionWorker {
         for (const { queue, channel, payload } of deliveryJobs) {
           const deliveryPayload: DeliveryJobPayload = {
             notifyId,
-            correlationId,
+            recordId,
             tenantId,
             channel,
             payload,
@@ -114,49 +126,54 @@ export class IngestionWorker {
             ? ` (scheduled for ${new Date(scheduledFor).toISOString()})`
             : ''
 
-          logger.debug(
-            `[${correlationId}] Queued delivery job (channel=${channel}, key=${jobKey})${scheduleInfo}`,
+          logger.log(
+            `[${recordId}] Queued delivery job (channel=${channel}, key=${jobKey})${scheduleInfo}`,
           )
         }
 
         logger.log(
-          `[${correlationId}] Successfully processed ingestion job for notifyId=${notifyId}, channels=${deliveryJobs.map((d) => d.channel).join(',')}`,
+          `[${recordId}] Successfully processed ingestion job for notifyId=${notifyId}, channels=${deliveryJobs.map((d) => d.channel).join(',')}`,
         )
 
-        // TODO: Update notification_request status to PROCESSING in database
-        // await notificationRepository.update(notifyId, { status: NotificationStatus.PROCESSING })
+        // Update notification_request status to PROCESSING in database
+        await notificationRepository.update(
+          { id: recordId },
+          { status: NotificationStatus.PROCESSING },
+        )
 
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         logger.error(
-          `[${correlationId}] Failed to process ingestion job for notifyId=${notifyId}: ${errorMessage}`,
+          `[${recordId}] Failed to process ingestion job for notifyId=${notifyId}: ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
 
-        // TODO: Update notification_request status to FAILED in database
-        // await notificationRepository.update(notifyId, {
-        //   status: NotificationStatus.FAILED,
-        //   errorReason: errorMessage,
-        // })
+        // Update notification_request status to FAILED in database
+        await notificationRepository.update(
+          { id: recordId },
+          {
+            status: NotificationStatus.FAILED,
+          },
+        )
 
         // Re-throw to trigger BullMQ retry logic
         throw error
       }
     })
 
+    logger.log('Ingestion worker processor registered successfully')
+
     // Event listeners for job lifecycle
     ingestionQueue.on('completed', (job: Bull.Job<IngestionJobPayload>) => {
-      const { correlationId, notifyId } = job.data
-      // TODO: Update notification_request status to COMPLETED in database (if not already updated by delivery workers)
-      logger.debug(`[${correlationId}] Ingestion job completed: notifyId=${notifyId}`)
+      const { notifyId, recordId } = job.data
+      logger.debug(`[${recordId}] Ingestion job completed: notifyId=${notifyId}`)
     })
 
     ingestionQueue.on('failed', (job: Bull.Job<IngestionJobPayload>, err: Error) => {
-      const { correlationId, notifyId } = job.data
-      // TODO: Update notification_request status to FAILED in database (if not already updated in catch block)
+      const { notifyId, recordId } = job.data
       logger.error(
-        `[${correlationId}] Ingestion job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): notifyId=${notifyId}, error=${err.message}`,
+        `[${recordId}] Ingestion job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): notifyId=${notifyId}, error=${err.message}`,
       )
     })
 

@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm'
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
+import { TenantStatusCode } from './tenant-status-code.entity'
 
 /**
  * Tenant Entity
@@ -19,8 +20,12 @@ export class Tenant {
   @Column({ unique: true })
   slug: string
 
-  @Column({ default: 'active' })
-  status: 'active' | 'disabled'
+  @Column({ default: 'active', name: 'status' })
+  status: string
+
+  @ManyToOne(() => TenantStatusCode, { eager: true })
+  @JoinColumn({ name: 'status', referencedColumnName: 'code' })
+  statusCode: TenantStatusCode
 
   @Column({ name: 'created_at' })
   createdAt: Date

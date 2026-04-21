@@ -1,10 +1,17 @@
 import { Module, OnModuleInit, Inject, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
 import Bull from 'bull'
 import Redis from 'ioredis'
 import { QueueName } from '../enum/queue-name.enum'
 import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
+import { EmailDeliveryWorker } from './workers/email-delivery.worker'
+import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
+import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
+import { NotificationRequest } from '../notification/entities/notification-request.entity'
+import { NotificationService } from '../notification/notification.service'
 
 /**
  * Queue Module
@@ -15,9 +22,15 @@ import { IngestionWorker } from './workers/ingestion.worker'
  * Queues: - Ingestion: For processing incoming notifications and orchestrating delivery
  *         - Email Delivery: For handling email sending jobs
  *         - SMS Delivery: For handling SMS sending jobs
+ *
+ * Also provides scheduled retry job for PENDING notifications that couldn't be queued
+ * due to temporary Redis unavailability.
  */
 @Module({
+  imports: [TypeOrmModule.forFeature([NotificationRequest])],
   providers: [
+    PendingNotificationRetryService,
+    NotificationService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -144,7 +157,10 @@ export class QueueModule implements OnModuleInit {
     @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
     @Inject(QueueName.EMAIL_DELIVERY) private emailQueue?: Bull.Queue,
     @Inject(QueueName.SMS_DELIVERY) private smsQueue?: Bull.Queue,
+    @InjectRepository(NotificationRequest)
+    private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
+    private readonly notificationService?: NotificationService,
   ) {}
 
   async onModuleInit() {
@@ -155,6 +171,9 @@ export class QueueModule implements OnModuleInit {
     }
 
     this.logger.log('Initializing queue workers...')
+    this.logger.log(
+      `Dependency check - notificationService available: ${!!this.notificationService}`,
+    )
 
     // Read concurrency configuration
     const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
@@ -162,13 +181,36 @@ export class QueueModule implements OnModuleInit {
 
     // Initialize workers in background - don't block app startup
     // Workers will be ready when first job is queued
-    IngestionWorker.initialize(this.ingestionQueue, this.emailQueue, this.smsQueue, concurrency)
-      .then(() => {
-        this.logger.log('Queue workers initialized successfully')
-      })
-      .catch((error) => {
-        this.logger.warn(`Queue worker initialization failed: ${error.message}`)
-        this.logger.debug(error)
-      })
+    try {
+      this.logger.log('About to initialize ingestion worker...')
+      // Initialize ingestion worker - orchestrates fan-out to delivery queues
+      IngestionWorker.initialize(
+        this.ingestionQueue,
+        this.emailQueue,
+        this.smsQueue,
+        this.notificationRepository,
+        concurrency,
+      )
+      this.logger.log('Ingestion worker initialization started')
+
+      this.logger.log('About to initialize email delivery worker...')
+      // Initialize email delivery worker - handles email sending
+      // IMPORTANT: Do NOT await these - initialize() does not await process()
+      // and returns immediately after setting up listeners
+      EmailDeliveryWorker.initialize(this.emailQueue, this.notificationService, 2)
+      this.logger.log('Email delivery worker initialization started')
+
+      this.logger.log('About to initialize SMS delivery worker...')
+      // Initialize SMS delivery worker - handles SMS sending
+      SmsDeliveryWorker.initialize(this.smsQueue, this.notificationService, 2)
+      this.logger.log('SMS delivery worker initialization started')
+
+      this.logger.log('Queue workers initialized successfully')
+    } catch (error) {
+      this.logger.error(
+        `Queue worker initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      this.logger.debug(error)
+    }
   }
 }

@@ -1,9 +1,17 @@
 /**
  * Notification Request Status Lifecycle
  *
- * queued → processing → sending → completed/failed
+ * pending → queued → processing → sending → completed/failed
+ *
+ * pending: Notification received but not yet queued (temp state if Redis unavailable)
+ * queued: Successfully added to queue, awaiting processing
+ * processing: Ingestion worker processing channels
+ * sending: Delivery worker actively sending
+ * completed: Successfully sent
+ * failed: Permanently failed (max retries exceeded)
  */
 export enum NotificationStatus {
+  PENDING = 'pending',
   QUEUED = 'queued',
   PROCESSING = 'processing',
   SENDING = 'sending',
