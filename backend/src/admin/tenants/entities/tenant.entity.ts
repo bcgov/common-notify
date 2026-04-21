@@ -20,12 +20,12 @@ export class Tenant {
   @Column({ unique: true })
   slug: string
 
-  @Column({ default: 'active', name: 'status' })
-  status: string
-
   @ManyToOne(() => TenantStatusCode, { eager: true })
   @JoinColumn({ name: 'status', referencedColumnName: 'code' })
   statusCode: TenantStatusCode
+
+  @Column({ insert: false, update: false, name: 'status' })
+  status: string
 
   @Column({ name: 'created_at' })
   createdAt: Date

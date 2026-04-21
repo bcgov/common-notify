@@ -35,13 +35,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
       const notifyId = uuid()
 
       try {
-        logger.debug(`[DECORATOR-PARAMS] Received parameters:`, {
-          tenant: tenant ? { id: tenant.id, tenantType: typeof tenant } : null,
-          payloadKeys: payload ? Object.keys(payload) : null,
-          tenantIdType: tenant?.id ? typeof tenant.id : 'undefined',
-          tenantIdValue: tenant?.id || 'NO_ID',
-        })
-
         // Validate required dependencies
         if (!this.notificationService) {
           throw new Error(
@@ -70,12 +63,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         const tenantId = tenant.id
         const resolvedPayload = payload as any
 
-        logger.debug(`Queuing notification: ${notifyId}`, {
-          tenantId,
-          queueName,
-          hasEmail: !!resolvedPayload.email,
-          hasSms: !!resolvedPayload.sms,
-        })
         // Validate that at least one channel is provided
         if (!resolvedPayload.email && !resolvedPayload.sms) {
           throw new Error('At least one channel (email or sms) must be provided')
@@ -139,15 +126,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Try to queue to Redis.  If Redis is unavailable, this will throw and we catch it to avoid failing the request.  It will remain PENDING for retry job to process.
         let queueSucceeded = false
         try {
-          logger.debug(`Queue object: ${queue ? 'exists' : 'null'}`, { notifyId })
-          logger.debug(`Attempting to add job to queue: ${queueName}`, {
-            notifyId,
-            tenantId,
-            recordId: notificationRecord.id,
-            hasQueue: !!queue,
-          })
-          logger.log(`[DEBUG] About to queue job with recordId: ${notificationRecord.id}`)
-
           const jobPayload = {
             notifyId,
             recordId: notificationRecord.id,
@@ -155,11 +133,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             request: resolvedPayload,
             requestedAt: new Date().toISOString(),
           }
-          logger.log(`[DECORATOR-QUEUE-PAYLOAD] Job payload being queued:`, {
-            jobPayload: JSON.stringify(jobPayload),
-            recordIdInPayload: jobPayload.recordId,
-            recordIdType: typeof jobPayload.recordId,
-          })
 
           await queue.add(jobPayload, {
             jobId: notifyId,
@@ -171,7 +144,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             removeOnComplete: false,
             removeOnFail: false,
           })
-          logger.log(`[DEBUG] Job successfully queued with recordId: ${notificationRecord.id}`)
 
           queueSucceeded = true
           logger.log(`Job successfully enqueued: ${notifyId}`, {
@@ -194,9 +166,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             await this.notificationService.update(notificationRecord.id, tenantId, {
               status: NotificationStatus.QUEUED,
               updatedBy: 'system',
-            })
-            logger.log(`Notification status updated to QUEUED: ${notifyId}`, {
-              tenantId,
             })
           } catch (updateError) {
             logger.error(`Failed to update status to QUEUED: ${notifyId}`, {

@@ -12,6 +12,7 @@ const mockRepository = {
   find: vi.fn(),
   findOne: vi.fn(),
   remove: vi.fn(),
+  update: vi.fn(),
 }
 
 describe('NotificationService', () => {
@@ -144,11 +145,13 @@ describe('NotificationService', () => {
       const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
       const dto = { status: NotificationStatus.COMPLETED, updatedBy: 'admin' }
       const updated = { ...existing, ...dto }
-      mockRepository.findOne.mockResolvedValue(existing)
-      mockRepository.save.mockResolvedValue(updated)
+      mockRepository.findOne.mockResolvedValueOnce(existing)
+      mockRepository.update.mockResolvedValue({ affected: 1 })
+      mockRepository.findOne.mockResolvedValueOnce(updated)
 
       const result = await service.update(id, tenantId, dto)
 
+      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, dto)
       expect(result).toEqual(updated)
     })
 
@@ -156,13 +159,14 @@ describe('NotificationService', () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
       const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
-      mockRepository.findOne.mockResolvedValue(existing)
-      mockRepository.save.mockResolvedValue({ ...existing, updatedBy: 'admin' })
+      const updated = { ...existing, updatedBy: 'admin' }
+      mockRepository.findOne.mockResolvedValueOnce(existing)
+      mockRepository.update.mockResolvedValue({ affected: 1 })
+      mockRepository.findOne.mockResolvedValueOnce(updated)
 
       await service.update(id, tenantId, { updatedBy: 'admin' })
 
-      expect(existing.status).toBe(NotificationStatus.QUEUED)
-      expect(existing.updatedBy).toBe('admin')
+      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, { updatedBy: 'admin' })
     })
 
     it('should throw NotFoundException when notification not found', async () => {

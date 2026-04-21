@@ -9,11 +9,17 @@ describe('IngestionWorker', () => {
   let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
+  let mockNotificationRepository: any
   let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<IngestionJobPayload>) => void
   let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
 
   beforeEach(() => {
+    // Mock the repository
+    mockNotificationRepository = {
+      update: vi.fn().mockResolvedValue({ affected: 1 }),
+    }
+
     // Mock the queues
     mockIngestionQueue = {
       process: vi.fn().mockImplementation((...args) => {
@@ -56,6 +62,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       expect(mockIngestionQueue.process).toHaveBeenCalled()
@@ -66,6 +73,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       expect(mockIngestionQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -77,6 +85,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -111,6 +120,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -144,6 +154,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -171,6 +182,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       // Schedule for 1 minute from now
@@ -209,6 +221,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -231,6 +244,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -253,6 +267,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -280,6 +295,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -317,6 +333,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const emailPayload = { to: 'test@example.com', subject: 'Test Subject', body: 'Test body' }
@@ -352,6 +369,7 @@ describe('IngestionWorker', () => {
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationRepository,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {

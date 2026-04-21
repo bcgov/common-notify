@@ -49,9 +49,8 @@ export class NotifySimpleController {
     @GetTenant() _tenant: Tenant,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    // Implementation completely provided by @Queueable decorator
-    // which replaces this method body. See queueable.decorator.ts for details.
-    throw new Error('Decorator should handle this request')
+    // Implementation provided by @Queueable decorator
+    return undefined as any
   }
 }
 
