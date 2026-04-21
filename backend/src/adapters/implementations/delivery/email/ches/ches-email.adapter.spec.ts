@@ -1,21 +1,18 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter';
-import type {
-  SendEmailOptions,
-  SendEmailResult,
-} from '../../../../../../src/adapters/interfaces';
+import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
+import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
+import type { SendEmailOptions, SendEmailResult } from '../../../../../../src/adapters/interfaces'
 
-const fetchMock = vi.fn();
-global.fetch = fetchMock;
+const fetchMock = vi.fn()
+global.fetch = fetchMock
 
 describe('ChesEmailTransport', () => {
-  let transport: ChesEmailTransport;
-  let configGetMock: ReturnType<typeof vi.fn>;
+  let transport: ChesEmailTransport
+  let configGetMock: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
-    fetchMock.mockReset();
-    configGetMock = vi.fn();
+    fetchMock.mockReset()
+    configGetMock = vi.fn()
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -25,17 +22,17 @@ describe('ChesEmailTransport', () => {
           useValue: { get: configGetMock },
         },
       ],
-    }).compile();
+    }).compile()
 
-    transport = module.get(ChesEmailTransport);
-  });
+    transport = module.get(ChesEmailTransport)
+  })
 
   it('exposes name as ches', () => {
-    expect(transport.name).toBe('ches');
-  });
+    expect(transport.name).toBe('ches')
+  })
 
   it('throws when CHES config is incomplete', async () => {
-    configGetMock.mockReturnValue(undefined);
+    configGetMock.mockReturnValue(undefined)
 
     await expect(
       transport.send({
@@ -43,8 +40,8 @@ describe('ChesEmailTransport', () => {
         subject: 'Test',
         body: '<p>Hello</p>',
       }),
-    ).rejects.toThrow('CHES configuration incomplete');
-  });
+    ).rejects.toThrow('CHES configuration incomplete')
+  })
 
   it('returns SendEmailResult when send succeeds', async () => {
     configGetMock.mockImplementation((key: string) => {
@@ -54,9 +51,9 @@ describe('ChesEmailTransport', () => {
         'ches.clientSecret': 'client-secret',
         'ches.tokenUrl': 'https://auth.example.com/token',
         'ches.from': 'noreply@example.com',
-      };
-      return map[key];
-    });
+      }
+      return map[key]
+    })
 
     fetchMock
       .mockResolvedValueOnce({
@@ -74,41 +71,41 @@ describe('ChesEmailTransport', () => {
             messages: [{ msgId: 'msg-456', to: ['user@example.com'] }],
             txId: 'tx-789',
           }),
-      });
+      })
 
     const options: SendEmailOptions = {
       to: 'user@example.com',
       subject: 'Test',
       body: '<p>Hello</p>',
-    };
+    }
 
-    const result: SendEmailResult = await transport.send(options);
+    const result: SendEmailResult = await transport.send(options)
 
-    expect(result.messageId).toBe('msg-456');
-    expect(result.providerResponse).toBe('tx-789');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.messageId).toBe('msg-456')
+    expect(result.providerResponse).toBe('tx-789')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://ches.example.com/api/v1/email',
       expect.objectContaining({
         method: 'POST',
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest expect matchers are loosely typed */
+
         headers: expect.objectContaining({
           Authorization: 'Bearer token-123',
           'Content-Type': 'application/json',
         }),
       }),
-    );
+    )
 
-    const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit];
-    const bodyStr = typeof init?.body === 'string' ? init.body : '';
-    const emailBody = JSON.parse(bodyStr) as Record<string, unknown>;
+    const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit]
+    const bodyStr = typeof init?.body === 'string' ? init.body : ''
+    const emailBody = JSON.parse(bodyStr) as Record<string, unknown>
     expect(emailBody).toMatchObject({
       from: 'noreply@example.com',
       to: ['user@example.com'],
       subject: 'Test',
       body: '<p>Hello</p>',
       bodyType: 'html',
-    });
-  });
-});
+    })
+  })
+})

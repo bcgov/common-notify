@@ -1,3 +1,3 @@
-export * from './delivery';
-export * from './template';
-export * from './storage';
+export * from './delivery'
+export * from './template'
+export * from './storage'

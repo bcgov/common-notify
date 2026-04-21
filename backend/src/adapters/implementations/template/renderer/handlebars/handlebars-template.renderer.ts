@@ -1,29 +1,24 @@
-import { Injectable } from '@nestjs/common';
-import Handlebars from 'handlebars';
+import { Injectable } from '@nestjs/common'
+import Handlebars from 'handlebars'
 import {
   ITemplateRenderer,
   RenderContext,
   RenderedEmail,
   RenderedSms,
   RenderOptions,
-} from '../../../../interfaces';
-import { splitPersonalisation } from '../utils/split-personalisation';
+} from '../../../../interfaces'
+import { splitPersonalisation } from '../utils/split-personalisation'
 
 @Injectable()
 export class HandlebarsTemplateRenderer implements ITemplateRenderer {
-  readonly name = 'handlebars';
+  readonly name = 'handlebars'
 
-  renderEmail(
-    context: RenderContext,
-    _options?: RenderOptions,
-  ): Promise<RenderedEmail> {
-    const { strings, attachments } = splitPersonalisation(
-      context.personalisation,
-    );
+  renderEmail(context: RenderContext, _options?: RenderOptions): Promise<RenderedEmail> {
+    const { strings, attachments } = splitPersonalisation(context.personalisation)
     const subject = context.template.subject
       ? Handlebars.compile(context.template.subject)(strings)
-      : (context.defaultSubject ?? 'Notification');
-    const body = Handlebars.compile(context.template.body)(strings);
+      : (context.defaultSubject ?? 'Notification')
+    const body = Handlebars.compile(context.template.body)(strings)
 
     return Promise.resolve({
       subject,
@@ -36,16 +31,14 @@ export class HandlebarsTemplateRenderer implements ITemplateRenderer {
               sendingMethod: a.sendingMethod,
             }))
           : undefined,
-    });
+    })
   }
 
   renderSms(
     context: RenderContext & { personalisation: Record<string, string> },
     _options?: RenderOptions,
   ): Promise<RenderedSms> {
-    const body = Handlebars.compile(context.template.body)(
-      context.personalisation,
-    );
-    return Promise.resolve({ body });
+    const body = Handlebars.compile(context.template.body)(context.personalisation)
+    return Promise.resolve({ body })
   }
 }

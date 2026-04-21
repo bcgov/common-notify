@@ -1,2 +1,2 @@
-export * from './template-store.interface';
-export * from './sender-store.interface';
+export * from './template-store.interface'
+export * from './sender-store.interface'

@@ -1,22 +1,22 @@
-import { DynamicModule, Module, Type } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ChesEmailTransport } from './implementations/delivery/email/ches/ches-email.adapter';
-import { NodemailerEmailTransport } from './implementations/delivery/email/nodemailer/nodemailer-email.adapter';
-import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter';
+import { DynamicModule, Module, Type } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { ChesEmailTransport } from './implementations/delivery/email/ches/ches-email.adapter'
+import { NodemailerEmailTransport } from './implementations/delivery/email/nodemailer/nodemailer-email.adapter'
+import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter'
 import {
   EMAIL_ADAPTER,
   EMAIL_ADAPTER_MAP,
   SMS_ADAPTER,
   SMS_ADAPTER_MAP,
   SENDER_STORE,
-} from './tokens';
-import type { IEmailTransport, ISmsTransport } from './interfaces';
-import { InMemoryTemplateStore } from './implementations/storage/in-memory/in-memory-template.store';
-import { InMemorySenderStore } from './implementations/storage/in-memory/in-memory-sender.store';
+} from './tokens'
+import type { IEmailTransport, ISmsTransport } from './interfaces'
+import { InMemoryTemplateStore } from './implementations/storage/in-memory/in-memory-template.store'
+import { InMemorySenderStore } from './implementations/storage/in-memory/in-memory-sender.store'
 
 export interface AdaptersModuleOptions {
-  emailAdapter?: Type<IEmailTransport>;
-  smsAdapter?: Type<ISmsTransport>;
+  emailAdapter?: Type<IEmailTransport>
+  smsAdapter?: Type<ISmsTransport>
 }
 
 /**
@@ -46,9 +46,7 @@ export class AdaptersModule {
         },
         {
           provide: SMS_ADAPTER_MAP,
-          useFactory: (
-            twilio: TwilioSmsTransport,
-          ): Record<string, ISmsTransport> => ({
+          useFactory: (twilio: TwilioSmsTransport): Record<string, ISmsTransport> => ({
             twilio,
           }),
           inject: [TwilioSmsTransport],
@@ -59,14 +57,13 @@ export class AdaptersModule {
             map: Record<string, IEmailTransport>,
             configService: ConfigService,
           ): IEmailTransport => {
-            const key =
-              configService.get<string>('delivery.email') ?? 'ches';
+            const key = configService.get<string>('delivery.email') ?? 'ches'
             // Passthrough keys use GcNotifyApiClient/ChesPassthroughClient, not IEmailTransport; fallback for DI
             if (key?.includes(':passthrough')) {
-              return map['ches'] ?? map['nodemailer'];
+              return map['ches'] ?? map['nodemailer']
             }
-            const provider = key?.includes(':') ? key.split(':')[0] : key;
-            return map[provider] ?? map['ches'] ?? map['nodemailer'];
+            const provider = key?.includes(':') ? key.split(':')[0] : key
+            return map[provider] ?? map['ches'] ?? map['nodemailer']
           },
           inject: [EMAIL_ADAPTER_MAP, ConfigService],
         },
@@ -76,13 +73,13 @@ export class AdaptersModule {
             map: Record<string, ISmsTransport>,
             configService: ConfigService,
           ): ISmsTransport => {
-            const key = configService.get<string>('delivery.sms') ?? 'twilio';
+            const key = configService.get<string>('delivery.sms') ?? 'twilio'
             // Passthrough keys use GcNotifyApiClient, not ISmsTransport; fallback for DI
             if (key?.includes(':passthrough')) {
-              return map['twilio'];
+              return map['twilio']
             }
-            const provider = key?.includes(':') ? key.split(':')[0] : key;
-            return map[provider] ?? map['twilio'];
+            const provider = key?.includes(':') ? key.split(':')[0] : key
+            return map[provider] ?? map['twilio']
           },
           inject: [SMS_ADAPTER_MAP, ConfigService],
         },
@@ -97,6 +94,6 @@ export class AdaptersModule {
         InMemoryTemplateStore,
         SENDER_STORE,
       ],
-    };
+    }
   }
 }
