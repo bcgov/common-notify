@@ -15,6 +15,7 @@ import { ChesModule } from './ches/ches.module'
 import { NotificationModule } from './notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
+import { GcNotifyModule } from './gc-notify/gc-notify.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AdaptersModule } from './adapters'
     ChesModule,
     NotificationModule,
     AdaptersModule.forRoot(),
+    GcNotifyModule.forRoot(),
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],
