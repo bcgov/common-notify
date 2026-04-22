@@ -1,5 +1,5 @@
 export default () => {
-  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'noreply@notify-test.gov.bc.ca'
+  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
   const defaultTemplateSubject = process.env.DEFAULT_TEMPLATE_SUBJECT || 'Notification'
 
@@ -42,7 +42,7 @@ export default () => {
       clientId: process.env.CHES_CLIENT_ID,
       clientSecret: process.env.CHES_CLIENT_SECRET,
       tokenUrl: process.env.CHES_TOKEN_URL,
-      from: process.env.CHES_FROM || defaultEmailFrom,
+      from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
     },
   }
 }

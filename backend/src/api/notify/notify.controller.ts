@@ -14,7 +14,7 @@ import {
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas'
-import { ChesTransactionResponse } from '../../ches/schemas/ches-transaction-response'
+import { SendEmailResult } from 'src/adapters'
 
 @Controller('notifysimple')
 @UseGuards(TenantGuard)
@@ -24,7 +24,7 @@ export class NotifySimpleController {
   @Version('1')
   @Post()
   @HttpCode(201)
-  simpleSend(@Body() _body: NotifySimpleRequest): Promise<ChesTransactionResponse> {
+  simpleSend(@Body() _body: NotifySimpleRequest): Promise<SendEmailResult> {
     return this.notifyService.simpleSend(_body)
   }
 }

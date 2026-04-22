@@ -1,20 +1,18 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common'
+import { Injectable, BadRequestException, Logger, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { ChesApiClient } from '../../ches/ches-api.client'
-import { ChesMessageObject } from '../../ches/schemas/ches-message-object'
-import { ChesTransactionResponse } from '../../ches/schemas/ches-transaction-response'
 import { NotifySimpleRequest, NotifyEmailChannel } from './schemas'
+import { EMAIL_ADAPTER, IEmailTransport, SendEmailResult } from 'src/adapters'
 
 @Injectable()
 export class NotifyService {
   private readonly logger = new Logger(NotifyService.name)
 
   constructor(
-    private readonly chesApiClient: ChesApiClient,
+    @Inject(EMAIL_ADAPTER) private readonly emailAdapter: IEmailTransport,
     private readonly configService: ConfigService,
   ) {}
 
-  async simpleSend(request: NotifySimpleRequest): Promise<ChesTransactionResponse> {
+  async simpleSend(request: NotifySimpleRequest): Promise<SendEmailResult> {
     if (!request.email && !request.sms && !request.msgApp) {
       throw new BadRequestException('At least one channel (email, sms, or msgApp) must be provided')
     }
@@ -26,28 +24,23 @@ export class NotifyService {
     throw new BadRequestException('SMS and msgApp channels are not yet implemented')
   }
 
-  private sendEmail(email: NotifyEmailChannel): Promise<ChesTransactionResponse> {
-    const from = this.configService.get<string>('ches.from') ?? 'noreply@notify-test.gov.bc.ca'
-    const chesMessage: ChesMessageObject = {
+  private sendEmail(email: NotifyEmailChannel): Promise<SendEmailResult> {
+    const from = this.configService.get<string>('ches.from') ?? 'notify_noreply@gov.bc.ca'
+    return this.emailAdapter.send({
       from,
-      to: email.to,
+      to: email.to.join(', '),
       subject: email.subject,
       body: email.body,
-      bodyType: email.bodyType ?? 'text',
-      ...(email.cc && { cc: email.cc }),
-      ...(email.bcc && { bcc: email.bcc }),
-      ...(email.priority && { priority: email.priority }),
-      ...(email.encoding && { encoding: email.encoding as 'base64' | 'binary' | 'hex' | 'utf-8' }),
-      ...(email.delayedSend && { delayTS: new Date(email.delayedSend).getTime() }),
       ...(email.attachments && {
-        attachments: email.attachments.map(({ content, contentType, filename }) => ({
-          content,
-          contentType,
-          filename,
-        })),
+        attachments: email.attachments
+          .filter((a) => a.filename && a.content)
+          .map(({ content, filename }) => ({
+            filename: filename!,
+            content: content!,
+            sendingMethod: 'attach' as const,
+          })),
       }),
-    }
-    return this.chesApiClient.sendEmail(chesMessage)
+    })
   }
 
   notImplemented() {
