@@ -34,7 +34,7 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
  * Adding this decorator to a controller method will write the request and payload to the notification_request table.
  * We do this to ensure durability of the request (in case Redis is unavailable) and to have a record of all incoming requests for retry purposes.
  *
- * **Validation:** Request payloads are validated by NestJS's global ValidationPipe before this decorator runs,
+ * Validation: Request payloads are validated by NestJS's global ValidationPipe before this decorator runs,
  * so the payload is guaranteed to match NotifySimpleRequest schema. The decorator focuses solely on queuing logic.
  *
  * The decorator will attempt to queue the notification to the specified Bull queue. If queuing fails (e.g. Redis is down),
