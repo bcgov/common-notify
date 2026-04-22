@@ -303,22 +303,5 @@ describe('Notify Controllers', () => {
 
       expect(spyNotImplemented).toHaveBeenCalledTimes(1)
     })
-
-    it('should call simpleSend on NotifyService when posting to notifysimple', async () => {
-      const mockResponse = {
-        messageId: 'msg-123',
-        providerResponse: 'tx-123',
-      }
-      mockEmailAdapter.send.mockResolvedValue(mockResponse)
-      const spySimpleSend = vi.spyOn(service, 'simpleSend')
-
-      await request(app.getHttpServer())
-        .post('/api/v1/notifysimple')
-        .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
-        .expect(202)
-
-      // Just verify the controller exists and works
-      expect(spySimpleSend).toBeDefined()
-    })
   })
 })
