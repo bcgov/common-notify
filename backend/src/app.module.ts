@@ -15,6 +15,7 @@ import { ChesModule } from './ches/ches.module'
 import { QueueModule } from './queue/queue.module'
 import { NotificationModule } from './notification/notification.module'
 import configuration from './config/configuration'
+import { AdaptersModule } from './adapters'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import configuration from './config/configuration'
     AuthModule,
     ChesModule,
     NotificationModule,
+    AdaptersModule.forRoot(),
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],

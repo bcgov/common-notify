@@ -17,6 +17,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
+import { EMAIL_ADAPTER } from '../../adapters/tokens'
 
 // Mock TenantGuard to bypass authentication in tests
 const mockTenantGuard: CanActivate = {
@@ -36,22 +37,9 @@ const mockConfigService = {
   get: vi.fn().mockReturnValue(undefined),
 }
 
-const mockNotificationService = {
-  create: vi.fn().mockResolvedValue({
-    id: 'mock-notification-id',
-    tenantId: 'test-tenant-id',
-    status: 'PENDING',
-  }),
-  findAll: vi.fn(),
-  findOne: vi.fn(),
-  update: vi.fn(),
-  remove: vi.fn(),
-}
-
-const mockIngestionQueue = {
-  add: vi.fn().mockResolvedValue({ id: 'mock-job-id' }),
-  process: vi.fn(),
-  on: vi.fn(),
+const mockEmailAdapter = {
+  name: 'mock',
+  send: vi.fn(),
 }
 
 describe('Notify Controllers', () => {
@@ -73,6 +61,7 @@ describe('Notify Controllers', () => {
         { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
+        { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
       ],
     })
       .overrideGuard(TenantGuard)
@@ -99,7 +88,7 @@ describe('Notify Controllers', () => {
   afterEach(async () => {
     await app.close()
     vi.clearAllMocks()
-    mockChesApiClient.sendEmail.mockReset()
+    mockEmailAdapter.send.mockReset()
   })
 
   describe('NotifySimpleController', () => {
@@ -111,15 +100,19 @@ describe('Notify Controllers', () => {
     describe('POST /api/v1/notifysimple', () => {
       it('should return 201 status with a valid email payload', async () => {
         const mockResponse = {
-          txId: 'mock-tx-id',
-          messages: [{ msgId: 'mock-msg-id', to: ['test@example.com'] }],
+          messageId: 'mock-msg-id',
+          providerResponse: 'mock-tx-id',
         }
-        mockChesApiClient.sendEmail.mockResolvedValue(mockResponse)
+        mockEmailAdapter.send.mockResolvedValue(mockResponse)
 
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
           .expect(202)
+          .expect((res) => {
+            expect(res.body.messageId).toBe('mock-msg-id')
+            expect(res.body.providerResponse).toBe('mock-tx-id')
+          })
       })
 
       it('should return 422 when no channel is provided', async () => {
@@ -301,11 +294,11 @@ describe('Notify Controllers', () => {
 
     it('should call simpleSend on NotifyService when posting to notifysimple', async () => {
       const mockResponse = {
-        txId: 'tx-123',
-        messages: [{ msgId: 'msg-123', to: ['test@example.com'] }],
+        messageId: 'msg-123',
+        providerResponse: 'tx-123',
       }
-      mockChesApiClient.sendEmail.mockResolvedValue(mockResponse)
-      const spySimpleSend = vi.spyOn(service, 'notImplemented')
+      mockEmailAdapter.send.mockResolvedValue(mockResponse)
+      const spySimpleSend = vi.spyOn(service, 'simpleSend')
 
       await request(app.getHttpServer())
         .post('/api/v1/notifysimple')
