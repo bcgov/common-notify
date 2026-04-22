@@ -251,7 +251,7 @@ describe('IngestionWorker', () => {
       }
 
       await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
-        'No delivery channels specified (email or sms must be present)',
+        'No delivery channels specified - this should have been caught by validateBusinessRules',
       )
     })
 

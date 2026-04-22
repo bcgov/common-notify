@@ -129,6 +129,9 @@ describe('Notify Controllers', () => {
       })
 
       it('should return 422 when no channel is provided', async () => {
+        mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
+          'At least one recipient is required (email, SMS, or msgApp)',
+        ])
         return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
       })
     })

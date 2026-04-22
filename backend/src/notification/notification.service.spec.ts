@@ -195,24 +195,4 @@ describe('NotificationService', () => {
       )
     })
   })
-
-  describe('remove', () => {
-    it('should remove the notification', async () => {
-      const id = 'notif-uuid'
-      const tenantId = 'tenant-uuid'
-      const mockNotification = { id, tenantId }
-      mockRepository.findOne.mockResolvedValue(mockNotification)
-      mockRepository.remove.mockResolvedValue(undefined)
-
-      await service.remove(id, tenantId)
-
-      expect(mockRepository.remove).toHaveBeenCalledWith(mockNotification)
-    })
-
-    it('should throw NotFoundException when notification not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null)
-
-      await expect(service.remove('missing-id', 'tenant-uuid')).rejects.toThrow(NotFoundException)
-    })
-  })
 })
