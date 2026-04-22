@@ -102,6 +102,7 @@ jobs:
     name: Apply Gateway Config (TEST)
     needs: [import]
     runs-on: ubuntu-24.04
+    environment: TEST
     steps:
       - uses: actions/checkout@v4
       - name: Generate gateway config for TEST
@@ -155,6 +156,7 @@ jobs:
     name: Apply Gateway Config (PROD)
     needs: [promote-test]
     runs-on: ubuntu-24.04
+    environment: PROD
     steps:
       - uses: actions/checkout@v4
       - name: Generate gateway config for PROD
