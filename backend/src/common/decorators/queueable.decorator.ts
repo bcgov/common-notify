@@ -111,6 +111,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         }
 
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
+        // This is synchronous and required to succeed.
         let notificationRecord
         try {
           notificationRecord = await (this as QueueableContext).notificationService.create({
@@ -135,78 +136,73 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           throw dbError
         }
 
-        // Try to queue to Redis. If Redis is unavailable, this will throw and we catch it to avoid failing the request.
-        // It will remain PENDING for retry job to process.
-        let queueSucceeded = false
-        try {
-          const jobPayload = {
-            notifyId,
-            recordId: notificationRecord.id,
-            tenantId,
-            request: validatedPayload,
-            requestedAt: new Date().toISOString(),
-          }
-
-          await queue.add(jobPayload, {
-            jobId: notifyId,
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 2000,
-            },
-            removeOnComplete: false,
-            removeOnFail: false,
-          })
-
-          queueSucceeded = true
-          logger.log(`Job successfully enqueued: ${notifyId}`, {
-            tenantId,
-            queue: queueName,
-            jobId: notifyId,
-          })
-        } catch (queueError) {
-          // Redis unavailable... but that's OK, the status stays PENDING, and a retry job will pick it up to enqueue it once Redis is back up.
-          logger.warn(`Failed to enqueue job (will retry): ${notifyId}`, {
-            tenantId,
-            error: (queueError as Error).message,
-            errorStack: (queueError as Error).stack,
-          })
-        }
-
-        // Update status to QUEUED only if Redis accepted the job
-        if (queueSucceeded) {
-          try {
-            await (this as QueueableContext).notificationService.update(
-              notificationRecord.id,
-              tenantId,
-              {
-                status: NotificationStatus.QUEUED,
-                updatedBy: 'system',
-              },
-            )
-          } catch (updateError) {
-            logger.error(`Failed to update status to QUEUED: ${notifyId}`, {
-              tenantId,
-              error: (updateError as Error).message,
-            })
-            // Job is already in queue, so we log but don't throw
-          }
-        } else {
-          logger.log(`Notification stays PENDING, will be retried by scheduled job: ${notifyId}`, {
-            tenantId,
-          })
-        }
-
-        // Return 202 Accepted immediately (fire & forget)
-        // Client gets same response whether queued now or will be queued by retry job
-        return {
+        // Return 202 Accepted immediately without waiting for queue operation
+        // Queue operation continues asynchronously in the background
+        const response = {
           notifyId,
           recordId: notificationRecord.id,
-          status: queueSucceeded ? NotificationStatus.QUEUED : NotificationStatus.PENDING,
-          message: queueSucceeded
-            ? 'Notification queued for processing'
-            : 'Notification accepted, will be queued shortly',
+          status: NotificationStatus.PENDING,
+          message: 'Notification accepted, queuing in progress',
         }
+
+        // Fire off queueing asynchronously - don't block the response
+        // If queuing succeeds, status updates to QUEUED
+        // If queuing fails, PendingNotificationRetryService will pick it up and retry
+        setImmediate(async () => {
+          try {
+            const jobPayload = {
+              notifyId,
+              recordId: notificationRecord.id,
+              tenantId,
+              request: validatedPayload,
+              requestedAt: new Date().toISOString(),
+            }
+
+            await queue.add(jobPayload, {
+              jobId: notifyId,
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 2000,
+              },
+              removeOnComplete: false,
+              removeOnFail: false,
+            })
+
+            logger.log(`Job successfully enqueued: ${notifyId}`, {
+              tenantId,
+              queue: queueName,
+              jobId: notifyId,
+            })
+
+            // Update status to QUEUED now that it's in Redis
+            try {
+              await (this as QueueableContext).notificationService.update(
+                notificationRecord.id,
+                tenantId,
+                {
+                  status: NotificationStatus.QUEUED,
+                  updatedBy: 'system',
+                },
+              )
+            } catch (updateError) {
+              logger.error(`Failed to update status to QUEUED: ${notifyId}`, {
+                tenantId,
+                error: (updateError as Error).message,
+              })
+            }
+          } catch (queueError) {
+            // Redis unavailable... that's OK, status stays PENDING
+            // PendingNotificationRetryService will pick it up once Redis is back
+            logger.warn(`Failed to enqueue job (will be retried): ${notifyId}`, {
+              tenantId,
+              error: (queueError as Error).message,
+              errorStack: (queueError as Error).stack,
+            })
+          }
+        })
+
+        return response
       } catch (error) {
         logger.error(`Failed to queue notification: ${notifyId}`, {
           error: (error as Error).message,
