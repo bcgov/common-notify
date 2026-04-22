@@ -66,7 +66,7 @@ jobs:
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
           # Set gateway context
-          gwa config set gateway gw-fe8c5
+          gwa config set gateway gw-cnotify
 
           # Delete gateway configuration
           gwa destroy -i api-gateway/generated/gw-routes-pr.yaml || echo "Gateway config may not exist or already deleted"

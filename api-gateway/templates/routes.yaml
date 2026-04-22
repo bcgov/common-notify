@@ -387,7 +387,7 @@ plugins:
 ---
 kind: CredentialIssuer
 name: ${GATEWAY_ID} default ${ENVIRONMENT}
-description: Default Authorization Profile for gw-fe8c5 Gateway (${ENVIRONMENT})
+description: Default Authorization Profile for ${GATEWAY_ID} Gateway (${ENVIRONMENT})
 flow: client-credentials
 mode: auto
 authPlugin: jwt-keycloak

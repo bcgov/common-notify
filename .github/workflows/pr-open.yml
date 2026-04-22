@@ -85,7 +85,7 @@ jobs:
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
           # Set gateway context
-          gwa config set gateway gw-fe8c5
+          gwa config set gateway gw-cnotify
 
           # Apply gateway configuration
           gwa apply -i api-gateway/generated/gw-routes-pr.yaml

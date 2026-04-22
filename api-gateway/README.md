@@ -89,12 +89,12 @@ Gateway configurations are automatically applied during deployments:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GATEWAY_SERVICE_NAME` | Gateway service identifier | `gw-fe8c5-notify-dev` |
+| `GATEWAY_SERVICE_NAME` | Gateway service identifier | `gw-cnotify-notify-dev` |
 | `BACKEND_HOST` | Kubernetes backend service | `common-notify-6-backend.f6bc3f-dev.svc.cluster.local` |
-| `ROUTE_PREFIX` | Route name prefix | `gw-fe8c5-dev-` |
-| `GATEWAY_HOSTNAME` | External gateway hostname | `gw-fe8c5-notify.dev.api.gov.bc.ca` |
+| `ROUTE_PREFIX` | Route name prefix | `gw-cnotify-dev-` |
+| `GATEWAY_HOSTNAME` | External gateway hostname | `gw-cnotify-notify.dev.api.gov.bc.ca` |
 | `KEYCLOAK_ISSUER` | Keycloak issuer URL | `https://dev.loginproxy.gov.bc.ca/auth/realms/apigw` |
-| `ALLOWED_AUDIENCE` | JWT audience claim | `ap-gw-fe8c5-default-dev-dev` |
+| `ALLOWED_AUDIENCE` | JWT audience claim | `ap-gw-cnotify-default-dev-dev` |
 | `RELEASE_NAME` | Helm release name (auto-set) | `common-notify-6` |
 
 ## Adding New Routes
@@ -106,7 +106,7 @@ Gateway configurations are automatically applied during deployments:
 Example:
 ```yaml
 - name: ${ROUTE_PREFIX}my-new-route
-  tags: [ns.gw-fe8c5]
+  tags: [ns.gw-cnotify]
   hosts:
     - ${GATEWAY_HOSTNAME}
   paths:

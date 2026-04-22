@@ -82,7 +82,7 @@ jobs:
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+          gwa config set gateway gw-cnotify
           gwa apply -i api-gateway/generated/gw-routes-dev.yaml
 
   deploy-dev:
@@ -117,7 +117,7 @@ jobs:
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+          gwa config set gateway gw-cnotify
           gwa apply -i api-gateway/generated/gw-routes-test.yaml
 
   deploy-test:
@@ -170,7 +170,7 @@ jobs:
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+          gwa config set gateway gw-cnotify
           gwa apply -i api-gateway/generated/gw-routes-prod.yaml
 
   deploy-prod:
