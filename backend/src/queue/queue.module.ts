@@ -10,10 +10,10 @@ import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
-import { QueueMetricsService } from './services/queue-metrics.service'
 import { NotificationRequest } from '../notification/entities/notification-request.entity'
 import { NotificationService } from '../notification/notification.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
+import { TenantsModule } from '../admin/tenants/tenants.module'
 
 /**
  * Queue Module
@@ -29,11 +29,10 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
  * due to temporary Redis unavailability.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationRequest])],
+  imports: [TypeOrmModule.forFeature([NotificationRequest]), TenantsModule],
   providers: [
     PendingNotificationRetryService,
     NotificationService,
-    QueueMetricsService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -151,7 +150,6 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
     QueueName.INGESTION,
     QueueName.EMAIL_DELIVERY,
     QueueName.SMS_DELIVERY,
-    QueueMetricsService,
   ],
 })
 export class QueueModule implements OnModuleInit {
@@ -165,7 +163,6 @@ export class QueueModule implements OnModuleInit {
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
     private readonly notificationService?: NotificationService,
-    private readonly metricsService?: QueueMetricsService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}

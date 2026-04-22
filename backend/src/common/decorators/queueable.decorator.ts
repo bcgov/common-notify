@@ -94,6 +94,17 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // (guards run before ValidationPipe in NestJS middleware chain)
         const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
 
+        // Validate business rules (tenant active, recipient counts, content, spam, etc)
+        const businessErrors = await (
+          this as QueueableContext
+        ).notificationService.validateBusinessRules(tenantId, validatedPayload)
+        if (businessErrors.length > 0) {
+          throw new BadRequestException({
+            message: 'Request validation failed',
+            errors: businessErrors,
+          })
+        }
+
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         let notificationRecord
         try {
