@@ -111,6 +111,7 @@ export class SmsDeliveryWorker {
           await notificationService.update(recordId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',
+            errorReason: errorMessage,
           })
           logger.error(
             `[${recordId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,

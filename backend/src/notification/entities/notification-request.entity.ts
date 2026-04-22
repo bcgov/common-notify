@@ -38,4 +38,7 @@ export class NotificationRequest {
 
   @Column({ nullable: true, name: 'updated_by' })
   updatedBy: string
+
+  @Column({ type: 'text', nullable: true, name: 'error_reason' })
+  errorReason?: string
 }

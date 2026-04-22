@@ -53,6 +53,7 @@ export class NotificationService {
     const updateData: any = {}
     if (dto.status !== undefined) updateData.status = dto.status
     if (dto.updatedBy !== undefined) updateData.updatedBy = dto.updatedBy
+    if (dto.errorReason !== undefined) updateData.errorReason = dto.errorReason
 
     // Use query builder for explicit update (status field is part of FK constraint so TypeORM won't track it normally)
     await this.notificationRepository.update({ id, tenantId }, updateData)
