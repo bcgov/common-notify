@@ -13,6 +13,7 @@ import { PendingNotificationRetryService } from './services/pending-notification
 import { QueueMetricsService } from './services/queue-metrics.service'
 import { NotificationRequest } from '../notification/entities/notification-request.entity'
 import { NotificationService } from '../notification/notification.service'
+import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 
 /**
  * Queue Module
@@ -165,6 +166,8 @@ export class QueueModule implements OnModuleInit {
     private readonly configService?: ConfigService,
     private readonly notificationService?: NotificationService,
     private readonly metricsService?: QueueMetricsService,
+    @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
+    @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
 
   async onModuleInit() {
@@ -208,18 +211,22 @@ export class QueueModule implements OnModuleInit {
         this.emailQueue,
         this.notificationService,
         this.configService,
+        this.emailAdapter,
         emailConcurrency,
       )
       this.logger.log('Email delivery worker initialization started')
 
       this.logger.log('About to initialize SMS delivery worker...')
       // Initialize SMS delivery worker - handles SMS sending
+      // IMPORTANT: Do NOT await these - initialize() does not await process()
+      // and returns immediately after setting up listeners
       const smsConcurrency =
         this.configService?.get<number>('queue.smsDeliveryWorkerConcurrency') || 2
       SmsDeliveryWorker.initialize(
         this.smsQueue,
         this.notificationService,
         this.configService,
+        this.smsAdapter,
         smsConcurrency,
       )
       this.logger.log('SMS delivery worker initialization started')

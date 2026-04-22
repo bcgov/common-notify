@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { ISmsTransport } from '../../adapters'
 
 /**
  * SMS Delivery Worker
@@ -27,12 +28,14 @@ export class SmsDeliveryWorker {
    * @param smsQueue The BullMQ queue instance for SMS delivery jobs
    * @param notificationService Service for database updates
    * @param configService Configuration service for queue settings
+   * @param smsAdapter SMS transport adapter for sending SMS messages
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
   static async initialize(
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
+    smsAdapter: ISmsTransport,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)
@@ -83,10 +86,13 @@ export class SmsDeliveryWorker {
         })
         logger.debug(`[${recordId}] Updated notification status to SENDING`)
 
-        // TODO: Get adapter instance from factory
-        // const adapter = NotificationAdapterFactory.getAdapter(request)
-        // For now, we'll return a success response to allow testing
-        const result = await SmsDeliveryWorker.sendSmsViaAdapter(payload, logger, recordId)
+        // Send SMS using the injected adapter
+        const result = await SmsDeliveryWorker.sendSmsViaAdapter(
+          payload,
+          logger,
+          recordId,
+          smsAdapter,
+        )
 
         logger.debug(`[${recordId}] SMS sent successfully: ${JSON.stringify(result)}`)
 
@@ -140,35 +146,29 @@ export class SmsDeliveryWorker {
   }
 
   /**
-   * Send SMS via adapter (mock implementation for now)
-   * TODO: Replace with actual adapter.sendSms() call
+   * Send SMS via adapter
    * @param payload SMS payload
    * @param logger Logger instance
    * @param recordId Record ID for tracing
+   * @param smsAdapter SMS transport adapter
    * @returns Promise with send result
    */
   private static async sendSmsViaAdapter(
     payload: any,
     logger: Logger,
     recordId: string,
+    smsAdapter: ISmsTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    // TODO: Implement actual adapter call
-    // Example implementation when adapter is ready:
-    // const adapter = NotificationAdapterFactory.getAdapter(request)
-    // const result = await adapter.sendSms(payload)
-    // return { externalId: result.txId, provider: result.provider }
+    logger.debug(`[${recordId}] Sending SMS via ${smsAdapter.name} adapter to: ${payload.to}`)
 
-    // For now, simulate successful send
-    logger.debug(
-      `[${recordId}] Simulating SMS send to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
-    )
-
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    const result = await smsAdapter.send({
+      to: payload.to,
+      body: payload.body,
+    })
 
     return {
-      externalId: `sms-${Date.now()}`,
-      provider: 'gc-notify',
+      externalId: result.messageId || `${smsAdapter.name}-${Date.now()}`,
+      provider: smsAdapter.name,
     }
   }
 }

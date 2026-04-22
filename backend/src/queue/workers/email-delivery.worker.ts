@@ -5,6 +5,7 @@ import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas'
+import { IEmailTransport } from '../../adapters'
 
 /**
  * Email Delivery Worker
@@ -28,12 +29,14 @@ export class EmailDeliveryWorker {
    * @param emailQueue The BullMQ queue instance for email delivery jobs
    * @param notificationService Service for database updates
    * @param configService Configuration service for queue settings
+   * @param emailAdapter Email transport adapter for sending emails
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
   static async initialize(
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
+    emailAdapter: IEmailTransport,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -91,10 +94,13 @@ export class EmailDeliveryWorker {
         })
         logger.debug(`[${recordId}] Updated notification status to SENDING`)
 
-        // TODO: Get adapter instance from factory
-        // const adapter = NotificationAdapterFactory.getAdapter(request)
-        // For now, we'll return a success response to allow testing
-        const result = await EmailDeliveryWorker.sendEmail(emailPayload, logger, recordId)
+        // Send email using the injected adapter
+        const result = await EmailDeliveryWorker.sendEmail(
+          emailPayload,
+          logger,
+          recordId,
+          emailAdapter,
+        )
 
         logger.debug(`[${recordId}] Email sent successfully: ${JSON.stringify(result)}`)
 
@@ -148,32 +154,41 @@ export class EmailDeliveryWorker {
   }
 
   /**
-   * Send email via adapter (mock implementation for now)
-   * TODO: Replace with actual adapter.sendEmail() call
+   * Send email via adapter
    * @param payload Email payload
    * @param logger Logger instance
    * @param recordId Record ID for tracing
+   * @param emailAdapter Email transport adapter
    * @returns Promise with send result
    */
   private static async sendEmail(
     payload: NotifyEmailChannel,
     logger: Logger,
     recordId: string,
+    emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    // TODO: Implement actual adapter call
-    // Example implementation when adapter is ready:
-    // const adapter = NotificationAdapterFactory.getAdapter(request)
-    // const result = await adapter.sendEmail(payload)
-    // return { externalId: result.txId, provider: result.provider }
-
-    // For now, simulate successful send
     logger.debug(
-      `[${recordId}] Simulating email send to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
+      `[${recordId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
     )
 
+    const result = await emailAdapter.send({
+      to: Array.isArray(payload.to) ? payload.to.join(', ') : payload.to,
+      subject: payload.subject,
+      body: payload.body,
+      ...(payload.attachments && {
+        attachments: payload.attachments
+          .filter((a) => a.filename && a.content)
+          .map(({ content, filename }) => ({
+            filename: filename!,
+            content: content!,
+            sendingMethod: 'attach' as const,
+          })),
+      }),
+    })
+
     return {
-      externalId: `ches-${Date.now()}`,
-      provider: 'ches',
+      externalId: result.messageId || `${emailAdapter.name}-${Date.now()}`,
+      provider: emailAdapter.name,
     }
   }
 }

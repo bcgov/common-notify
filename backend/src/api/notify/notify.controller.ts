@@ -29,8 +29,6 @@ import { QueueName } from '../../enum/queue-name.enum'
 //
 // Anything requiring queueing should use the @Queueable decorator and implement the method with an
 // empty body (the decorator will handle the logic).
-import { SendEmailResult } from 'src/adapters'
-
 @Controller('notifysimple')
 @UseGuards(TenantGuard)
 export class NotifySimpleController {
