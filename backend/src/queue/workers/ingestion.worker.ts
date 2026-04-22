@@ -102,9 +102,12 @@ export class IngestionWorker {
           })
         }
 
-        // Ensure at least one channel is specified
+        // Note: At least one channel is guaranteed by validateBusinessRules()
+        // which runs before this job is queued, so this should never be empty
         if (deliveryJobs.length === 0) {
-          throw new Error('No delivery channels specified (email or sms must be present)')
+          throw new Error(
+            'No delivery channels specified - this should have been caught by validateBusinessRules',
+          )
         }
 
         // Queue delivery jobs with idempotency and tracing

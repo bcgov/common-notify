@@ -1,5 +1,5 @@
 /**
- * Notification Request Status Lifecycle
+ * Notification Request Status Lifecycle, maps to status in notification_status_code table and used for processing logic in workers and API
  *
  * pending → queued → processing → sending → completed/failed
  *
