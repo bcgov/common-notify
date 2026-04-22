@@ -25,7 +25,7 @@ export class NotifyService {
   }
 
   private sendEmail(email: NotifyEmailChannel): Promise<SendEmailResult> {
-    const from = this.configService.get<string>('ches.from') ?? 'noreply@notify-test.gov.bc.ca'
+    const from = this.configService.get<string>('ches.from') ?? 'notify_noreply@gov.bc.ca'
     return this.emailAdapter.send({
       from,
       to: email.to.join(', '),
