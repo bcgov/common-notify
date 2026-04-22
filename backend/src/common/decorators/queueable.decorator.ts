@@ -1,4 +1,9 @@
-import { Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common'
+import {
+  Logger,
+  InternalServerErrorException,
+  BadRequestException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
@@ -94,12 +99,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // (guards run before ValidationPipe in NestJS middleware chain)
         const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
 
-        // Validate business rules (tenant active, recipient counts, content, spam, etc)
+        // Validate business rules (tenant active, recipient counts, content, etc)
         const businessErrors = await (
           this as QueueableContext
         ).notificationService.validateBusinessRules(tenantId, validatedPayload)
         if (businessErrors.length > 0) {
-          throw new BadRequestException({
+          throw new UnprocessableEntityException({
             message: 'Request validation failed',
             errors: businessErrors,
           })
