@@ -1,9 +1,4 @@
-import {
-  Logger,
-  UnprocessableEntityException,
-  InternalServerErrorException,
-  BadRequestException,
-} from '@nestjs/common'
+import { Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common'
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
@@ -18,60 +13,6 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 export interface QueueableContext {
   notificationService: NotificationService
   queueMap: Map<QueueName, Bull.Queue>
-}
-
-/**
- * Type guard to validate if payload is a valid NotifySimpleRequest
- * Ensures payload has the expected structure with at least one channel (email, SMS, or msgApp)
- * This validation is redundant with NestJS's class-validator but provides safety
- * if the decorator is used incorrectly or with incompatible payloads.
- */
-function isValidNotifyRequest(payload: unknown): payload is NotifySimpleRequest {
-  if (typeof payload !== 'object' || payload === null) {
-    return false
-  }
-
-  const p = payload as Record<string, unknown>
-
-  // Must have at least email, sms, or msgApp
-  const hasEmail = typeof p.email === 'object' && p.email !== null
-  const hasSms = typeof p.sms === 'object' && p.sms !== null
-  const hasMsgApp = typeof p.msgApp === 'object' && p.msgApp !== null
-
-  if (!hasEmail && !hasSms && !hasMsgApp) {
-    return false
-  }
-
-  // Validate email structure if present (NotifyEmailChannel has required: to, subject, body)
-  if (hasEmail) {
-    const email = p.email as Record<string, unknown>
-    if (
-      !Array.isArray(email.to) ||
-      email.to.length === 0 ||
-      typeof email.subject !== 'string' ||
-      typeof email.body !== 'string'
-    ) {
-      return false
-    }
-  }
-
-  // Validate SMS structure if present (NotifySmsChannel has required: to, body)
-  if (hasSms) {
-    const sms = p.sms as Record<string, unknown>
-    if (!Array.isArray(sms.to) || sms.to.length === 0 || typeof sms.body !== 'string') {
-      return false
-    }
-  }
-
-  // Validate msgApp structure if present (NotifyMsgAppChannel has required: to, body)
-  if (hasMsgApp) {
-    const msgApp = p.msgApp as Record<string, unknown>
-    if (!Array.isArray(msgApp.to) || msgApp.to.length === 0 || typeof msgApp.body !== 'string') {
-      return false
-    }
-  }
-
-  return true
 }
 
 /**
@@ -92,7 +33,12 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
  * This decorator handles the queuing logic for notifications with strong type safety.
  * Adding this decorator to a controller method will write the request and payload to the notification_request table.
  * We do this to ensure durability of the request (in case Redis is unavailable) and to have a record of all incoming requests for retry purposes.
- * The decorator will attempt to queue the notification to the specified Bull queue. If queuing fails (e.g. Redis is down), the notification remains in PENDING status and will be retried by a scheduled job.
+ *
+ * **Validation:** Request payloads are validated by NestJS's global ValidationPipe before this decorator runs,
+ * so the payload is guaranteed to match NotifySimpleRequest schema. The decorator focuses solely on queuing logic.
+ *
+ * The decorator will attempt to queue the notification to the specified Bull queue. If queuing fails (e.g. Redis is down),
+ * the notification remains in PENDING status and will be retried by a scheduled job.
  *
  * @param queueName - Queue to add job to (from QueueName enum)
  */
@@ -144,14 +90,9 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         const tenantId = tenant.id
 
-        // Validate payload with type guard
-        if (!isValidNotifyRequest(payload)) {
-          throw new UnprocessableEntityException(
-            'Request payload is invalid. Must include NotifySimpleRequest with at least one channel (email, sms, or msgApp): email requires {to: string[], subject: string, body: string}, sms requires {to: string[], body: string}, msgApp requires {to: string[], body: string}',
-          )
-        }
-
-        const validatedPayload: NotifySimpleRequest = payload
+        // Payload is guaranteed to be valid by global ValidationPipe
+        // (guards run before ValidationPipe in NestJS middleware chain)
+        const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
 
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         let notificationRecord
