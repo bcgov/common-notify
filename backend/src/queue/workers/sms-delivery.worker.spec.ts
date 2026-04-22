@@ -5,15 +5,25 @@ import { SmsDeliveryWorker } from './sms-delivery.worker'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../notification/schemas'
+import { ISmsTransport } from '../../adapters'
 
 describe('SmsDeliveryWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockConfigService: any
+  let mockSmsAdapter: ISmsTransport
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
   beforeEach(() => {
+    // Mock the SMS adapter
+    mockSmsAdapter = {
+      name: 'twilio',
+      send: vi.fn().mockResolvedValue({
+        messageId: `twilio-${Date.now()}`,
+      }),
+    }
+
     // Mock the notification service
     mockNotificationService = {
       update: vi.fn().mockResolvedValue({
@@ -63,6 +73,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       expect(mockSmsQueue.process).toHaveBeenCalled()
@@ -73,6 +84,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       expect(mockSmsQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -86,6 +98,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -132,6 +145,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -157,6 +171,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -182,6 +197,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -207,6 +223,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -233,6 +250,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -259,6 +277,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -285,6 +304,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -311,6 +331,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('DB Error'))
@@ -346,6 +367,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -389,6 +411,7 @@ describe('SmsDeliveryWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockSmsAdapter,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('Send failed'))

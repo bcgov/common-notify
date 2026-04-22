@@ -1,11 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { NotifyService } from './notify.service'
 import { ConfigService } from '@nestjs/config'
+import { EMAIL_ADAPTER, IEmailTransport } from 'src/adapters'
 
 describe('NotifyService', () => {
   let service: NotifyService
+  let mockEmailAdapter: IEmailTransport
 
   beforeEach(async () => {
+    mockEmailAdapter = {
+      name: 'ches',
+      send: vi.fn().mockResolvedValue({ messageId: `ches-${Date.now()}` }),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotifyService,
@@ -14,6 +21,10 @@ describe('NotifyService', () => {
           useValue: {
             get: vi.fn(),
           },
+        },
+        {
+          provide: EMAIL_ADAPTER,
+          useValue: mockEmailAdapter,
         },
       ],
     }).compile()

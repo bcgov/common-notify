@@ -5,16 +5,26 @@ import { EmailDeliveryWorker } from './email-delivery.worker'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../notification/schemas'
+import { IEmailTransport } from '../../adapters'
 
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockConfigService: any
+  let mockEmailAdapter: IEmailTransport
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
   beforeEach(() => {
+    // Mock the email adapter
+    mockEmailAdapter = {
+      name: 'ches',
+      send: vi.fn().mockResolvedValue({
+        messageId: `ches-${Date.now()}`,
+      }),
+    }
+
     // Mock the notification service
     mockNotificationService = {
       update: vi.fn().mockResolvedValue({
@@ -68,6 +78,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       expect(mockEmailQueue.process).toHaveBeenCalled()
@@ -78,6 +89,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       expect(mockEmailQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -89,6 +101,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -137,6 +150,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -165,6 +179,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -191,6 +206,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -217,6 +233,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -243,6 +260,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -269,6 +287,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -296,6 +315,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -323,6 +343,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -350,6 +371,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -377,6 +399,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       // Simulate final attempt
@@ -414,6 +437,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -467,6 +491,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -498,6 +523,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -529,6 +555,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -562,6 +589,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -596,6 +624,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -628,6 +657,7 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockEmailAdapter,
         5, // Custom concurrency
       )
 

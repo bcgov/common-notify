@@ -42,6 +42,18 @@ const mockEmailAdapter = {
   send: vi.fn(),
 }
 
+const mockNotificationService = {
+  getNotifications: vi.fn(),
+  getNotificationStatus: vi.fn(),
+  createNotification: vi.fn(),
+  create: vi.fn().mockResolvedValue({ id: 'mock-notification-id' }),
+}
+
+const mockIngestionQueue = {
+  add: vi.fn(),
+  process: vi.fn(),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -99,19 +111,19 @@ describe('Notify Controllers', () => {
 
     describe('POST /api/v1/notifysimple', () => {
       it('should return 201 status with a valid email payload', async () => {
-        const mockResponse = {
-          messageId: 'mock-msg-id',
-          providerResponse: 'mock-tx-id',
-        }
-        mockEmailAdapter.send.mockResolvedValue(mockResponse)
+        mockEmailAdapter.send.mockResolvedValue({
+          messageId: 'ches-123456',
+        })
 
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
           .expect(202)
           .expect((res) => {
-            expect(res.body.messageId).toBe('mock-msg-id')
-            expect(res.body.providerResponse).toBe('mock-tx-id')
+            expect(res.body.notifyId).toBeDefined()
+            expect(res.body.recordId).toBeDefined()
+            expect(res.body.status).toBeDefined()
+            expect(res.body.message).toBeDefined()
           })
       })
 
