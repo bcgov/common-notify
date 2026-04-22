@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotificationRequest } from './entities/notification-request.entity'
@@ -14,11 +15,34 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
 
+  // Validation limits (configurable via environment variables)
+  private readonly emailMaxRecipients: number
+  private readonly emailMaxSubjectLength: number
+  private readonly emailMaxBodyLength: number
+  private readonly smsMaxRecipients: number
+  private readonly smsMaxBodyLength: number
+  private readonly msgAppMaxRecipients: number
+  private readonly msgAppMaxBodyLength: number
+
   constructor(
     @InjectRepository(NotificationRequest)
     private readonly notificationRepository: Repository<NotificationRequest>,
     private readonly tenantsService: TenantsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // Load validation limits from environment variables with sensible defaults
+    this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
+    this.emailMaxSubjectLength =
+      this.configService.get<number>('VALIDATE_EMAIL_MAX_SUBJECT_LENGTH') ?? 500
+    this.emailMaxBodyLength =
+      this.configService.get<number>('VALIDATE_EMAIL_MAX_BODY_LENGTH') ?? 50000
+    this.smsMaxRecipients = this.configService.get<number>('VALIDATE_SMS_MAX_RECIPIENTS') ?? 50
+    this.smsMaxBodyLength = this.configService.get<number>('VALIDATE_SMS_MAX_BODY_LENGTH') ?? 1600
+    this.msgAppMaxRecipients =
+      this.configService.get<number>('VALIDATE_MSGAPP_MAX_RECIPIENTS') ?? 100
+    this.msgAppMaxBodyLength =
+      this.configService.get<number>('VALIDATE_MSGAPP_MAX_BODY_LENGTH') ?? 50000
+  }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
     const notification = this.notificationRepository.create({
@@ -67,12 +91,6 @@ export class NotificationService {
     return updated
   }
 
-  async remove(id: string, tenantId: string): Promise<void> {
-    const notification = await this.findOne(id, tenantId)
-    await this.notificationRepository.remove(notification)
-    this.logger.debug(`Deleted notification request: ${id}`)
-  }
-
   /**
    * Validates business rules before queuing a notification.
    * This complements the DTO validation which only checks structure/format.
@@ -82,12 +100,6 @@ export class NotificationService {
    * - At least one channel has recipients
    * - Recipients counts are within reasonable limits
    * - Content is present and reasonable length
-   * - No obvious spam patterns
-   *
-   * Future validations (not implemented yet):
-   * - Template exists (if templateId provided)
-   * - Rate limits not exceeded
-   * - Recipients not on blocklist
    *
    * @param tenantId UUID of the tenant making the request
    * @param request The NotifySimpleRequest to validate
@@ -119,93 +131,72 @@ export class NotificationService {
 
     // Validate email channel
     if (request.email?.to) {
-      if (request.email.to.length > 100) {
-        errors.push(`Too many email recipients (${request.email.to.length}). Max: 100`)
+      if (request.email.to.length > this.emailMaxRecipients) {
+        errors.push(
+          `Too many email recipients (${request.email.to.length}). Max: ${this.emailMaxRecipients}`,
+        )
       }
 
       if (!request.email.subject?.trim()) {
         errors.push('Email subject cannot be empty')
       }
 
-      if (request.email.subject && request.email.subject.length > 500) {
-        errors.push(`Email subject too long (${request.email.subject.length}). Max: 500`)
+      if (request.email.subject && request.email.subject.length > this.emailMaxSubjectLength) {
+        errors.push(
+          `Email subject too long (${request.email.subject.length}). Max: ${this.emailMaxSubjectLength}`,
+        )
       }
 
       if (!request.email.body?.trim()) {
         errors.push('Email body cannot be empty')
       }
 
-      if (request.email.body && request.email.body.length > 50000) {
-        errors.push(`Email body too long (${request.email.body.length}). Max: 50000 characters`)
+      if (request.email.body && request.email.body.length > this.emailMaxBodyLength) {
+        errors.push(
+          `Email body too long (${request.email.body.length}). Max: ${this.emailMaxBodyLength} characters`,
+        )
       }
     }
 
     // Validate SMS channel
     if (request.sms?.to) {
-      if (request.sms.to.length > 50) {
-        errors.push(`Too many SMS recipients (${request.sms.to.length}). Max: 50`)
+      if (request.sms.to.length > this.smsMaxRecipients) {
+        errors.push(
+          `Too many SMS recipients (${request.sms.to.length}). Max: ${this.smsMaxRecipients}`,
+        )
       }
 
       if (!request.sms.body?.trim()) {
         errors.push('SMS body cannot be empty')
       }
 
-      if (request.sms.body && request.sms.body.length > 1600) {
+      if (request.sms.body && request.sms.body.length > this.smsMaxBodyLength) {
         // SMS can be split across multiple messages, but warn if very long
-        errors.push(`SMS body too long (${request.sms.body.length}). Max: 1600 characters`)
+        errors.push(
+          `SMS body too long (${request.sms.body.length}). Max: ${this.smsMaxBodyLength} characters`,
+        )
       }
     }
 
     // Validate msgApp channel
     if (request.msgApp?.to) {
-      if (request.msgApp.to.length > 100) {
-        errors.push(`Too many msgApp recipients (${request.msgApp.to.length}). Max: 100`)
+      if (request.msgApp.to.length > this.msgAppMaxRecipients) {
+        errors.push(
+          `Too many msgApp recipients (${request.msgApp.to.length}). Max: ${this.msgAppMaxRecipients}`,
+        )
       }
 
       if (!request.msgApp.body?.trim()) {
         errors.push('MsgApp body cannot be empty')
       }
 
-      if (request.msgApp.body && request.msgApp.body.length > 50000) {
-        errors.push(`MsgApp body too long (${request.msgApp.body.length}). Max: 50000 characters`)
+      if (request.msgApp.body && request.msgApp.body.length > this.msgAppMaxBodyLength) {
+        errors.push(
+          `MsgApp body too long (${request.msgApp.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
+        )
       }
-    }
-
-    // Check for common spam patterns
-    if (this.looksLikeSpam(request)) {
-      errors.push('Request matches spam detection patterns')
     }
 
     return errors
-  }
-
-  /**
-   * Simple spam detection heuristics - can be extended
-   * Returns true if request appears to be spam
-   */
-  private looksLikeSpam(request: NotifySimpleRequest): boolean {
-    // Check email for spam patterns
-    if (request.email?.body) {
-      const body = request.email.body
-
-      // All CAPS + long = likely spam
-      if (body.toUpperCase() === body && body.length > 100) {
-        return true
-      }
-
-      // Excessive links (more than 20)
-      const linkCount = (body.match(/https?:\/\//g) || []).length
-      if (linkCount > 20) {
-        return true
-      }
-
-      // Excessive exclamation marks (more than 10% of text)
-      const exclamationCount = (body.match(/!/g) || []).length
-      if (exclamationCount > body.length * 0.1) {
-        return true
-      }
-    }
-
-    return false
   }
 }
