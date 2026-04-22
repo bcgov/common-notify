@@ -13,6 +13,307 @@ This directory contains templates and automation for managing API Gateway config
 - PR-specific gateway configs for isolated testing
 - Automatic cleanup on PR close/merge
 
+## Gateway Architecture
+
+### Current Gateway: `gw-cnotify`
+
+The Common Notify service uses the **`gw-cnotify`** gateway for all environments:
+
+| Environment | Gateway URL | Backend Service |
+|------------|-------------|-----------------|
+| **DEV** | `https://gw-cnotify-notify.dev.api.gov.bc.ca` | `common-notify-dev-backend.f6bc3f-dev.svc.cluster.local` |
+| **TEST** | `https://gw-cnotify-notify.test.api.gov.bc.ca` | `common-notify-test-backend.f6bc3f-test.svc.cluster.local` |
+| **PROD** | `https://gw-cnotify-notify.api.gov.bc.ca` | `common-notify-prod-backend.f6bc3f-prod.svc.cluster.local` |
+| **PR-{N}** | `https://gw-cnotify-notify.dev.api.gov.bc.ca` | `common-notify-{N}-backend.f6bc3f-dev.svc.cluster.local` |
+
+**Health Check Endpoints:**
+```bash
+# Public health endpoints (no authentication required)
+curl https://gw-cnotify-notify.dev.api.gov.bc.ca/api/health
+curl https://gw-cnotify-notify.test.api.gov.bc.ca/api/health
+curl https://gw-cnotify-notify.api.gov.bc.ca/api/health
+```
+
+### Gateway Migration History
+
+**Phase 1 (Completed):** Created new `gw-cnotify` gateway alongside existing `gw-fe8c5`
+- New gateway deployed with parallel services
+- All environments (DEV/TEST/PROD) operational
+- Fork-friendly configuration with `GATEWAY_ID` variable
+
+**Phase 2 (Completed):** Migrated all workflows and configurations to `gw-cnotify`
+- Updated PR, merge, and cleanup workflows
+- Updated frontend default URLs
+- Updated all documentation
+
+**Phase 3 (Current):** Enhanced PR isolation and monitoring
+- Documented isolation strategy
+- Added monitoring guidance
+- Prepared rate limiting configuration for future use
+
+## PR Isolation Strategy
+
+### How PR Gateway Isolation Works
+
+Each PR gets isolated gateway routes within the shared `gw-cnotify` gateway:
+
+```
+┌─────────────────────────────────────────┐
+│      gw-cnotify Gateway (Shared)        │
+├─────────────────────────────────────────┤
+│  PR-29 Routes:                          │
+│    - gw-cnotify-pr-29-notify-simple     │
+│    - gw-cnotify-pr-29-notify-event      │
+│    - gw-cnotify-pr-29-ches-email        │
+│    ↓ Backend: pr-29-backend pod         │
+├─────────────────────────────────────────┤
+│  PR-30 Routes:                          │
+│    - gw-cnotify-pr-30-notify-simple     │
+│    - gw-cnotify-pr-30-notify-event      │
+│    - gw-cnotify-pr-30-ches-email        │
+│    ↓ Backend: pr-30-backend pod         │
+├─────────────────────────────────────────┤
+│  DEV Routes:                            │
+│    - gw-cnotify-dev-notify-simple       │
+│    - gw-cnotify-dev-notify-event        │
+│    - gw-cnotify-dev-ches-email          │
+│    ↓ Backend: dev-backend pod           │
+└─────────────────────────────────────────┘
+```
+
+### Isolation Mechanisms
+
+**1. Unique Route Prefixes**
+- Each PR: `gw-cnotify-pr-{NUMBER}-{route}`
+- DEV: `gw-cnotify-dev-{route}`
+- TEST: `gw-cnotify-test-{route}`
+- PROD: `gw-cnotify-prod-{route}`
+
+**2. Environment-Specific Tags**
+```yaml
+tags: [ns.gw-cnotify, env.dev]    # DEV routes
+tags: [ns.gw-cnotify, env.test]   # TEST routes
+tags: [ns.gw-cnotify, env.prod]   # PROD routes
+```
+
+**3. Backend Pod Isolation**
+- Each PR deploys to its own Kubernetes pod
+- Resource limits applied per pod
+- Pod failures don't affect other PRs
+
+**4. Authentication Requirement**
+- All routes (except health checks) require JWT authentication
+- Tokens issued by Keycloak for authorized consumers only
+- Not publicly accessible
+
+**5. Automatic Cleanup**
+- Routes automatically deleted when PR closes
+- Prevents resource accumulation
+- Workflow: `.github/workflows/pr-close.yml`
+
+### Current Protection Levels
+
+✅ **Route Isolation:** Unique prefixes prevent route conflicts
+✅ **Backend Isolation:** Separate pods with resource limits
+✅ **Authentication:** JWT required for all API endpoints
+✅ **Automatic Cleanup:** Routes deleted on PR close
+✅ **Environment Tags:** Prevents cross-environment conflicts
+⚠️ **Rate Limiting:** Not currently enforced (see Advanced Configuration)
+
+### When Is This Sufficient?
+
+The current isolation is adequate for:
+- ✅ Developer testing and validation
+- ✅ PR preview deployments
+- ✅ Integration testing
+- ✅ Preventing accidental cross-PR interference
+
+Consider adding rate limiting if:
+- ⚠️ PRs start experiencing performance issues
+- ⚠️ Need to prevent runaway test scripts
+- ⚠️ Require strict resource quotas per PR
+
+## Security & Authentication
+
+### Authentication Flow
+
+All API endpoints (except `/health` and `/api/health`) require JWT authentication:
+
+```
+Client → Keycloak (Token Endpoint)
+           ↓
+       JWT Token
+           ↓
+Client → API Gateway → Backend Service
+           ↑
+      JWT Validation
+```
+
+### Keycloak Configuration
+
+| Environment | Issuer | Audience |
+|------------|--------|----------|
+| DEV | `https://dev.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-dev-dev` |
+| TEST | `https://test.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-test-test` |
+| PROD | `https://loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-prod-prod` |
+
+### Consumer Headers
+
+The gateway automatically injects consumer identity headers:
+```
+X-Consumer-Username: {consumer_username}
+X-Consumer-ID: {consumer_id}
+```
+
+Backend services can use these headers for tenant identification and audit logging.
+
+## Monitoring & Observability
+
+### Health Monitoring
+
+**Check Gateway Availability:**
+```bash
+# DEV
+curl -i https://gw-cnotify-notify.dev.api.gov.bc.ca/api/health
+
+# TEST
+curl -i https://gw-cnotify-notify.test.api.gov.bc.ca/api/health
+
+# PROD
+curl -i https://gw-cnotify-notify.api.gov.bc.ca/api/health
+```
+
+Expected response:
+```json
+HTTP/2 200 OK
+{"status":"ok"}
+```
+
+### PR Gateway Verification
+
+**Verify PR routes are created:**
+```bash
+# Login to API Gateway
+gwa login --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+
+# Set gateway context
+gwa config set gateway gw-cnotify
+
+# List all routes (look for pr-{NUMBER} prefixes)
+gwa gateway routes
+```
+
+### Workflow Monitoring
+
+**PR Workflow:**
+1. PR opened → Check `gateway-config` job in Actions tab
+2. Look for: `✅ Gateway configuration generated successfully!`
+3. Verify: `gwa apply` completes without errors
+
+**PR Cleanup:**
+1. PR closed → Check `gateway-cleanup` job
+2. Look for: `Gateway config deleted` or `may not exist` (both OK)
+
+### Common Issues
+
+**503 Service Unavailable**
+- Cause: Backend pod not running
+- Check: `kubectl get pods -n f6bc3f-dev | grep pr-{NUMBER}`
+- Fix: Verify deployment succeeded in Actions
+
+**401 Unauthorized**
+- Cause: Invalid or missing JWT token
+- Check: Token issuer matches environment
+- Fix: Request new token from correct Keycloak realm
+
+**404 Not Found**
+- Cause: Route doesn't exist or wrong path
+- Check: Verify gateway config applied successfully
+- Fix: Regenerate and reapply gateway config
+
+## Advanced Configuration
+
+### Adding Rate Limiting (Future Use)
+
+If you need to add rate limiting to protect against excessive requests:
+
+**1. Edit `api-gateway/templates/routes.yaml`:**
+
+Add after the `request-transformer` plugin:
+```yaml
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    config:
+      second: 100      # Max 100 requests per second
+      minute: 1000     # Max 1000 requests per minute
+      hour: 10000      # Max 10000 requests per hour
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+```
+
+**2. Apply to specific environments:**
+
+For PR-only rate limiting, use conditional configuration:
+```yaml
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}, env.dev]  # Only DEV (includes PRs)
+    enabled: true
+    config:
+      second: 50
+      minute: 500
+```
+
+**3. Test rate limiting:**
+```bash
+# Send rapid requests
+for i in {1..60}; do
+  curl -H "Authorization: Bearer $TOKEN" \
+       https://gw-cnotify-notify.dev.api.gov.bc.ca/api/v1/notifysimple
+done
+
+# Should see 429 Too Many Requests after limit
+```
+
+### Adding Request Size Limits
+
+Protect against large payloads:
+```yaml
+  - name: request-size-limiting
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    config:
+      allowed_payload_size: 10    # 10 MB max
+      size_unit: megabytes
+      require_content_length: false
+```
+
+### Adding Request Correlation IDs
+
+For distributed tracing:
+```yaml
+  - name: correlation-id
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid
+      echo_downstream: true
+```
+
+### Custom Plugin Configuration
+
+See [Kong Plugin Hub](https://docs.konghq.com/hub/) for all available plugins.
+
+Common plugins for API gateways:
+- `rate-limiting` - Request rate limits
+- `request-size-limiting` - Payload size limits
+- `ip-restriction` - IP allowlist/blocklist
+- `cors` - Cross-origin resource sharing
+- `bot-detection` - Bot traffic filtering
+- `prometheus` - Metrics export
+
 ## Directory Structure
 
 ```
