@@ -2,9 +2,11 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { NotificationService } from './notification.service'
 import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatus } from './schemas'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 const mockRepository = {
   create: vi.fn(),
@@ -13,6 +15,14 @@ const mockRepository = {
   findOne: vi.fn(),
   remove: vi.fn(),
   update: vi.fn(),
+}
+
+const mockConfigService = {
+  get: vi.fn().mockReturnValue(undefined),
+}
+
+const mockTenantsService = {
+  findOne: vi.fn(),
 }
 
 describe('NotificationService', () => {
@@ -25,6 +35,14 @@ describe('NotificationService', () => {
         {
           provide: getRepositoryToken(NotificationRequest),
           useValue: mockRepository,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+        {
+          provide: TenantsService,
+          useValue: mockTenantsService,
         },
       ],
     }).compile()

@@ -47,6 +47,7 @@ const mockNotificationService = {
   getNotificationStatus: vi.fn(),
   createNotification: vi.fn(),
   create: vi.fn().mockResolvedValue({ id: 'mock-notification-id' }),
+  validateBusinessRules: vi.fn().mockResolvedValue([]),
 }
 
 const mockIngestionQueue = {
