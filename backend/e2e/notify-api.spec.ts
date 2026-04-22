@@ -37,21 +37,19 @@ test.beforeAll(() => {
       expiresIn: number
     }
     JWT_TOKEN = tokenData.accessToken
-    console.log('✅ Loaded token from file')
+    console.log(' Loaded token from file')
   } catch {
     // Fallback to environment variable if file doesn't exist
     JWT_TOKEN = process.env.E2E_TEST_AUTH_TOKEN || ''
-    console.warn('⚠️  Could not read token file, falling back to E2E_TEST_AUTH_TOKEN')
+    console.warn(' Could not read token file, falling back to E2E_TEST_AUTH_TOKEN')
   }
 
   if (!JWT_TOKEN) {
-    console.warn('⚠️  JWT_TOKEN not available in tests.')
-    console.warn('    Ensure global-setup.ts completed successfully.')
-    console.warn('    Set credentials and retry: CLIENT_ID, CLIENT_SECRET')
+    console.warn('JWT_TOKEN not available in tests.')
+    console.warn('Ensure global-setup.ts completed successfully.')
+    console.warn('Set credentials and retry: CLIENT_ID, CLIENT_SECRET')
   } else {
-    console.log(
-      '✅ Using authenticated token (first 20 chars): ' + JWT_TOKEN.substring(0, 20) + '...',
-    )
+    console.log('Using authenticated token (first 20 chars): ' + JWT_TOKEN.substring(0, 20) + '...')
   }
 })
 

@@ -1,12 +1,8 @@
 import { IsString, IsUUID, IsOptional, IsEnum } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 
-export enum NotificationStatus {
-  QUEUED = 'queued',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
+export { NotificationStatus }
 
 export class CreateNotificationRequestDto {
   @ApiProperty({ description: 'Tenant UUID that submitted the request', format: 'uuid' })
@@ -26,4 +22,10 @@ export class CreateNotificationRequestDto {
   @IsOptional()
   @IsString()
   createdBy?: string
+
+  @ApiPropertyOptional({
+    description: 'Request payload (stored for retry purposes)',
+  })
+  @IsOptional()
+  payload?: any
 }

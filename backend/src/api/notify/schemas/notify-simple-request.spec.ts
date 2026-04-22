@@ -4,7 +4,6 @@ import { validate } from 'class-validator'
 import { NotifySimpleRequest } from './notify-simple-request'
 import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
-import { NotifyMsgAppChannel } from './notify-msg-app-channel'
 
 describe('NotifySimpleRequest', () => {
   describe('Valid Instance Creation', () => {
@@ -40,22 +39,7 @@ describe('NotifySimpleRequest', () => {
       expect(instance.sms).toBeDefined()
     })
 
-    it('should create a valid instance with msgApp channel', async () => {
-      const data = {
-        msgApp: {
-          to: ['user-guid-1', 'user-guid-2'],
-          body: 'Test message',
-        },
-      }
-
-      const instance = plainToInstance(NotifySimpleRequest, data)
-      const errors = await validate(instance)
-
-      expect(errors).toHaveLength(0)
-      expect(instance.msgApp).toBeDefined()
-    })
-
-    it('should create a valid instance with all channels', async () => {
+    it('should create a valid instance with email and sms channels', async () => {
       const data = {
         email: {
           to: ['test@example.com'],
@@ -66,10 +50,6 @@ describe('NotifySimpleRequest', () => {
           to: ['+16045551234', '+16045555678'],
           body: 'Test SMS',
         },
-        msgApp: {
-          to: ['user-guid-1', 'user-guid-2'],
-          body: 'Test message',
-        },
       }
 
       const instance = plainToInstance(NotifySimpleRequest, data)
@@ -78,7 +58,6 @@ describe('NotifySimpleRequest', () => {
       expect(errors).toHaveLength(0)
       expect(instance.email).toBeDefined()
       expect(instance.sms).toBeDefined()
-      expect(instance.msgApp).toBeDefined()
     })
 
     it('should create instance with params', async () => {
@@ -116,7 +95,6 @@ describe('NotifySimpleRequest', () => {
       // At least one channel should be required in the service, but schema allows empty
       expect(instance.email).toBeUndefined()
       expect(instance.sms).toBeUndefined()
-      expect(instance.msgApp).toBeUndefined()
       expect(instance.params).toBeUndefined()
     })
 
@@ -134,7 +112,6 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.sms).toBeUndefined()
-      expect(instance.msgApp).toBeUndefined()
     })
 
     it('should allow only sms channel', async () => {
@@ -150,23 +127,6 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.email).toBeUndefined()
-      expect(instance.msgApp).toBeUndefined()
-    })
-
-    it('should allow only msgApp channel', async () => {
-      const data = {
-        msgApp: {
-          to: ['user-guid-1'],
-          body: 'Test message',
-        },
-      }
-
-      const instance = plainToInstance(NotifySimpleRequest, data)
-      const errors = await validate(instance)
-
-      expect(errors).toHaveLength(0)
-      expect(instance.email).toBeUndefined()
-      expect(instance.sms).toBeUndefined()
     })
   })
 
@@ -273,22 +233,6 @@ describe('NotifySimpleRequest', () => {
         expect(instance.sms).toBeInstanceOf(NotifySmsChannel)
       }
     })
-
-    it('should transform msgApp to NotifyMsgAppChannel instance', async () => {
-      const data = {
-        msgApp: {
-          to: ['user-guid-1'],
-          body: 'Test message',
-        },
-      }
-
-      const instance = plainToInstance(NotifySimpleRequest, data)
-
-      expect(instance.msgApp).toBeDefined()
-      if (instance.msgApp) {
-        expect(instance.msgApp).toBeInstanceOf(NotifyMsgAppChannel)
-      }
-    })
   })
 
   describe('Type Coercion', () => {
@@ -369,15 +313,11 @@ describe('NotifySimpleRequest', () => {
           to: '+16045551234',
           body: 'Test SMS',
         },
-        msgApp: {
-          userGuid: '550e8400-e29b-41d4-a716-446655440000',
-          body: 'Test message',
-        },
       }
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
-      expect(Object.keys(instance).sort()).toEqual(['params', 'email', 'sms', 'msgApp'].sort())
+      expect(Object.keys(instance).sort()).toEqual(['email', 'msgApp', 'params', 'sms'].sort())
     })
 
     it('should handle deeply nested params', async () => {
@@ -410,14 +350,12 @@ describe('NotifySimpleRequest', () => {
       const data = {
         email: undefined,
         sms: undefined,
-        msgApp: undefined,
       }
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
       expect(instance.email).toBeUndefined()
       expect(instance.sms).toBeUndefined()
-      expect(instance.msgApp).toBeUndefined()
     })
 
     it('should filter out extra properties not in schema', () => {
@@ -445,7 +383,6 @@ describe('NotifySimpleRequest', () => {
       expect(instance).toBeDefined()
       expect(instance.email).toBeUndefined()
       expect(instance.sms).toBeUndefined()
-      expect(instance.msgApp).toBeUndefined()
       expect(instance.params).toBeUndefined()
     })
   })
