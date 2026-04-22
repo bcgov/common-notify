@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { ModuleRef } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { customLogger } from './common/logger.config'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { VersioningType, ValidationPipe } from '@nestjs/common'
-import { metricsMiddleware } from 'src/middleware/prom'
+import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
 
@@ -17,12 +18,20 @@ export async function bootstrap() {
     logger: customLogger,
   })
 
+  // Store ModuleRef globally for decorator access (used by @Queueable)
+  ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
+
   // Add body parsers for form data
   app.use(bodyParser.urlencoded({ extended: true }))
   app.use(bodyParser.json())
 
   app.useGlobalPipes(
-    new ValidationPipe({ errorHttpStatusCode: 422, whitelist: true, transform: true }),
+    new ValidationPipe({
+      errorHttpStatusCode: 422,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   )
 
   app.use(helmet())
@@ -44,10 +53,10 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('Users example')
-    .setDescription('The user API description')
+    .setTitle('Notify API')
+    .setDescription('The Notify API for sending notifications via email and SMS')
     .setVersion('1.0')
-    .addTag('users')
+    .addTag('notify')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

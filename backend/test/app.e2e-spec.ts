@@ -15,10 +15,9 @@ describe('AppController (e2e)', () => {
       .useValue({
         get: (key: string) => {
           const config: Record<string, string> = {
-            'auth.jwksUri':
-              'https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs',
-            'auth.keycloakClientId': 'notify-6388',
-            'auth.jwtIssuer': 'https://dev.loginproxy.gov.bc.ca/auth/realms/standard',
+            'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
+            'auth.keycloakClientId': 'test-client',
+            'auth.jwtIssuer': 'https://example.com/realms/test',
           }
           return config[key]
         },
@@ -27,6 +26,10 @@ describe('AppController (e2e)', () => {
 
     app = moduleFixture.createNestApplication()
     await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
   })
 
   it('/ (GET)', () =>
