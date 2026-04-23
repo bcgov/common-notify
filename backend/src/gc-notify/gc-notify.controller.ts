@@ -48,8 +48,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Get list of notifications' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiQuery({ name: 'template_type', required: false, enum: ['sms', 'email'] })
   @ApiQuery({
@@ -99,8 +99,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Send an email notification' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 201,
@@ -120,8 +120,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Send an SMS notification' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 201,
@@ -141,8 +141,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Send a batch of notifications' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 201,
@@ -161,8 +161,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Get notification by ID' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 200,
@@ -183,8 +183,8 @@ export class GcNotifyController {
   @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 200,
@@ -201,8 +201,8 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Get template by ID' })
   @ApiHeader({
     name: 'X-GC-Notify-Api-Key',
-    required: false,
-    description: 'Required when using GC Notify passthrough mode. Your GC Notify API key.',
+    required: true,
+    description: 'Your GC Notify API key.',
   })
   @ApiResponse({
     status: 200,
