@@ -11,9 +11,6 @@ export class NotificationAcceptanceResponse {
   @ApiProperty({ format: 'uuid', description: 'Unique notification request ID' })
   notifyId: string
 
-  @ApiProperty({ format: 'uuid', description: 'Internal record ID for tracking' })
-  recordId: string
-
   @ApiProperty({
     enum: [NotificationStatus.PENDING, NotificationStatus.QUEUED],
     description:

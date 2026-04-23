@@ -103,7 +103,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -139,7 +138,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-456',
-          recordId: 'record-456',
           tenantId: 'tenant-456',
           request: {
             sms: { to: ['+1234567890'], body: 'SMS test' },
@@ -174,7 +172,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-789',
-          recordId: 'record-789',
           tenantId: 'tenant-789',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -206,7 +203,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-scheduled',
-          recordId: 'record-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -243,7 +239,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-channel',
-          recordId: 'record-no-channel',
           tenantId: 'tenant-no-channel',
           request: {}, // No email or sms
           requestedAt: new Date().toISOString(),
@@ -267,7 +262,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-request',
-          recordId: 'record-no-request',
           tenantId: 'tenant-no-request',
           request: undefined as any,
           requestedAt: new Date().toISOString(),
@@ -291,7 +285,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: undefined as any,
-          recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -302,32 +295,6 @@ describe('IngestionWorker', () => {
 
       await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
         'Invalid ingestion job: notifyId is missing or invalid',
-      )
-    })
-
-    it('should throw error when recordId is missing', async () => {
-      await IngestionWorker.initialize(
-        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-      )
-
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
-        data: {
-          notifyId: 'notify-123',
-          recordId: '' as any,
-          tenantId: 'tenant-123',
-          request: {
-            email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
-          },
-          requestedAt: new Date().toISOString(),
-        },
-      }
-
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
-        'Invalid ingestion job: recordId is missing or invalid',
       )
     })
 
@@ -343,7 +310,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
           tenantId: null as any,
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -369,7 +335,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
           tenantId: 'tenant-123',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },
@@ -407,7 +372,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-failed',
-          recordId: 'record-failed',
           tenantId: 'tenant-failed',
           request: {}, // Will cause error: no channels
           requestedAt: new Date().toISOString(),
@@ -447,7 +411,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-data',
-          recordId: 'record-data',
           tenantId: 'tenant-data',
           request: {
             email: emailPayload,
@@ -461,7 +424,6 @@ describe('IngestionWorker', () => {
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({
           notifyId: 'notify-data',
-          recordId: 'record-data',
           tenantId: 'tenant-data',
           channel: NotificationChannel.EMAIL,
           payload: emailPayload,
@@ -483,7 +445,6 @@ describe('IngestionWorker', () => {
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
-          recordId: 'record-retry',
           tenantId: 'tenant-retry',
           request: {
             email: { to: ['test@example.com'], subject: 'Test', body: 'Test body' },

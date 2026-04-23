@@ -27,7 +27,7 @@ describe('SmsDeliveryWorker', () => {
     // Mock the notification service
     mockNotificationService = {
       update: vi.fn().mockResolvedValue({
-        id: 'record-123',
+        id: 'notify-123',
         status: NotificationStatus.COMPLETED,
       }),
     }
@@ -104,7 +104,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-sms-123',
-          recordId: 'record-sms-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
@@ -125,14 +125,14 @@ describe('SmsDeliveryWorker', () => {
 
       // Should have called update twice (SENDING, then COMPLETED)
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-sms-123',
+        'notify-sms-123',
         'tenant-123',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
         }),
       )
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-sms-123',
+        'notify-sms-123',
         'tenant-123',
         expect.objectContaining({
           status: NotificationStatus.COMPLETED,
@@ -151,7 +151,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: undefined,
@@ -177,7 +177,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
@@ -203,7 +203,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
@@ -229,7 +229,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: undefined as any,
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
@@ -245,33 +245,6 @@ describe('SmsDeliveryWorker', () => {
       )
     })
 
-    it('should throw error when recordId is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockSmsAdapter,
-      )
-
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
-        data: {
-          notifyId: 'notify-123',
-          recordId: '' as any,
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.SMS,
-          payload: {
-            to: ['+16135551234'],
-            body: 'Test body',
-          },
-          attempt: 0,
-        } as DeliveryJobPayload,
-      }
-
-      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Invalid delivery job: recordId is missing or invalid',
-      )
-    })
-
     it('should throw error when tenantId is missing', async () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
@@ -283,7 +256,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: null as any,
           channel: NotificationChannel.SMS,
           payload: {
@@ -310,7 +283,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
@@ -339,7 +312,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-fail',
-          recordId: 'record-fail',
+
           tenantId: 'tenant-fail',
           channel: NotificationChannel.SMS,
           payload: {
@@ -354,7 +327,7 @@ describe('SmsDeliveryWorker', () => {
 
       // Verify we attempted the first update to SENDING
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-fail',
+        'notify-fail',
         'tenant-fail',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
@@ -373,7 +346,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
-          recordId: 'record-retry',
+
           tenantId: 'tenant-retry',
           channel: NotificationChannel.SMS,
           payload: {
@@ -385,7 +358,7 @@ describe('SmsDeliveryWorker', () => {
       }
 
       mockNotificationService.update.mockImplementationOnce(async () => ({
-        id: 'record-retry',
+        id: 'notify-retry',
         status: NotificationStatus.SENDING,
       }))
       mockNotificationService.update.mockImplementationOnce(async () => {
@@ -398,7 +371,7 @@ describe('SmsDeliveryWorker', () => {
 
       // Should only have one SENDING update, not FAILED
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-retry',
+        'notify-retry',
         'tenant-retry',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
@@ -419,7 +392,7 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-error',
-          recordId: 'record-error',
+
           tenantId: 'tenant-error',
           channel: NotificationChannel.SMS,
           payload: {
