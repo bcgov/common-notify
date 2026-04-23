@@ -15,68 +15,51 @@ This directory contains templates and automation for managing API Gateway config
 
 ## Gateway Architecture
 
-### Current Gateway: `gw-cnotify`
+### Current Gateway: `gw-fe8c5`
 
-The Common Notify service uses the **`gw-cnotify`** gateway for all environments:
+The Common Notify service uses the **`gw-fe8c5`** gateway (published and operational) for all environments:
 
 | Environment | Gateway URL | Backend Service |
 |------------|-------------|-----------------|
-| **DEV** | `https://gw-cnotify-notify.dev.api.gov.bc.ca` | `common-notify-dev-backend.f6bc3f-dev.svc.cluster.local` |
-| **TEST** | `https://gw-cnotify-notify.test.api.gov.bc.ca` | `common-notify-test-backend.f6bc3f-test.svc.cluster.local` |
-| **PROD** | `https://gw-cnotify-notify.api.gov.bc.ca` | `common-notify-prod-backend.f6bc3f-prod.svc.cluster.local` |
-| **PR-{N}** | `https://gw-cnotify-notify.dev.api.gov.bc.ca` | `common-notify-{N}-backend.f6bc3f-dev.svc.cluster.local` |
+| **DEV** | `https://gw-fe8c5-notify.dev.api.gov.bc.ca` | `common-notify-dev-backend.f6bc3f-dev.svc.cluster.local` |
+| **TEST** | `https://gw-fe8c5-notify.test.api.gov.bc.ca` | `common-notify-test-backend.f6bc3f-test.svc.cluster.local` |
+| **PROD** | `https://gw-fe8c5-notify.api.gov.bc.ca` | `common-notify-prod-backend.f6bc3f-prod.svc.cluster.local` |
+| **PR-{N}** | `https://gw-fe8c5-notify.dev.api.gov.bc.ca` | `common-notify-{N}-backend.f6bc3f-dev.svc.cluster.local` |
 
 **Health Check Endpoints:**
 ```bash
 # Public health endpoints (no authentication required)
-curl https://gw-cnotify-notify.dev.api.gov.bc.ca/api/health
-curl https://gw-cnotify-notify.test.api.gov.bc.ca/api/health
-curl https://gw-cnotify-notify.api.gov.bc.ca/api/health
+curl https://gw-fe8c5-notify.dev.api.gov.bc.ca/api/health
+curl https://gw-fe8c5-notify.test.api.gov.bc.ca/api/health
+curl https://gw-fe8c5-notify.api.gov.bc.ca/api/health
 ```
-
-### Gateway Migration History
-
-**Phase 1 (Completed):** Created new `gw-cnotify` gateway alongside existing `gw-fe8c5`
-- New gateway deployed with parallel services
-- All environments (DEV/TEST/PROD) operational
-- Fork-friendly configuration with `GATEWAY_ID` variable
-
-**Phase 2 (Completed):** Migrated all workflows and configurations to `gw-cnotify`
-- Updated PR, merge, and cleanup workflows
-- Updated frontend default URLs
-- Updated all documentation
-
-**Phase 3 (Current):** Enhanced PR isolation and monitoring
-- Documented isolation strategy
-- Added monitoring guidance
-- Prepared rate limiting configuration for future use
 
 ## PR Isolation Strategy
 
 ### How PR Gateway Isolation Works
 
-Each PR gets isolated gateway routes within the shared `gw-cnotify` gateway:
+Each PR gets isolated gateway routes within the shared `gw-fe8c5` gateway:
 
 ```
 ┌─────────────────────────────────────────┐
-│      gw-cnotify Gateway (Shared)        │
+│      gw-fe8c5 Gateway (Shared)          │
 ├─────────────────────────────────────────┤
 │  PR-29 Routes:                          │
-│    - gw-cnotify-pr-29-notify-simple     │
-│    - gw-cnotify-pr-29-notify-event      │
-│    - gw-cnotify-pr-29-ches-email        │
+│    - gw-fe8c5-pr-29-notify-simple       │
+│    - gw-fe8c5-pr-29-notify-event        │
+│    - gw-fe8c5-pr-29-ches-email          │
 │    ↓ Backend: pr-29-backend pod         │
 ├─────────────────────────────────────────┤
 │  PR-30 Routes:                          │
-│    - gw-cnotify-pr-30-notify-simple     │
-│    - gw-cnotify-pr-30-notify-event      │
-│    - gw-cnotify-pr-30-ches-email        │
+│    - gw-fe8c5-pr-30-notify-simple       │
+│    - gw-fe8c5-pr-30-notify-event        │
+│    - gw-fe8c5-pr-30-ches-email          │
 │    ↓ Backend: pr-30-backend pod         │
 ├─────────────────────────────────────────┤
 │  DEV Routes:                            │
-│    - gw-cnotify-dev-notify-simple       │
-│    - gw-cnotify-dev-notify-event        │
-│    - gw-cnotify-dev-ches-email          │
+│    - gw-fe8c5-dev-notify-simple         │
+│    - gw-fe8c5-dev-notify-event          │
+│    - gw-fe8c5-dev-ches-email            │
 │    ↓ Backend: dev-backend pod           │
 └─────────────────────────────────────────┘
 ```
@@ -84,16 +67,16 @@ Each PR gets isolated gateway routes within the shared `gw-cnotify` gateway:
 ### Isolation Mechanisms
 
 **1. Unique Route Prefixes**
-- Each PR: `gw-cnotify-pr-{NUMBER}-{route}`
-- DEV: `gw-cnotify-dev-{route}`
-- TEST: `gw-cnotify-test-{route}`
-- PROD: `gw-cnotify-prod-{route}`
+- Each PR: `gw-fe8c5-pr-{NUMBER}-{route}`
+- DEV: `gw-fe8c5-dev-{route}`
+- TEST: `gw-fe8c5-test-{route}`
+- PROD: `gw-fe8c5-prod-{route}`
 
 **2. Environment-Specific Tags**
 ```yaml
-tags: [ns.gw-cnotify, env.dev]    # DEV routes
-tags: [ns.gw-cnotify, env.test]   # TEST routes
-tags: [ns.gw-cnotify, env.prod]   # PROD routes
+tags: [ns.gw-fe8c5, env.dev]    # DEV routes
+tags: [ns.gw-fe8c5, env.test]   # TEST routes
+tags: [ns.gw-fe8c5, env.prod]   # PROD routes
 ```
 
 **3. Backend Pod Isolation**
@@ -153,9 +136,9 @@ Client → API Gateway → Backend Service
 
 | Environment | Issuer | Audience |
 |------------|--------|----------|
-| DEV | `https://dev.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-dev-dev` |
-| TEST | `https://test.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-test-test` |
-| PROD | `https://loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-cnotify-default-prod-prod` |
+| DEV | `https://dev.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-fe8c5-default-dev-dev` |
+| TEST | `https://test.loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-fe8c5-default-test-test` |
+| PROD | `https://loginproxy.gov.bc.ca/auth/realms/apigw` | `ap-gw-fe8c5-default-prod-prod` |
 
 ### Consumer Headers
 
@@ -174,13 +157,13 @@ Backend services can use these headers for tenant identification and audit loggi
 **Check Gateway Availability:**
 ```bash
 # DEV
-curl -i https://gw-cnotify-notify.dev.api.gov.bc.ca/api/health
+curl -i https://gw-fe8c5-notify.dev.api.gov.bc.ca/api/health
 
 # TEST
-curl -i https://gw-cnotify-notify.test.api.gov.bc.ca/api/health
+curl -i https://gw-fe8c5-notify.test.api.gov.bc.ca/api/health
 
 # PROD
-curl -i https://gw-cnotify-notify.api.gov.bc.ca/api/health
+curl -i https://gw-fe8c5-notify.api.gov.bc.ca/api/health
 ```
 
 Expected response:
@@ -197,7 +180,7 @@ HTTP/2 200 OK
 gwa login --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
 
 # Set gateway context
-gwa config set gateway gw-cnotify
+gwa config set gateway gw-fe8c5
 
 # List all routes (look for pr-{NUMBER} prefixes)
 gwa gateway routes
@@ -270,7 +253,7 @@ For PR-only rate limiting, use conditional configuration:
 # Send rapid requests
 for i in {1..60}; do
   curl -H "Authorization: Bearer $TOKEN" \
-       https://gw-cnotify-notify.dev.api.gov.bc.ca/api/v1/notifysimple
+       https://gw-fe8c5-notify.dev.api.gov.bc.ca/api/v1/notifysimple
 done
 
 # Should see 429 Too Many Requests after limit
@@ -390,12 +373,13 @@ Gateway configurations are automatically applied during deployments:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GATEWAY_SERVICE_NAME` | Gateway service identifier | `gw-cnotify-notify-dev` |
+| `GATEWAY_ID` | Gateway identifier | `gw-fe8c5` |
+| `GATEWAY_SERVICE_NAME` | Gateway service identifier | `gw-fe8c5-notify-dev` |
 | `BACKEND_HOST` | Kubernetes backend service | `common-notify-6-backend.f6bc3f-dev.svc.cluster.local` |
-| `ROUTE_PREFIX` | Route name prefix | `gw-cnotify-dev-` |
-| `GATEWAY_HOSTNAME` | External gateway hostname | `gw-cnotify-notify.dev.api.gov.bc.ca` |
+| `ROUTE_PREFIX` | Route name prefix | `gw-fe8c5-dev-` |
+| `GATEWAY_HOSTNAME` | External gateway hostname | `gw-fe8c5-notify.dev.api.gov.bc.ca` |
 | `KEYCLOAK_ISSUER` | Keycloak issuer URL | `https://dev.loginproxy.gov.bc.ca/auth/realms/apigw` |
-| `ALLOWED_AUDIENCE` | JWT audience claim | `ap-gw-cnotify-default-dev-dev` |
+| `ALLOWED_AUDIENCE` | JWT audience claim | `ap-gw-fe8c5-default-dev-dev` |
 | `RELEASE_NAME` | Helm release name (auto-set) | `common-notify-6` |
 
 ## Adding New Routes
@@ -407,7 +391,7 @@ Gateway configurations are automatically applied during deployments:
 Example:
 ```yaml
 - name: ${ROUTE_PREFIX}my-new-route
-  tags: [ns.gw-cnotify]
+  tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
   hosts:
     - ${GATEWAY_HOSTNAME}
   paths:
