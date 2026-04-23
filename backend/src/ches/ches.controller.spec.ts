@@ -4,7 +4,7 @@ import { ChesController } from './ches.controller'
 import { ChesApiClient } from './ches-api.client'
 import { ChesMessageObject } from './schemas/ches-message-object'
 import { ChesMergeRequest } from './schemas/ches-merge-request'
-import { TenantGuard } from 'src/common/guards/tenant.guard'
+import { TenantGuard } from '../common/guards/tenant.guard'
 
 describe('ChesController', () => {
   let controller: ChesController

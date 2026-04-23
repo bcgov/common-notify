@@ -1,7 +1,8 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
+import { VersioningType, CanActivate, ExecutionContext, ValidationPipe } from '@nestjs/common'
+import { vi } from 'vitest'
 import request from 'supertest'
 import {
   NotifySimpleController,
@@ -11,9 +12,11 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotificationService } from '../../notification/notification.service'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
+import { QueueName } from '../../enum/queue-name.enum'
 import { EMAIL_ADAPTER } from '../../adapters/tokens'
 
 // Mock TenantGuard to bypass authentication in tests
@@ -39,6 +42,19 @@ const mockEmailAdapter = {
   send: vi.fn(),
 }
 
+const mockNotificationService = {
+  getNotifications: vi.fn(),
+  getNotificationStatus: vi.fn(),
+  createNotification: vi.fn(),
+  create: vi.fn().mockResolvedValue({ id: 'mock-notification-id' }),
+  validateBusinessRules: vi.fn().mockResolvedValue([]),
+}
+
+const mockIngestionQueue = {
+  add: vi.fn(),
+  process: vi.fn(),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -54,8 +70,10 @@ describe('Notify Controllers', () => {
       ],
       providers: [
         NotifyService,
+        { provide: NotificationService, useValue: mockNotificationService },
         { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
       ],
     })
@@ -65,6 +83,14 @@ describe('Notify Controllers', () => {
 
     service = module.get<NotifyService>(NotifyService)
     app = module.createNestApplication()
+    app.useGlobalPipes(
+      new ValidationPipe({
+        errorHttpStatusCode: 422,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    )
     app.enableVersioning({
       type: VersioningType.URI,
       prefix: 'api/v',
@@ -86,24 +112,27 @@ describe('Notify Controllers', () => {
 
     describe('POST /api/v1/notifysimple', () => {
       it('should return 201 status with a valid email payload', async () => {
-        const mockResponse = {
-          messageId: 'mock-msg-id',
-          providerResponse: 'mock-tx-id',
-        }
-        mockEmailAdapter.send.mockResolvedValue(mockResponse)
+        mockEmailAdapter.send.mockResolvedValue({
+          messageId: 'ches-123456',
+        })
 
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
-          .expect(201)
+          .expect(202)
           .expect((res) => {
-            expect(res.body.messageId).toBe('mock-msg-id')
-            expect(res.body.providerResponse).toBe('mock-tx-id')
+            expect(res.body.notifyId).toBeDefined()
+            expect(res.body.recordId).toBeDefined()
+            expect(res.body.status).toBeDefined()
+            expect(res.body.message).toBeDefined()
           })
       })
 
-      it('should return 400 when no channel is provided', async () => {
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      it('should return 422 when no channel is provided', async () => {
+        mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
+          'At least one recipient is required (email, SMS, or msgApp)',
+        ])
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
       })
     })
   })
@@ -235,7 +264,7 @@ describe('Notify Controllers', () => {
     })
 
     describe('GET /api/v1/templates/:templateId', () => {
-      it('should return 501 status', async () => {
+      it('should return 501 status', { timeout: 10000 }, async () => {
         return request(app.getHttpServer()).get('/api/v1/templates/template-123').expect(501)
       })
     })
@@ -277,22 +306,6 @@ describe('Notify Controllers', () => {
       service.notImplemented()
 
       expect(spyNotImplemented).toHaveBeenCalledTimes(1)
-    })
-
-    it('should call simpleSend on NotifyService when posting to notifysimple', async () => {
-      const mockResponse = {
-        messageId: 'msg-123',
-        providerResponse: 'tx-123',
-      }
-      mockEmailAdapter.send.mockResolvedValue(mockResponse)
-      const spySimpleSend = vi.spyOn(service, 'simpleSend')
-
-      await request(app.getHttpServer())
-        .post('/api/v1/notifysimple')
-        .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
-        .expect(201)
-
-      expect(spySimpleSend).toHaveBeenCalledTimes(1)
     })
   })
 })

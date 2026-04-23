@@ -102,7 +102,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3002
 app.listen(PORT, () => {
-  console.log(`✅ Mock OAuth2 Token Server listening on port ${PORT}`)
+  console.log(` Mock OAuth2 Token Server listening on port ${PORT}`)
   console.log(`   POST http://localhost:${PORT}/ - OAuth2 token endpoint`)
   console.log(`   GET  http://localhost:${PORT}/health - Health check`)
   console.log('')

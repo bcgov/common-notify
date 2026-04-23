@@ -12,6 +12,7 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { ChesModule } from './ches/ches.module'
+import { QueueModule } from './queue/queue.module'
 import { NotificationModule } from './notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
@@ -26,6 +27,7 @@ import { GcNotifyModule } from './gc-notify/gc-notify.module'
     }),
     TerminusModule,
     DatabaseModule,
+    QueueModule,
     AdminModule,
     ApiModule,
     AuthModule,

@@ -22,6 +22,14 @@ export default () => {
       url: process.env.DATABASE_URL,
     },
 
+    // Redis & Job Queues
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+    },
+
     // System defaults (used when sender store or provider override not set)
     defaults: {
       email: { from: defaultEmailFrom },
@@ -45,8 +53,25 @@ export default () => {
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
     },
 
+    // GC Notify
     gcNotify: {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
+    },
+
+    // Job Queue Worker Configuration
+    queue: {
+      ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      emailDeliveryWorkerConcurrency: parseInt(
+        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      smsDeliveryWorkerConcurrency: parseInt(
+        process.env.SMS_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
+      jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
   }
 }

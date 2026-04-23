@@ -15,4 +15,9 @@ export class UpdateNotificationRequestDto {
   @IsOptional()
   @IsString()
   updatedBy?: string
+
+  @ApiPropertyOptional({ description: 'Error reason when notification fails' })
+  @IsOptional()
+  @IsString()
+  errorReason?: string
 }

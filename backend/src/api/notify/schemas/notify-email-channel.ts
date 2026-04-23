@@ -8,6 +8,7 @@ import {
   IsDateString,
   IsObject,
   ValidateNested,
+  ArrayMinSize,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -22,6 +23,7 @@ export class NotifyAttachment {
 export class NotifyEmailChannel {
   @ApiProperty({ type: [String] })
   @IsArray()
+  @ArrayMinSize(1)
   @IsEmail({}, { each: true })
   to: string[]
 
