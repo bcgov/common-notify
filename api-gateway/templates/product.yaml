@@ -1,0 +1,69 @@
+kind: DraftDataset
+name: ${GATEWAY_ID}-notify-dataset
+title: Notify
+organization: ministry-of-citizens-services
+organizationUnit: devops-and-cloud-services
+notes:
+  A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
+  a unified API.
+tags: [notify, openapi, notifications, email, sms]
+license_title: Access Only
+view_audience: Government
+security_class: PUBLIC
+record_publish_date: '2026-04-10'
+---
+kind: CredentialIssuer
+name: ${GATEWAY_ID} default dev
+description: Built-in OAuth2/OIDC using BC Gov Keycloak (DEV)
+flow: client-credentials
+mode: auto
+authPlugin: jwt-keycloak
+clientAuthenticator: client-secret
+clientRoles: []
+inheritFrom: Gold Shared IdP
+---
+kind: CredentialIssuer
+name: ${GATEWAY_ID} default test
+description: Built-in OAuth2/OIDC using BC Gov Keycloak (TEST)
+flow: client-credentials
+mode: auto
+authPlugin: jwt-keycloak
+clientAuthenticator: client-secret
+clientRoles: []
+inheritFrom: Gold Shared IdP
+---
+kind: CredentialIssuer
+name: ${GATEWAY_ID} default prod
+description: Built-in OAuth2/OIDC using BC Gov Keycloak (PROD)
+flow: client-credentials
+mode: auto
+authPlugin: jwt-keycloak
+clientAuthenticator: client-secret
+clientRoles: []
+inheritFrom: Gold Shared IdP
+---
+kind: Product
+name: Notify API
+dataset: ${GATEWAY_ID}-notify-dataset
+environments:
+  - name: dev
+    active: true
+    approval: false
+    flow: client-credentials
+    credentialIssuer: ${GATEWAY_ID} default dev
+    services:
+      - ${GATEWAY_ID}-notify-dev
+  - name: test
+    active: true
+    approval: false
+    flow: client-credentials
+    credentialIssuer: ${GATEWAY_ID} default test
+    services:
+      - ${GATEWAY_ID}-notify-test
+  - name: prod
+    active: true
+    approval: false
+    flow: client-credentials
+    credentialIssuer: ${GATEWAY_ID} default prod
+    services:
+      - ${GATEWAY_ID}-notify-prod

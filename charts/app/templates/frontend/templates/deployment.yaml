@@ -63,7 +63,7 @@ spec:
                   key: keycloak-client-id
             {{- else }}
             - name: VITE_API_GATEWAY_NOTIFY_URL
-              value: {{ .Values.frontend.apiGatewayNotifyUrl | default "https://gw-fe8c5-notify.dev.api.gov.bc.ca" | quote }}
+              value: {{ .Values.frontend.apiGatewayNotifyUrl | default "https://gw-cnotify-notify.dev.api.gov.bc.ca" | quote }}
             - name: VITE_KEYCLOAK_URL
               value: {{ .Values.frontend.keycloakUrl | default "https://dev.loginproxy.gov.bc.ca/auth" | quote }}
             - name: VITE_KEYCLOAK_REALM
