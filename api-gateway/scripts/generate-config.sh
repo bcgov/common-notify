@@ -87,10 +87,11 @@ echo "  Output: $OUTPUT_FILE"
 # Use envsubst to substitute environment variables in template
 envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 
-# For non-PROD environments, remove the DraftDataset, Product and CredentialIssuer sections
-# These should only be published from the PROD config to avoid conflicts
-if [ "$ENVIRONMENT" != "prod" ]; then
-  echo "Removing DraftDataset, Product and CredentialIssuer sections (only published from PROD)..."
+# For PR environments, remove the DraftDataset, Product and CredentialIssuer sections
+# PRs are temporary and should not be included in the Product catalog
+# DEV/TEST/PROD are permanent and need to be in the Product
+if [ "$ENVIRONMENT" == "pr" ]; then
+  echo "Removing DraftDataset, Product and CredentialIssuer sections (PR is temporary)..."
   # Create a temporary file
   TMP_FILE="${OUTPUT_FILE}.tmp"
 
