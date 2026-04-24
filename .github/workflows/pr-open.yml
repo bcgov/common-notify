@@ -61,10 +61,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config for PR
+      - name: Generate gateway config for PR + permanent services
         run: |
           chmod +x api-gateway/scripts/generate-gateway-config.sh
-          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+          # Generate combined config with PR + permanent services (dev+test+prod)
+          api-gateway/scripts/generate-gateway-config.sh pr-with-permanent common-notify-${{ github.event.number }}
 
       - name: Apply gateway config
         env:
@@ -82,8 +83,8 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply gateway configuration
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml
+          # Apply PR + permanent services (prevents deletion of dev/test/prod)
+          gwa apply -i api-gateway/generated/gw-services-pr-with-permanent.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})

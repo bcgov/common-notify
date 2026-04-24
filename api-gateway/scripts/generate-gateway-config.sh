@@ -4,9 +4,10 @@ set -e
 # Unified Gateway Configuration Generator
 #
 # Usage:
-#   ./generate-gateway-config.sh product              # Generate Product config only
-#   ./generate-gateway-config.sh pr <release-name>    # Generate PR routes
-#   ./generate-gateway-config.sh all                  # Generate Product + all services (dev+test+prod)
+#   ./generate-gateway-config.sh product                        # Generate Product config only
+#   ./generate-gateway-config.sh pr <release-name>              # Generate PR routes only
+#   ./generate-gateway-config.sh all                            # Generate Product + all services (dev+test+prod)
+#   ./generate-gateway-config.sh pr-with-permanent <release>    # Generate PR + permanent services (dev+test+prod+PR)
 
 COMMAND=$1
 RELEASE_NAME=$2
@@ -115,13 +116,44 @@ case "$COMMAND" in
     echo "   - gw-services-all.yaml (All environment services)"
     ;;
 
+  pr-with-permanent)
+    if [ -z "$RELEASE_NAME" ]; then
+      echo "Error: Release name required for PR config"
+      echo "Usage: $0 pr-with-permanent <release-name>"
+      exit 1
+    fi
+    echo "Generating PR + permanent services configuration..."
+    echo ""
+    echo "1. Permanent service configs:"
+    (generate_env_config "dev")
+    (generate_env_config "test")
+    (generate_env_config "prod")
+    echo ""
+    echo "2. PR service config:"
+    (generate_env_config "pr" "$RELEASE_NAME")
+    echo ""
+    echo "3. Combined services file (dev+test+prod+PR):"
+    cat "${SCRIPT_DIR}/generated/gw-routes-dev.yaml" > "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    echo "---" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    cat "${SCRIPT_DIR}/generated/gw-routes-test.yaml" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    echo "---" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    cat "${SCRIPT_DIR}/generated/gw-routes-prod.yaml" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    echo "---" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    cat "${SCRIPT_DIR}/generated/gw-routes-pr.yaml" >> "${SCRIPT_DIR}/generated/gw-services-pr-with-permanent.yaml"
+    echo "  ✓ Generated: gw-services-pr-with-permanent.yaml (dev+test+prod+PR)"
+    echo ""
+    echo "✅ Complete! Ready to apply:"
+    echo "   - gw-services-pr-with-permanent.yaml (Adds PR without deleting permanent services)"
+    ;;
+
   *)
     echo "Error: Invalid command"
     echo ""
     echo "Usage:"
-    echo "  $0 product              # Generate Product config"
-    echo "  $0 pr <release-name>    # Generate PR routes"
-    echo "  $0 all                  # Generate Product + all services"
+    echo "  $0 product                        # Generate Product config"
+    echo "  $0 pr <release-name>              # Generate PR routes only"
+    echo "  $0 all                            # Generate Product + all services"
+    echo "  $0 pr-with-permanent <release>    # Generate PR + permanent services"
     exit 1
     ;;
 esac
