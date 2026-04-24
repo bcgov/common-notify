@@ -69,12 +69,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Generate Product and Services config
+      - name: Generate gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-product-config.sh
-          chmod +x api-gateway/scripts/generate-all-services.sh
-          api-gateway/scripts/generate-product-config.sh
-          api-gateway/scripts/generate-all-services.sh
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh all
       - name: Apply gateway config
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
