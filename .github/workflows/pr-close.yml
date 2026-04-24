@@ -39,20 +39,19 @@ jobs:
   cleanup_gateway:
     name: Delete PR API Gateway Config
     runs-on: ubuntu-24.04
+    concurrency:
+      group: gateway-config-apply
+      cancel-in-progress: false  # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate PR gateway config for cleanup
-        env:
-          PR_NUMBER: ${{ github.event.number }}
+      - name: Generate gateway config (dev+test+prod only)
         run: |
-          # Make script executable
-          chmod +x api-gateway/scripts/generate-config.sh
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          # Generate combined services file with dev+test+prod (excludes PR)
+          api-gateway/scripts/generate-gateway-config.sh all
 
-          # Generate PR-specific gateway config (needed for deletion)
-          api-gateway/scripts/generate-config.sh pr common-notify-${{ github.event.number }}
-
-      - name: Delete gateway config
+      - name: Remove PR service by applying permanent services
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -68,5 +67,5 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Delete gateway configuration
-          gwa destroy -i api-gateway/generated/gw-routes-pr.yaml || echo "Gateway config may not exist or already deleted"
+          # Apply permanent services (dev+test+prod) - this will remove PR service
+          gwa apply -i api-gateway/generated/gw-services-all.yaml
