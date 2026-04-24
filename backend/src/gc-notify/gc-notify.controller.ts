@@ -35,11 +35,11 @@ import {
   TemplatesListResponse,
   FileAttachment,
 } from './schemas'
-import { TenantGuard } from 'src/common/guards/tenant.guard'
+import { ApiKeyGuard } from 'src/common/guards/api-key.guard'
 
 @ApiTags('GC Notify')
 @ApiExtraModels(EmailContent, SmsContent, FileAttachment)
-@UseGuards(TenantGuard)
+@UseGuards(ApiKeyGuard)
 @Controller('gcnotify/v2')
 export class GcNotifyController {
   constructor(private readonly gcNotifyApiClient: GcNotifyApiClient) {}
@@ -47,9 +47,10 @@ export class GcNotifyController {
   @Get('notifications')
   @ApiOperation({ summary: 'Get list of notifications' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiQuery({ name: 'template_type', required: false, enum: ['sms', 'email'] })
   @ApiQuery({
@@ -98,9 +99,10 @@ export class GcNotifyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send an email notification' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 201,
@@ -119,9 +121,10 @@ export class GcNotifyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send an SMS notification' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 201,
@@ -140,9 +143,10 @@ export class GcNotifyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send a batch of notifications' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 201,
@@ -160,9 +164,10 @@ export class GcNotifyController {
   @Get('notifications/:notificationId')
   @ApiOperation({ summary: 'Get notification by ID' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 200,
@@ -182,9 +187,10 @@ export class GcNotifyController {
   @ApiOperation({ summary: 'Get list of templates' })
   @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 200,
@@ -200,9 +206,10 @@ export class GcNotifyController {
   @Get('template/:templateId')
   @ApiOperation({ summary: 'Get template by ID' })
   @ApiHeader({
-    name: 'X-GC-Notify-Api-Key',
+    name: 'Authorization',
     required: true,
-    description: 'Your GC Notify API key.',
+    description: 'API key in format: ApiKey-v1 {api-key}',
+    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 200,
@@ -216,10 +223,12 @@ export class GcNotifyController {
   }
 
   private requireAuthHeader(req: express.Request): string {
-    const key = req.headers['x-gc-notify-api-key'] ?? req.headers['X-GC-Notify-Api-Key']
-    if (typeof key === 'string' && key.trim()) {
-      return `ApiKey-v1 ${key.trim()}`
+    const authHeader = req.headers['authorization']
+    if (typeof authHeader === 'string' && authHeader.trim()) {
+      return authHeader.trim()
     }
-    throw new BadRequestException('X-GC-Notify-Api-Key header is required')
+    throw new BadRequestException(
+      'Authorization header is required with format: ApiKey-v1 {api-key}',
+    )
   }
 }

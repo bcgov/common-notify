@@ -152,6 +152,22 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
 plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
