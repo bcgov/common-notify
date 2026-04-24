@@ -9,11 +9,37 @@ redis:
     enabled: false  # Disabled per BC Gov pattern
   image:
     registry: artifacts.developer.gov.bc.ca/docker-remote
+  master:
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: netapp-block-standard
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
   replica:
     shareProcessNamespace: true
     replicaCount: 2
-    podSecurityContext: {}
-    containerSecurityContext: {}
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
     persistentVolumeClaimRetentionPolicy:
       enabled: true
       whenDeleted: Delete
@@ -32,8 +58,14 @@ redis:
   sentinel:
     enabled: true
     quorum: 1
-    podSecurityContext: {}
-    containerSecurityContext: {}
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
     image:
       registry: artifacts.developer.gov.bc.ca/docker-remote
     persistence:
@@ -62,8 +94,14 @@ redis:
     save ""
   metrics:
     enabled: true
-    podSecurityContext: {}
-    containerSecurityContext: {}
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
     image:
       registry: artifacts.developer.gov.bc.ca/docker-remote
     resources:

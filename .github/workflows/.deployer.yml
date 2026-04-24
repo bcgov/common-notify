@@ -137,7 +137,7 @@ jobs:
             helm upgrade --install \
               ${{ github.event.repository.name }}-redis \
               bitnami/redis \
-              --version 18.0.0 \
+              --version 25.4.1 \
               -f ${VALUES_FILE} \
               ${VALUES_OVERRIDE} \
               --wait \
