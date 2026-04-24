@@ -72,6 +72,19 @@ spec:
               value: info
             - name: GC_NOTIFY_BASE_URL
               value: https://api.notification.canada.ca
+            - name: REDIS_HOST
+              value: {{ .Values.global.config.redisHost | default "nr-notify-redis-master" }}
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.config.redisSecret | default "nr-notify-redis" }}
+                  key: redis-password
+            - name: REDIS_DB
+              value: "0"
+            - name: INGESTION_WORKER_CONCURRENCY
+              value: "1"
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}

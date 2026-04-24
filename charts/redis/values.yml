@@ -1,0 +1,47 @@
+# Redis configuration for job queues and caching
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    # Password will be generated automatically by Bitnami chart
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  replica:
+    replicaCount: 1  # Default for dev and test
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  # AOF persistence configuration
+  commonConfiguration: |-
+    # Enable AOF persistence
+    appendonly yes
+    appendfsync everysec
+    appendfilename "appendonly.aof"
+    # Disable RDB persistence
+    save ""
+  metrics:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

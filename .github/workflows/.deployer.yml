@@ -52,6 +52,10 @@ on:
         description: Paths used to trigger a database deployment; e.g. ('charts/crunchy/')
         required: false
         type: string
+      redis_triggers:
+        description: Paths used to trigger a redis deployment; e.g. ('charts/redis/')
+        required: false
+        type: string
 
       ### Usually a bad idea / not recommended
       timeout-minutes:
@@ -101,6 +105,43 @@ jobs:
           environment: ${{ inputs.environment }}
           values_file: charts/crunchy/values.yml
           triggers: ${{ inputs.db_triggers }}
+
+      - uses: actions/checkout@v4
+        if: inputs.redis_triggers != ''
+        name: Checkout for Redis
+
+      - name: Deploy Redis
+        if: inputs.redis_triggers != ''
+        id: deploy_redis
+        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ inputs.oc_server }}
+          triggers: ${{ inputs.redis_triggers }}
+          ref: ${{ github.ref }}
+          commands: |
+            # Deploy Redis using Bitnami Helm chart
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+
+            # Determine values file based on environment
+            VALUES_FILE="charts/redis/values.yml"
+            if [ "${{ inputs.environment }}" == "PROD" ]; then
+              VALUES_OVERRIDE="-f charts/redis/values-prod.yml"
+            else
+              VALUES_OVERRIDE=""
+            fi
+
+            # Deploy Redis
+            helm upgrade --install \
+              ${{ github.event.repository.name }}-redis \
+              bitnami/redis \
+              --version 18.0.0 \
+              -f ${VALUES_FILE} \
+              ${VALUES_OVERRIDE} \
+              --wait \
+              --timeout 5m
 
       # Variables
       - if: inputs.tag  == ''
