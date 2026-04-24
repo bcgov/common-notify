@@ -141,7 +141,7 @@ jobs:
               -f ${VALUES_FILE} \
               ${VALUES_OVERRIDE} \
               --wait \
-              --timeout 10m
+              --timeout 15m
 
       # Variables
       - if: inputs.tag  == ''
