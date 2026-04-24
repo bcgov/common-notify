@@ -28,7 +28,7 @@ describe('GcNotifyController', () => {
 
   const makeReq = (apiKey?: string): express.Request => {
     return {
-      headers: apiKey ? { 'x-gc-notify-api-key': apiKey } : {},
+      headers: apiKey ? { authorization: `ApiKey-v1 ${apiKey}` } : {},
     } as unknown as express.Request
   }
 
@@ -57,13 +57,13 @@ describe('GcNotifyController', () => {
   })
 
   describe('requireAuthHeader (via any endpoint)', () => {
-    it('should throw BadRequestException when X-GC-Notify-Api-Key header is missing', async () => {
+    it('should throw BadRequestException when Authorization header is missing', async () => {
       await expect(controller.getTemplates(undefined, makeReq())).rejects.toThrow(
         BadRequestException,
       )
     })
 
-    it('should throw BadRequestException when X-GC-Notify-Api-Key header is blank', async () => {
+    it('should throw BadRequestException when Authorization header is blank', async () => {
       await expect(controller.getTemplates(undefined, makeReq('   '))).rejects.toThrow(
         BadRequestException,
       )

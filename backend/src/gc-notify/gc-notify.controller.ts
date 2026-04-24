@@ -224,8 +224,15 @@ export class GcNotifyController {
 
   private requireAuthHeader(req: express.Request): string {
     const authHeader = req.headers['authorization']
-    if (typeof authHeader === 'string' && authHeader.trim()) {
-      return authHeader.trim()
+    if (typeof authHeader === 'string') {
+      const trimmed = authHeader.trim()
+      // Validate format: "ApiKey-v1 {key}"
+      if (trimmed.startsWith('ApiKey-v1 ')) {
+        const key = trimmed.substring('ApiKey-v1 '.length).trim()
+        if (key) {
+          return trimmed
+        }
+      }
     }
     throw new BadRequestException(
       'Authorization header is required with format: ApiKey-v1 {api-key}',
