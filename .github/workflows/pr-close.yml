@@ -43,14 +43,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Generate PR gateway config for cleanup
-        env:
-          PR_NUMBER: ${{ github.event.number }}
         run: |
-          # Make script executable
-          chmod +x api-gateway/scripts/generate-config.sh
-
-          # Generate PR-specific gateway config (needed for deletion)
-          api-gateway/scripts/generate-config.sh pr common-notify-${{ github.event.number }}
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
       - name: Delete gateway config
         env:
