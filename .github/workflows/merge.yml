@@ -67,6 +67,9 @@ jobs:
     name: Apply Gateway Config (All Environments)
     needs: [import]
     runs-on: ubuntu-24.04
+    concurrency:
+      group: gateway-config-apply
+      cancel-in-progress: false  # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
       - name: Generate gateway configuration
