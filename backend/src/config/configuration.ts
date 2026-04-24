@@ -1,5 +1,5 @@
 export default () => {
-  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'noreply@notify-test.gov.bc.ca'
+  const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
   const defaultTemplateSubject = process.env.DEFAULT_TEMPLATE_SUBJECT || 'Notification'
 
@@ -22,6 +22,14 @@ export default () => {
       url: process.env.DATABASE_URL,
     },
 
+    // Redis & Job Queues
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+    },
+
     // System defaults (used when sender store or provider override not set)
     defaults: {
       email: { from: defaultEmailFrom },
@@ -42,7 +50,23 @@ export default () => {
       clientId: process.env.CHES_CLIENT_ID,
       clientSecret: process.env.CHES_CLIENT_SECRET,
       tokenUrl: process.env.CHES_TOKEN_URL,
-      from: process.env.CHES_FROM || defaultEmailFrom,
+      from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
+    },
+
+    // Job Queue Worker Configuration
+    queue: {
+      ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      emailDeliveryWorkerConcurrency: parseInt(
+        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      smsDeliveryWorkerConcurrency: parseInt(
+        process.env.SMS_DELIVERY_WORKER_CONCURRENCY || '2',
+        10,
+      ),
+      jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
+      jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
   }
 }

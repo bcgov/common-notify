@@ -6,12 +6,14 @@ import {
   IsUUID,
   IsDateString,
   IsObject,
+  ArrayMinSize,
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class NotifyMsgAppChannel {
   @ApiProperty({ type: [String] })
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
   to: string[]
 

@@ -2,9 +2,11 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { NotificationService } from './notification.service'
 import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatus } from './schemas'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 const mockRepository = {
   create: vi.fn(),
@@ -12,6 +14,15 @@ const mockRepository = {
   find: vi.fn(),
   findOne: vi.fn(),
   remove: vi.fn(),
+  update: vi.fn(),
+}
+
+const mockConfigService = {
+  get: vi.fn().mockReturnValue(undefined),
+}
+
+const mockTenantsService = {
+  findOne: vi.fn(),
 }
 
 describe('NotificationService', () => {
@@ -24,6 +35,14 @@ describe('NotificationService', () => {
         {
           provide: getRepositoryToken(NotificationRequest),
           useValue: mockRepository,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+        {
+          provide: TenantsService,
+          useValue: mockTenantsService,
         },
       ],
     }).compile()
@@ -144,11 +163,13 @@ describe('NotificationService', () => {
       const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
       const dto = { status: NotificationStatus.COMPLETED, updatedBy: 'admin' }
       const updated = { ...existing, ...dto }
-      mockRepository.findOne.mockResolvedValue(existing)
-      mockRepository.save.mockResolvedValue(updated)
+      mockRepository.findOne.mockResolvedValueOnce(existing)
+      mockRepository.update.mockResolvedValue({ affected: 1 })
+      mockRepository.findOne.mockResolvedValueOnce(updated)
 
       const result = await service.update(id, tenantId, dto)
 
+      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, dto)
       expect(result).toEqual(updated)
     })
 
@@ -156,13 +177,14 @@ describe('NotificationService', () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
       const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
-      mockRepository.findOne.mockResolvedValue(existing)
-      mockRepository.save.mockResolvedValue({ ...existing, updatedBy: 'admin' })
+      const updated = { ...existing, updatedBy: 'admin' }
+      mockRepository.findOne.mockResolvedValueOnce(existing)
+      mockRepository.update.mockResolvedValue({ affected: 1 })
+      mockRepository.findOne.mockResolvedValueOnce(updated)
 
       await service.update(id, tenantId, { updatedBy: 'admin' })
 
-      expect(existing.status).toBe(NotificationStatus.QUEUED)
-      expect(existing.updatedBy).toBe('admin')
+      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, { updatedBy: 'admin' })
     })
 
     it('should throw NotFoundException when notification not found', async () => {
@@ -171,26 +193,6 @@ describe('NotificationService', () => {
       await expect(service.update('missing-id', 'tenant-uuid', {})).rejects.toThrow(
         NotFoundException,
       )
-    })
-  })
-
-  describe('remove', () => {
-    it('should remove the notification', async () => {
-      const id = 'notif-uuid'
-      const tenantId = 'tenant-uuid'
-      const mockNotification = { id, tenantId }
-      mockRepository.findOne.mockResolvedValue(mockNotification)
-      mockRepository.remove.mockResolvedValue(undefined)
-
-      await service.remove(id, tenantId)
-
-      expect(mockRepository.remove).toHaveBeenCalledWith(mockNotification)
-    })
-
-    it('should throw NotFoundException when notification not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null)
-
-      await expect(service.remove('missing-id', 'tenant-uuid')).rejects.toThrow(NotFoundException)
     })
   })
 })

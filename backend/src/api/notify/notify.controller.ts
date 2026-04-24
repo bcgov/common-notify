@@ -10,22 +10,47 @@ import {
   HttpCode,
   Version,
   UseGuards,
+  Inject,
 } from '@nestjs/common'
+import Bull from 'bull'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
+import { NotificationService } from '../../notification/notification.service'
 import { NotifySimpleRequest } from './schemas'
-import { ChesTransactionResponse } from '../../ches/schemas/ches-transaction-response'
+import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
+import { Queueable } from '../../common/decorators/queueable.decorator'
+import { QueueName } from '../../enum/queue-name.enum'
 
+// Note: All endpoints except NotifySimpleController.simpleSend are
+// placeholders and return 501 Not Implemented. This is intentional to allow incremental
+// implementation and testing of the simple send flow first, which is the current priority.
+//
+// Anything requiring queueing should use the @Queueable decorator and implement the method with an
+// empty body (the decorator will handle the logic).
 @Controller('notifysimple')
 @UseGuards(TenantGuard)
 export class NotifySimpleController {
-  constructor(private readonly notifyService: NotifyService) {}
+  private readonly queueMap: Map<QueueName, Bull.Queue>
+
+  constructor(
+    private readonly notificationService: NotificationService,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
+  ) {
+    this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
+  }
 
   @Version('1')
   @Post()
-  @HttpCode(201)
-  simpleSend(@Body() _body: NotifySimpleRequest): Promise<ChesTransactionResponse> {
-    return this.notifyService.simpleSend(_body)
+  @HttpCode(202)
+  @Queueable(QueueName.INGESTION)
+  simpleSend(
+    @GetTenant() _tenant: Tenant,
+    @Body() _body: NotifySimpleRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable decorator
+    return undefined as any
   }
 }
 

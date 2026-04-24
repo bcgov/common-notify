@@ -7,6 +7,7 @@ import {
   IsNumber,
   ValidateNested,
   IsObject,
+  ArrayMinSize,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ChesAttachmentObject } from './ches-message-object'
@@ -15,6 +16,7 @@ export class ChesContextObject {
   @ApiProperty() @IsObject() context: Record<string, unknown>
   @ApiProperty({ type: [String] })
   @IsArray()
+  @ArrayMinSize(1)
   @IsEmail({}, { each: true })
   to: string[]
   @ApiPropertyOptional({ type: [String] })

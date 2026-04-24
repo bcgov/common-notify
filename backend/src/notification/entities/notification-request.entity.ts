@@ -24,6 +24,9 @@ export class NotificationRequest {
   @JoinColumn({ name: 'status', referencedColumnName: 'code' })
   statusCode: NotificationStatusCode
 
+  @Column({ name: 'payload', type: 'jsonb', nullable: true })
+  payload?: any
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 
@@ -35,4 +38,7 @@ export class NotificationRequest {
 
   @Column({ nullable: true, name: 'updated_by' })
   updatedBy: string
+
+  @Column({ type: 'text', nullable: true, name: 'error_reason' })
+  errorReason?: string
 }

@@ -110,7 +110,7 @@ async function globalSetup(_config: FullConfig) {
       const tokenFile = join(__dirname, '.playwright-token')
       writeFileSync(tokenFile, JSON.stringify({ accessToken, expiresIn }), 'utf-8')
 
-      console.log(`✅ Token fetched successfully`)
+      console.log(` Token fetched successfully`)
       console.log(`   Token expires in: ${expiresIn}s`)
       console.log(`   Token (first 20 chars): ${accessToken.substring(0, 20)}...`)
     } catch (fetchError) {
