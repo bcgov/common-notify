@@ -53,6 +53,11 @@ export default () => {
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
     },
 
+    // GC Notify
+    gcNotify: {
+      baseUrl: process.env.GC_NOTIFY_BASE_URL,
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
