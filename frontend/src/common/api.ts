@@ -10,7 +10,7 @@ export interface ApiRequestParameters<T = object> {
   enableNotification?: boolean
 }
 
-const STATUS_CODES = {
+export const STATUS_CODES = {
   Ok: 200,
   BadRequest: 400,
   Unauthorized: 401,
