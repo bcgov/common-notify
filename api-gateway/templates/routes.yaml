@@ -1,27 +1,13 @@
-kind: DraftDataset
-name: gw-fe8c5-notify-dataset
-title: Notify
-organization: ministry-of-citizens-services
-organizationUnit: devops-and-cloud-services
-notes:
-  A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
-  a unified API.
-tags: [notify, openapi, notifications, email, sms]
-license_title: Access Only
-view_audience: Government
-security_class: PUBLIC
-record_publish_date: '2026-04-10'
----
 kind: GatewayService
 name: ${GATEWAY_SERVICE_NAME}
-tags: [ns.gw-fe8c5]
+tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
 host: ${BACKEND_HOST}
 port: 80
 protocol: http
 retries: 0
 routes:
   - name: ${ROUTE_PREFIX}notify-health
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -34,7 +20,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-api-health
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -47,7 +33,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}ches-email
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -60,7 +46,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -73,7 +59,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -86,7 +72,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-preview
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -99,7 +85,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-types
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -112,7 +98,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-list
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -126,7 +112,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-status
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -139,7 +125,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-callbacks
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -154,7 +140,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}templates
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -168,7 +154,7 @@ routes:
     response_buffering: true
 plugins:
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
@@ -194,7 +180,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
@@ -220,7 +206,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
@@ -246,7 +232,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
@@ -272,7 +258,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
@@ -298,7 +284,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
@@ -324,7 +310,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
@@ -350,7 +336,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: jwt-keycloak
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
@@ -376,7 +362,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: false
   - name: request-transformer
-    tags: [ns.gw-fe8c5]
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     config:
       http_method: null
@@ -384,39 +370,3 @@ plugins:
         headers:
           - X-Consumer-Username:$(consumer_username)
           - X-Consumer-ID:$(consumer_id)
----
-kind: CredentialIssuer
-name: gw-fe8c5 default ${ENVIRONMENT}
-description: Default Authorization Profile for gw-fe8c5 Gateway (${ENVIRONMENT})
-flow: client-credentials
-mode: auto
-authPlugin: jwt-keycloak
-clientAuthenticator: client-secret
-clientRoles: []
-inheritFrom: Gold Shared IdP
----
-kind: Product
-name: Notify API
-dataset: gw-fe8c5-notify-dataset
-environments:
-  - name: dev
-    active: true
-    approval: false
-    flow: client-credentials
-    credentialIssuer: gw-fe8c5 default dev
-    services:
-      - gw-fe8c5-notify-dev
-  - name: test
-    active: true
-    approval: false
-    flow: client-credentials
-    credentialIssuer: gw-fe8c5 default test
-    services:
-      - gw-fe8c5-notify-test
-  - name: prod
-    active: true
-    approval: false
-    flow: client-credentials
-    credentialIssuer: gw-fe8c5 default prod
-    services:
-      - gw-fe8c5-notify-prod
