@@ -63,38 +63,16 @@ jobs:
             # Tag as test for TEST environment
             oc tag ${{ matrix.package }}:dev ${{ matrix.package }}:test
 
-  gateway-product:
-    name: Apply Gateway Product Config
+  gateway-config:
+    name: Apply Gateway Config (All Environments)
     needs: [import]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Generate product config
+      - name: Generate gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-product-config.sh
-          api-gateway/scripts/generate-product-config.sh
-      - name: Apply product config
-        env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
-        run: |
-          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
-          sudo mv gwa /usr/local/bin/
-          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
-          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
-          gwa apply -i api-gateway/generated/gw-product.yaml
-
-  gateway-config-dev:
-    name: Apply Gateway Config (DEV)
-    needs: [gateway-product]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate gateway config for DEV
-        run: |
-          chmod +x api-gateway/scripts/generate-config.sh
-          api-gateway/scripts/generate-config.sh dev common-notify-dev
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh all
       - name: Apply gateway config
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
@@ -105,11 +83,14 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          gwa apply -i api-gateway/generated/gw-routes-dev.yaml
+          # Apply Product first (defines all environments)
+          gwa apply -i api-gateway/generated/gw-product.yaml
+          # Then apply all services together (prevents deletion)
+          gwa apply -i api-gateway/generated/gw-services-all.yaml
 
   deploy-dev:
     name: Deploy (DEV)
-    needs: [gateway-config-dev]
+    needs: [gateway-config]
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
@@ -120,32 +101,9 @@ jobs:
       db_triggers: ('charts/crunchy/')
       tag: dev
 
-  gateway-config-test:
-    name: Apply Gateway Config (TEST)
-    needs: [gateway-product]
-    runs-on: ubuntu-24.04
-    environment: TEST
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate gateway config for TEST
-        run: |
-          chmod +x api-gateway/scripts/generate-config.sh
-          api-gateway/scripts/generate-config.sh test
-      - name: Apply gateway config
-        env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
-        run: |
-          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
-          sudo mv gwa /usr/local/bin/
-          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
-          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
-          gwa apply -i api-gateway/generated/gw-routes-test.yaml
-
   deploy-test:
     name: Deploy (TEST)
-    needs: [gateway-config-test]
+    needs: [gateway-config]
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
@@ -174,32 +132,9 @@ jobs:
             # Tag test images as prod for PROD environment
             oc tag ${{ matrix.package }}:test ${{ matrix.package }}:prod
 
-  gateway-config-prod:
-    name: Apply Gateway Config (PROD)
-    needs: [promote-test]
-    runs-on: ubuntu-24.04
-    environment: PROD
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate gateway config for PROD
-        run: |
-          chmod +x api-gateway/scripts/generate-config.sh
-          api-gateway/scripts/generate-config.sh prod
-      - name: Apply gateway config
-        env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
-        run: |
-          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
-          sudo mv gwa /usr/local/bin/
-          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
-          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
-          gwa apply -i api-gateway/generated/gw-routes-prod.yaml
-
   deploy-prod:
     name: Deploy (PROD)
-    needs: [gateway-config-prod]
+    needs: [promote-test]
     uses: ./.github/workflows/.deployer.yml
     secrets: inherit
     with:
