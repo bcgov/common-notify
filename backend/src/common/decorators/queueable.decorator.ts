@@ -136,7 +136,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Queue operation continues asynchronously in the background
         const response = {
           notifyId: notificationRecord.id,
-          status: NotificationStatus.PENDING,
+          status: NotificationStatus.ACCEPTED,
           message: 'Notification accepted, queuing in progress',
         }
 

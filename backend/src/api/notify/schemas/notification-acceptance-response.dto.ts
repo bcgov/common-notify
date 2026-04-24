@@ -12,9 +12,14 @@ export class NotificationAcceptanceResponse {
   notifyId: string
 
   @ApiProperty({
-    enum: [NotificationStatus.PENDING, NotificationStatus.QUEUED],
+    enum: [
+      NotificationStatus.PENDING,
+      NotificationStatus.ACCEPTED,
+      NotificationStatus.QUEUED,
+      NotificationStatus.SCHEDULED,
+    ],
     description:
-      'Current status: QUEUED if immediately added to queue, PENDING if queued to retry job',
+      'Current status: ACCEPTED if request is acknowledged, SCHEDULED if request is accepted and scheduled for future processing, QUEUED if immediately added to queue, PENDING if queued to retry job',
   })
   status: NotificationStatus
 
