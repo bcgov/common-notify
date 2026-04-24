@@ -1,26 +1,27 @@
 # Redis configuration for job queues and caching
+# Based on BC Gov OpenShift best practices - using Sentinel architecture
 redis:
   enabled: true
   architecture: replication
+  global:
+    storageClass: netapp-block-standard
   auth:
-    enabled: true
-    # Password will be generated automatically by Bitnami chart
-  master:
-    persistence:
-      enabled: true
-      size: 8Gi
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
+    enabled: false  # Disabled per BC Gov pattern
+  image:
+    registry: artifacts.developer.gov.bc.ca/docker-remote
   replica:
-    replicaCount: 1  # Default for dev and test
+    shareProcessNamespace: true
+    replicaCount: 2
+    podSecurityContext: {}
+    containerSecurityContext: {}
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenDeleted: Delete
     persistence:
       enabled: true
-      size: 8Gi
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      storageClass: netapp-block-standard
     resources:
       requests:
         cpu: 100m
@@ -28,6 +29,29 @@ redis:
       limits:
         cpu: 500m
         memory: 512Mi
+  sentinel:
+    enabled: true
+    quorum: 1
+    podSecurityContext: {}
+    containerSecurityContext: {}
+    image:
+      registry: artifacts.developer.gov.bc.ca/docker-remote
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      storageClass: netapp-block-standard
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenScaled: Delete
+      whenDeleted: Delete
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
   # AOF persistence configuration
   commonConfiguration: |-
     # Enable AOF persistence
@@ -38,6 +62,10 @@ redis:
     save ""
   metrics:
     enabled: true
+    podSecurityContext: {}
+    containerSecurityContext: {}
+    image:
+      registry: artifacts.developer.gov.bc.ca/docker-remote
     resources:
       requests:
         cpu: 50m
