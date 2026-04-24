@@ -83,10 +83,10 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply Product first (defines all environments)
-          gwa apply -i api-gateway/generated/gw-product.yaml
-          # Then apply all services together (prevents deletion)
+          # Apply services first (must exist before Product can reference them)
           gwa apply -i api-gateway/generated/gw-services-all.yaml
+          # Then apply Product (links to the services)
+          gwa apply -i api-gateway/generated/gw-product.yaml
 
   deploy-dev:
     name: Deploy (DEV)
