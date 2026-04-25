@@ -122,7 +122,7 @@ jobs:
           ref: ${{ github.ref }}
           commands: |
             # Deploy Redis using Bitnami Helm chart
-            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo add bitnami https://charts.bitnami.com/bitnami || true
             helm repo update
 
             # Determine values file based on environment
@@ -133,9 +133,19 @@ jobs:
               VALUES_OVERRIDE=""
             fi
 
+            # Check for and clean up any pending Helm operations
+            RELEASE_NAME="${{ github.event.repository.name }}-redis"
+            HELM_STATUS=$(helm status ${RELEASE_NAME} -o json 2>/dev/null | jq -r '.info.status' || echo "not-found")
+
+            if [[ "${HELM_STATUS}" == "pending-install" ]] || [[ "${HELM_STATUS}" == "pending-upgrade" ]] || [[ "${HELM_STATUS}" == "pending-rollback" ]]; then
+              echo "Found pending Helm operation (${HELM_STATUS}), performing rollback..."
+              helm rollback ${RELEASE_NAME} || helm uninstall ${RELEASE_NAME} || true
+              sleep 5
+            fi
+
             # Deploy Redis
             helm upgrade --install \
-              ${{ github.event.repository.name }}-redis \
+              ${RELEASE_NAME} \
               bitnami/redis \
               --version 25.4.1 \
               -f ${VALUES_FILE} \
