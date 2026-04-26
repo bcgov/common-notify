@@ -143,15 +143,17 @@ jobs:
               sleep 5
             fi
 
-            # Deploy Redis
+            # Deploy Redis (async - let Kubernetes manage pod startup)
             helm upgrade --install \
               ${RELEASE_NAME} \
               bitnami/redis \
               --version 25.4.1 \
               -f ${VALUES_FILE} \
               ${VALUES_OVERRIDE} \
-              --wait \
-              --timeout 15m
+              --timeout 5m
+
+            echo "✓ Redis deployment initiated successfully"
+            echo "Pods will become ready in background (check with: kubectl get pods)"
 
       # Variables
       - if: inputs.tag  == ''
