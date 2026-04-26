@@ -1,5 +1,6 @@
 # Redis configuration for job queues and caching
 # Based on BC Gov OpenShift best practices - using Sentinel architecture
+# Storage quota freed - ready for automated deployment
 redis:
   enabled: true
   architecture: replication
