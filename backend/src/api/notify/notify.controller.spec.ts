@@ -122,7 +122,6 @@ describe('Notify Controllers', () => {
           .expect(202)
           .expect((res) => {
             expect(res.body.notifyId).toBeDefined()
-            expect(res.body.recordId).toBeDefined()
             expect(res.body.status).toBeDefined()
             expect(res.body.message).toBeDefined()
           })

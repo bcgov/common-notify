@@ -8,7 +8,6 @@ import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
 import { QueueName } from '../../enum/queue-name.enum'
-import { v4 as uuid } from 'uuid'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
 
 /**
@@ -56,8 +55,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
       tenant?: unknown,
       payload?: unknown,
     ) {
-      const notifyId = uuid()
-
       try {
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
@@ -123,13 +120,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id}`,
             {
-              notifyId,
+              notifyId: notificationRecord.id,
               tenantId,
-              recordId: notificationRecord.id,
             },
           )
         } catch (dbError) {
-          logger.error(`Failed to create notification record: ${notifyId}`, {
+          logger.error(`Failed to create notification record`, {
             tenantId,
             error: (dbError as Error).message,
           })
@@ -139,9 +135,8 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Return 202 Accepted immediately without waiting for queue operation
         // Queue operation continues asynchronously in the background
         const response = {
-          notifyId,
-          recordId: notificationRecord.id,
-          status: NotificationStatus.PENDING,
+          notifyId: notificationRecord.id,
+          status: NotificationStatus.ACCEPTED,
           message: 'Notification accepted, queuing in progress',
         }
 
@@ -151,15 +146,14 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         setImmediate(async () => {
           try {
             const jobPayload = {
-              notifyId,
-              recordId: notificationRecord.id,
+              notifyId: notificationRecord.id,
               tenantId,
               request: validatedPayload,
               requestedAt: new Date().toISOString(),
             }
 
             await queue.add(jobPayload, {
-              jobId: notifyId,
+              jobId: notificationRecord.id,
               attempts: 3,
               backoff: {
                 type: 'exponential',
@@ -169,10 +163,10 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               removeOnFail: false,
             })
 
-            logger.log(`Job successfully enqueued: ${notifyId}`, {
+            logger.log(`Job successfully enqueued: ${notificationRecord.id}`, {
               tenantId,
               queue: queueName,
-              jobId: notifyId,
+              jobId: notificationRecord.id,
             })
 
             // Update status to QUEUED now that it's in Redis
@@ -186,7 +180,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
                 },
               )
             } catch (updateError) {
-              logger.error(`Failed to update status to QUEUED: ${notifyId}`, {
+              logger.error(`Failed to update status to QUEUED: ${notificationRecord.id}`, {
                 tenantId,
                 error: (updateError as Error).message,
               })
@@ -194,7 +188,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           } catch (queueError) {
             // Redis unavailable... that's OK, status stays PENDING
             // PendingNotificationRetryService will pick it up once Redis is back
-            logger.warn(`Failed to enqueue job (will be retried): ${notifyId}`, {
+            logger.warn(`Failed to enqueue job (will be retried): ${notificationRecord.id}`, {
               tenantId,
               error: (queueError as Error).message,
               errorStack: (queueError as Error).stack,
@@ -204,7 +198,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         return response
       } catch (error) {
-        logger.error(`Failed to queue notification: ${notifyId}`, {
+        logger.error(`Failed to queue notification`, {
           error: (error as Error).message,
           stack: (error as Error).stack,
         })

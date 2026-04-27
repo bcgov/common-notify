@@ -257,7 +257,6 @@ describe('PendingNotificationRetryService', () => {
       await service.retryPendingNotifications()
       const jobData = mockQueue.add.mock.calls[0][1]
       expect(jobData).toHaveProperty('notifyId', 'notify-1')
-      expect(jobData).toHaveProperty('recordId', 'notify-1')
       expect(jobData).toHaveProperty('tenantId', 'tenant-1')
       expect(jobData).toHaveProperty('request')
       expect(jobData).toHaveProperty('requestedAt')

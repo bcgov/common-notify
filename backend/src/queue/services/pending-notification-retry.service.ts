@@ -72,7 +72,6 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
             'process',
             {
               notifyId: notification.id,
-              recordId: notification.id,
               tenantId: notification.tenantId,
               request: notification.payload || {}, // Use stored payload
               requestedAt: notification.createdAt.toISOString(),
