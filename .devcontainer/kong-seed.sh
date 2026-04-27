@@ -73,6 +73,7 @@ notify-list:/api/v1/notify
 notify-status:/api/v1/notify/status
 notify-callbacks:/api/v1/notify/registerCallback
 templates:/api/v1/templates
+notifications:/api/v1/notifications
 "
 
 echo "$ROUTE_CONFIGS" | while read -r route_config; do

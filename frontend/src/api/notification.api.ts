@@ -1,6 +1,5 @@
 import type { AxiosError } from 'axios'
-import axios from 'axios'
-import { STATUS_CODES } from '@/common/api'
+import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 
 export const notificationApi = {
   /**
@@ -9,8 +8,8 @@ export const notificationApi = {
    */
   async listNotifications() {
     try {
-      const response = await axios.get('/api/v1/notifications')
-      return response.data
+      const params = generateApiParameters('/api/v1/notifications')
+      return await get(params)
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {
@@ -30,8 +29,8 @@ export const notificationApi = {
    */
   async getNotification(id: string) {
     try {
-      const response = await axios.get(`/api/v1/notifications/${id}`)
-      return response.data
+      const params = generateApiParameters(`/api/v1/notifications/${id}`)
+      return await get(params)
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {
