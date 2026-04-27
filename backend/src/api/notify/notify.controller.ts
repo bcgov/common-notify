@@ -52,6 +52,30 @@ export class NotifySimpleController {
     // Implementation provided by @Queueable decorator
     return undefined as any
   }
+
+  @Version('1')
+  @Post('email')
+  @HttpCode(202)
+  @Queueable(QueueName.INGESTION)
+  simpleSendEmail(
+    @GetTenant() _tenant: Tenant,
+    @Body() _body: NotifySimpleRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable decorator
+    return undefined as any
+  }
+
+  @Version('1')
+  @Post('sms')
+  @HttpCode(202)
+  @Queueable(QueueName.INGESTION)
+  simpleSendSms(
+    @GetTenant() _tenant: Tenant,
+    @Body() _body: NotifySimpleRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable decorator
+    return undefined as any
+  }
 }
 
 @Controller('notifyevent')

@@ -120,9 +120,9 @@ export class NotificationService {
     }
 
     // Ensure at least one channel has recipients
-    const emailRecipients = request.email?.to?.length ?? 0
-    const smsRecipients = request.sms?.to?.length ?? 0
-    const msgAppRecipients = request.msgApp?.to?.length ?? 0
+    const emailRecipients = request.email?.recipients?.length ?? 0
+    const smsRecipients = request.sms?.recipients?.length ?? 0
+    const msgAppRecipients = request.msgApp?.recipients?.length ?? 0
     const totalRecipients = emailRecipients + smsRecipients + msgAppRecipients
 
     if (totalRecipients === 0) {
@@ -130,10 +130,10 @@ export class NotificationService {
     }
 
     // Validate email channel
-    if (request.email?.to) {
-      if (request.email.to.length > this.emailMaxRecipients) {
+    if (request.email?.recipients) {
+      if (request.email.recipients.length > this.emailMaxRecipients) {
         errors.push(
-          `Too many email recipients (${request.email.to.length}). Max: ${this.emailMaxRecipients}`,
+          `Too many email recipients (${request.email.recipients.length}). Max: ${this.emailMaxRecipients}`,
         )
       }
 
@@ -159,10 +159,10 @@ export class NotificationService {
     }
 
     // Validate SMS channel
-    if (request.sms?.to) {
-      if (request.sms.to.length > this.smsMaxRecipients) {
+    if (request.sms?.recipients) {
+      if (request.sms.recipients.length > this.smsMaxRecipients) {
         errors.push(
-          `Too many SMS recipients (${request.sms.to.length}). Max: ${this.smsMaxRecipients}`,
+          `Too many SMS recipients (${request.sms.recipients.length}). Max: ${this.smsMaxRecipients}`,
         )
       }
 
@@ -179,10 +179,10 @@ export class NotificationService {
     }
 
     // Validate msgApp channel
-    if (request.msgApp?.to) {
-      if (request.msgApp.to.length > this.msgAppMaxRecipients) {
+    if (request.msgApp?.recipients) {
+      if (request.msgApp.recipients.length > this.msgAppMaxRecipients) {
         errors.push(
-          `Too many msgApp recipients (${request.msgApp.to.length}). Max: ${this.msgAppMaxRecipients}`,
+          `Too many msgApp recipients (${request.msgApp.recipients.length}). Max: ${this.msgAppMaxRecipients}`,
         )
       }
 
