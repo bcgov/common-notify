@@ -101,6 +101,7 @@ jobs:
       params: --set global.secrets.persist=false --set frontend.secrets.enabled=false
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
 
   tests:
     name: Tests
