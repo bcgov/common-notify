@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AppModule } from '../src/app.module'
+import { PendingNotificationRetryService } from '../src/queue/services/pending-notification-retry.service'
 
 describe('AppController (e2e)', () => {
   let app: INestApplication
@@ -21,6 +22,10 @@ describe('AppController (e2e)', () => {
           }
           return config[key]
         },
+      })
+      .overrideProvider(PendingNotificationRetryService)
+      .useValue({
+        onModuleInit: () => Promise.resolve(),
       })
       .compile()
 
