@@ -108,7 +108,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Test SMS',
           },
           attempt: 0,
@@ -207,7 +207,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -260,7 +260,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: null as any,
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Test body',
           },
           attempt: 0,
@@ -287,7 +287,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Test body',
           },
           attempt: -1,
@@ -316,7 +316,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-fail',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Will fail',
           },
           attempt: 2, // Final attempt (0, 1, 2 = 3 total)
@@ -350,7 +350,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-retry',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Will retry',
           },
           attempt: 0, // First attempt
@@ -396,7 +396,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-error',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Will error',
           },
           attempt: 0,

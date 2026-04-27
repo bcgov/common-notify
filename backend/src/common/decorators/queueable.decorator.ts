@@ -134,9 +134,18 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         // Return 202 Accepted immediately without waiting for queue operation
         // Queue operation continues asynchronously in the background
+
+        // Determine which channels are included in the request
+        const channels: string[] = []
+        if (validatedPayload.email) channels.push('email')
+        if (validatedPayload.sms) channels.push('sms')
+        if (validatedPayload.msgApp) channels.push('msgApp')
+
         const response = {
           notifyId: notificationRecord.id,
           status: NotificationStatus.ACCEPTED,
+          channels: channels.length > 0 ? channels : ['email', 'sms', 'msgApp'],
+          createdAt: notificationRecord.createdAt || new Date(),
           message: 'Notification accepted, queuing in progress',
         }
 

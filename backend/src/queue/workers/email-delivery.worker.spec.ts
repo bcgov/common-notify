@@ -110,7 +110,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test Email',
             body: 'Test body',
           },
@@ -158,7 +158,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-456',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test1@example.com', 'test2@example.com', 'test3@example.com'],
+            recipients: ['test1@example.com', 'test2@example.com', 'test3@example.com'],
             subject: 'Multi-recipient Email',
             body: 'Test for multiple recipients',
           },
@@ -240,7 +240,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             body: 'Test body',
           },
           attempt: 0,
@@ -267,7 +267,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
           },
           attempt: 0,
@@ -294,7 +294,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -322,7 +322,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: null as any,
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -350,7 +350,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -381,7 +381,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-fail',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Will fail',
             body: 'Test',
           },
@@ -416,7 +416,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-retry',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Will retry',
             body: 'Test',
           },
@@ -470,7 +470,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -534,7 +534,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -568,7 +568,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -603,7 +603,7 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['recipient@example.com'],
+            recipients: ['recipient@example.com'],
             cc: ['cc@example.com'],
             bcc: ['bcc@example.com'],
             subject: 'Test Email',

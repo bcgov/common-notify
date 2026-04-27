@@ -68,7 +68,11 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
-        if (!payload.to || !Array.isArray(payload.to) || payload.to.length === 0) {
+        if (
+          !payload.recipients ||
+          !Array.isArray(payload.recipients) ||
+          payload.recipients.length === 0
+        ) {
           throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
@@ -156,10 +160,12 @@ export class SmsDeliveryWorker {
     notifyId: string,
     smsAdapter: ISmsTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(`[${notifyId}] Sending SMS via ${smsAdapter.name} adapter to: ${payload.to}`)
+    logger.debug(
+      `[${notifyId}] Sending SMS via ${smsAdapter.name} adapter to: ${payload.recipients}`,
+    )
 
     const result = await smsAdapter.send({
-      to: payload.to,
+      to: payload.recipients,
       body: payload.body,
     })
 

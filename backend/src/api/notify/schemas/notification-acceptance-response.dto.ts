@@ -24,6 +24,19 @@ export class NotificationAcceptanceResponse {
   status: NotificationStatus
 
   @ApiProperty({
+    type: 'array',
+    items: { type: 'string', enum: ['email', 'sms', 'msgApp'] },
+    description: 'Channels that will be used to send the notification',
+  })
+  channels: string[]
+
+  @ApiProperty({
+    description: 'Timestamp when the notification was created',
+    format: 'date-time',
+  })
+  createdAt: Date
+
+  @ApiProperty({
     description: 'Human-readable status message',
   })
   message: string

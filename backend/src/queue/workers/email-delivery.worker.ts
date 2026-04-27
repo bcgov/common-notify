@@ -72,7 +72,11 @@ export class EmailDeliveryWorker {
         // Cast payload to email channel type for type safety
         const emailPayload = payload as NotifyEmailChannel
 
-        if (!emailPayload.to || !Array.isArray(emailPayload.to) || emailPayload.to.length === 0) {
+        if (
+          !emailPayload.recipients ||
+          !Array.isArray(emailPayload.recipients) ||
+          emailPayload.recipients.length === 0
+        ) {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
@@ -165,11 +169,11 @@ export class EmailDeliveryWorker {
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
     logger.debug(
-      `[${notifyId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients}`,
     )
 
     const result = await emailAdapter.send({
-      to: Array.isArray(payload.to) ? payload.to.join(', ') : payload.to,
+      to: Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients,
       subject: payload.subject,
       body: payload.body,
       ...(payload.attachments && {
