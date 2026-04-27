@@ -102,6 +102,7 @@ jobs:
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
       tag: dev
 
   deploy-test:
@@ -115,6 +116,7 @@ jobs:
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set frontend.secrets.enabled=false
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
       tag: test
 
   promote-test:
@@ -146,5 +148,6 @@ jobs:
       db_user: appproxy # appproxy is the user which works with pgbouncer.
       params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
       tag: prod
       timeout-minutes: 15
