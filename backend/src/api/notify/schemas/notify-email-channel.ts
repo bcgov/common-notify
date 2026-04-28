@@ -21,11 +21,11 @@ export class NotifyAttachment {
 }
 
 export class NotifyEmailChannel {
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], description: 'Email recipients' })
   @IsArray()
   @ArrayMinSize(1)
   @IsEmail({}, { each: true })
-  to: string[]
+  recipients: string[]
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()

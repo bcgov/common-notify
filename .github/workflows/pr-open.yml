@@ -58,6 +58,9 @@ jobs:
     name: Apply API Gateway Config
     needs: [import]
     runs-on: ubuntu-24.04
+    concurrency:
+      group: gateway-config-apply
+      cancel-in-progress: false  # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +101,7 @@ jobs:
       params: --set global.secrets.persist=false --set frontend.secrets.enabled=false
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
 
   tests:
     name: Tests

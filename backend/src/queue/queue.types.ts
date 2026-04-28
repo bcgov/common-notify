@@ -30,8 +30,7 @@ export interface NotificationRequest {
  * Job payload for ingestion queue
  */
 export interface IngestionJobPayload {
-  notifyId: string
-  recordId: string // Database notification_request.id for status updates and tracing
+  notifyId: string // Database notification_request.id
   tenantId: string
   request: NotifyRequest
   requestedAt: string
@@ -42,8 +41,7 @@ export interface IngestionJobPayload {
  * Job payload for delivery queues (email, SMS, etc)
  */
 export interface DeliveryJobPayload {
-  notifyId: string
-  recordId: string // Database notification_request.id for status updates and tracing
+  notifyId: string // Database notification_request.id
   tenantId: string
   channel: NotificationChannel
   payload: DeliveryPayload

@@ -11,15 +11,30 @@ export class NotificationAcceptanceResponse {
   @ApiProperty({ format: 'uuid', description: 'Unique notification request ID' })
   notifyId: string
 
-  @ApiProperty({ format: 'uuid', description: 'Internal record ID for tracking' })
-  recordId: string
-
   @ApiProperty({
-    enum: [NotificationStatus.PENDING, NotificationStatus.QUEUED],
+    enum: [
+      NotificationStatus.PENDING,
+      NotificationStatus.ACCEPTED,
+      NotificationStatus.QUEUED,
+      NotificationStatus.SCHEDULED,
+    ],
     description:
-      'Current status: QUEUED if immediately added to queue, PENDING if queued to retry job',
+      'Current status: ACCEPTED if request is acknowledged, SCHEDULED if request is accepted and scheduled for future processing, QUEUED if immediately added to queue, PENDING if queued to retry job',
   })
   status: NotificationStatus
+
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'string', enum: ['email', 'sms', 'msgApp'] },
+    description: 'Channels that will be used to send the notification',
+  })
+  channels: string[]
+
+  @ApiProperty({
+    description: 'Timestamp when the notification was created',
+    format: 'date-time',
+  })
+  createdAt: Date
 
   @ApiProperty({
     description: 'Human-readable status message',

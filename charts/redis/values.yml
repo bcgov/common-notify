@@ -1,0 +1,114 @@
+# Redis configuration for job queues and caching
+# Based on BC Gov OpenShift best practices - using Sentinel architecture
+# Storage quota freed - ready for automated deployment
+redis:
+  enabled: true
+  architecture: replication
+  global:
+    storageClass: netapp-block-standard
+  auth:
+    enabled: false  # Disabled per BC Gov pattern
+  image:
+    registry: artifacts.developer.gov.bc.ca/docker-remote
+  master:
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: netapp-block-standard
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  replica:
+    shareProcessNamespace: true
+    replicaCount: 2
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenDeleted: Delete
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      storageClass: netapp-block-standard
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  sentinel:
+    enabled: true
+    quorum: 1
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
+    image:
+      registry: artifacts.developer.gov.bc.ca/docker-remote
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      storageClass: netapp-block-standard
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenScaled: Delete
+      whenDeleted: Delete
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  # AOF persistence configuration
+  commonConfiguration: |-
+    # Enable AOF persistence
+    appendonly yes
+    appendfsync everysec
+    appendfilename "appendonly.aof"
+    # Disable RDB persistence
+    save ""
+  metrics:
+    enabled: true
+    podSecurityContext:
+      enabled: true
+      fsGroup: null
+      runAsUser: null
+    containerSecurityContext:
+      enabled: true
+      runAsUser: null
+      runAsNonRoot: false
+    image:
+      registry: artifacts.developer.gov.bc.ca/docker-remote
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

@@ -11,11 +11,11 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class NotifySmsChannel {
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], description: 'Phone number recipients' })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  to: string[]
+  recipients: string[]
 
   @ApiProperty() @IsString() body: string
 

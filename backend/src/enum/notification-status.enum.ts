@@ -17,4 +17,6 @@ export enum NotificationStatus {
   SENDING = 'sending',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  ACCEPTED = 'accepted',
+  SCHEDULED = 'scheduled',
 }

@@ -10,7 +10,7 @@ describe('NotifySimpleRequest', () => {
     it('should create a valid instance with email channel', async () => {
       const data = {
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -21,13 +21,13 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.email).toBeDefined()
-      expect(instance.email?.to).toEqual(['test@example.com'])
+      expect(instance.email?.recipients).toEqual(['test@example.com'])
     })
 
     it('should create a valid instance with sms channel', async () => {
       const data = {
         sms: {
-          to: ['+16045551234', '+16045555678'],
+          recipients: ['+16045551234', '+16045555678'],
           body: 'Test SMS',
         },
       }
@@ -42,12 +42,12 @@ describe('NotifySimpleRequest', () => {
     it('should create a valid instance with email and sms channels', async () => {
       const data = {
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
         sms: {
-          to: ['+16045551234', '+16045555678'],
+          recipients: ['+16045551234', '+16045555678'],
           body: 'Test SMS',
         },
       }
@@ -68,7 +68,7 @@ describe('NotifySimpleRequest', () => {
           custom: 'value',
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -101,7 +101,7 @@ describe('NotifySimpleRequest', () => {
     it('should allow only email channel', async () => {
       const data = {
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -117,7 +117,7 @@ describe('NotifySimpleRequest', () => {
     it('should allow only sms channel', async () => {
       const data = {
         sms: {
-          to: ['+16045551234'],
+          recipients: ['+16045551234'],
           body: 'Test SMS',
         },
       }
@@ -139,7 +139,7 @@ describe('NotifySimpleRequest', () => {
           key3: true,
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -160,7 +160,7 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: {},
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -177,7 +177,7 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: 'not an object',
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -196,7 +196,7 @@ describe('NotifySimpleRequest', () => {
     it('should transform email to NotifyEmailChannel instance', async () => {
       const data = {
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           cc: ['cc@example.com'],
           bcc: ['bcc@example.com'],
           subject: 'Test',
@@ -209,7 +209,7 @@ describe('NotifySimpleRequest', () => {
       const instance = plainToInstance(NotifySimpleRequest, data)
 
       expect(instance.email).toBeInstanceOf(NotifyEmailChannel)
-      expect(instance.email?.to).toEqual(['test@example.com'])
+      expect(instance.email?.recipients).toEqual(['test@example.com'])
       expect(instance.email?.cc).toEqual(['cc@example.com'])
       expect(instance.email?.bcc).toEqual(['bcc@example.com'])
       expect(instance.email?.bodyType).toBe('html')
@@ -219,7 +219,7 @@ describe('NotifySimpleRequest', () => {
     it('should transform sms to NotifySmsChannel instance', async () => {
       const data = {
         sms: {
-          to: ['+16045551234'],
+          recipients: ['+16045551234'],
           body: 'Test SMS',
           priority: 'normal',
         },
@@ -244,7 +244,7 @@ describe('NotifySimpleRequest', () => {
           timestamp: 1234567890,
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -265,7 +265,7 @@ describe('NotifySimpleRequest', () => {
           isDeleted: false,
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -286,7 +286,7 @@ describe('NotifySimpleRequest', () => {
           undefinedValue: undefined,
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -305,12 +305,12 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: { key: 'value' },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
         sms: {
-          to: '+16045551234',
+          recipients: '+16045551234',
           body: 'Test SMS',
         },
       }
@@ -330,7 +330,7 @@ describe('NotifySimpleRequest', () => {
           },
         },
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },
@@ -361,7 +361,7 @@ describe('NotifySimpleRequest', () => {
     it('should filter out extra properties not in schema', () => {
       const data = {
         email: {
-          to: ['test@example.com'],
+          recipients: ['test@example.com'],
           subject: 'Test',
           body: 'Test body',
         },

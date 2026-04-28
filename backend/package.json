@@ -47,7 +47,6 @@
     "ioredis": "^5.3.7",
     "jwks-rsa": "^4.0.1",
     "jose": "^6.2.2",
-    "jwks-rsa": "^4.0.1",
     "mustache": "^4.2.0",
     "nest-winston": "^1.10.1",
     "nodemailer": "^8.0.5",

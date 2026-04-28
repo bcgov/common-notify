@@ -28,7 +28,7 @@ describe('EmailDeliveryWorker', () => {
     // Mock the notification service
     mockNotificationService = {
       update: vi.fn().mockResolvedValue({
-        id: 'record-123',
+        id: 'notify-123',
         status: NotificationStatus.COMPLETED,
       }),
     }
@@ -107,11 +107,10 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test Email',
             body: 'Test body',
           },
@@ -129,14 +128,14 @@ describe('EmailDeliveryWorker', () => {
 
       // Verify status updates
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-123',
+        'notify-123',
         'tenant-123',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
         }),
       )
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-123',
+        'notify-123',
         'tenant-123',
         expect.objectContaining({
           status: NotificationStatus.COMPLETED,
@@ -156,11 +155,10 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-456',
-          recordId: 'record-456',
           tenantId: 'tenant-456',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test1@example.com', 'test2@example.com', 'test3@example.com'],
+            recipients: ['test1@example.com', 'test2@example.com', 'test3@example.com'],
             subject: 'Multi-recipient Email',
             body: 'Test for multiple recipients',
           },
@@ -185,7 +183,6 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: undefined,
@@ -212,7 +209,7 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
@@ -239,11 +236,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             body: 'Test body',
           },
           attempt: 0,
@@ -266,11 +263,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
           },
           attempt: 0,
@@ -293,11 +290,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: undefined as any,
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -307,34 +304,6 @@ describe('EmailDeliveryWorker', () => {
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
         'Invalid delivery job: notifyId is missing or invalid',
-      )
-    })
-
-    it('should throw error when recordId is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockEmailAdapter,
-      )
-
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
-        data: {
-          notifyId: 'notify-123',
-          recordId: '' as any,
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.EMAIL,
-          payload: {
-            to: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test body',
-          },
-          attempt: 0,
-        } as DeliveryJobPayload,
-      }
-
-      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Invalid delivery job: recordId is missing or invalid',
       )
     })
 
@@ -349,11 +318,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: null as any,
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -377,11 +346,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test body',
           },
@@ -408,11 +377,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-fail',
-          recordId: 'record-fail',
+
           tenantId: 'tenant-fail',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Will fail',
             body: 'Test',
           },
@@ -424,7 +393,7 @@ describe('EmailDeliveryWorker', () => {
 
       // Verify we attempted the first update to SENDING
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-fail',
+        'notify-fail',
         'tenant-fail',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
@@ -443,11 +412,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
-          recordId: 'record-retry',
+
           tenantId: 'tenant-retry',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Will retry',
             body: 'Test',
           },
@@ -457,7 +426,7 @@ describe('EmailDeliveryWorker', () => {
 
       // Mock adapter to throw error
       mockNotificationService.update.mockImplementationOnce(async () => ({
-        id: 'record-retry',
+        id: 'notify-retry',
         status: NotificationStatus.SENDING,
       }))
       mockNotificationService.update.mockImplementationOnce(async () => {
@@ -470,7 +439,7 @@ describe('EmailDeliveryWorker', () => {
 
       // Should only have one SENDING update, not FAILED
       expect(mockNotificationService.update).toHaveBeenCalledWith(
-        'record-retry',
+        'notify-retry',
         'tenant-retry',
         expect.objectContaining({
           status: NotificationStatus.SENDING,
@@ -478,7 +447,7 @@ describe('EmailDeliveryWorker', () => {
       )
       // Should not have FAILED status update on first attempt
       expect(mockNotificationService.update).not.toHaveBeenCalledWith(
-        'record-retry',
+        'notify-retry',
         'tenant-retry',
         expect.objectContaining({
           status: NotificationStatus.FAILED,
@@ -497,11 +466,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -529,7 +498,7 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-fail',
-          recordId: 'record-fail',
+
           tenantId: 'tenant-fail',
           channel: NotificationChannel.EMAIL,
           payload: undefined,
@@ -561,11 +530,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -582,7 +551,7 @@ describe('EmailDeliveryWorker', () => {
       expect(completedCall[2].updatedBy).toBe('system')
     })
 
-    it('should log with recordId for end-to-end tracing', async () => {
+    it('should log with notifyId for end-to-end tracing', async () => {
       const debugSpy = vi.spyOn(Logger.prototype, 'debug')
 
       await EmailDeliveryWorker.initialize(
@@ -595,11 +564,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['test@example.com'],
+            recipients: ['test@example.com'],
             subject: 'Test',
             body: 'Test',
           },
@@ -609,12 +578,12 @@ describe('EmailDeliveryWorker', () => {
 
       await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
-      // Verify logs include recordId prefix
+      // Verify logs include notifyId prefix
       const logCalls = debugSpy.mock.calls
-      const hasRecordIdLogging = logCalls.some((call) =>
-        call[0]?.toString().includes('[record-123]'),
+      const hasNotifyIdLogging = logCalls.some((call) =>
+        call[0]?.toString().includes('[notify-123]'),
       )
-      expect(hasRecordIdLogging).toBe(true)
+      expect(hasNotifyIdLogging).toBe(true)
 
       debugSpy.mockRestore()
     })
@@ -630,11 +599,11 @@ describe('EmailDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-123',
-          recordId: 'record-123',
+
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           payload: {
-            to: ['recipient@example.com'],
+            recipients: ['recipient@example.com'],
             cc: ['cc@example.com'],
             bcc: ['bcc@example.com'],
             subject: 'Test Email',
