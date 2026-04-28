@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router'
 
 const navItems = [
   { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Workspaces', to: '/workspaces' },
+  { label: 'Notification Events', to: '/notification-events' },
   { label: 'Templates', to: '/templates' },
   { label: 'Distribution Lists', to: '/distribution-lists' },
   { label: 'Settings', to: '/settings' },

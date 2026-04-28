@@ -13,13 +13,13 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifications } from '@/redux/thunks/notification.thunks'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
-const mockWorkspaces = [
+const mockNotificationEvents = [
   { id: 1, name: 'Graduates Outcome Survey' },
   { id: 2, name: 'Employer Followup Survey' },
   { id: 3, name: 'Internal Team Alert' },
 ]
 
-const workspaceItems = mockWorkspaces.map((ws) => ({ id: ws.id, label: ws.name }))
+const notificationEventItems = mockNotificationEvents.map((ws) => ({ id: ws.id, label: ws.name }))
 
 const columnHelper = createColumnHelper<NotificationRequest>()
 
@@ -72,14 +72,14 @@ const Dashboard: FC = () => {
         <h1 className="fw-bold mb-0">Dashboard</h1>
       </div>
 
-      {/* Workspaces list + Send Test Notification */}
+      {/* Notification Events list + Send Test Notification */}
       <Row className="mb-5">
         <Col md={6}>
-          <h2 className="h4 fw-bold mb-3">Workspaces</h2>
+          <h2 className="h4 fw-bold mb-3">Notification Events</h2>
           <ul className="list-unstyled d-flex flex-column gap-2">
-            {mockWorkspaces.map((ws) => (
+            {mockNotificationEvents.map((ws) => (
               <li key={ws.id}>
-                <Link to="/workspaces" className="text-secondary">
+                <Link to="/notification-events" className="text-secondary">
                   {ws.name}
                 </Link>
               </li>
@@ -92,9 +92,9 @@ const Dashboard: FC = () => {
             <h3 className="h5 fw-bold mb-3">Send Test Notification</h3>
             <Form className="d-flex flex-column gap-3">
               <Select
-                label="Workspaces"
+                label="Notification Events"
                 placeholder="select..."
-                items={workspaceItems}
+                items={notificationEventItems}
                 style={{ width: '100%' }}
               />
               <Select

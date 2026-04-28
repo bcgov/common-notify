@@ -9,18 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WorkspacesRouteImport } from './routes/workspaces'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as NotificationEventsRouteImport } from './routes/notification-events'
 import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 
-const WorkspacesRoute = WorkspacesRouteImport.update({
-  id: '/workspaces',
-  path: '/workspaces',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -29,6 +24,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationEventsRoute = NotificationEventsRouteImport.update({
+  id: '/notification-events',
+  path: '/notification-events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DistributionListsRoute = DistributionListsRouteImport.update({
@@ -51,26 +51,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
-  '/workspaces': typeof WorkspacesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
-  '/workspaces': typeof WorkspacesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
-  '/workspaces': typeof WorkspacesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,45 +78,38 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/notification-events'
     | '/settings'
     | '/templates'
-    | '/workspaces'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/notification-events'
     | '/settings'
     | '/templates'
-    | '/workspaces'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/notification-events'
     | '/settings'
     | '/templates'
-    | '/workspaces'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DistributionListsRoute: typeof DistributionListsRoute
+  NotificationEventsRoute: typeof NotificationEventsRoute
   SettingsRoute: typeof SettingsRoute
   TemplatesRoute: typeof TemplatesRoute
-  WorkspacesRoute: typeof WorkspacesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/workspaces': {
-      id: '/workspaces'
-      path: '/workspaces'
-      fullPath: '/workspaces'
-      preLoaderRoute: typeof WorkspacesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -129,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notification-events': {
+      id: '/notification-events'
+      path: '/notification-events'
+      fullPath: '/notification-events'
+      preLoaderRoute: typeof NotificationEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/distribution-lists': {
@@ -159,9 +159,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DistributionListsRoute: DistributionListsRoute,
+  NotificationEventsRoute: NotificationEventsRoute,
   SettingsRoute: SettingsRoute,
   TemplatesRoute: TemplatesRoute,
-  WorkspacesRoute: WorkspacesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
