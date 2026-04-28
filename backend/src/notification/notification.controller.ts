@@ -9,6 +9,8 @@ import {
 import { NotificationService } from './notification.service'
 import { NotificationRequestDto } from './schemas'
 import { AuthJwtGuard } from 'src/auth/guards/auth.jwt-guard'
+import { GetTenant } from 'src/common/decorators/get-tenant.decorator'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -32,7 +34,7 @@ export class NotificationController {
   @ApiOperation({ summary: 'Get a notification request by ID scoped to the authenticated tenant' })
   @ApiOkResponse({ type: NotificationRequestDto })
   @ApiNotFoundResponse({ description: 'Notification request not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.notificationService.findOne(id)
+  findOne(@Param('id', ParseUUIDPipe) id: string, @GetTenant() tenant: Tenant) {
+    return this.notificationService.findOne(id, tenant.id)
   }
 }
