@@ -55,8 +55,8 @@ describe('NotificationController', () => {
   describe('GET /api/v1/notification_request', () => {
     it('should return 200 with a list of notifications', async () => {
       const mockNotifications = [
-        { id: 'notif-1', tenantId: 'test-tenant-id', status: NotificationStatus.QUEUED },
-        { id: 'notif-2', tenantId: 'test-tenant-id', status: NotificationStatus.COMPLETED },
+        { id: 'notif-1', tenantId: 'test-tenant-id', status: 'queued' },
+        { id: 'notif-2', tenantId: 'test-tenant-id', status: 'completed' },
       ]
       mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
