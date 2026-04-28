@@ -2,18 +2,11 @@ import { useEffect } from 'react'
 import type { FC } from 'react'
 import { Button, Form, Select, TextField } from '@bcgov/design-system-react-components'
 import { Link } from '@tanstack/react-router'
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
 import { Col, Row, Table } from 'react-bootstrap'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { setStatusFilter, selectFilteredNotifications } from '@/redux/slices/notification.slice'
 import { NotificationStatus } from '@/enum/notification-status.enum'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 const mockNotificationEvents = [
   { id: 1, name: 'Graduates Outcome Survey' },
@@ -22,24 +15,6 @@ const mockNotificationEvents = [
 ]
 
 const notificationEventItems = mockNotificationEvents.map((ws) => ({ id: ws.id, label: ws.name }))
-
-const columnHelper = createColumnHelper<NotificationRequest>()
-
-const columns = [
-  columnHelper.accessor('tenantId', {
-    header: 'Tenant ID',
-    cell: ({ getValue }) => (
-      <Link to="/" style={{ color: 'black', fontFamily: 'monospace' }}>
-        {getValue().slice(0, 8)}&hellip;
-      </Link>
-    ),
-  }),
-  columnHelper.accessor('status', { header: 'Status' }),
-  columnHelper.accessor('createdAt', {
-    header: 'Created',
-    cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
-  }),
-]
 
 const statusFilterItems = [
   { id: 'all', label: 'All' },
@@ -57,12 +32,6 @@ const Dashboard: FC = () => {
   useEffect(() => {
     dispatch(fetchNotifications())
   }, [dispatch])
-
-  const table = useReactTable({
-    data: filteredNotifications,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  })
 
   return (
     <div>
@@ -134,31 +103,25 @@ const Dashboard: FC = () => {
           </div>
           <Table bordered hover responsive>
             <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th key={header.id}>
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
-                  ))}
-                </tr>
-              ))}
+              <tr>
+                <th>Tenant ID</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={columns.length} className="text-center">
+                  <td colSpan={3} className="text-center">
                     Loading...
                   </td>
                 </tr>
               ) : (
-                table.getRowModel().rows.map((row) => (
+                filteredNotifications.map((row) => (
                   <tr key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
+                    <td>{row.tenantId}</td>
+                    <td>{row.status}</td>
+                    <td>{new Date(row.createdAt).toLocaleString()}</td>
                   </tr>
                 ))
               )}
