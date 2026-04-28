@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { fetchNotifications } from '../thunks/notification.thunks'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
-import { NotificationStatus } from '@/enum/notification-status.enum'
+import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { RootState } from '../store'
 
 interface NotificationState {

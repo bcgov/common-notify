@@ -31,7 +31,6 @@ const NotificationEvents: FC = () => {
             value={search}
             onChange={(val) => setSearch(val)}
             style={{ width: '400px' }}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             {...({ placeholder: 'Search Notification Events...' } as any)}
           />
         </Col>

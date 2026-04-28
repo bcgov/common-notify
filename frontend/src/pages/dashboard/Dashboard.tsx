@@ -26,7 +26,7 @@ const statusFilterItems = [
 
 const Dashboard: FC = () => {
   const dispatch = useAppDispatch()
-  const { statusFilter, isLoading, error } = useAppSelector((state) => state.notification)
+  const { statusFilter, isLoading } = useAppSelector((state) => state.notification)
   const filteredNotifications = useAppSelector(selectFilteredNotifications)
 
   useEffect(() => {
