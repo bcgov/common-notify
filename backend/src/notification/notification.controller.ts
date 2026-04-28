@@ -24,7 +24,7 @@ export class NotificationController {
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
   @ApiOkResponse({ isArray: true, type: NotificationRequestDto })
   findAll() {
-    return this.notificationService.findAll('5ae63fe4-e928-4fd7-9f1d-a6b9ef98a5bf')
+    return this.notificationService.findAll()
   }
 
   @Version('1')

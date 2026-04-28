@@ -11,6 +11,8 @@ import {
 import { Col, Row, Table } from 'react-bootstrap'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifications } from '@/redux/thunks/notification.thunks'
+import { setStatusFilter, selectFilteredNotifications } from '@/redux/slices/notification.slice'
+import { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 const mockNotificationEvents = [
@@ -24,8 +26,8 @@ const notificationEventItems = mockNotificationEvents.map((ws) => ({ id: ws.id, 
 const columnHelper = createColumnHelper<NotificationRequest>()
 
 const columns = [
-  columnHelper.accessor('id', {
-    header: 'ID',
+  columnHelper.accessor('tenantId', {
+    header: 'Tenant ID',
     cell: ({ getValue }) => (
       <Link to="/" style={{ color: 'black', fontFamily: 'monospace' }}>
         {getValue().slice(0, 8)}&hellip;
@@ -33,34 +35,31 @@ const columns = [
     ),
   }),
   columnHelper.accessor('status', { header: 'Status' }),
-  columnHelper.accessor('createdBy', { header: 'Created By' }),
   columnHelper.accessor('createdAt', {
     header: 'Created',
     cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
   }),
-  columnHelper.accessor('updatedAt', {
-    header: 'Updated',
-    cell: ({ row, getValue }) => (
-      <>
-        {new Date(getValue()).toLocaleString()}
-        {row.original.errorReason && (
-          <div className="text-danger small">{row.original.errorReason}</div>
-        )}
-      </>
-    ),
-  }),
+]
+
+const statusFilterItems = [
+  { id: 'all', label: 'All' },
+  ...Object.values(NotificationStatus).map((s) => ({
+    id: s,
+    label: s.charAt(0).toUpperCase() + s.slice(1),
+  })),
 ]
 
 const Dashboard: FC = () => {
   const dispatch = useAppDispatch()
-  const { items: notifications, isLoading, error } = useAppSelector((state) => state.notification)
+  const { statusFilter, isLoading, error } = useAppSelector((state) => state.notification)
+  const filteredNotifications = useAppSelector(selectFilteredNotifications)
 
   useEffect(() => {
     dispatch(fetchNotifications())
   }, [dispatch])
 
   const table = useReactTable({
-    data: notifications,
+    data: filteredNotifications,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
@@ -123,6 +122,16 @@ const Dashboard: FC = () => {
         <Col md={12}>
           <h2 className="h4 fw-bold mb-3">Notification Status</h2>
           {/* {error && <p className="text-danger">{error}</p>} */}
+          <div className="mb-3" style={{ maxWidth: '220px' }}>
+            <Select
+              label="Filter by status"
+              items={statusFilterItems}
+              selectedKey={statusFilter}
+              onSelectionChange={(key) =>
+                dispatch(setStatusFilter(key as NotificationStatus | 'all'))
+              }
+            />
+          </div>
           <Table bordered hover responsive>
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -139,7 +148,7 @@ const Dashboard: FC = () => {
               {isLoading ? (
                 <tr>
                   <td colSpan={columns.length} className="text-center">
-                    Loading&hellip;
+                    Loading...
                   </td>
                 </tr>
               ) : (

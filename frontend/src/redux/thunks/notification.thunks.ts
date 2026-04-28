@@ -9,7 +9,7 @@ export const fetchNotifications = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('notification/fetchAll', async (_, { rejectWithValue }) => {
   try {
-    return await notificationApi.listNotifications()
+    return (await notificationApi.listNotifications()) as NotificationRequest[]
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load notifications')
   }

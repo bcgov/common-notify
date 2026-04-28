@@ -56,8 +56,8 @@ export class NotificationService {
     return saved
   }
 
-  async findAll(tenantId: string): Promise<NotificationRequest[]> {
-    return this.notificationRepository.find({ where: { tenantId }, order: { createdAt: 'DESC' } })
+  async findAll(): Promise<NotificationRequest[]> {
+    return this.notificationRepository.find({ order: { createdAt: 'DESC' } })
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
