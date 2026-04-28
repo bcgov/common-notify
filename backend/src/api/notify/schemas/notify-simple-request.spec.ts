@@ -345,6 +345,126 @@ describe('NotifySimpleRequest', () => {
     })
   })
 
+  describe('DelayedSend Validation', () => {
+    it('should accept ISO 8601 date format with Z for delayedSend', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          delayedSend: '2026-04-28T10:00:00Z',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00Z')
+    })
+
+    it('should accept ISO 8601 date format with offset for delayedSend', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          delayedSend: '2026-04-28T10:00:00-07:00',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00-07:00')
+    })
+
+    it('should accept relaxed date format with timezone abbreviation', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          delayedSend: '2026-04-28 10:00:00 PST',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.email?.delayedSend).toBe('2026-04-28 10:00:00 PST')
+    })
+
+    it('should reject date format without timezone', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          delayedSend: '2026-04-28 10:00:00',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      const delayedSendErrors = errors.filter((err) => err.property === 'email')
+      expect(delayedSendErrors.length).toBeGreaterThan(0)
+    })
+
+    it('should reject invalid date format for delayedSend', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          delayedSend: 'not a valid date',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      const delayedSendErrors = errors.filter((err) => err.property === 'email')
+      expect(delayedSendErrors.length).toBeGreaterThan(0)
+    })
+
+    it('should allow delayedSend with sms channel', async () => {
+      const data = {
+        sms: {
+          recipients: ['+16045551234'],
+          body: 'Test SMS',
+          delayedSend: '2026-04-28T10:00:00Z',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.sms?.delayedSend).toBe('2026-04-28T10:00:00Z')
+    })
+
+    it('should be optional field', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+          // No delayedSend field
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.email?.delayedSend).toBeUndefined()
+    })
+  })
+
   describe('Edge Cases', () => {
     it('should create instance with undefined channels', async () => {
       const data = {
