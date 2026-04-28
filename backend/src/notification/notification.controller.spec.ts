@@ -1,16 +1,20 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType, CanActivate } from '@nestjs/common'
+import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
 import { AuthJwtGuard } from '../auth/guards/auth.jwt-guard'
 import { NotificationStatus } from './schemas'
 
-// Mock AuthJwtGuard to bypass authentication in tests
+// Mock AuthJwtGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {
-  canActivate: () => true,
+  canActivate: (context: ExecutionContext) => {
+    const req = context.switchToHttp().getRequest()
+    req.tenant = { id: 'test-tenant-id' }
+    return true
+  },
 }
 
 const mockNotificationService = {
@@ -115,7 +119,7 @@ describe('NotificationController', () => {
 
       await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
 
-      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, expect.anything())
+      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, 'test-tenant-id')
     })
   })
 
