@@ -133,6 +133,61 @@ describe('Notify Controllers', () => {
         ])
         return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
       })
+
+      it('should return 202 with status "accepted" for immediate send', async () => {
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: ['test@example.com'],
+              subject: 'Test',
+              body: 'Hello',
+            },
+          })
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.status).toBe('accepted')
+            expect(res.body.message).toContain('Notification accepted')
+          })
+      })
+
+      it('should return 202 with status "scheduled" when delayedSend is provided', async () => {
+        const futureDate = new Date(Date.now() + 3600000).toISOString() // 1 hour from now (ISO format with Z)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: ['test@example.com'],
+              subject: 'Test',
+              body: 'Hello',
+              delayedSend: futureDate,
+            },
+          })
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.status).toBe('scheduled')
+            expect(res.body.message).toContain('Notification scheduled for delivery')
+          })
+      })
+
+      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: ['test@example.com'],
+              subject: 'Test',
+              body: 'Hello',
+              delayedSend: pastDate,
+            },
+          })
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.status).toBe('scheduled')
+            expect(res.body.message).toContain('Notification scheduled for delivery')
+          })
+      })
     })
   })
 
