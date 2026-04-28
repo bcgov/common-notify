@@ -198,7 +198,9 @@ describe('NotificationService', () => {
     it('should throw NotFoundException when notification not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.update('missing-id', 'tenant-uuid', {})).rejects.toThrow(NotFoundException)
+      await expect(service.update('missing-id', 'tenant-uuid', {})).rejects.toThrow(
+        NotFoundException,
+      )
     })
   })
 })
