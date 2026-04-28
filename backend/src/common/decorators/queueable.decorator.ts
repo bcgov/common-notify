@@ -208,18 +208,24 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               jobId: notificationRecord.id,
             })
 
-            // Update status to QUEUED now that it's in Redis
+            // Update status after queuing
+            // For scheduled sends, keep status as SCHEDULED
+            // For immediate sends, update to QUEUED
+            const statusAfterQueuing = hasDelayedSend
+              ? NotificationStatus.SCHEDULED
+              : NotificationStatus.QUEUED
+
             try {
               await (this as QueueableContext).notificationService.update(
                 notificationRecord.id,
                 tenantId,
                 {
-                  status: NotificationStatus.QUEUED,
+                  status: statusAfterQueuing,
                   updatedBy: 'system',
                 },
               )
             } catch (updateError) {
-              logger.error(`Failed to update status to QUEUED: ${notificationRecord.id}`, {
+              logger.error(`Failed to update status after queuing: ${notificationRecord.id}`, {
                 tenantId,
                 error: (updateError as Error).message,
               })
