@@ -54,7 +54,7 @@ describe('NotificationController', () => {
     expect(controller).toBeDefined()
   })
 
-  describe('GET /api/v1/notifications', () => {
+  describe('GET /api/v1/notification_request', () => {
     it('should return 200 with a list of notifications', async () => {
       const mockNotifications = [
         { id: 'notif-1', tenantId: 'test-tenant-id', status: NotificationStatus.QUEUED },
@@ -63,7 +63,7 @@ describe('NotificationController', () => {
       mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
       return request(app.getHttpServer())
-        .get('/api/v1/notifications')
+        .get('/api/v1/notification_request')
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveLength(2)
@@ -75,7 +75,7 @@ describe('NotificationController', () => {
       mockNotificationService.findAll.mockResolvedValue([])
 
       return request(app.getHttpServer())
-        .get('/api/v1/notifications')
+        .get('/api/v1/notification_request')
         .expect(200)
         .expect((res) => {
           expect(res.body).toEqual([])
@@ -85,13 +85,13 @@ describe('NotificationController', () => {
     it('should call findAll with no arguments', async () => {
       mockNotificationService.findAll.mockResolvedValue([])
 
-      await request(app.getHttpServer()).get('/api/v1/notifications').expect(200)
+      await request(app.getHttpServer()).get('/api/v1/notification_request').expect(200)
 
       expect(mockNotificationService.findAll).toHaveBeenCalledWith()
     })
   })
 
-  describe('GET /api/v1/notifications/:id', () => {
+  describe('GET /api/v1/notification_request/:id', () => {
     it('should return 200 with a notification by id', async () => {
       const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
       const mockNotification = {
@@ -102,7 +102,7 @@ describe('NotificationController', () => {
       mockNotificationService.findOne.mockResolvedValue(mockNotification)
 
       return request(app.getHttpServer())
-        .get(`/api/v1/notifications/${notifId}`)
+        .get(`/api/v1/notification_request/${notifId}`)
         .expect(200)
         .expect((res) => {
           expect(res.body.id).toBe(notifId)
@@ -110,14 +110,14 @@ describe('NotificationController', () => {
     })
 
     it('should return 400 for an invalid UUID', async () => {
-      return request(app.getHttpServer()).get('/api/v1/notifications/not-a-uuid').expect(400)
+      return request(app.getHttpServer()).get('/api/v1/notification_request/not-a-uuid').expect(400)
     })
 
     it('should call findOne with the id and tenantId', async () => {
       const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
       mockNotificationService.findOne.mockResolvedValue({ id: notifId })
 
-      await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
+      await request(app.getHttpServer()).get(`/api/v1/notification_request/${notifId}`).expect(200)
 
       expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, 'test-tenant-id')
     })
@@ -128,7 +128,7 @@ describe('NotificationController', () => {
       const spyFindAll = vi.spyOn(service, 'findAll')
       mockNotificationService.findAll.mockResolvedValue([])
 
-      await request(app.getHttpServer()).get('/api/v1/notifications').expect(200)
+      await request(app.getHttpServer()).get('/api/v1/notification_request').expect(200)
 
       expect(spyFindAll).toHaveBeenCalledTimes(1)
     })
@@ -138,7 +138,7 @@ describe('NotificationController', () => {
       const spyFindOne = vi.spyOn(service, 'findOne')
       mockNotificationService.findOne.mockResolvedValue({ id: notifId })
 
-      await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
+      await request(app.getHttpServer()).get(`/api/v1/notification_request/${notifId}`).expect(200)
 
       expect(spyFindOne).toHaveBeenCalledTimes(1)
     })
