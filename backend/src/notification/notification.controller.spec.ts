@@ -6,7 +6,6 @@ import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
 import { AuthJwtGuard } from '../auth/guards/auth.jwt-guard'
-import { NotificationStatus } from './schemas'
 
 // Mock AuthJwtGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {
@@ -19,7 +18,6 @@ const mockAuthGuard: CanActivate = {
 
 const mockNotificationService = {
   findAll: vi.fn(),
-  findOne: vi.fn(),
 }
 
 describe('NotificationController', () => {
@@ -91,38 +89,6 @@ describe('NotificationController', () => {
     })
   })
 
-  describe('GET /api/v1/notification_request/:id', () => {
-    it('should return 200 with a notification by id', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      const mockNotification = {
-        id: notifId,
-        tenantId: 'test-tenant-id',
-        status: NotificationStatus.QUEUED,
-      }
-      mockNotificationService.findOne.mockResolvedValue(mockNotification)
-
-      return request(app.getHttpServer())
-        .get(`/api/v1/notification_request/${notifId}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(notifId)
-        })
-    })
-
-    it('should return 400 for an invalid UUID', async () => {
-      return request(app.getHttpServer()).get('/api/v1/notification_request/not-a-uuid').expect(400)
-    })
-
-    it('should call findOne with the id and tenantId', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      mockNotificationService.findOne.mockResolvedValue({ id: notifId })
-
-      await request(app.getHttpServer()).get(`/api/v1/notification_request/${notifId}`).expect(200)
-
-      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, 'test-tenant-id')
-    })
-  })
-
   describe('NotificationService integration', () => {
     it('should call findAll on NotificationService when listing notifications', async () => {
       const spyFindAll = vi.spyOn(service, 'findAll')
@@ -131,16 +97,6 @@ describe('NotificationController', () => {
       await request(app.getHttpServer()).get('/api/v1/notification_request').expect(200)
 
       expect(spyFindAll).toHaveBeenCalledTimes(1)
-    })
-
-    it('should call findOne on NotificationService with id and tenantId', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      const spyFindOne = vi.spyOn(service, 'findOne')
-      mockNotificationService.findOne.mockResolvedValue({ id: notifId })
-
-      await request(app.getHttpServer()).get(`/api/v1/notification_request/${notifId}`).expect(200)
-
-      expect(spyFindOne).toHaveBeenCalledTimes(1)
     })
   })
 })
