@@ -58,18 +58,17 @@ jobs:
     name: Apply API Gateway Config
     needs: [import]
     runs-on: ubuntu-24.04
+    concurrency:
+      group: gateway-config-apply
+      cancel-in-progress: false  # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config for PR
-        env:
-          PR_NUMBER: ${{ github.event.number }}
+      - name: Generate gateway config for PR + permanent services
         run: |
-          # Make script executable
-          chmod +x api-gateway/scripts/generate-config.sh
-
-          # Generate PR-specific gateway config
-          api-gateway/scripts/generate-config.sh pr common-notify-${{ github.event.number }}
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          # Generate combined config with PR + permanent services (dev+test+prod)
+          api-gateway/scripts/generate-gateway-config.sh pr-with-permanent common-notify-${{ github.event.number }}
 
       - name: Apply gateway config
         env:
@@ -87,8 +86,8 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply gateway configuration
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml
+          # Apply PR + permanent services (prevents deletion of dev/test/prod)
+          gwa apply -i api-gateway/generated/gw-services-pr-with-permanent.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})
@@ -102,6 +101,7 @@ jobs:
       params: --set global.secrets.persist=false --set frontend.secrets.enabled=false
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
+      redis_triggers: ('charts/redis/')
 
   tests:
     name: Tests

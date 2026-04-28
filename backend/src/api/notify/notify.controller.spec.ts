@@ -118,11 +118,10 @@ describe('Notify Controllers', () => {
 
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
-          .send({ email: { to: ['test@example.com'], subject: 'Test', body: 'Hello' } })
+          .send({ email: { recipients: ['test@example.com'], subject: 'Test', body: 'Hello' } })
           .expect(202)
           .expect((res) => {
             expect(res.body.notifyId).toBeDefined()
-            expect(res.body.recordId).toBeDefined()
             expect(res.body.status).toBeDefined()
             expect(res.body.message).toBeDefined()
           })

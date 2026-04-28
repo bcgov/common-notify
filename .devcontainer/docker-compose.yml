@@ -78,6 +78,7 @@ services:
       <<: *postgres-vars
       NODE_ENV: development
       KONG_ADMIN_URL: http://kong:8001
+      GC_NOTIFY_BASE_URL: ${GC_NOTIFY_BASE_URL:-https://api.notification.canada.ca}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0

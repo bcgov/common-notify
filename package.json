@@ -1,0 +1,6 @@
+{
+  "name": "nr-notify-root",
+  "version": "1.0.0",
+  "description": "Root package.json for CI compatibility. All code is in subfolders.",
+  "private": true
+}

@@ -47,21 +47,16 @@ export class IngestionWorker {
 
     // Register the job processor with configurable concurrency
     ingestionQueue.process(concurrency, async (job: Bull.Job<IngestionJobPayload>) => {
-      const { notifyId, recordId, tenantId, request, scheduledFor, requestedAt } = job.data
+      const { notifyId, tenantId, request, scheduledFor, requestedAt } = job.data
 
-      logger.debug(
-        `[${recordId}] Processing ingestion job for notifyId=${notifyId}, tenant=${tenantId}`,
-      )
+      logger.debug(`[${notifyId}] Processing ingestion job for tenant=${tenantId}`)
 
       try {
-        logger.log(`[${recordId}] [IngestionWorker] Starting to process job ${job.id}`)
+        logger.log(`[${notifyId}] [IngestionWorker] Starting to process job ${job.id}`)
 
         // Validate IngestionJobPayload structure
         if (!notifyId || typeof notifyId !== 'string') {
           throw new Error('Invalid ingestion job: notifyId is missing or invalid')
-        }
-        if (!recordId || typeof recordId !== 'string') {
-          throw new Error('Invalid ingestion job: recordId is missing or invalid')
         }
         if (!tenantId || typeof tenantId !== 'string') {
           throw new Error('Invalid ingestion job: tenantId is missing or invalid')
@@ -84,7 +79,7 @@ export class IngestionWorker {
 
         // Email channel
         if (request.email) {
-          logger.log(`[${recordId}] Adding email delivery job for notifyId=${notifyId}`)
+          logger.log(`[${notifyId}] Adding email delivery job`)
           deliveryJobs.push({
             queue: emailQueue,
             channel: NotificationChannel.EMAIL,
@@ -94,7 +89,7 @@ export class IngestionWorker {
 
         // SMS channel
         if (request.sms) {
-          logger.log(`[${recordId}] Adding SMS delivery job for notifyId=${notifyId}`)
+          logger.log(`[${notifyId}] Adding SMS delivery job`)
           deliveryJobs.push({
             queue: smsQueue,
             channel: NotificationChannel.SMS,
@@ -114,7 +109,6 @@ export class IngestionWorker {
         for (const { queue, channel, payload } of deliveryJobs) {
           const deliveryPayload: DeliveryJobPayload = {
             notifyId,
-            recordId,
             tenantId,
             channel,
             payload,
@@ -146,16 +140,16 @@ export class IngestionWorker {
             : ''
 
           logger.log(
-            `[${recordId}] Queued delivery job (channel=${channel}, key=${jobKey})${scheduleInfo}`,
+            `[${notifyId}] Queued delivery job (channel=${channel}, key=${jobKey})${scheduleInfo}`,
           )
         }
 
         logger.log(
-          `[${recordId}] Successfully processed ingestion job for notifyId=${notifyId}, channels=${deliveryJobs.map((d) => d.channel).join(',')}`,
+          `[${notifyId}] Successfully processed ingestion job, channels=${deliveryJobs.map((d) => d.channel).join(',')}`,
         )
 
         // Update notification_request status to PROCESSING in database
-        await notificationService.update(recordId, tenantId, {
+        await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.PROCESSING,
           updatedBy: 'ingestion-worker',
         })
@@ -164,12 +158,12 @@ export class IngestionWorker {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         logger.error(
-          `[${recordId}] Failed to process ingestion job for notifyId=${notifyId}: ${errorMessage}`,
+          `[${notifyId}] Failed to process ingestion job: ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
 
         // Update notification_request status to FAILED in database
-        await notificationService.update(recordId, tenantId, {
+        await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.FAILED,
           updatedBy: 'ingestion-worker',
         })
@@ -183,14 +177,14 @@ export class IngestionWorker {
 
     // Event listeners for job lifecycle
     ingestionQueue.on('completed', (job: Bull.Job<IngestionJobPayload>) => {
-      const { notifyId, recordId } = job.data
-      logger.debug(`[${recordId}] Ingestion job completed: notifyId=${notifyId}`)
+      const { notifyId } = job.data
+      logger.debug(`[${notifyId}] Ingestion job completed`)
     })
 
     ingestionQueue.on('failed', (job: Bull.Job<IngestionJobPayload>, err: Error) => {
-      const { notifyId, recordId } = job.data
+      const { notifyId } = job.data
       logger.error(
-        `[${recordId}] Ingestion job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): notifyId=${notifyId}, error=${err.message}`,
+        `[${notifyId}] Ingestion job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
     })
 
