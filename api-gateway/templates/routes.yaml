@@ -243,6 +243,11 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}notification-request-list
+    paths:
+      - /api/v1/notification_request
+    methods:
+      - GET
 plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]

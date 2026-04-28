@@ -58,7 +58,7 @@ test.describe('Notifications API E2E Tests', () => {
     test('should require authentication to list notifications', async () => {
       const context = await request.newContext()
 
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notifications`)
+      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notification_request`)
 
       expect(response.status()).toBeGreaterThanOrEqual(400)
       await context.dispose()
@@ -71,7 +71,7 @@ test.describe('Notifications API E2E Tests', () => {
         },
       })
 
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notifications`)
+      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notification_request`)
 
       expect(response.status()).toBe(200)
       const body = await response.json()
@@ -86,7 +86,7 @@ test.describe('Notifications API E2E Tests', () => {
         },
       })
 
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notifications`)
+      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notification_request`)
 
       expect(response.status()).toBe(200)
       const body = await response.json()
@@ -109,7 +109,7 @@ test.describe('Notifications API E2E Tests', () => {
       const context = await request.newContext()
 
       const response = await context.get(
-        `${API_BASE_URL}/${API_VERSION}/notifications/f47ac10b-58cc-4372-a567-0e02b2c3d479`,
+        `${API_BASE_URL}/${API_VERSION}/notification_request/f47ac10b-58cc-4372-a567-0e02b2c3d479`,
       )
 
       expect(response.status()).toBeGreaterThanOrEqual(400)
@@ -123,7 +123,9 @@ test.describe('Notifications API E2E Tests', () => {
         },
       })
 
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notifications/not-a-uuid`)
+      const response = await context.get(
+        `${API_BASE_URL}/${API_VERSION}/notification_request/not-a-uuid`,
+      )
 
       expect(response.status()).toBe(400)
       await context.dispose()
@@ -137,7 +139,7 @@ test.describe('Notifications API E2E Tests', () => {
       })
 
       const response = await context.get(
-        `${API_BASE_URL}/${API_VERSION}/notifications/f47ac10b-58cc-4372-a567-0e02b2c3d479`,
+        `${API_BASE_URL}/${API_VERSION}/notification_request/f47ac10b-58cc-4372-a567-0e02b2c3d479`,
       )
 
       expect(response.status()).toBe(404)
@@ -152,7 +154,9 @@ test.describe('Notifications API E2E Tests', () => {
         },
       })
 
-      const listResponse = await listContext.get(`${API_BASE_URL}/${API_VERSION}/notifications`)
+      const listResponse = await listContext.get(
+        `${API_BASE_URL}/${API_VERSION}/notification_request`,
+      )
       const notifications = await listResponse.json()
       await listContext.dispose()
 
@@ -169,7 +173,9 @@ test.describe('Notifications API E2E Tests', () => {
         },
       })
 
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notifications/${notifId}`)
+      const response = await context.get(
+        `${API_BASE_URL}/${API_VERSION}/notification_request/${notifId}`,
+      )
 
       expect(response.status()).toBe(200)
       const body = await response.json()
