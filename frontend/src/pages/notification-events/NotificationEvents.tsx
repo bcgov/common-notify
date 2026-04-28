@@ -2,12 +2,6 @@ import { useMemo, useState } from 'react'
 import type { FC } from 'react'
 import { Button, TextField } from '@bcgov/design-system-react-components'
 import { Link } from '@tanstack/react-router'
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
 import { Col, Row, Table } from 'react-bootstrap'
 
 const mockNotificationEvents = [
@@ -16,38 +10,14 @@ const mockNotificationEvents = [
   { id: 3, name: 'Internal Team Alert', lastUpdated: 'Feb 1, 10:45 AM', format: 'Email' },
 ]
 
-type NotificationEventRow = (typeof mockNotificationEvents)[number]
-
-const columnHelper = createColumnHelper<NotificationEventRow>()
-
-const columns = [
-  columnHelper.accessor('name', {
-    header: 'Notification Events Title',
-    cell: ({ getValue }) => (
-      <Link to="/notification-events" style={{ color: 'black' }}>
-        {getValue()}
-      </Link>
-    ),
-  }),
-  columnHelper.accessor('lastUpdated', { header: 'Last updated' }),
-  columnHelper.accessor('format', { header: 'Format' }),
-]
-
 const NotificationEvents: FC = () => {
   const [search, setSearch] = useState('')
 
-  // Basic filter on the table contents
   const filteredNotificationEvents = useMemo(
     () =>
       mockNotificationEvents.filter((ws) => ws.name.toLowerCase().includes(search.toLowerCase())),
     [search],
   )
-
-  const table = useReactTable({
-    data: filteredNotificationEvents,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  })
 
   return (
     <div>
@@ -74,22 +44,22 @@ const NotificationEvents: FC = () => {
 
       <Table bordered hover responsive>
         <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th key={header.id}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
+          <tr>
+            <th>Notification Events Title</th>
+            <th>Last updated</th>
+            <th>Format</th>
+          </tr>
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
+          {filteredNotificationEvents.map((row) => (
             <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-              ))}
+              <td>
+                <Link to="/notification-events" style={{ color: 'black' }}>
+                  {row.name}
+                </Link>
+              </td>
+              <td>{row.lastUpdated}</td>
+              <td>{row.format}</td>
             </tr>
           ))}
         </tbody>
