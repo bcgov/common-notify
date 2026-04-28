@@ -8,18 +8,33 @@ import {
 
 /**
  * Validator constraint for flexible date string parsing
+ * Requires timezone information to avoid ambiguity in scheduling
  */
 @ValidatorConstraint({ name: 'isValidDateString', async: false })
 export class IsValidDateStringConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
     if (typeof value !== 'string') return false
-    // Try to parse as date - JavaScript's Date constructor is lenient
+
+    // Must have timezone in one of these formats:
+    // 1. Z suffix for UTC: "2026-04-28T09:31:00Z"
+    // 2. Offset format: "2026-04-28T09:31:00+00:00" or "2026-04-28T09:31:00-07:00"
+    // 3. Timezone abbreviation: "2026-04-28 09:31:00 PST" or "2026-04-28 09:31:00 PDT"
+    const hasTimezoneFormat =
+      value.endsWith('Z') || // UTC
+      /[+-]\d{2}:\d{2}$/.test(value) || // Offset format
+      /\s[A-Z]{2,4}$/.test(value) // TZ abbreviation (2-4 letters)
+
+    if (!hasTimezoneFormat) {
+      return false
+    }
+
+    // Validate the date can be parsed by JavaScript
     const date = new Date(value)
     return !isNaN(date.getTime())
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} must be a valid date string (accepts ISO 8601, RFC 2822, and other standard formats like "2026-04-28 8:55:00 PST")`
+    return `${args.property} must be a valid date string with timezone (e.g., "2026-04-28T09:31:00Z", "2026-04-28T09:31:00-07:00", or "2026-04-28 09:31:00 PDT")`
   }
 }
 
