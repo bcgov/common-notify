@@ -33,6 +33,6 @@ export class NotificationController {
   @ApiOkResponse({ type: NotificationRequestDto })
   @ApiNotFoundResponse({ description: 'Notification request not found' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.notificationService.findOne(id, '5ae63fe4-e928-4fd7-9f1d-a6b9ef98a5bf')
+    return this.notificationService.findOne(id)
   }
 }

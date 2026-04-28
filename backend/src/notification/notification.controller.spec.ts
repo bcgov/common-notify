@@ -1,20 +1,16 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
+import { VersioningType, CanActivate } from '@nestjs/common'
 import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
-import { TenantGuard } from '../common/guards/tenant.guard'
+import { AuthJwtGuard } from '../auth/guards/auth.jwt-guard'
 import { NotificationStatus } from './schemas'
 
-// Mock TenantGuard to bypass authentication in tests
-const mockTenantGuard: CanActivate = {
-  canActivate: (context: ExecutionContext) => {
-    const req = context.switchToHttp().getRequest()
-    req.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
-    return true
-  },
+// Mock AuthJwtGuard to bypass authentication in tests
+const mockAuthGuard: CanActivate = {
+  canActivate: () => true,
 }
 
 const mockNotificationService = {
@@ -31,8 +27,8 @@ describe('NotificationController', () => {
       controllers: [NotificationController],
       providers: [{ provide: NotificationService, useValue: mockNotificationService }],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(AuthJwtGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     service = module.get<NotificationService>(NotificationService)
@@ -82,12 +78,12 @@ describe('NotificationController', () => {
         })
     })
 
-    it('should call findAll with the tenant id', async () => {
+    it('should call findAll with no arguments', async () => {
       mockNotificationService.findAll.mockResolvedValue([])
 
       await request(app.getHttpServer()).get('/api/v1/notifications').expect(200)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('test-tenant-id')
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith()
     })
   })
 
@@ -113,13 +109,13 @@ describe('NotificationController', () => {
       return request(app.getHttpServer()).get('/api/v1/notifications/not-a-uuid').expect(400)
     })
 
-    it('should call findOne with the id and tenant id', async () => {
+    it('should call findOne with the id only', async () => {
       const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
       mockNotificationService.findOne.mockResolvedValue({ id: notifId })
 
       await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
 
-      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, 'test-tenant-id')
+      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId)
     })
   })
 

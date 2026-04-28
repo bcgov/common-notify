@@ -102,18 +102,16 @@ describe('NotificationService', () => {
   })
 
   describe('findAll', () => {
-    it('should return all notifications for a tenant', async () => {
-      const tenantId = 'tenant-uuid'
+    it('should return all notifications', async () => {
       const mockNotifications = [
-        { id: 'notif-1', tenantId },
-        { id: 'notif-2', tenantId },
+        { id: 'notif-1', tenantId: 'tenant-uuid' },
+        { id: 'notif-2', tenantId: 'tenant-uuid' },
       ]
       mockRepository.find.mockResolvedValue(mockNotifications)
 
-      const result = await service.findAll(tenantId)
+      const result = await service.findAll()
 
       expect(mockRepository.find).toHaveBeenCalledWith({
-        where: { tenantId },
         order: { createdAt: 'DESC' },
       })
       expect(result).toEqual(mockNotifications)
@@ -122,7 +120,7 @@ describe('NotificationService', () => {
     it('should return empty array when no notifications exist', async () => {
       mockRepository.find.mockResolvedValue([])
 
-      const result = await service.findAll('tenant-uuid')
+      const result = await service.findAll()
 
       expect(result).toEqual([])
     })
@@ -131,26 +129,25 @@ describe('NotificationService', () => {
   describe('findOne', () => {
     it('should return a notification when found', async () => {
       const id = 'notif-uuid'
-      const tenantId = 'tenant-uuid'
-      const mockNotification = { id, tenantId }
+      const mockNotification = { id, tenantId: 'tenant-uuid' }
       mockRepository.findOne.mockResolvedValue(mockNotification)
 
-      const result = await service.findOne(id, tenantId)
+      const result = await service.findOne(id)
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id, tenantId } })
+      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id } })
       expect(result).toEqual(mockNotification)
     })
 
     it('should throw NotFoundException when not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.findOne('missing-id', 'tenant-uuid')).rejects.toThrow(NotFoundException)
+      await expect(service.findOne('missing-id')).rejects.toThrow(NotFoundException)
     })
 
     it('should include the id in the NotFoundException message', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.findOne('missing-id', 'tenant-uuid')).rejects.toThrow(
+      await expect(service.findOne('missing-id')).rejects.toThrow(
         "Notification request with id 'missing-id' not found",
       )
     })
@@ -159,40 +156,46 @@ describe('NotificationService', () => {
   describe('update', () => {
     it('should update status and return the notification', async () => {
       const id = 'notif-uuid'
-      const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId: 'tenant-uuid',
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const dto = { status: NotificationStatus.COMPLETED, updatedBy: 'admin' }
       const updated = { ...existing, ...dto }
       mockRepository.findOne.mockResolvedValueOnce(existing)
       mockRepository.update.mockResolvedValue({ affected: 1 })
       mockRepository.findOne.mockResolvedValueOnce(updated)
 
-      const result = await service.update(id, tenantId, dto)
+      const result = await service.update(id, dto)
 
-      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, dto)
+      expect(mockRepository.update).toHaveBeenCalledWith({ id }, dto)
       expect(result).toEqual(updated)
     })
 
     it('should only update provided fields', async () => {
       const id = 'notif-uuid'
-      const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId: 'tenant-uuid',
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const updated = { ...existing, updatedBy: 'admin' }
       mockRepository.findOne.mockResolvedValueOnce(existing)
       mockRepository.update.mockResolvedValue({ affected: 1 })
       mockRepository.findOne.mockResolvedValueOnce(updated)
 
-      await service.update(id, tenantId, { updatedBy: 'admin' })
+      await service.update(id, { updatedBy: 'admin' })
 
-      expect(mockRepository.update).toHaveBeenCalledWith({ id, tenantId }, { updatedBy: 'admin' })
+      expect(mockRepository.update).toHaveBeenCalledWith({ id }, { updatedBy: 'admin' })
     })
 
     it('should throw NotFoundException when notification not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.update('missing-id', 'tenant-uuid', {})).rejects.toThrow(
-        NotFoundException,
-      )
+      await expect(service.update('missing-id', {})).rejects.toThrow(NotFoundException)
     })
   })
 })

@@ -60,21 +60,17 @@ export class NotificationService {
     return this.notificationRepository.find({ order: { createdAt: 'DESC' } })
   }
 
-  async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
-    const notification = await this.notificationRepository.findOne({ where: { id, tenantId } })
+  async findOne(id: string): Promise<NotificationRequest> {
+    const notification = await this.notificationRepository.findOne({ where: { id } })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }
     return notification
   }
 
-  async update(
-    id: string,
-    tenantId: string,
-    dto: UpdateNotificationRequestDto,
-  ): Promise<NotificationRequest> {
+  async update(id: string, dto: UpdateNotificationRequestDto): Promise<NotificationRequest> {
     // Verify the record exists first
-    await this.findOne(id, tenantId)
+    await this.findOne(id)
 
     // Build update object with only fields that were provided
     const updateData: any = {}
@@ -83,10 +79,10 @@ export class NotificationService {
     if (dto.errorReason !== undefined) updateData.errorReason = dto.errorReason
 
     // Use query builder for explicit update (status field is part of FK constraint so TypeORM won't track it normally)
-    await this.notificationRepository.update({ id, tenantId }, updateData)
+    await this.notificationRepository.update({ id }, updateData)
 
     // Fetch and return updated record
-    const updated = await this.findOne(id, tenantId)
+    const updated = await this.findOne(id)
     this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
     return updated
   }
