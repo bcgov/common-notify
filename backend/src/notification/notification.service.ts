@@ -8,7 +8,6 @@ import {
   NotificationStatus,
   UpdateNotificationRequestDto,
   NotificationRequestDto,
-  TenantDto,
   PaginatedNotificationResponse,
 } from './schemas'
 import { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
