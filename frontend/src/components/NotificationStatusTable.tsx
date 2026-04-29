@@ -21,7 +21,7 @@ const NotificationStatusTable: FC = () => {
 
   // Fetch notifications when status filter changes
   useEffect(() => {
-    dispatch(fetchNotifications(statusFilter))
+    dispatch(fetchNotifications())
   }, [statusFilter, dispatch])
 
   // Build status filter items from Redux
