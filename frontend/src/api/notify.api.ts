@@ -1,6 +1,7 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import UserService from '@/service/user-service'
+import type { Tenant } from '@/interfaces/Tenant'
 
 /**
  * Centralized API abstraction layer for Notify API endpoints.
@@ -124,6 +125,24 @@ export const notifyApi = {
       )
     }
   },
+
+  /**
+   * Get all available tenants
+   * GET /admin/tenants/v1
+   * Returns array directly (not wrapped)
+   */
+  async getTenants(): Promise<Tenant[]> {
+    try {
+      const response = await axios.get('/admin/tenants/v1')
+      // Response is already TenantDto[] array, not wrapped
+      return Array.isArray(response.data) ? response.data : []
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch tenants: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  },
+
 }
 
 export default notifyApi

@@ -1,0 +1,82 @@
+/**
+ * TenantSelectionModal Styles
+ *
+ * V3 Modal-based tenant selection UI
+ * BC Design System aligned styling
+ */
+
+.tenant-selection-modal-content {
+  padding: 2rem 0;
+
+  .tenant-selection-description {
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+    color: var(--text-secondary, #333);
+    font-weight: 500;
+  }
+
+  .tenant-selection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .tenant-selection-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background-color: var(--background-light, #f9f9f9);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+
+    &:hover {
+      background-color: var(--background-hover, #f0f0f0);
+      border-color: var(--primary-color, #003366);
+    }
+
+    &:focus {
+      outline: 2px solid var(--primary-color, #003366);
+      outline-offset: 2px;
+    }
+
+    .tenant-selection-radio {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      border: 2px solid var(--border-color, #999);
+      border-radius: 50%;
+      background-color: white;
+      margin-top: 2px;
+      transition: all 0.2s ease;
+    }
+
+    .tenant-selection-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tenant-selection-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-dark, #222);
+      margin-bottom: 0.25rem;
+      word-break: break-word;
+    }
+
+    .tenant-selection-id {
+      font-size: 0.85rem;
+      color: var(--text-secondary, #666);
+      font-weight: 400;
+    }
+
+    &:hover .tenant-selection-radio,
+    &:focus .tenant-selection-radio {
+      border-color: var(--primary-color, #003366);
+      background-color: var(--primary-light, #e6f0f7);
+    }
+  }
+}
