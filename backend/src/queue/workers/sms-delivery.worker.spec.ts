@@ -233,7 +233,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
-            to: ['+16135551234'],
+            recipients: ['+16135551234'],
             body: 'Test body',
           },
           attempt: 0,

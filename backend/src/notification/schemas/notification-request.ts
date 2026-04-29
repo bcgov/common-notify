@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { NotificationStatus } from './create-notification-request'
+import { TenantDto } from './tenant'
 
 export class NotificationRequestDto {
   @ApiProperty({ description: 'Unique identifier for the notification request', format: 'uuid' })
@@ -7,6 +8,9 @@ export class NotificationRequestDto {
 
   @ApiProperty({ description: 'Tenant that submitted the request', format: 'uuid' })
   tenantId: string
+
+  @ApiProperty({ type: TenantDto, description: 'Tenant information including name and slug' })
+  tenant?: TenantDto
 
   @ApiProperty({
     enum: NotificationStatus,

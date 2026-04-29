@@ -1,7 +1,7 @@
-import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import type { InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import UserService from '@/service/user-service'
-import { STATUS_CODES } from '@/common/api'
+import type { NotifySimpleRequest } from '@/interfaces/NotifyPayload'
 
 /**
  * Centralized API abstraction layer for Notify API endpoints.
@@ -13,44 +13,21 @@ import { STATUS_CODES } from '@/common/api'
 /**
  * Configure axios interceptors for auth error handling
  */
+let requestInterceptorConfigured = false
+
 const configureAxios = () => {
-  // Request interceptor: Add auth token to all requests
-  axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-    const token = UserService.getToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  })
-
-  // Response interceptor: Handle auth errors globally
-  axios.interceptors.response.use(
-    (response) => response,
-    (error: AxiosError) => {
-      const { response, config } = error
-
-      // Only redirect to login if there's truly no token (not just API rejection)
-      if (response && response.status === STATUS_CODES.Unauthorized) {
-        const token = UserService.getToken()
-
-        if (!token) {
-          // No token at all: redirect to Keycloak login
-          UserService.doLogin()
-        } else if (config?.url?.startsWith('/api')) {
-          // API call with valid token was rejected: let it propagate as error
-          // so Redux/component can show error toast instead of redirecting
-          return Promise.reject(error)
-        } else {
-          // Non-API request was rejected: redirect to login
-          UserService.doLogin()
-        }
-      } else if (response && response.status === STATUS_CODES.Forbidden) {
-        // 403 = authenticated but lacks permission.  Handles the case where user has a token but the gateway rejects it due to missing role/permission. Redirect to a "Not Authorized" page instead of login.
-        globalThis.location.href = '/not-authorized'
+  // Request interceptor: Add auth token to all requests (register only once)
+  // Response interceptor is handled globally in @/common/api to avoid duplicate handlers
+  if (!requestInterceptorConfigured) {
+    axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+      const token = UserService.getToken()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
       }
-      return Promise.reject(error)
-    },
-  )
+      return config
+    })
+    requestInterceptorConfigured = true
+  }
 }
 
 // Configure on module load
@@ -61,10 +38,7 @@ export const notifyApi = {
    * Send a simple notification
    * POST /api/v1/notifysimple
    */
-  async sendSimpleNotify(payload: {
-    email?: { to: string[]; subject: string; body: string }
-    sms?: { to: string[]; body: string }
-  }) {
+  async sendSimpleNotify(payload: NotifySimpleRequest) {
     try {
       // Send request with X-Realm header to route to user auth path
       const response = await axios.post('/api/v1/notifysimple', payload, {

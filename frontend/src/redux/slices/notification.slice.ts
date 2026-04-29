@@ -46,10 +46,6 @@ export const notificationSlice = createSlice({
 
 export const { setStatusFilter } = notificationSlice.actions
 
-export const selectFilteredNotifications = (state: RootState) => {
-  const { items, statusFilter } = state.notification
-  if (statusFilter === 'all') return items
-  return items.filter((n) => n.status === statusFilter)
-}
+export const selectNotifications = (state: RootState) => state.notification.items
 
 export default notificationSlice.reducer
