@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render } from '@testing-library/react'
-import { Provider } from 'react-redux'
-import { configureStore, PreloadedState } from '@reduxjs/toolkit'
-import { createRootRoute, RootRoute } from '@tanstack/react-router'
+import { configureStore } from '@reduxjs/toolkit'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
@@ -29,7 +26,7 @@ describe('RootLayout - CodeTables Loading', () => {
     vi.clearAllMocks()
   })
 
-  const createStore = (preloadedState?: PreloadedState<any>) => {
+  const createStore = (preloadedState?: any) => {
     return configureStore({
       reducer: {
         codeTables: codeTablesReducer,
@@ -45,7 +42,7 @@ describe('RootLayout - CodeTables Loading', () => {
     const mockFetch = vi.fn().mockResolvedValue(mockCodeTablesState)
     vi.mocked(codeTableThunks.fetchCodeTables).mockImplementation(mockFetch)
 
-    const preloadedState: PreloadedState<any> = {
+    const preloadedState: any = {
       codeTables: mockCodeTablesState,
       notification: {
         notifications: [],
@@ -65,7 +62,7 @@ describe('RootLayout - CodeTables Loading', () => {
   })
 
   it('should have code tables available to child routes via Redux', () => {
-    const preloadedState: PreloadedState<any> = {
+    const preloadedState: any = {
       codeTables: mockCodeTablesState,
       notification: {
         notifications: [],

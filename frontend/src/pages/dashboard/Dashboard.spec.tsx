@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
-import { configureStore, PreloadedState } from '@reduxjs/toolkit'
+import { configureStore } from '@reduxjs/toolkit'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
-import * as notificationThunks from '@/redux/thunks/notification.thunks'
 
 vi.mock('@/redux/thunks/notification.thunks')
 
 describe('Dashboard with CodeTables', () => {
-  let preloadedState: PreloadedState<any>
+  let preloadedState: any
 
   const mockCodeTablesState: CodeTablesState = {
     statuses: [
@@ -42,14 +41,14 @@ describe('Dashboard with CodeTables', () => {
     }
   })
 
-  const createStore = (preloadedState?: PreloadedState<any>) => {
+  const createStore = (initialState?: any) => {
     return configureStore({
       reducer: {
         codeTables: codeTablesReducer,
         notification: notificationReducer,
       },
-      preloadedState,
-    })
+      preloadedState: initialState,
+    } as any)
   }
 
   it('should use code tables from Redux (loaded at app root)', async () => {
@@ -105,7 +104,7 @@ describe('Dashboard with CodeTables', () => {
   })
 
   it('should handle loading state while fetching code tables', () => {
-    const loadingState: PreloadedState<any> = {
+    const loadingState: any = {
       codeTables: {
         ...mockCodeTablesState,
         isLoading: true,
@@ -131,7 +130,7 @@ describe('Dashboard with CodeTables', () => {
   })
 
   it('should handle error state from code tables', () => {
-    const errorState: PreloadedState<any> = {
+    const errorState: any = {
       codeTables: {
         statuses: [],
         channels: [],
@@ -172,7 +171,7 @@ describe('Dashboard with CodeTables', () => {
     expect(selectOptions.length).toBeGreaterThan(1)
 
     // Dispatch action to update code tables
-    const newState: PreloadedState<any> = {
+    const newState: any = {
       codeTables: {
         ...mockCodeTablesState,
         statuses: [

@@ -5,9 +5,6 @@ import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import LoadingSpinner from './LoadingSpinner'
 import { APP_VERSION } from '@/utils/version'
-import 'react-toastify/dist/ReactToastify.css'
-import '@/scss/components/layout.scss'
-import '@/scss/components/toasts.scss'
 import { SideBar } from './Sidebar'
 
 type Props = {
