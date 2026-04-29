@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { fetchCodeTables } from '@/redux/thunks/codeTables.thunks'
-import * as api from '@/service/api'
+import * as api from '@/common/api'
 
-vi.mock('@/service/api')
+vi.mock('@/common/api')
 
 describe('codeTables.thunks', () => {
   beforeEach(() => {

@@ -45,7 +45,7 @@ describe('RootLayout - CodeTables Loading', () => {
     const preloadedState: any = {
       codeTables: mockCodeTablesState,
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,
@@ -65,7 +65,7 @@ describe('RootLayout - CodeTables Loading', () => {
     const preloadedState: any = {
       codeTables: mockCodeTablesState,
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,

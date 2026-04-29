@@ -33,7 +33,7 @@ describe('Dashboard with CodeTables', () => {
     preloadedState = {
       codeTables: mockCodeTablesState,
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,
@@ -110,7 +110,7 @@ describe('Dashboard with CodeTables', () => {
         isLoading: true,
       },
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,
@@ -139,7 +139,7 @@ describe('Dashboard with CodeTables', () => {
         error: 'Failed to fetch code tables',
       },
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,
@@ -180,7 +180,7 @@ describe('Dashboard with CodeTables', () => {
         ],
       },
       notification: {
-        notifications: [],
+        items: [],
         statusFilter: 'all',
         isLoading: false,
         error: null,
