@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { NotificationStatusCode } from './notification-status-code.entity'
+import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
 @Entity('notification_request')
 export class NotificationRequest {
@@ -16,6 +17,10 @@ export class NotificationRequest {
 
   @Column({ name: 'tenant_id' })
   tenantId: string
+
+  @ManyToOne(() => Tenant, { eager: true })
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant
 
   @Column({ name: 'status' })
   status: string

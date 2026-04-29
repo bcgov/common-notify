@@ -20,11 +20,11 @@
 
 // Error toast
 .Toastify__toast--error {
-  background-color: $danger-color;
-  color: white;
+  background-color: lighten($danger-color, 35%);
+  color: $danger-color;
 
   .Toastify__toast-icon {
-    color: white;
+    color: $danger-color;
   }
 }
 

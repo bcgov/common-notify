@@ -19,7 +19,7 @@ import { IEmailTransport } from '../../adapters'
  * 6. Implements retry logic with exponential backoff
  *
  * Idempotency: Job key is notifyId_email, preventing duplicate delivery
- * Tracing: All operations logged with recordId for end-to-end visibility
+ * Tracing: All operations logged with notifyId for end-to-end visibility
  */
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
@@ -46,19 +46,16 @@ export class EmailDeliveryWorker {
     // Register the job processor with configurable concurrency
     // Note: Don't await process() - it sets up listeners and never resolves
     emailQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId, recordId, tenantId, payload, attempt } = job.data
+      const { notifyId, tenantId, payload, attempt } = job.data
 
       logger.debug(
-        `[${recordId}] Processing email delivery job (attempt ${attempt + 1}/3) for notifyId=${notifyId}, tenant=${tenantId}`,
+        `[${notifyId}] Processing email delivery job (attempt ${attempt + 1}/3) for tenant=${tenantId}`,
       )
 
       try {
         // Validate DeliveryJobPayload structure
         if (!notifyId || typeof notifyId !== 'string') {
           throw new Error('Invalid delivery job: notifyId is missing or invalid')
-        }
-        if (!recordId || typeof recordId !== 'string') {
-          throw new Error('Invalid delivery job: recordId is missing or invalid')
         }
         if (!tenantId || typeof tenantId !== 'string') {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
@@ -75,7 +72,11 @@ export class EmailDeliveryWorker {
         // Cast payload to email channel type for type safety
         const emailPayload = payload as NotifyEmailChannel
 
-        if (!emailPayload.to || !Array.isArray(emailPayload.to) || emailPayload.to.length === 0) {
+        if (
+          !emailPayload.recipients ||
+          !Array.isArray(emailPayload.recipients) ||
+          emailPayload.recipients.length === 0
+        ) {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
@@ -88,47 +89,47 @@ export class EmailDeliveryWorker {
         }
 
         // Update status to SENDING
-        await notificationService.update(recordId, tenantId, {
+        await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
-        logger.debug(`[${recordId}] Updated notification status to SENDING`)
+        logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
         const result = await EmailDeliveryWorker.sendEmail(
           emailPayload,
           logger,
-          recordId,
+          notifyId,
           emailAdapter,
         )
 
-        logger.debug(`[${recordId}] Email sent successfully: ${JSON.stringify(result)}`)
+        logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
         // Update status to COMPLETED
-        await notificationService.update(recordId, tenantId, {
+        await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.COMPLETED,
           updatedBy: 'system',
         })
-        logger.log(`[${recordId}] Notification marked as COMPLETED`)
+        logger.log(`[${notifyId}] Notification marked as COMPLETED`)
 
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         logger.error(
-          `[${recordId}] Failed to send email delivery job for notifyId=${notifyId} (attempt ${attempt + 1}/3): ${errorMessage}`,
+          `[${notifyId}] Failed to send email delivery job (attempt ${attempt + 1}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
 
         // Update status to FAILED on final attempt
         if (attempt >= 2) {
           // Last attempt (0, 1, 2 = 3 total attempts)
-          await notificationService.update(recordId, tenantId, {
+          await notificationService.update(notifyId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',
             errorReason: errorMessage,
           })
           logger.error(
-            `[${recordId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
+            `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
         }
 
@@ -139,14 +140,14 @@ export class EmailDeliveryWorker {
 
     // Event listeners for job lifecycle
     emailQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId, recordId } = job.data
-      logger.debug(`[${recordId}] Email delivery job completed: notifyId=${notifyId}`)
+      const { notifyId } = job.data
+      logger.debug(`[${notifyId}] Email delivery job completed`)
     })
 
     emailQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
-      const { notifyId, recordId } = job.data
+      const { notifyId } = job.data
       logger.error(
-        `[${recordId}] Email delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): notifyId=${notifyId}, error=${err.message}`,
+        `[${notifyId}] Email delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
     })
 
@@ -157,22 +158,22 @@ export class EmailDeliveryWorker {
    * Send email via adapter
    * @param payload Email payload
    * @param logger Logger instance
-   * @param recordId Record ID for tracing
+   * @param notifyId Notification ID for tracing
    * @param emailAdapter Email transport adapter
    * @returns Promise with send result
    */
   private static async sendEmail(
     payload: NotifyEmailChannel,
     logger: Logger,
-    recordId: string,
+    notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
     logger.debug(
-      `[${recordId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.to) ? payload.to.join(', ') : payload.to}`,
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients}`,
     )
 
     const result = await emailAdapter.send({
-      to: Array.isArray(payload.to) ? payload.to.join(', ') : payload.to,
+      to: Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients,
       subject: payload.subject,
       body: payload.body,
       ...(payload.attachments && {

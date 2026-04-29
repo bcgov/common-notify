@@ -4,18 +4,18 @@ import {
   IsOptional,
   IsEnum,
   IsUUID,
-  IsDateString,
   IsObject,
   ArrayMinSize,
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsValidDateString } from './validators/date-string.validator'
 
 export class NotifySmsChannel {
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], description: 'Phone number recipients' })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  to: string[]
+  recipients: string[]
 
   @ApiProperty() @IsString() body: string
 
@@ -31,9 +31,11 @@ export class NotifySmsChannel {
   @IsUUID()
   identityId?: string
 
-  @ApiPropertyOptional({ description: 'ISO 8601 datetime for delayed send' })
+  @ApiPropertyOptional({
+    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
+  })
   @IsOptional()
-  @IsDateString()
+  @IsValidDateString()
   delayedSend?: string
 
   @ApiPropertyOptional({ enum: ['low', 'normal', 'high'] })

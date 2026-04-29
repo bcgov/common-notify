@@ -7,6 +7,8 @@ import {
   CreateNotificationRequestDto,
   NotificationStatus,
   UpdateNotificationRequestDto,
+  NotificationRequestDto,
+  PaginatedNotificationResponse,
 } from './schemas'
 import { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
@@ -44,6 +46,28 @@ export class NotificationService {
       this.configService.get<number>('VALIDATE_MSGAPP_MAX_BODY_LENGTH') ?? 50000
   }
 
+  /**
+   * Maps NotificationRequest entity to NotificationRequestDto with tenant data
+   */
+  private mapToDto(entity: NotificationRequest): NotificationRequestDto {
+    return {
+      id: entity.id,
+      tenantId: entity.tenantId,
+      status: entity.status,
+      createdAt: entity.createdAt,
+      createdBy: entity.createdBy,
+      updatedAt: entity.updatedAt,
+      updatedBy: entity.updatedBy,
+      tenant: entity.tenant
+        ? {
+            id: entity.tenant.id,
+            name: entity.tenant.name,
+            slug: entity.tenant.slug,
+          }
+        : undefined,
+    }
+  }
+
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
@@ -56,8 +80,40 @@ export class NotificationService {
     return saved
   }
 
-  async findAll(tenantId: string): Promise<NotificationRequest[]> {
-    return this.notificationRepository.find({ where: { tenantId }, order: { createdAt: 'DESC' } })
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+  ): Promise<PaginatedNotificationResponse> {
+    // Ensure page and limit are valid
+    const pageNum = Math.max(1, page)
+    const limitNum = Math.min(Math.max(1, limit), 100) // Cap at 100 to prevent abuse
+
+    const skip = (pageNum - 1) * limitNum
+
+    // Build where clause - include status filter if provided
+    const where: any = {}
+    if (status && status !== 'all') {
+      where.status = status
+    }
+
+    // Get both the data and total count
+    const [notifications, total] = await this.notificationRepository.findAndCount({
+      where,
+      skip,
+      take: limitNum,
+      order: { createdAt: 'DESC' },
+    })
+
+    const totalPages = Math.ceil(total / limitNum)
+
+    return {
+      data: notifications.map((n) => this.mapToDto(n)),
+      count: total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+    }
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
@@ -66,6 +122,11 @@ export class NotificationService {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }
     return notification
+  }
+
+  // Demo route, to be removed
+  async getTenants(): Promise<any> {
+    return this.tenantsService.findAll()
   }
 
   async update(
@@ -120,9 +181,9 @@ export class NotificationService {
     }
 
     // Ensure at least one channel has recipients
-    const emailRecipients = request.email?.to?.length ?? 0
-    const smsRecipients = request.sms?.to?.length ?? 0
-    const msgAppRecipients = request.msgApp?.to?.length ?? 0
+    const emailRecipients = request.email?.recipients?.length ?? 0
+    const smsRecipients = request.sms?.recipients?.length ?? 0
+    const msgAppRecipients = request.msgApp?.recipients?.length ?? 0
     const totalRecipients = emailRecipients + smsRecipients + msgAppRecipients
 
     if (totalRecipients === 0) {
@@ -130,10 +191,10 @@ export class NotificationService {
     }
 
     // Validate email channel
-    if (request.email?.to) {
-      if (request.email.to.length > this.emailMaxRecipients) {
+    if (request.email?.recipients) {
+      if (request.email.recipients.length > this.emailMaxRecipients) {
         errors.push(
-          `Too many email recipients (${request.email.to.length}). Max: ${this.emailMaxRecipients}`,
+          `Too many email recipients (${request.email.recipients.length}). Max: ${this.emailMaxRecipients}`,
         )
       }
 
@@ -159,10 +220,10 @@ export class NotificationService {
     }
 
     // Validate SMS channel
-    if (request.sms?.to) {
-      if (request.sms.to.length > this.smsMaxRecipients) {
+    if (request.sms?.recipients) {
+      if (request.sms.recipients.length > this.smsMaxRecipients) {
         errors.push(
-          `Too many SMS recipients (${request.sms.to.length}). Max: ${this.smsMaxRecipients}`,
+          `Too many SMS recipients (${request.sms.recipients.length}). Max: ${this.smsMaxRecipients}`,
         )
       }
 
@@ -179,10 +240,10 @@ export class NotificationService {
     }
 
     // Validate msgApp channel
-    if (request.msgApp?.to) {
-      if (request.msgApp.to.length > this.msgAppMaxRecipients) {
+    if (request.msgApp?.recipients) {
+      if (request.msgApp.recipients.length > this.msgAppMaxRecipients) {
         errors.push(
-          `Too many msgApp recipients (${request.msgApp.to.length}). Max: ${this.msgAppMaxRecipients}`,
+          `Too many msgApp recipients (${request.msgApp.recipients.length}). Max: ${this.msgAppMaxRecipients}`,
         )
       }
 

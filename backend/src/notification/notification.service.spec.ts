@@ -13,6 +13,7 @@ const mockRepository = {
   save: vi.fn(),
   find: vi.fn(),
   findOne: vi.fn(),
+  findAndCount: vi.fn(),
   remove: vi.fn(),
   update: vi.fn(),
 }
@@ -102,29 +103,58 @@ describe('NotificationService', () => {
   })
 
   describe('findAll', () => {
-    it('should return all notifications for a tenant', async () => {
-      const tenantId = 'tenant-uuid'
+    it('should return paginated notifications', async () => {
       const mockNotifications = [
-        { id: 'notif-1', tenantId },
-        { id: 'notif-2', tenantId },
+        { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
+        { id: 'notif-2', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
       ]
-      mockRepository.find.mockResolvedValue(mockNotifications)
+      mockRepository.findAndCount.mockResolvedValue([mockNotifications, 2])
 
-      const result = await service.findAll(tenantId)
+      const result = await service.findAll(1, 10)
 
-      expect(mockRepository.find).toHaveBeenCalledWith({
-        where: { tenantId },
+      expect(mockRepository.findAndCount).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 10,
         order: { createdAt: 'DESC' },
       })
-      expect(result).toEqual(mockNotifications)
+      expect(result.count).toBe(2)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(10)
+      expect(result.totalPages).toBe(1)
     })
 
-    it('should return empty array when no notifications exist', async () => {
-      mockRepository.find.mockResolvedValue([])
+    it('should return empty data array when no notifications exist', async () => {
+      mockRepository.findAndCount.mockResolvedValue([[], 0])
 
-      const result = await service.findAll('tenant-uuid')
+      const result = await service.findAll(1, 10)
 
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
+      expect(result.count).toBe(0)
+    })
+
+    it('should filter by status when provided', async () => {
+      const mockNotifications = [
+        { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
+      ]
+      mockRepository.findAndCount.mockResolvedValue([mockNotifications, 1])
+
+      await service.findAll(1, 10, NotificationStatus.COMPLETED)
+
+      expect(mockRepository.findAndCount).toHaveBeenCalledWith({
+        where: { status: NotificationStatus.COMPLETED },
+        skip: 0,
+        take: 10,
+        order: { createdAt: 'DESC' },
+      })
+    })
+
+    it('should calculate totalPages correctly', async () => {
+      mockRepository.findAndCount.mockResolvedValue([[], 25])
+
+      const result = await service.findAll(1, 10)
+
+      expect(result.totalPages).toBe(3)
     })
   })
 
@@ -160,7 +190,12 @@ describe('NotificationService', () => {
     it('should update status and return the notification', async () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId,
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const dto = { status: NotificationStatus.COMPLETED, updatedBy: 'admin' }
       const updated = { ...existing, ...dto }
       mockRepository.findOne.mockResolvedValueOnce(existing)
@@ -176,7 +211,12 @@ describe('NotificationService', () => {
     it('should only update provided fields', async () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId,
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const updated = { ...existing, updatedBy: 'admin' }
       mockRepository.findOne.mockResolvedValueOnce(existing)
       mockRepository.update.mockResolvedValue({ affected: 1 })

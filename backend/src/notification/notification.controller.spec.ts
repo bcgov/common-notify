@@ -5,21 +5,25 @@ import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
-import { TenantGuard } from '../common/guards/tenant.guard'
-import { NotificationStatus } from './schemas'
+import { AuthJwtGuard } from '../auth/guards/auth.jwt-guard'
+import { RoleGuard } from '../common/guards/role.guard'
 
-// Mock TenantGuard to bypass authentication in tests
-const mockTenantGuard: CanActivate = {
+// Mock AuthJwtGuard to bypass authentication and populate request.tenant
+const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const req = context.switchToHttp().getRequest()
-    req.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
+    req.tenant = { id: 'test-tenant-id' }
     return true
   },
 }
 
+// Mock RoleGuard to bypass role checking
+const mockRoleGuard: CanActivate = {
+  canActivate: () => true,
+}
+
 const mockNotificationService = {
   findAll: vi.fn(),
-  findOne: vi.fn(),
 }
 
 describe('NotificationController', () => {
@@ -31,8 +35,10 @@ describe('NotificationController', () => {
       controllers: [NotificationController],
       providers: [{ provide: NotificationService, useValue: mockNotificationService }],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(AuthJwtGuard)
+      .useValue(mockAuthGuard)
+      .overrideGuard(RoleGuard)
+      .useValue(mockRoleGuard)
       .compile()
 
     service = module.get<NotificationService>(NotificationService)
@@ -54,93 +60,100 @@ describe('NotificationController', () => {
     expect(controller).toBeDefined()
   })
 
-  describe('GET /api/v1/notifications', () => {
-    it('should return 200 with a list of notifications', async () => {
-      const mockNotifications = [
-        { id: 'notif-1', tenantId: 'test-tenant-id', status: NotificationStatus.QUEUED },
-        { id: 'notif-2', tenantId: 'test-tenant-id', status: NotificationStatus.COMPLETED },
-      ]
+  describe('GET /api/v1/notification_request', () => {
+    it('should return 200 with a paginated list of notifications', async () => {
+      const mockNotifications = {
+        data: [
+          { id: 'notif-1', tenantId: 'test-tenant-id', status: 'queued' },
+          { id: 'notif-2', tenantId: 'test-tenant-id', status: 'completed' },
+        ],
+        count: 2,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
       mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
       return request(app.getHttpServer())
-        .get('/api/v1/notifications')
+        .get('/api/v1/notification_request')
         .expect(200)
         .expect((res) => {
-          expect(res.body).toHaveLength(2)
-          expect(res.body[0].id).toBe('notif-1')
+          expect(res.body.data).toHaveLength(2)
+          expect(res.body.count).toBe(2)
+          expect(res.body.page).toBe(1)
+          expect(res.body.data[0].id).toBe('notif-1')
         })
     })
 
-    it('should return empty array when no notifications exist', async () => {
-      mockNotificationService.findAll.mockResolvedValue([])
-
-      return request(app.getHttpServer())
-        .get('/api/v1/notifications')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toEqual([])
-        })
-    })
-
-    it('should call findAll with the tenant id', async () => {
-      mockNotificationService.findAll.mockResolvedValue([])
-
-      await request(app.getHttpServer()).get('/api/v1/notifications').expect(200)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('test-tenant-id')
-    })
-  })
-
-  describe('GET /api/v1/notifications/:id', () => {
-    it('should return 200 with a notification by id', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      const mockNotification = {
-        id: notifId,
-        tenantId: 'test-tenant-id',
-        status: NotificationStatus.QUEUED,
+    it('should return empty data array when no notifications exist', async () => {
+      const mockNotifications = {
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
       }
-      mockNotificationService.findOne.mockResolvedValue(mockNotification)
+      mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
       return request(app.getHttpServer())
-        .get(`/api/v1/notifications/${notifId}`)
+        .get('/api/v1/notification_request')
         .expect(200)
         .expect((res) => {
-          expect(res.body.id).toBe(notifId)
+          expect(res.body.data).toEqual([])
+          expect(res.body.count).toBe(0)
         })
     })
 
-    it('should return 400 for an invalid UUID', async () => {
-      return request(app.getHttpServer()).get('/api/v1/notifications/not-a-uuid').expect(400)
+    it('should call findAll with page and limit parameters', async () => {
+      const mockNotifications = {
+        data: [],
+        count: 0,
+        page: 2,
+        limit: 20,
+        totalPages: 0,
+      }
+      mockNotificationService.findAll.mockResolvedValue(mockNotifications)
+
+      await request(app.getHttpServer())
+        .get('/api/v1/notification_request?page=2&limit=20')
+        .expect(200)
+
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith(2, 20, undefined)
     })
 
-    it('should call findOne with the id and tenant id', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      mockNotificationService.findOne.mockResolvedValue({ id: notifId })
+    it('should call findAll with status filter parameter', async () => {
+      const mockNotifications = {
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      }
+      mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
-      await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
+      await request(app.getHttpServer())
+        .get('/api/v1/notification_request?status=completed')
+        .expect(200)
 
-      expect(mockNotificationService.findOne).toHaveBeenCalledWith(notifId, 'test-tenant-id')
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith(1, 10, 'completed')
     })
   })
 
   describe('NotificationService integration', () => {
     it('should call findAll on NotificationService when listing notifications', async () => {
       const spyFindAll = vi.spyOn(service, 'findAll')
-      mockNotificationService.findAll.mockResolvedValue([])
+      const mockNotifications = {
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      }
+      mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
-      await request(app.getHttpServer()).get('/api/v1/notifications').expect(200)
+      await request(app.getHttpServer()).get('/api/v1/notification_request').expect(200)
 
       expect(spyFindAll).toHaveBeenCalledTimes(1)
-    })
-
-    it('should call findOne on NotificationService when fetching a notification by id', async () => {
-      const notifId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-      const spyFindOne = vi.spyOn(service, 'findOne')
-      mockNotificationService.findOne.mockResolvedValue({ id: notifId })
-
-      await request(app.getHttpServer()).get(`/api/v1/notifications/${notifId}`).expect(200)
-
-      expect(spyFindOne).toHaveBeenCalledTimes(1)
     })
   })
 })

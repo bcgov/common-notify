@@ -9,9 +9,7 @@ import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
 import { APP_VERSION } from '@/utils/version'
-import 'react-toastify/dist/ReactToastify.css'
-import '@/scss/components/layout.scss'
-import '@/scss/components/toasts.scss'
+import { SideBar } from './Sidebar'
 
 type Props = {
   children: React.ReactNode
@@ -81,7 +79,12 @@ const Layout: FC<Props> = ({ children }) => {
             </div>
           </Header>
         </div>
-        <div className="layout-content">{children}</div>
+        <div className="layout-body">
+          <div className="layout-body-inner">
+            <SideBar />
+            <div className="layout-content">{children}</div>
+          </div>
+        </div>
         <div className="layout-footer">
           <Footer />
           <div className="footer-version">v{APP_VERSION}</div>
