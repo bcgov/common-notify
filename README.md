@@ -542,7 +542,237 @@ As per 3.4 but add an additional recipient to the CC list. POST to /notifyevent 
     "sms" :{}
   }
 }
-````
+```
+### 4. Callbacks 
+##### 4.1 Send with callback 
 
+Send a notification and request delivery updates via a callback endpoint 
 
-<!-- Testing API gateway automation -->
+**Admin UI** No setup required **API** POST to /notifyevent **Payload**
+```json
+{
+  "notificationEventType": "funding-approved",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Development Fund",
+    "amount": "1000",
+    "emailaddress": "lucky@me.com",
+    "phonenumber": "7787001234"
+  },
+  "callback": {
+    "url": "https://api.myapp.com/notify/callback",
+    "events": ["DELIVERED", "FAILED"]
+  }
+}
+```
+
+##### 4.2 Callback result 
+
+Example payload sent when delivery status changes
+
+```json
+{
+  "notifyId": "12345-abcde",
+  "notificationEventType": "funding-approved",
+  "status": "DELIVERED",
+  "channel": "email",
+  "recipient": "lucky@me.com",
+  "timestamp": "2026-01-01T10:00:00Z",
+  "retryable": false
+}
+```
+
+##### 4.3 Callback failure example
+
+```json
+{
+  "notifyId": "12345-abcde",
+  "notificationEventType": "funding-approved",
+  "status": "FAILED",
+  "channel": "sms",
+  "recipient": "7787001234",
+  "timestamp": "2026-01-01T10:01:00Z",
+  "retryable": true,
+  "error": {
+    "code": "SMS_PROVIDER_ERROR",
+    "message": "Message delivery failed"
+  }
+}
+```
+Note 
+* Callbacks are triggered per channel
+* Multiple callbacks may be generated for a single request
+* Callback configuration overrides tenant defaults
+
+### 5. Subscriptions (UI-driven callbacks) 
+
+Subscriptions notify external systems of events without requiring callbacks in every request 
+
+**Admin UI** Create a subscription with endpoint and filters Example configuration
+
+```json
+{
+  "name": "Funding Notifications",
+  "endpointUrl": "https://api.myapp.com/notify/subscription",
+  "method": "POST",
+  "filters": {
+    "notificationEventTypes": ["funding-approved"],
+    "statuses": ["DELIVERED", "FAILED"]
+  }
+}
+```
+
+##### 5.1 Subscription trigger 
+
+Send a notification (no callback required) 
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approved",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Development Fund",
+    "amount": "1000",
+    "emailaddress": "lucky@me.com",
+    "phonenumber": "7787001234"
+  }
+}
+```
+
+##### 5.2 Subscription result 
+
+If filters match, Notify POSTs to the configured endpoint
+
+```json
+{
+  "notifyId": "12345-abcde",
+  "notificationEventType": "funding-approved",
+  "status": "DELIVERED",
+  "channel": "email",
+  "recipient": "lucky@me.com",
+  "timestamp": "2026-01-01T10:00:00Z"
+}
+```
+Note 
+* Subscriptions are configured in the UI only
+* They apply across the tenant
+* Subscriptions and callbacks may both be active
+
+### 6. Attachments 
+##### 6.1 Send with inline attachment 
+
+Send an email with a base64 encoded attachment 
+
+**Admin UI** No setup required **API** POST to /notifysimple/email **Payload**
+
+```json
+{
+  "to": ["me@example.com"],
+  "subject": "Report Attached",
+  "body": "Please find the report attached",
+  "attachments": [
+    {
+      "filename": "report.pdf",
+      "contentType": "application/pdf",
+      "content": "JVBERi0xLjQKJcfs..."
+    }
+  ]
+}
+```
+
+##### 6.2 Send with URL attachment
+
+```json
+{
+  "to": ["me@example.com"],
+  "subject": "Report Available",
+  "body": "See attached document",
+  "attachments": [
+    {
+      "filename": "report.pdf",
+      "url": "https://files.myapp.com/report.pdf"
+    }
+  ]
+}
+```
+
+### 6.3 Attachment via Notification Event 
+
+**Admin UI** Add attachment definition to the Notification Event 
+
+**API** POST to /notifyevent **Payload**
+
+```json
+{
+  "notificationEventType": "funding-approved",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Development Fund",
+    "amount": "1000",
+    "emailaddress": "lucky@me.com"
+  }
+}
+```
+
+##### 6.4 Override attachment 
+
+Override or add attachments in the request
+
+```json
+{
+  "notificationEventType": "funding-approved",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Development Fund",
+    "amount": "1000",
+    "emailaddress": "lucky@me.com"
+  },
+  "overrides": {
+    "email": {
+      "attachments": [
+        {
+          "filename": "custom-letter.txt",
+          "content": "Q3VzdG9tIGF0dGFjaG1lbnQ="
+        }
+      ]
+    }
+  }
+}
+```
+
+##### 6.5 Templated attachment
+
+```json
+{
+  "notificationEventType": "funding-approved",
+  "params": {
+    "firstname": "Lucky",
+    "lastname": "Applicant",
+    "program": "Small Business Development Fund",
+    "amount": "1000"
+  },
+  "overrides": {
+    "email": {
+      "attachments": [
+        {
+          "filename": "approval-{{firstname}}.txt",
+          "template": {
+            "body": "Approval for {{firstname}} {{lastname}} for {{program}}"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+Note 
+* Attachments are primarily supported for email
+* Attachments can be defined in UI or API
+* Overrides follow standard cascading rules
+* Templates support parameter substitution
