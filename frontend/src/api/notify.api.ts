@@ -63,7 +63,7 @@ export const notifyApi = {
    */
   async sendSimpleNotify(payload: {
     email?: { to: string[]; subject: string; body: string }
-    sms?: { to: string[]; body: string }
+    sms?: { recipients: string[]; body: string }
   }) {
     try {
       // Send request with X-Realm header to route to user auth path

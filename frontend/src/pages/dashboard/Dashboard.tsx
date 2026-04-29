@@ -6,7 +6,8 @@ import { Col, Row, Table } from 'react-bootstrap'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { setStatusFilter, selectFilteredNotifications } from '@/redux/slices/notification.slice'
-import { NotificationStatus } from '@/enum/notification-status.enum'
+import { selectStatuses } from '@/redux/slices/codeTables.slice'
+import type { NotificationStatus } from '@/enum/notification-status.enum'
 
 const mockNotificationEvents = [
   { id: 1, name: 'Graduates Outcome Survey' },
@@ -16,18 +17,20 @@ const mockNotificationEvents = [
 
 const notificationEventItems = mockNotificationEvents.map((ws) => ({ id: ws.id, label: ws.name }))
 
-const statusFilterItems = [
-  { id: 'all', label: 'All' },
-  ...Object.values(NotificationStatus).map((s) => ({
-    id: s,
-    label: s.charAt(0).toUpperCase() + s.slice(1),
-  })),
-]
-
 const Dashboard: FC = () => {
   const dispatch = useAppDispatch()
   const { statusFilter, isLoading } = useAppSelector((state) => state.notification)
   const filteredNotifications = useAppSelector(selectFilteredNotifications)
+  const statuses = useAppSelector(selectStatuses)
+
+  // Build status filter items from Redux
+  const statusFilterItems = [
+    { id: 'all', label: 'All' },
+    ...statuses.map((s) => ({
+      id: s.id,
+      label: s.label,
+    })),
+  ]
 
   useEffect(() => {
     dispatch(fetchNotifications())
