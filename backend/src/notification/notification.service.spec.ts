@@ -102,18 +102,16 @@ describe('NotificationService', () => {
   })
 
   describe('findAll', () => {
-    it('should return all notifications for a tenant', async () => {
-      const tenantId = 'tenant-uuid'
+    it('should return all notifications', async () => {
       const mockNotifications = [
-        { id: 'notif-1', tenantId },
-        { id: 'notif-2', tenantId },
+        { id: 'notif-1', tenantId: 'tenant-uuid' },
+        { id: 'notif-2', tenantId: 'tenant-uuid' },
       ]
       mockRepository.find.mockResolvedValue(mockNotifications)
 
-      const result = await service.findAll(tenantId)
+      const result = await service.findAll()
 
       expect(mockRepository.find).toHaveBeenCalledWith({
-        where: { tenantId },
         order: { createdAt: 'DESC' },
       })
       expect(result).toEqual(mockNotifications)
@@ -122,7 +120,7 @@ describe('NotificationService', () => {
     it('should return empty array when no notifications exist', async () => {
       mockRepository.find.mockResolvedValue([])
 
-      const result = await service.findAll('tenant-uuid')
+      const result = await service.findAll()
 
       expect(result).toEqual([])
     })
@@ -160,7 +158,12 @@ describe('NotificationService', () => {
     it('should update status and return the notification', async () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId,
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const dto = { status: NotificationStatus.COMPLETED, updatedBy: 'admin' }
       const updated = { ...existing, ...dto }
       mockRepository.findOne.mockResolvedValueOnce(existing)
@@ -176,7 +179,12 @@ describe('NotificationService', () => {
     it('should only update provided fields', async () => {
       const id = 'notif-uuid'
       const tenantId = 'tenant-uuid'
-      const existing = { id, tenantId, status: NotificationStatus.QUEUED, updatedBy: null }
+      const existing = {
+        id,
+        tenantId,
+        status: NotificationStatus.QUEUED,
+        updatedBy: null,
+      }
       const updated = { ...existing, updatedBy: 'admin' }
       mockRepository.findOne.mockResolvedValueOnce(existing)
       mockRepository.update.mockResolvedValue({ affected: 1 })

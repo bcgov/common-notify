@@ -1,6 +1,7 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import UserService from '@/service/user-service'
+import { STATUS_CODES } from '@/common/api'
 
 /**
  * Centralized API abstraction layer for Notify API endpoints.
@@ -8,20 +9,6 @@ import UserService from '@/service/user-service'
  *
  * Components should call Redux actions/thunks instead of making API calls directly.
  */
-
-// HTTP status codes
-const STATUS_CODES = {
-  Ok: 200,
-  BadRequest: 400,
-  Unauthorized: 401,
-  Forbidden: 403,
-  NotFound: 404,
-  MethodNotAllowed: 405,
-  InternalServerError: 500,
-  BadGateway: 502,
-  ServiceUnavailable: 503,
-  Conflict: 409,
-}
 
 /**
  * Configure axios interceptors for auth error handling

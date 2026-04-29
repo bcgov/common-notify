@@ -56,8 +56,8 @@ export class NotificationService {
     return saved
   }
 
-  async findAll(tenantId: string): Promise<NotificationRequest[]> {
-    return this.notificationRepository.find({ where: { tenantId }, order: { createdAt: 'DESC' } })
+  async findAll(): Promise<NotificationRequest[]> {
+    return this.notificationRepository.find({ order: { createdAt: 'DESC' } })
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
@@ -66,6 +66,11 @@ export class NotificationService {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }
     return notification
+  }
+
+  // Demo route, to be removed
+  async getTenants(): Promise<any> {
+    return this.tenantsService.findAll()
   }
 
   async update(

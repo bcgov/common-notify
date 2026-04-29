@@ -74,6 +74,7 @@ notify-status:/api/v1/notify/status
 notify-callbacks:/api/v1/notify/registerCallback
 templates:/api/v1/templates
 gcnotify:/api/gcnotify/v2
+notification_request:/api/v1/notification_request
 "
 
 echo "$ROUTE_CONFIGS" | while read -r route_config; do

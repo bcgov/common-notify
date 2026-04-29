@@ -1,38 +1,23 @@
-import { Controller, Get, Param, Version, UseGuards, ParseUUIDPipe } from '@nestjs/common'
-import {
-  ApiTags,
-  ApiOperation,
-  ApiOkResponse,
-  ApiNotFoundResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger'
-import { TenantGuard } from '../common/guards/tenant.guard'
-import { GetTenant } from '../common/decorators/get-tenant.decorator'
-import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { Controller, Get, Version, UseGuards, Logger } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { NotificationRequestDto } from './schemas'
+import { AuthJwtGuard } from 'src/auth/guards/auth.jwt-guard'
 
-@ApiTags('notifications')
-@Controller('notifications')
-@UseGuards(TenantGuard)
+@ApiTags('notification_request')
+@Controller('notification_request')
+@UseGuards(AuthJwtGuard)
 @ApiBearerAuth()
 export class NotificationController {
+  private readonly logger = new Logger(NotificationController.name)
+
   constructor(private readonly notificationService: NotificationService) {}
 
   @Version('1')
   @Get()
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
   @ApiOkResponse({ isArray: true, type: NotificationRequestDto })
-  findAll(@GetTenant() tenant: Tenant) {
-    return this.notificationService.findAll(tenant.id)
-  }
-
-  @Version('1')
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a notification request by ID scoped to the authenticated tenant' })
-  @ApiOkResponse({ type: NotificationRequestDto })
-  @ApiNotFoundResponse({ description: 'Notification request not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @GetTenant() tenant: Tenant) {
-    return this.notificationService.findOne(id, tenant.id)
+  findAll() {
+    return this.notificationService.findAll()
   }
 }
