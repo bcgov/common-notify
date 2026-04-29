@@ -58,7 +58,7 @@ const NotificationStatusTable: FC = () => {
                 Loading...
               </td>
             </tr>
-          ) : notifications.length > 0 ? (
+          ) : notifications && notifications.length > 0 ? (
             notifications.map((row) => (
               <tr key={row.id}>
                 <td>{row.tenant?.name || row.tenantId}</td>

@@ -6,8 +6,16 @@ import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
-vi.mock('@/redux/thunks/notification.thunks')
+vi.mock('@/redux/thunks/notification.thunks', async () => {
+  const { createAsyncThunk: createThunk } = await import('@reduxjs/toolkit')
+  return {
+    fetchNotifications: createThunk<NotificationRequest[]>('notification/fetchAll', async () => {
+      return []
+    }),
+  }
+})
 
 describe('Dashboard with CodeTables', () => {
   let preloadedState: any
@@ -126,7 +134,7 @@ describe('Dashboard with CodeTables', () => {
     )
 
     // Component should render even during loading
-    expect(screen.getByRole('main')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
   })
 
   it('should handle error state from code tables', () => {
@@ -155,7 +163,7 @@ describe('Dashboard with CodeTables', () => {
     )
 
     // Component should still render with fallback or empty state
-    expect(screen.getByRole('main')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
   })
 
   it('should update filter options when code tables change', () => {

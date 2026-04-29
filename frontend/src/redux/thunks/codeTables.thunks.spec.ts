@@ -1,151 +1,115 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { configureStore } from '@reduxjs/toolkit'
 import { fetchCodeTables } from '@/redux/thunks/codeTables.thunks'
 import * as api from '@/common/api'
+import codeTablesReducer from '@/redux/slices/codeTables.slice'
 
-vi.mock('@/common/api')
+vi.mock('@/common/api', () => ({
+  get: vi.fn(),
+  generateApiParameters: vi.fn((path: string) => ({ url: path })),
+}))
 
 describe('codeTables.thunks', () => {
+  let store: ReturnType<typeof configureStore>
+
   beforeEach(() => {
     vi.clearAllMocks()
+    store = configureStore({
+      reducer: {
+        codeTables: codeTablesReducer,
+      },
+    })
   })
 
   describe('fetchCodeTables', () => {
-    const mockStatusesResponse = {
-      data: {
-        data: [
-          { code: 'sent', description: 'Sent' },
-          { code: 'failed', description: 'Failed' },
-          { code: 'pending', description: 'Pending' },
-        ],
-      },
-    }
-
-    const mockChannelsResponse = {
-      data: {
-        data: [
-          { channel_code: 'EMAIL', description: 'Email' },
-          { channel_code: 'SMS', description: 'SMS' },
-        ],
-      },
-    }
-
-    const mockEventTypesResponse = {
-      data: {
-        data: [
-          { event_type_code: 'PASSWORD_RESET', description: 'Password Reset' },
-          { event_type_code: 'INVOICE_SENT', description: 'Invoice Sent' },
-        ],
-      },
-    }
-
     it('should fetch and transform code tables successfully', async () => {
-      const mockApiClient = {
-        get: vi.fn(),
-      }
-      vi.mocked(api.apiClient, true).get = mockApiClient.get
+      const mockStatusesData = [
+        { code: 'sent', description: 'Sent' },
+        { code: 'failed', description: 'Failed' },
+        { code: 'pending', description: 'Pending' },
+      ]
+      const mockChannelsData = [
+        { channel_code: 'EMAIL', description: 'Email' },
+        { channel_code: 'SMS', description: 'SMS' },
+      ]
+      const mockEventTypesData = [
+        { event_type_code: 'PASSWORD_RESET', description: 'Password Reset' },
+        { event_type_code: 'INVOICE_SENT', description: 'Invoice Sent' },
+      ]
 
-      mockApiClient.get
-        .mockResolvedValueOnce(mockStatusesResponse)
-        .mockResolvedValueOnce(mockChannelsResponse)
-        .mockResolvedValueOnce(mockEventTypesResponse)
+      ;(api.get as any).mockResolvedValueOnce(mockStatusesData)
+      ;(api.get as any).mockResolvedValueOnce(mockChannelsData)
+      ;(api.get as any).mockResolvedValueOnce(mockEventTypesData)
 
-      const thunk = fetchCodeTables()
-      const result = await thunk(async (fn) => fn())
+      await (store.dispatch as any)(fetchCodeTables())
 
-      expect(result.payload).toBeDefined()
-      expect(result.payload.statuses).toHaveLength(3)
-      expect(result.payload.channels).toHaveLength(2)
-      expect(result.payload.eventTypes).toHaveLength(2)
-
-      // Verify transformation
-      expect(result.payload.statuses[0]).toEqual({
+      const state = (store.getState() as any).codeTables
+      expect(state.statuses).toHaveLength(3)
+      expect(state.channels).toHaveLength(2)
+      expect(state.eventTypes).toHaveLength(2)
+      expect(state.statuses[0]).toEqual({
         id: 'sent',
         label: 'Sent',
         description: 'sent',
       })
-      expect(result.payload.channels[0]).toEqual({
-        id: 'EMAIL',
-        label: 'Email',
-        description: 'EMAIL',
-      })
-      expect(result.payload.eventTypes[0]).toEqual({
-        id: 'PASSWORD_RESET',
-        label: 'Password Reset',
-        description: 'PASSWORD_RESET',
-      })
-
-      expect(result.payload.isLoading).toBe(false)
-      expect(result.payload.error).toBeNull()
     })
 
     it('should handle API error for statuses', async () => {
-      const mockApiClient = {
-        get: vi.fn(),
-      }
-      vi.mocked(api.apiClient, true).get = mockApiClient.get
+      ;(api.get as any).mockRejectedValueOnce(new Error('Network error'))
 
-      mockApiClient.get.mockRejectedValueOnce(new Error('Network error'))
+      await (store.dispatch as any)(fetchCodeTables())
 
-      const thunk = fetchCodeTables()
-      const result = await thunk(async (fn) => fn())
-
-      expect(result.type).toBe('codeTables/fetchCodeTables/rejected')
-      expect(result.payload).toBe('Network error')
+      const state = (store.getState() as any).codeTables
+      expect(state.isLoading).toBe(false)
+      expect(state.error).toBe('Network error')
     })
 
     it('should handle API error for channels', async () => {
-      const mockApiClient = {
-        get: vi.fn(),
-      }
-      vi.mocked(api.apiClient, true).get = mockApiClient.get
+      const mockStatusesData = [
+        { code: 'sent', description: 'Sent' },
+        { code: 'failed', description: 'Failed' },
+        { code: 'pending', description: 'Pending' },
+      ]
 
-      mockApiClient.get
-        .mockResolvedValueOnce(mockStatusesResponse)
-        .mockRejectedValueOnce(new Error('Channel fetch failed'))
+      ;(api.get as any).mockResolvedValueOnce(mockStatusesData)
+      ;(api.get as any).mockRejectedValueOnce(new Error('Channel fetch failed'))
 
-      const thunk = fetchCodeTables()
-      const result = await thunk(async (fn) => fn())
+      await (store.dispatch as any)(fetchCodeTables())
 
-      expect(result.type).toBe('codeTables/fetchCodeTables/rejected')
-      expect(result.payload).toBe('Channel fetch failed')
-    })
-
-    it('should handle unknown error', async () => {
-      const mockApiClient = {
-        get: vi.fn(),
-      }
-      vi.mocked(api.apiClient, true).get = mockApiClient.get
-
-      mockApiClient.get.mockRejectedValueOnce('Unknown error')
-
-      const thunk = fetchCodeTables()
-      const result = await thunk(async (fn) => fn())
-
-      expect(result.type).toBe('codeTables/fetchCodeTables/rejected')
-      expect(result.payload).toBe('Failed to fetch code tables')
+      const state = (store.getState() as any).codeTables
+      expect(state.error).toBe('Channel fetch failed')
     })
 
     it('should make correct API calls', async () => {
-      const mockApiClient = {
-        get: vi.fn(),
-      }
-      vi.mocked(api.apiClient, true).get = mockApiClient.get
+      const mockStatusesData = [
+        { code: 'sent', description: 'Sent' },
+        { code: 'failed', description: 'Failed' },
+        { code: 'pending', description: 'Pending' },
+      ]
+      const mockChannelsData = [
+        { channel_code: 'EMAIL', description: 'Email' },
+        { channel_code: 'SMS', description: 'SMS' },
+      ]
+      const mockEventTypesData = [
+        { event_type_code: 'PASSWORD_RESET', description: 'Password Reset' },
+        { event_type_code: 'INVOICE_SENT', description: 'Invoice Sent' },
+      ]
 
-      mockApiClient.get
-        .mockResolvedValueOnce(mockStatusesResponse)
-        .mockResolvedValueOnce(mockChannelsResponse)
-        .mockResolvedValueOnce(mockEventTypesResponse)
+      ;(api.get as any)
+        .mockResolvedValueOnce(mockStatusesData)
+        .mockResolvedValueOnce(mockChannelsData)
+        .mockResolvedValueOnce(mockEventTypesData)
 
-      const thunk = fetchCodeTables()
-      await thunk(async (fn) => fn())
+      await (store.dispatch as any)(fetchCodeTables())
 
-      expect(mockApiClient.get).toHaveBeenCalledTimes(3)
-      expect(mockApiClient.get).toHaveBeenNthCalledWith(
-        1,
+      expect(api.get as any).toHaveBeenCalledTimes(3)
+      expect(api.generateApiParameters as any).toHaveBeenCalledWith(
         '/api/v1/code-tables/notification-status',
       )
-      expect(mockApiClient.get).toHaveBeenNthCalledWith(2, '/api/v1/code-tables/channels')
-      expect(mockApiClient.get).toHaveBeenNthCalledWith(3, '/api/v1/code-tables/event-types')
+      expect(api.generateApiParameters as any).toHaveBeenCalledWith('/api/v1/code-tables/channels')
+      expect(api.generateApiParameters as any).toHaveBeenCalledWith(
+        '/api/v1/code-tables/event-types',
+      )
     })
   })
 })

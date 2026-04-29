@@ -113,7 +113,7 @@ describe('CodeTablesService', () => {
 
   describe('getStatuses', () => {
     it('should return all status codes transformed to CodeTableItem format', async () => {
-      vi.mocked(statusCodeRepo.find).mockResolvedValueOnce(mockStatusCodes)
+      ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
 
       const result = await service.getStatuses()
 
@@ -129,7 +129,7 @@ describe('CodeTablesService', () => {
     })
 
     it('should return empty array when no status codes exist', async () => {
-      vi.mocked(statusCodeRepo.find).mockResolvedValueOnce([])
+      ;(statusCodeRepo.find as any).mockResolvedValueOnce([])
 
       const result = await service.getStatuses()
 
@@ -138,7 +138,7 @@ describe('CodeTablesService', () => {
 
     it('should handle database errors', async () => {
       const error = new Error('Database error')
-      vi.mocked(statusCodeRepo.find).mockRejectedValueOnce(error)
+      ;(statusCodeRepo.find as any).mockRejectedValueOnce(error)
 
       await expect(service.getStatuses()).rejects.toThrow('Database error')
     })
@@ -146,7 +146,7 @@ describe('CodeTablesService', () => {
 
   describe('getChannels', () => {
     it('should return all channel codes transformed to CodeTableItem format', async () => {
-      vi.mocked(channelCodeRepo.find).mockResolvedValueOnce(mockChannelCodes)
+      ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
 
       const result = await service.getChannels()
 
@@ -162,7 +162,7 @@ describe('CodeTablesService', () => {
     })
 
     it('should return empty array when no channel codes exist', async () => {
-      vi.mocked(channelCodeRepo.find).mockResolvedValueOnce([])
+      ;(channelCodeRepo.find as any).mockResolvedValueOnce([])
 
       const result = await service.getChannels()
 
@@ -171,7 +171,7 @@ describe('CodeTablesService', () => {
 
     it('should handle database errors', async () => {
       const error = new Error('Database error')
-      vi.mocked(channelCodeRepo.find).mockRejectedValueOnce(error)
+      ;(channelCodeRepo.find as any).mockRejectedValueOnce(error)
 
       await expect(service.getChannels()).rejects.toThrow('Database error')
     })
@@ -179,7 +179,7 @@ describe('CodeTablesService', () => {
 
   describe('getEventTypes', () => {
     it('should return all event type codes transformed to CodeTableItem format', async () => {
-      vi.mocked(eventTypeCodeRepo.find).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       const result = await service.getEventTypes()
 
@@ -195,7 +195,7 @@ describe('CodeTablesService', () => {
     })
 
     it('should return empty array when no event type codes exist', async () => {
-      vi.mocked(eventTypeCodeRepo.find).mockResolvedValueOnce([])
+      ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce([])
 
       const result = await service.getEventTypes()
 
@@ -204,7 +204,7 @@ describe('CodeTablesService', () => {
 
     it('should handle database errors', async () => {
       const error = new Error('Database error')
-      vi.mocked(eventTypeCodeRepo.find).mockRejectedValueOnce(error)
+      ;(eventTypeCodeRepo.find as any).mockRejectedValueOnce(error)
 
       await expect(service.getEventTypes()).rejects.toThrow('Database error')
     })
@@ -212,9 +212,9 @@ describe('CodeTablesService', () => {
 
   describe('getAllCodeTables', () => {
     it('should return all code tables combined', async () => {
-      vi.mocked(statusCodeRepo.find).mockResolvedValueOnce(mockStatusCodes)
-      vi.mocked(channelCodeRepo.find).mockResolvedValueOnce(mockChannelCodes)
-      vi.mocked(eventTypeCodeRepo.find).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
+      ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
+      ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       const result = await service.getAllCodeTables()
 
@@ -229,9 +229,9 @@ describe('CodeTablesService', () => {
     })
 
     it('should make parallel database calls', async () => {
-      statusCodeRepo.find.mockResolvedValueOnce(mockStatusCodes)
-      channelCodeRepo.find.mockResolvedValueOnce(mockChannelCodes)
-      eventTypeCodeRepo.find.mockResolvedValueOnce(mockEventTypeCodes)
+      ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
+      ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
+      ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       await service.getAllCodeTables()
 
@@ -241,9 +241,9 @@ describe('CodeTablesService', () => {
     })
 
     it('should handle partial failures', async () => {
-      statusCodeRepo.find.mockResolvedValueOnce(mockStatusCodes)
-      channelCodeRepo.find.mockRejectedValueOnce(new Error('Channel lookup failed'))
-      eventTypeCodeRepo.find.mockResolvedValueOnce(mockEventTypeCodes)
+      ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
+      ;(channelCodeRepo.find as any).mockRejectedValueOnce(new Error('Channel lookup failed'))
+      ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       await expect(service.getAllCodeTables()).rejects.toThrow('Channel lookup failed')
     })
