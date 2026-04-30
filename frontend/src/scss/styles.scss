@@ -18,3 +18,10 @@ $bootstrap-icons-font-src:
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2') format('woff2'),
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff') format('woff');
 @import '../../node_modules/bootstrap-icons/font/bootstrap-icons.scss';
+
+// Make BCGov Select button fill its container when width is set on the wrapper
+.bcds-react-aria-Select {
+  .bcds-react-aria-Select--Button {
+    width: 100%;
+  }
+}

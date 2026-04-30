@@ -4,6 +4,8 @@ import { Tenant } from './admin/tenants/entities/tenant.entity'
 import { TenantStatusCode } from './admin/tenants/entities/tenant-status-code.entity'
 import { NotificationRequest } from './notification/entities/notification-request.entity'
 import { NotificationStatusCode } from './notification/entities/notification-status-code.entity'
+import { NotificationChannelCode } from './notification/entities/notification-channel-code.entity'
+import { NotificationEventTypeCode } from './notification/entities/notification-event-type-code.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -22,7 +24,14 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
       password: dbPassword,
       database: dbName,
       schema: dbSchema,
-      entities: [Tenant, TenantStatusCode, NotificationRequest, NotificationStatusCode],
+      entities: [
+        Tenant,
+        TenantStatusCode,
+        NotificationRequest,
+        NotificationStatusCode,
+        NotificationChannelCode,
+        NotificationEventTypeCode,
+      ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],
       poolErrorHandler: (error) => console.log('Pool error:', error),

@@ -96,6 +96,7 @@ services:
       BACKEND_URL: http://backend:3000
       PORT: 3000
       NODE_ENV: development
+      VITE_API_GATEWAY_NOTIFY_URL: http://kong:8000
     image: *node-image
     ports: ['3000:3000']
     volumes: ['../frontend:/app', '/app/node_modules']

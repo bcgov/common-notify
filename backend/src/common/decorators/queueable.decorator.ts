@@ -141,12 +141,34 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         if (validatedPayload.sms) channels.push('sms')
         if (validatedPayload.msgApp) channels.push('msgApp')
 
+        // Determine if this is a delayed send and extract the scheduled timestamp
+        const delayedSendTimestamp =
+          validatedPayload.email?.delayedSend ||
+          validatedPayload.sms?.delayedSend ||
+          validatedPayload.msgApp?.delayedSend
+
+        // Calculate delay in milliseconds if delayedSend is present
+        let delayMs = 0
+        if (delayedSendTimestamp) {
+          const scheduledTime = new Date(delayedSendTimestamp).getTime()
+          const now = Date.now()
+          delayMs = Math.max(0, scheduledTime - now)
+        }
+
+        // Determine initial status: SCHEDULED if delayedSend is set, otherwise ACCEPTED
+        const hasDelayedSend = !!delayedSendTimestamp
+        const initialStatus = hasDelayedSend
+          ? NotificationStatus.SCHEDULED
+          : NotificationStatus.ACCEPTED
+
         const response = {
           notifyId: notificationRecord.id,
-          status: NotificationStatus.ACCEPTED,
+          status: initialStatus,
           channels: channels.length > 0 ? channels : ['email', 'sms', 'msgApp'],
           createdAt: notificationRecord.createdAt || new Date(),
-          message: 'Notification accepted, queuing in progress',
+          message: hasDelayedSend
+            ? `Notification scheduled for delivery at ${delayedSendTimestamp}`
+            : 'Notification accepted, queuing in progress',
         }
 
         // Fire off queueing asynchronously - don't block the response
@@ -159,9 +181,10 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               tenantId,
               request: validatedPayload,
               requestedAt: new Date().toISOString(),
+              ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
             }
 
-            await queue.add(jobPayload, {
+            const queueOptions: any = {
               jobId: notificationRecord.id,
               attempts: 3,
               backoff: {
@@ -170,7 +193,14 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               },
               removeOnComplete: false,
               removeOnFail: false,
-            })
+            }
+
+            // Add delay if this is a scheduled send
+            if (delayMs > 0) {
+              queueOptions.delay = delayMs
+            }
+
+            await queue.add(jobPayload, queueOptions)
 
             logger.log(`Job successfully enqueued: ${notificationRecord.id}`, {
               tenantId,
@@ -178,18 +208,24 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               jobId: notificationRecord.id,
             })
 
-            // Update status to QUEUED now that it's in Redis
+            // Update status after queuing
+            // For scheduled sends, keep status as SCHEDULED
+            // For immediate sends, update to QUEUED
+            const statusAfterQueuing = hasDelayedSend
+              ? NotificationStatus.SCHEDULED
+              : NotificationStatus.QUEUED
+
             try {
               await (this as QueueableContext).notificationService.update(
                 notificationRecord.id,
                 tenantId,
                 {
-                  status: NotificationStatus.QUEUED,
+                  status: statusAfterQueuing,
                   updatedBy: 'system',
                 },
               )
             } catch (updateError) {
-              logger.error(`Failed to update status to QUEUED: ${notificationRecord.id}`, {
+              logger.error(`Failed to update status after queuing: ${notificationRecord.id}`, {
                 tenantId,
                 error: (updateError as Error).message,
               })

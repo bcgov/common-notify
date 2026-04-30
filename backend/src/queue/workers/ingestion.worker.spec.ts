@@ -227,6 +227,43 @@ describe('IngestionWorker', () => {
       expect(callArgs.delay).toBeLessThanOrEqual(60000)
     })
 
+    it('should update status to processing for scheduled notifications', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+      )
+
+      const futureDate = new Date(Date.now() + 60000).toISOString()
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-scheduled',
+          tenantId: 'tenant-scheduled',
+          request: {
+            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+          },
+          requestedAt: new Date().toISOString(),
+          scheduledFor: futureDate,
+        },
+      }
+
+      await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+      // The notificationService.update should be called to update status to PROCESSING
+      // This happens when the scheduled time arrives and the job is now being processed
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-scheduled',
+        'tenant-scheduled',
+        {
+          status: 'processing',
+          updatedBy: 'ingestion-worker',
+        },
+      )
+    })
+
     it('should throw error when no channels are specified', async () => {
       await IngestionWorker.initialize(
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,

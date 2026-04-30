@@ -2,6 +2,7 @@ import type { AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 
 export interface ApiRequestParameters<T = object> {
   url: string
@@ -10,7 +11,7 @@ export interface ApiRequestParameters<T = object> {
   enableNotification?: boolean
 }
 
-const STATUS_CODES = {
+export const STATUS_CODES = {
   Ok: 200,
   BadRequest: 400,
   Unauthorized: 401,
@@ -25,21 +26,27 @@ const STATUS_CODES = {
 
 const { KEYCLOAK_URL } = config
 
-// Response interceptor to handle auth errors
-axios.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    const { response } = error
-    if (response && response.status === STATUS_CODES.Unauthorized) {
-      // 401 = unauthenticated: redirect to Keycloak login
-      UserService.doLogin()
-    } else if (response && response.status === STATUS_CODES.Forbidden) {
-      // 403 = authenticated but lacks permission
-      globalThis.location.href = '/not-authorized'
-    }
-    return Promise.reject(error)
-  },
-)
+// Flag to prevent duplicate interceptor registration
+let responseInterceptorRegistered = false
+
+// Response interceptor to handle auth errors (register only once)
+if (!responseInterceptorRegistered) {
+  axios.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+      const { response } = error
+      if (response && response.status === STATUS_CODES.Unauthorized) {
+        // 401 = unauthenticated: redirect to Keycloak login
+        UserService.doLogin()
+      } else if (response && response.status === STATUS_CODES.Forbidden) {
+        // 403 = authenticated but lacks permission: show toast instead of redirecting
+        showErrorToast('You do not have permission to access this resource')
+      }
+      return Promise.reject(error)
+    },
+  )
+  responseInterceptorRegistered = true
+}
 
 const setAuthHeader = () => {
   axios.defaults.headers.common['Authorization'] = `Bearer ${UserService.getToken()}`
