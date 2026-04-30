@@ -517,7 +517,7 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
@@ -570,7 +570,7 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
@@ -597,7 +597,7 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
@@ -624,4 +624,4 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
