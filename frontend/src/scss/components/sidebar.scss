@@ -27,6 +27,15 @@
     cursor: pointer;
     padding: $spacing-sm $spacing-md;
     margin-bottom: $spacing-xs;
+
+    // special button styling
+    background: none;
+    border: none;
+    outline: none;
+    appearance: none;
+    color: inherit;
+    font: inherit;
+    width: 100%;
   }
 
   &__nav {
