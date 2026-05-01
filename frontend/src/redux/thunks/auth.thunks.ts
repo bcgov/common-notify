@@ -2,6 +2,7 @@ import { createAsyncThunk } from '@reduxjs/toolkit'
 import UserService from '@/service/user-service'
 import type { AuthUser } from '@/interfaces/AuthUser'
 import type { RootState } from '../store'
+import notifyApi from '@/api/notify.api'
 
 /**
  * Initialize auth from JWT token
@@ -59,5 +60,27 @@ export const initializeAuthFromToken = createAsyncThunk<
     return user
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to initialize auth')
+  }
+})
+
+/**
+ * Fetch user's tenants from API
+ *
+ * Called after authentication is initialized. Fetches the list of tenants
+ * the authenticated user has access to. Auto-selects if only one tenant exists.
+ */
+export const fetchTenants = createAsyncThunk<
+  Tenant[],
+  void,
+  {
+    state: RootState
+    rejectValue: string
+  }
+>('auth/fetchTenants', async (_, { rejectWithValue }) => {
+  try {
+    const tenants = await notifyApi.getTenants()
+    return tenants
+  } catch (error) {
+    return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch tenants')
   }
 })
