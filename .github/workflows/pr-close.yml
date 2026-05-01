@@ -20,6 +20,7 @@ jobs:
     secrets:
       oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
       oc_token: ${{ secrets.OC_DEV_TOKEN }}
+      oc_server: https://api.silver.devops.gov.bc.ca:6443
     with:
       cleanup: helm
       packages: backend frontend migrations
@@ -69,3 +70,35 @@ jobs:
 
           # Apply permanent services (dev+test+prod) - this will remove PR service
           gwa apply -i api-gateway/generated/gw-services-all.yaml
+
+      - name: Wait for PR service deletion
+        env:
+          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+        run: |
+          # Define PR service name
+          PR_SERVICE_NAME="nr-notify-pr-${{ github.event.number }}"
+
+          echo "Waiting for service '$PR_SERVICE_NAME' to be deleted..."
+
+          # Maximum wait time in seconds (5 minutes)
+          MAX_WAIT=300
+          ELAPSED=0
+          INTERVAL=10
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # Get list of services and check if PR service still exists
+            SERVICES=$(gwa status | grep -c "$PR_SERVICE_NAME" || true)
+
+            if [ "$SERVICES" -eq 0 ]; then
+              echo "✓ Service '$PR_SERVICE_NAME' has been successfully deleted"
+              exit 0
+            fi
+
+            echo "Service still exists. Waiting ${INTERVAL}s... (${ELAPSED}s/${MAX_WAIT}s elapsed)"
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "Warning: Timeout waiting for service deletion after ${MAX_WAIT}s"
+          echo "Service may still exist in the gateway"
+          exit 1
