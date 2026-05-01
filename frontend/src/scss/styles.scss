@@ -5,12 +5,7 @@
 @import './components/layout.scss';
 @import './components/loading-spinner.scss';
 @import './components/toasts.scss';
-
-// Global font family
-html,
-body {
-  font-family: 'BCSans', sans-serif;
-}
+@import './components/sidebar.scss';
 
 // Import Bootstrap and Bootstrap Icons
 @import '../../node_modules/bootstrap/scss/bootstrap';
@@ -18,6 +13,12 @@ $bootstrap-icons-font-src:
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2') format('woff2'),
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff') format('woff');
 @import '../../node_modules/bootstrap-icons/font/bootstrap-icons.scss';
+
+// Global font family (after Bootstrap so it overrides Bootstrap's reboot)
+html,
+body {
+  font-family: 'BCSans', sans-serif;
+}
 
 // Make BCGov Select button fill its container when width is set on the wrapper
 .bcds-react-aria-Select {
