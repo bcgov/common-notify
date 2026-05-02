@@ -120,7 +120,7 @@ describe('IngestionWorker', () => {
           channel: NotificationChannel.EMAIL,
         }),
         expect.objectContaining({
-          jobId: 'notify-123_email',
+          jobId: 'notify-123_EMAIL',
           attempts: 3,
         }),
       )
@@ -155,7 +155,7 @@ describe('IngestionWorker', () => {
           channel: NotificationChannel.SMS,
         }),
         expect.objectContaining({
-          jobId: 'notify-456_sms',
+          jobId: 'notify-456_SMS',
         }),
       )
     })

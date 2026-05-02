@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
 
 /**
  * Ingestion Worker

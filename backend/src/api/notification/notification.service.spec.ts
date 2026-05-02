@@ -5,7 +5,7 @@ import { NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NotificationService } from './notification.service'
 import { NotificationRequest } from './entities/notification-request.entity'
-import { NotificationStatus } from './schemas'
+import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 
 const mockRepository = {

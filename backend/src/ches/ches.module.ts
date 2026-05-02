@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common'
 import { ChesController } from './ches.controller'
 import { ChesOAuthService } from './ches-oauth.service'
 import { ChesApiClient } from './ches-api.client'
-import { AdminModule } from '../admin/admin.module'
+import { AdminModule } from '../api/admin/admin.module'
 import { TenantGuard } from '../common/guards/tenant.guard'
 
 @Module({

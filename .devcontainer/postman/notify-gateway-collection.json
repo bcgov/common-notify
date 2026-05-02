@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "acd00845-25fc-4c0f-962f-b15f6d40c309",
+    "_postman_id": "6a1e6d57-b302-4c0f-91e5-4b610054383e",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -144,6 +144,409 @@
             "description": "Get an OAuth2 access token from Kong's OAuth2 plugin (DEV environment with Kong).\n\n**Prerequisites:**\n1. Kong is running in DEV environment\n2. Load .env.notify-dev.json as environment\n3. Set kong_token_url environment variable\n4. Kong seed script has created test credentials\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890\n- Client B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Client C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
           },
           "response": []
+        },
+        {
+          "name": "Get Frontend OAuth2 Token (Standard Realm - Interactive Login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('frontend_jwt_token', jsonData.access_token);",
+                  "    pm.environment.set('frontend_token_expires_in', jsonData.expires_in || 3600);",
+                  "    pm.test('Frontend OAuth2 Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ Frontend OAuth2 Token saved to {{frontend_jwt_token}}');",
+                  "    console.log('Token type:', jsonData.token_type);",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "} else {",
+                  "    pm.test('Failed to get Frontend OAuth2 token', function() {",
+                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{frontend_client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{frontend_client_secret}}",
+                  "type": "text"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "{{authorization_code}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["auth", "realms", "standard", "protocol", "openid-connect", "token"]
+            },
+            "description": "Exchange authorization code for OAuth2 access token from Keycloak frontend realm (standard).\n\n**Setup Required:**\n1. First, navigate to Keycloak authorization endpoint in browser:\n   `{{keycloak_url}}/realms/standard/protocol/openid-connect/auth?client_id={{frontend_client_id}}&redirect_uri={{frontend_redirect_uri}}&response_type=code&scope=openid+profile+email`\n2. Login with your BC Government credentials\n3. Copy the authorization code from the redirect URL\n4. Set `authorization_code` environment variable with the code\n5. Run this request to exchange it for an access token\n\n**Environment Variables Required:**\n- `keycloak_url`: Keycloak instance URL (e.g., https://test.loginproxy.gov.bc.ca)\n- `frontend_client_id`: Frontend OAuth2 client ID (e.g., notify-6388)\n- `frontend_client_secret`: Frontend OAuth2 client secret\n- `frontend_redirect_uri`: Redirect URI for OAuth2 callback (e.g., http://localhost:3000/callback)\n- `authorization_code`: Authorization code obtained from Keycloak login\n\nThe token will be automatically saved to `{{frontend_jwt_token}}` for use in frontend API requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Frontend API",
+      "item": [
+        {
+          "name": "Code Tables - All",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessTokenUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+                  "type": "string"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code_with_pkce",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "useBrowser",
+                  "value": true,
+                  "type": "boolean"
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{frontend_client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/code-tables",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "code-tables"]
+            },
+            "description": "Retrieve all code tables (notification statuses, channels, event types) via the API Gateway.\n\n**How to use:**\n1. Go to Authorization tab\n2. Click **\"Get New Access Token\"** button\n3. A browser will open for you to login to Keycloak\n4. After login, click \"Use Token\"\n5. Send the request"
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Notification Status",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "clientId",
+                  "value": "{{frontend_client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "clientSecret",
+                  "value": "",
+                  "type": "string"
+                },
+                {
+                  "key": "accessTokenUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+                  "type": "string"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code_with_pkce",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "useBrowser",
+                  "value": true,
+                  "type": "boolean"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/code-tables/notification-status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "code-tables", "notification-status"]
+            },
+            "description": "Retrieve notification status code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Channels",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "grant_type",
+                  "value": "implicit",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{frontend_client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/code-tables/channels",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "code-tables", "channels"]
+            },
+            "description": "Retrieve notification channels code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Event Types",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "grant_type",
+                  "value": "implicit",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{frontend_client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/code-tables/event-types",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "code-tables", "event-types"]
+            },
+            "description": "Retrieve event types code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Notification Request - List",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "scope",
+                  "value": "",
+                  "type": "string"
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{frontend_client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "accessTokenUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "useBrowser",
+                  "value": true,
+                  "type": "boolean"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code_with_pkce",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notification_request",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notification_request"],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "take",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieve list of notification requests via the API Gateway."
+          },
+          "response": []
+        }
+      ],
+      "description": "Requests that test the API Gateway using frontend JWT tokens (standard realm). These requests call the gateway directly to verify responses for code-tables endpoints.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [""]
+          }
         }
       ]
     },

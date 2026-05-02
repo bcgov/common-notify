@@ -6,17 +6,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type {
-  CreateEmailNotificationRequest,
-  CreateSmsNotificationRequest,
-  NotificationResponse,
-  Notification,
-  Template,
-  Links,
-  PostBulkRequest,
-  PostBulkResponse,
-} from './schemas'
-import type { FileAttachment } from './schemas'
+import type { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
+import type { CreateSmsNotificationRequest } from './schemas/create-sms-notification-request'
+import type { NotificationResponse } from './schemas/notification-response'
+import type { Notification } from './schemas/notification'
+import type { Template } from './schemas/template'
+import type { Links } from './schemas/links'
+import type { PostBulkRequest } from './schemas/post-bulk-request'
+import type { PostBulkResponse } from './schemas/post-bulk-response'
+import type { FileAttachment } from './schemas/file-attachment'
 
 interface GcNotifyErrorResponse {
   errors?: Array<{ error: string; message: string }>

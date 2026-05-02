@@ -18,9 +18,9 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
-import { CreateTenantDto } from './dto/create-tenant.dto'
-import { TenantDto } from './dto/tenant.dto'
-import { JwtGuard } from '../../common/guards/jwt.guard'
+import { CreateTenantDto } from './schemas/create-tenant.dto'
+import { TenantDto } from './schemas/tenant.dto'
+import { JwtGuard } from '../../../common/guards/jwt.guard'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })

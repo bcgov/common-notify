@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
 

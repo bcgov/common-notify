@@ -4,7 +4,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EmailDeliveryWorker } from './email-delivery.worker'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { NotificationStatus } from '../../notification/schemas'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 import { IEmailTransport } from '../../adapters'
 
 describe('EmailDeliveryWorker', () => {

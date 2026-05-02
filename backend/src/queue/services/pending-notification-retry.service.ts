@@ -2,8 +2,8 @@ import { Injectable, Logger, Inject, OnApplicationBootstrap, OnModuleDestroy } f
 import { Repository } from 'typeorm'
 import { InjectRepository } from '@nestjs/typeorm'
 import Bull from 'bull'
-import { NotificationRequest } from '../../notification/entities/notification-request.entity'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
+import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 

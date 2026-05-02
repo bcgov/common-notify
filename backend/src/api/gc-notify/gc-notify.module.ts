@@ -2,7 +2,7 @@ import { DynamicModule, Module } from '@nestjs/common'
 import { GcNotifyApiClient } from './gc-notify-api.client'
 import { GcNotifyController } from './gc-notify.controller'
 import { TenantGuard } from 'src/common/guards/tenant.guard'
-import { TenantsModule } from 'src/admin/tenants/tenants.module'
+import { TenantsModule } from '../admin/tenants/tenants.module'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>

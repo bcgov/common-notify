@@ -1,7 +1,7 @@
 import { Controller, Get, Version, UseGuards, Logger, Query } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
-import { PaginatedNotificationResponse } from './schemas'
+import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { AuthJwtGuard } from 'src/auth/guards/auth.jwt-guard'
 import { RoleGuard } from 'src/common/guards/role.guard'
 import { RequireRole } from 'src/auth/decorators/require-role.decorator'

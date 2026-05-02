@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { NotificationStatusCode } from '../../notification/entities/notification-status-code.entity'
-import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
-import { NotificationEventTypeCode } from '../../notification/entities/notification-event-type-code.entity'
+import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
+import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
+import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 
 export class CodeTableItemDto {
   id: string

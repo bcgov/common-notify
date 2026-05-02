@@ -10,10 +10,10 @@ import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
-import { NotificationRequest } from '../notification/entities/notification-request.entity'
-import { NotificationService } from '../notification/notification.service'
+import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
+import { NotificationService } from '../api/notification/notification.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
-import { TenantsModule } from '../admin/tenants/tenants.module'
+import { TenantsModule } from '../api/admin/tenants/tenants.module'
 
 /**
  * Queue Module
