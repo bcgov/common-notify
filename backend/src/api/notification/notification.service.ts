@@ -6,11 +6,11 @@ import { NotificationRequest } from './entities/notification-request.entity'
 import {
   CreateNotificationRequestDto,
   NotificationStatus,
-  UpdateNotificationRequestDto,
-  NotificationRequestDto,
-  PaginatedNotificationResponse,
-} from './schemas'
-import { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
+} from './schemas/create-notification-request'
+import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
+import { NotificationRequestDto } from './schemas/notification-request'
+import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 
 @Injectable()

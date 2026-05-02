@@ -3,9 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { CodeTablesService } from './code-tables.service'
-import { NotificationStatusCode } from '../../notification/entities/notification-status-code.entity'
-import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
-import { NotificationEventTypeCode } from '../../notification/entities/notification-event-type-code.entity'
+import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
+import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
+import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 
 describe('CodeTablesService', () => {
   let service: CodeTablesService

@@ -21,20 +21,18 @@ import {
 } from '@nestjs/swagger'
 import * as express from 'express'
 import { GcNotifyApiClient } from './gc-notify-api.client'
-import {
-  CreateEmailNotificationRequest,
-  CreateSmsNotificationRequest,
-  NotificationResponse,
-  Notification,
-  Template,
-  PostBulkRequest,
-  PostBulkResponse,
-  EmailContent,
-  SmsContent,
-  NotificationsListResponse,
-  TemplatesListResponse,
-  FileAttachment,
-} from './schemas'
+import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
+import { CreateSmsNotificationRequest } from './schemas/create-sms-notification-request'
+import { NotificationResponse } from './schemas/notification-response'
+import { Notification } from './schemas/notification'
+import { Template } from './schemas/template'
+import { PostBulkRequest } from './schemas/post-bulk-request'
+import { PostBulkResponse } from './schemas/post-bulk-response'
+import { EmailContent } from './schemas/email-content'
+import { SmsContent } from './schemas/sms-content'
+import { NotificationsListResponse } from './schemas/notifications-list-response'
+import { TemplatesListResponse } from './schemas/templates-list-response'
+import { FileAttachment } from './schemas/file-attachment'
 import { ApiKeyGuard } from 'src/common/guards/api-key.guard'
 
 @ApiTags('GC Notify')

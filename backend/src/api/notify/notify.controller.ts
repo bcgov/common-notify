@@ -15,13 +15,13 @@ import {
 import Bull from 'bull'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { GetTenant } from '../../common/decorators/get-tenant.decorator'
-import { Tenant } from '../../admin/tenants/entities/tenant.entity'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
-import { NotificationService } from '../../notification/notification.service'
-import { NotifySimpleRequest } from './schemas'
+import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { NotificationService } from '../notification/notification.service'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -162,26 +162,6 @@ export class NotifyController {
   @Delete('registerCallback/:callbackId')
   @HttpCode(501)
   deleteCallback(@Param('callbackId') _callbackId: string) {
-    return this.notifyService.notImplemented()
-  }
-}
-
-@Controller('templates')
-@UseGuards(TenantGuard)
-export class TemplatesController {
-  constructor(private readonly notifyService: NotifyService) {}
-
-  @Version('1')
-  @Get()
-  @HttpCode(501)
-  listTemplates(@Query('limit') _limit?: string, @Query('cursor') _cursor?: string) {
-    return this.notifyService.notImplemented()
-  }
-
-  @Version('1')
-  @Get(':templateId')
-  @HttpCode(501)
-  getTemplate(@Param('templateId') _templateId: string) {
     return this.notifyService.notImplemented()
   }
 }

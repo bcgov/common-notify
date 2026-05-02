@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
-import { CreateTenantDto } from './dto/create-tenant.dto'
+import { CreateTenantDto } from './schemas/create-tenant.dto'
 
 /**
  * TenantsService
