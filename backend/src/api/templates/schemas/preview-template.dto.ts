@@ -1,4 +1,4 @@
-import { IsObject, IsOptional, ValidateIf } from 'class-validator'
+import { IsObject, IsOptional } from 'class-validator'
 
 /**
  * DTO for previewing a template with sample data
