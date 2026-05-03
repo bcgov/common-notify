@@ -310,24 +310,11 @@ export class NotificationService {
    * @returns Array of stuck notifications
    */
   async findStuck(since: Date): Promise<any[]> {
-    const stuckNotifications = await this.notificationRepository.find({
-      where: [
-        {
-          status: 'processing' as any,
-          updatedAt: undefined, // Will be filtered by query builder
-        },
-        {
-          status: 'sending' as any,
-          updatedAt: undefined,
-        },
-      ],
-    })
-
     // Filter by time using a more direct query
     const result = await this.notificationRepository.query(
-      `SELECT id, tenant_id, status, updated_at 
-       FROM notify.notification_request 
-       WHERE status IN ('processing', 'sending') 
+      `SELECT id, tenant_id, status, updated_at
+       FROM notify.notification_request
+       WHERE status IN ('processing', 'sending')
        AND updated_at < $1`,
       [since],
     )
