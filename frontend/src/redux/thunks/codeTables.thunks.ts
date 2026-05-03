@@ -16,9 +16,9 @@ export const fetchCodeTables = createAsyncThunk<
   try {
     // Fetch all code tables in parallel for better performance
     const [statuses_data, channels_data, eventTypes_data] = await Promise.all([
-      get<any[]>(generateApiParameters('/api/v1/code-tables/notification-status')),
-      get<any[]>(generateApiParameters('/api/v1/code-tables/channels')),
-      get<any[]>(generateApiParameters('/api/v1/code-tables/event-types')),
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/notification-status')),
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/channels')),
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/event-types')),
     ])
 
     // Map notification statuses

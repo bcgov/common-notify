@@ -5,6 +5,7 @@ import { NotificationStatusCode } from './entities/notification-status-code.enti
 import { NotificationChannelCode } from './entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from './entities/notification-event-type-code.entity'
 import { NotificationController } from './notification.controller'
+import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 
@@ -18,7 +19,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
     ]),
     TenantsModule,
   ],
-  controllers: [NotificationController],
+  controllers: [NotificationController, NotificationFrontendController],
   providers: [NotificationService],
   exports: [NotificationService],
 })

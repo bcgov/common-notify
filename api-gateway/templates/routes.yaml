@@ -279,7 +279,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables
+      - /api/v1/frontend/code-tables
     methods:
       - GET
     strip_path: false
@@ -308,7 +308,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/notification-status
+      - /api/v1/frontend/code-tables/notification-status
     methods:
       - GET
     strip_path: false
@@ -337,7 +337,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/channels
+      - /api/v1/frontend/code-tables/channels
     methods:
       - GET
     strip_path: false
@@ -366,7 +366,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/event-types
+      - /api/v1/frontend/code-tables/event-types
     methods:
       - GET
     strip_path: false
@@ -395,7 +395,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notification_request
+      - /api/v1/frontend/notification_request
     methods:
       - GET
     strip_path: false

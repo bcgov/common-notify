@@ -104,11 +104,13 @@ describe('codeTables.thunks', () => {
 
       expect(api.get as any).toHaveBeenCalledTimes(3)
       expect(api.generateApiParameters as any).toHaveBeenCalledWith(
-        '/api/v1/code-tables/notification-status',
+        '/api/v1/frontend/code-tables/notification-status',
       )
-      expect(api.generateApiParameters as any).toHaveBeenCalledWith('/api/v1/code-tables/channels')
       expect(api.generateApiParameters as any).toHaveBeenCalledWith(
-        '/api/v1/code-tables/event-types',
+        '/api/v1/frontend/code-tables/channels',
+      )
+      expect(api.generateApiParameters as any).toHaveBeenCalledWith(
+        '/api/v1/frontend/code-tables/event-types',
       )
     })
   })

@@ -5,6 +5,7 @@ import { NotificationChannelCode } from '../notification/entities/notification-c
 import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTablesController } from './code-tables.controller'
+import { CodeTablesFrontendController } from './code-tables-frontend.controller'
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { CodeTablesController } from './code-tables.controller'
       NotificationEventTypeCode,
     ]),
   ],
-  controllers: [CodeTablesController],
+  controllers: [CodeTablesController, CodeTablesFrontendController],
   providers: [CodeTablesService],
   exports: [CodeTablesService],
 })
