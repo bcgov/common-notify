@@ -27,6 +27,7 @@ export class IngestionWorker {
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
    * @param notificationService Service for database updates
+   * @param notifyService Service for template resolution
    * @param configService Configuration service for queue settings
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
@@ -111,6 +112,7 @@ export class IngestionWorker {
             notifyId,
             tenantId,
             channel,
+            request, // Include original request so delivery workers can resolve templates
             payload,
             attempt: 0,
           }

@@ -35,6 +35,7 @@ export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
   constructor(
+    private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
@@ -49,6 +50,7 @@ export class NotifySimpleController {
     @GetTenant() _tenant: Tenant,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
+    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
     // Implementation provided by @Queueable decorator
     return undefined as any
   }
@@ -61,6 +63,7 @@ export class NotifySimpleController {
     @GetTenant() _tenant: Tenant,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
+    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
     // Implementation provided by @Queueable decorator
     return undefined as any
   }
@@ -73,6 +76,7 @@ export class NotifySimpleController {
     @GetTenant() _tenant: Tenant,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
+    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
     // Implementation provided by @Queueable decorator
     return undefined as any
   }

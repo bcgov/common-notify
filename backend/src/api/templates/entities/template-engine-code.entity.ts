@@ -19,6 +19,12 @@ export class TemplateEngineCode {
   description: string
 
   /**
+   * Sentence-case display name for UI rendering (e.g., "Handlebars", "Mustache")
+   */
+  @Column({ name: 'display_name', length: 100 })
+  displayName: string
+
+  /**
    * Timestamp when the engine code was created
    */
   @CreateDateColumn({ name: 'created_at' })

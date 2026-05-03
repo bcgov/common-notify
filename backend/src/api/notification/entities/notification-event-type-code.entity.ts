@@ -8,6 +8,9 @@ export class NotificationEventTypeCode {
   @Column({ length: 255 })
   description: string
 
+  @Column({ name: 'display_name', length: 100 })
+  displayName: string
+
   @Column({ default: false })
   is_mandatory: boolean
 

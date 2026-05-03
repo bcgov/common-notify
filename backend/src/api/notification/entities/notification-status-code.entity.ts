@@ -8,6 +8,9 @@ export class NotificationStatusCode {
   @Column({ length: 255 })
   description: string
 
+  @Column({ name: 'display_name', length: 100 })
+  displayName: string
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 

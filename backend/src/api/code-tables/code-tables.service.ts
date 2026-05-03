@@ -40,8 +40,8 @@ export class CodeTablesService {
       })
       return statuses.map((s) => ({
         id: s.code,
-        label: s.description,
-        description: s.code,
+        label: s.displayName || s.description,
+        description: s.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch status codes', error)
@@ -59,8 +59,8 @@ export class CodeTablesService {
       })
       return channels.map((c) => ({
         id: c.channelCode,
-        label: c.description,
-        description: c.channelCode,
+        label: c.displayName || c.description,
+        description: c.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch channel codes', error)
@@ -78,8 +78,8 @@ export class CodeTablesService {
       })
       return eventTypes.map((e) => ({
         id: e.eventTypeCode,
-        label: e.description,
-        description: e.eventTypeCode,
+        label: e.displayName || e.description,
+        description: e.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch event type codes', error)

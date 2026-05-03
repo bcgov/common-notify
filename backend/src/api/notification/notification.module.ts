@@ -8,6 +8,7 @@ import { NotificationController } from './notification.controller'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { TemplatesModule } from '../templates/templates.module'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
       NotificationEventTypeCode,
     ]),
     TenantsModule,
+    TemplatesModule,
   ],
   controllers: [NotificationController, NotificationFrontendController],
   providers: [NotificationService],

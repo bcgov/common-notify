@@ -12,6 +12,7 @@ import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { TemplatesRepository } from '../templates/templates.repository'
 
 @Injectable()
 export class NotificationService {
@@ -31,6 +32,7 @@ export class NotificationService {
     private readonly notificationRepository: Repository<NotificationRequest>,
     private readonly tenantsService: TenantsService,
     private readonly configService: ConfigService,
+    private readonly templatesRepository: TemplatesRepository,
   ) {
     // Load validation limits from environment variables with sensible defaults
     this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
@@ -180,6 +182,38 @@ export class NotificationService {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
+    // Validate template if templateId is provided
+    if (request.templateId) {
+      try {
+        const template = await this.templatesRepository.findById(tenantId, request.templateId)
+        if (!template) {
+          errors.push(
+            `Template '${request.templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
+          )
+        } else {
+          // Verify template has required channel codes for requested channels
+          const requestedChannels = []
+          if (request.email?.recipients) requestedChannels.push('EMAIL')
+          if (request.sms?.recipients) requestedChannels.push('SMS')
+          if (request.msgApp?.recipients) requestedChannels.push('MSGAPP')
+
+          const templateChannelCode = template.channelCode
+
+          for (const channel of requestedChannels) {
+            if (templateChannelCode !== channel) {
+              errors.push(
+                `Template '${request.templateId}' has channel code '${templateChannelCode}' but requested channel is '${channel}'.`,
+              )
+            }
+          }
+        }
+      } catch (error) {
+        errors.push(
+          `Failed to validate template: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
+
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.length ?? 0
     const smsRecipients = request.sms?.recipients?.length ?? 0
@@ -198,24 +232,27 @@ export class NotificationService {
         )
       }
 
-      if (!request.email.subject?.trim()) {
-        errors.push('Email subject cannot be empty')
-      }
+      // Only validate content if not using a template (template provides subject/body)
+      if (!request.templateId) {
+        if (!request.email.subject?.trim()) {
+          errors.push('Email subject cannot be empty')
+        }
 
-      if (request.email.subject && request.email.subject.length > this.emailMaxSubjectLength) {
-        errors.push(
-          `Email subject too long (${request.email.subject.length}). Max: ${this.emailMaxSubjectLength}`,
-        )
-      }
+        if (request.email.subject && request.email.subject.length > this.emailMaxSubjectLength) {
+          errors.push(
+            `Email subject too long (${request.email.subject.length}). Max: ${this.emailMaxSubjectLength}`,
+          )
+        }
 
-      if (!request.email.body?.trim()) {
-        errors.push('Email body cannot be empty')
-      }
+        if (!request.email.body?.trim()) {
+          errors.push('Email body cannot be empty')
+        }
 
-      if (request.email.body && request.email.body.length > this.emailMaxBodyLength) {
-        errors.push(
-          `Email body too long (${request.email.body.length}). Max: ${this.emailMaxBodyLength} characters`,
-        )
+        if (request.email.body && request.email.body.length > this.emailMaxBodyLength) {
+          errors.push(
+            `Email body too long (${request.email.body.length}). Max: ${this.emailMaxBodyLength} characters`,
+          )
+        }
       }
     }
 
@@ -227,15 +264,18 @@ export class NotificationService {
         )
       }
 
-      if (!request.sms.body?.trim()) {
-        errors.push('SMS body cannot be empty')
-      }
+      // Only validate content if not using a template (template provides body)
+      if (!request.templateId) {
+        if (!request.sms.body?.trim()) {
+          errors.push('SMS body cannot be empty')
+        }
 
-      if (request.sms.body && request.sms.body.length > this.smsMaxBodyLength) {
-        // SMS can be split across multiple messages, but warn if very long
-        errors.push(
-          `SMS body too long (${request.sms.body.length}). Max: ${this.smsMaxBodyLength} characters`,
-        )
+        if (request.sms.body && request.sms.body.length > this.smsMaxBodyLength) {
+          // SMS can be split across multiple messages, but warn if very long
+          errors.push(
+            `SMS body too long (${request.sms.body.length}). Max: ${this.smsMaxBodyLength} characters`,
+          )
+        }
       }
     }
 
@@ -247,17 +287,56 @@ export class NotificationService {
         )
       }
 
-      if (!request.msgApp.body?.trim()) {
-        errors.push('MsgApp body cannot be empty')
-      }
+      // Only validate content if not using a template (template provides body)
+      if (!request.templateId) {
+        if (!request.msgApp.body?.trim()) {
+          errors.push('MsgApp body cannot be empty')
+        }
 
-      if (request.msgApp.body && request.msgApp.body.length > this.msgAppMaxBodyLength) {
-        errors.push(
-          `MsgApp body too long (${request.msgApp.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
-        )
+        if (request.msgApp.body && request.msgApp.body.length > this.msgAppMaxBodyLength) {
+          errors.push(
+            `MsgApp body too long (${request.msgApp.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
+          )
+        }
       }
     }
 
     return errors
+  }
+
+  /**
+   * Find notifications stuck in PROCESSING or SENDING status
+   * @param since Notifications updated before this time are considered stuck
+   * @returns Array of stuck notifications
+   */
+  async findStuck(since: Date): Promise<any[]> {
+    const stuckNotifications = await this.notificationRepository.find({
+      where: [
+        {
+          status: 'processing' as any,
+          updatedAt: undefined, // Will be filtered by query builder
+        },
+        {
+          status: 'sending' as any,
+          updatedAt: undefined,
+        },
+      ],
+    })
+
+    // Filter by time using a more direct query
+    const result = await this.notificationRepository.query(
+      `SELECT id, tenant_id, status, updated_at 
+       FROM notify.notification_request 
+       WHERE status IN ('processing', 'sending') 
+       AND updated_at < $1`,
+      [since],
+    )
+
+    return result.map((row: any) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      status: row.status,
+      updatedAt: row.updated_at,
+    }))
   }
 }

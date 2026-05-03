@@ -12,8 +12,10 @@ import {
   UseGuards,
   Logger,
   ParseUUIDPipe,
+  Req,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import * as express from 'express'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { GetTenant } from '../../common/decorators/get-tenant.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
@@ -111,8 +113,10 @@ export class TemplatesController {
   async createTemplate(
     @GetTenant() tenant: Tenant,
     @Body() createTemplateDto: CreateTemplateDto,
+    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
-    return this.templatesService.createTemplate(tenant.id, createTemplateDto)
+    const user = this.extractUserFromRequest(req)
+    return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
 
   /**
@@ -131,8 +135,10 @@ export class TemplatesController {
     @GetTenant() tenant: Tenant,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
+    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
-    return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto)
+    const user = this.extractUserFromRequest(req)
+    return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
 
   /**
@@ -170,5 +176,37 @@ export class TemplatesController {
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
+  }
+
+  /**
+   * Extract user information from the request
+   * Checks JWT claims and Kong headers for user identifier
+   */
+  private extractUserFromRequest(req?: express.Request): string {
+    if (!req) return 'system'
+
+    try {
+      // Try to get user from Kong headers
+      const kongUsername = req.headers['x-consumer-username']
+      if (kongUsername) return kongUsername as string
+
+      // Try to get user from JWT
+      const authHeader = req.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
+          // Try various claim names for user identifier
+          return (
+            payload.preferred_username || payload.email || payload.name || payload.sub || 'system'
+          )
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to extract user from request:', (error as Error).message)
+    }
+
+    return 'system'
   }
 }

@@ -17,8 +17,22 @@ export class TemplatesService {
 
   /**
    * List all active templates for a tenant
+   * @param tenantId The tenant ID
+   * @param page Page number (1-indexed)
+   * @param limit Items per page (max 100)
    */
   async listTemplates(tenantId: string, page: number = 1, limit: number = 10): Promise<any[]> {
+    // Validate pagination limits
+    if (limit > 100) {
+      throw new BadRequestException('Limit must not exceed 100 items per page')
+    }
+    if (limit < 1) {
+      throw new BadRequestException('Limit must be at least 1')
+    }
+    if (page < 1) {
+      throw new BadRequestException('Page must be at least 1')
+    }
+
     // Convert page number to offset (1-indexed to 0-indexed)
     const offset = (page - 1) * limit
     const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
@@ -38,8 +52,11 @@ export class TemplatesService {
 
   /**
    * Create a new template
+   * @param tenantId The tenant ID
+   * @param createDto Template creation data
+   * @param userId User creating the template (for audit trail)
    */
-  async createTemplate(tenantId: string, createDto: any): Promise<any> {
+  async createTemplate(tenantId: string, createDto: any, userId: string = 'system'): Promise<any> {
     // Validate channel-specific required fields
     if (createDto.channelCode === NotificationChannel.EMAIL && !createDto.subject) {
       throw new BadRequestException('Email templates require a subject')
@@ -61,8 +78,8 @@ export class TemplatesService {
       engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
       version: 1,
       active: true,
-      createdBy: 'system', // TODO: Get from JWT
-      updatedBy: 'system',
+      createdBy: userId,
+      updatedBy: userId,
     })
 
     // Create a version record
@@ -75,7 +92,7 @@ export class TemplatesService {
       subject: template.subject,
       body: template.body,
       engineCode: template.engineCode,
-      createdBy: 'system', // TODO: Get from JWT
+      createdBy: userId,
     })
 
     return this.toResponseDto(template)
@@ -83,8 +100,17 @@ export class TemplatesService {
 
   /**
    * Update a template (creates a new version)
+   * @param tenantId The tenant ID
+   * @param templateId The template ID
+   * @param updateDto Template update data
+   * @param userId User updating the template (for audit trail)
    */
-  async updateTemplate(tenantId: string, templateId: string, updateDto: any): Promise<any> {
+  async updateTemplate(
+    tenantId: string,
+    templateId: string,
+    updateDto: any,
+    userId: string = 'system',
+  ): Promise<any> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
@@ -114,11 +140,11 @@ export class TemplatesService {
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = updateDto.engineCode || template.engineCode
-    template.updatedBy = 'system' // TODO: Get from JWT
+    template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)
 
-    // Version record is automatically created by database trigger (V15 migration)
+    // Version record is automatically created by database trigger
     // This ensures version history is maintained even for direct SQL updates/datafixes
 
     return this.toResponseDto(updated)
@@ -146,20 +172,33 @@ export class TemplatesService {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
 
-    // Render the template based on the engine
-    const rendered = await this.renderTemplate(template, previewDto.personalisation || {})
+    // Use the same rendering logic as delivery workers to avoid code duplication
+    const rendered = this.renderTemplateContent(template, previewDto.personalisation || {})
 
     return {
       templateId: template.id,
       channelCode: template.channelCode,
+      subject: rendered.subject,
+      body: rendered.body,
+    }
+  }
+
+  /**
+   * Render template content (subject and/or body) with personalisation data
+   * Used by delivery workers to render templates before sending
+   * @param template The template to render
+   * @param personalisation The data to use for rendering (e.g., request.params)
+   * @returns Object with rendered subject and body
+   */
+  public renderTemplateContent(
+    template: Template,
+    personalisation: Record<string, any> = {},
+  ): { subject?: string; body: string } {
+    return {
       subject: template.subject
-        ? this.renderText(
-            template.subject,
-            previewDto.personalisation || {},
-            template.engineCode as TemplateEngine,
-          )
+        ? this.renderText(template.subject, personalisation, template.engineCode as TemplateEngine)
         : undefined,
-      body: rendered,
+      body: this.renderText(template.body, personalisation, template.engineCode as TemplateEngine),
     }
   }
 

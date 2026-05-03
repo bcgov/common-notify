@@ -46,6 +46,7 @@ export interface DeliveryJobPayload {
   notifyId: string // Database notification_request.id
   tenantId: string
   channel: NotificationChannel
-  payload: DeliveryPayload
+  request: NotifyRequest // Original request (may contain templateId)
+  payload: DeliveryPayload // Channel-specific payload
   attempt: number
 }
