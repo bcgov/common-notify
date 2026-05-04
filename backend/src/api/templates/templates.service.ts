@@ -6,6 +6,10 @@ import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplatesRepository } from './templates.repository'
+import { CreateTemplateDto } from './schemas/create-template.dto'
+import { UpdateTemplateDto } from './schemas/update-template.dto'
+import { PreviewTemplateDto } from './schemas/preview-template.dto'
+import { TemplateResponseDto } from './schemas/template-response.dto'
 
 /**
  * Service for template business logic
@@ -21,7 +25,11 @@ export class TemplatesService {
    * @param page Page number (1-indexed)
    * @param limit Items per page (max 100)
    */
-  async listTemplates(tenantId: string, page: number = 1, limit: number = 10): Promise<any[]> {
+  async listTemplates(
+    tenantId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<TemplateResponseDto[]> {
     // Validate pagination limits
     if (limit > 100) {
       throw new BadRequestException('Limit must not exceed 100 items per page')
@@ -42,7 +50,7 @@ export class TemplatesService {
   /**
    * Get a specific template
    */
-  async getTemplate(tenantId: string, templateId: string): Promise<any> {
+  async getTemplate(tenantId: string, templateId: string): Promise<TemplateResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
@@ -56,7 +64,11 @@ export class TemplatesService {
    * @param createDto Template creation data
    * @param userId User creating the template (for audit trail)
    */
-  async createTemplate(tenantId: string, createDto: any, userId: string = 'system'): Promise<any> {
+  async createTemplate(
+    tenantId: string,
+    createDto: CreateTemplateDto,
+    userId: string = 'system',
+  ): Promise<TemplateResponseDto> {
     // Validate channel-specific required fields
     if (createDto.channelCode === NotificationChannel.EMAIL && !createDto.subject) {
       throw new BadRequestException('Email templates require a subject')
@@ -108,9 +120,9 @@ export class TemplatesService {
   async updateTemplate(
     tenantId: string,
     templateId: string,
-    updateDto: any,
+    updateDto: UpdateTemplateDto,
     userId: string = 'system',
-  ): Promise<any> {
+  ): Promise<TemplateResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
@@ -166,7 +178,11 @@ export class TemplatesService {
    * Preview a template with sample data
    * Renders the template without storing anything
    */
-  async previewTemplate(tenantId: string, templateId: string, previewDto: any): Promise<any> {
+  async previewTemplate(
+    tenantId: string,
+    templateId: string,
+    previewDto: PreviewTemplateDto,
+  ): Promise<any> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)

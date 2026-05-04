@@ -2,9 +2,9 @@ import { Controller, Get, Version, UseGuards, Logger, Query } from '@nestjs/comm
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
-import { AuthJwtGuard } from 'src/auth/guards/auth.jwt-guard'
-import { RoleGuard } from 'src/common/guards/role.guard'
-import { RequireRole } from 'src/auth/decorators/require-role.decorator'
+import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { RoleGuard } from '../../auth/guards/role.guard'
+import { RequireRole } from '../../auth/decorators/require-role.decorator'
 
 @ApiTags('notification_request')
 @Controller('notification_request')

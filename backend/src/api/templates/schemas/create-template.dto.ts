@@ -48,6 +48,7 @@ export class CreateTemplateDto {
    */
   @IsString()
   @MinLength(1)
+  @MaxLength(10000)
   body: string
 
   /**

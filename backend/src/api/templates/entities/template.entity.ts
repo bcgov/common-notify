@@ -11,7 +11,7 @@ import {
 } from 'typeorm'
 import { TemplateEngineCode } from './template-engine-code.entity'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
-import { NotificationChannelCode } from 'src/api/notification/entities/notification-channel-code.entity'
+import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
 
 /**
  * Template entity representing a notification template.

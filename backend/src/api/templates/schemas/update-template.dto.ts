@@ -44,6 +44,7 @@ export class UpdateTemplateDto extends PartialType(CreateTemplateDto) {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(10000)
   body?: string
 
   /**

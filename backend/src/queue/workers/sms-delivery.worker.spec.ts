@@ -125,9 +125,14 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-sms-123',
-
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
+          request: {
+            sms: {
+              recipients: ['+16135551234'],
+              body: 'Test SMS',
+            },
+          } as any,
           payload: {
             recipients: ['+16135551234'],
             body: 'Test SMS',
@@ -504,17 +509,20 @@ describe('SmsDeliveryWorker', () => {
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
           notifyId: 'notify-error',
-
           tenantId: 'tenant-error',
           channel: NotificationChannel.SMS,
+          request: {
+            sms: {
+              recipients: ['+16135551234'],
+              body: 'Will error',
+            },
+          } as any,
           payload: {
             recipients: ['+16135551234'],
             body: 'Will error',
           },
           attempt: 0,
         },
-        attemptsMade: 0,
-        opts: { attempts: 3 },
         opts: {
           attempts: 3,
           backoff: {

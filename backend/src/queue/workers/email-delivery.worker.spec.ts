@@ -145,14 +145,6 @@ describe('EmailDeliveryWorker', () => {
           },
         } as any,
         attemptsMade: 0,
-        opts: {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-        } as any,
-        attemptsMade: 0,
       }
 
       const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -203,14 +195,6 @@ describe('EmailDeliveryWorker', () => {
           },
           attempt: 0,
         } as DeliveryJobPayload,
-        opts: {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-        } as any,
-        attemptsMade: 0,
         opts: {
           attempts: 3,
           backoff: {
@@ -663,7 +647,6 @@ describe('EmailDeliveryWorker', () => {
           attempt: 0,
         } as any as DeliveryJobPayload,
         attemptsMade: 1,
-        opts: { attempts: 3 },
         opts: {
           attempts: 3,
           backoff: {
@@ -671,7 +654,6 @@ describe('EmailDeliveryWorker', () => {
             delay: 2000,
           },
         } as any,
-        attemptsMade: 0,
       }
 
       const error = new Error('Test error')
