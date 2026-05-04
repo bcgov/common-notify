@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "acd00845-25fc-4c0f-962f-b15f6d40c309",
+    "_postman_id": "6690f38c-65d4-448e-8145-7356d3bb3560",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -144,6 +144,254 @@
             "description": "Get an OAuth2 access token from Kong's OAuth2 plugin (DEV environment with Kong).\n\n**Prerequisites:**\n1. Kong is running in DEV environment\n2. Load .env.notify-dev.json as environment\n3. Set kong_token_url environment variable\n4. Kong seed script has created test credentials\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890\n- Client B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Client C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
           },
           "response": []
+        },
+        {
+          "name": "Get Frontend OAuth2 Token (Standard Realm - Interactive Login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('frontend_jwt_token', jsonData.access_token);",
+                  "    pm.environment.set('frontend_token_expires_in', jsonData.expires_in || 3600);",
+                  "    pm.test('Frontend OAuth2 Token obtained successfully', function() {",
+                  "        pm.expect(jsonData.access_token).to.exist;",
+                  "    });",
+                  "    console.log('✅ Frontend OAuth2 Token saved to {{frontend_jwt_token}}');",
+                  "    console.log('Token type:', jsonData.token_type);",
+                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "} else {",
+                  "    pm.test('Failed to get Frontend OAuth2 token', function() {",
+                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{frontend_client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{frontend_client_secret}}",
+                  "type": "text"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{frontend_redirect_uri}}",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "{{authorization_code}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["auth", "realms", "standard", "protocol", "openid-connect", "token"]
+            },
+            "description": "Exchange authorization code for OAuth2 access token from Keycloak frontend realm (standard).\n\n**Setup Required:**\n1. First, navigate to Keycloak authorization endpoint in browser:\n   `{{keycloak_url}}/realms/standard/protocol/openid-connect/auth?client_id={{frontend_client_id}}&redirect_uri={{frontend_redirect_uri}}&response_type=code&scope=openid+profile+email`\n2. Login with your BC Government credentials\n3. Copy the authorization code from the redirect URL\n4. Set `authorization_code` environment variable with the code\n5. Run this request to exchange it for an access token\n\n**Environment Variables Required:**\n- `keycloak_url`: Keycloak instance URL (e.g., https://test.loginproxy.gov.bc.ca)\n- `frontend_client_id`: Frontend OAuth2 client ID (e.g., notify-6388)\n- `frontend_client_secret`: Frontend OAuth2 client secret\n- `frontend_redirect_uri`: Redirect URI for OAuth2 callback (e.g., http://localhost:3000/callback)\n- `authorization_code`: Authorization code obtained from Keycloak login\n\nThe token will be automatically saved to `{{frontend_jwt_token}}` for use in frontend API requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Frontend API",
+      "item": [
+        {
+          "name": "Code Tables - All",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/frontend/code-tables",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "frontend", "code-tables"]
+            },
+            "description": "Retrieve all code tables (notification statuses, channels, event types) via the API Gateway.\n\n**How to use:**\n1. Go to Authorization tab\n2. Click **\"Get New Access Token\"** button\n3. A browser will open for you to login to Keycloak\n4. After login, click \"Use Token\"\n5. Send the request"
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Notification Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/frontend/code-tables/notification-status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "frontend", "code-tables", "notification-status"]
+            },
+            "description": "Retrieve notification status code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Channels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/frontend/code-tables/channels",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "frontend", "code-tables", "channels"]
+            },
+            "description": "Retrieve notification channels code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Code Tables - Event Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/frontend/code-tables/event-types",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "frontend", "code-tables", "event-types"]
+            },
+            "description": "Retrieve event types code table via the API Gateway."
+          },
+          "response": []
+        },
+        {
+          "name": "Notification Request - List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/frontend/notification_request",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "frontend", "notification_request"],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "take",
+                  "value": "10",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieve list of notification requests via the API Gateway."
+          },
+          "response": []
+        }
+      ],
+      "description": "Requests that test the API Gateway using frontend JWT tokens (standard realm). These requests call the gateway directly to verify responses for code-tables endpoints.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloak_url}}/realms/standard/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloak_url}}/realms/standard/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "refreshRequestParams",
+            "value": [],
+            "type": "any"
+          },
+          {
+            "key": "tokenRequestParams",
+            "value": [],
+            "type": "any"
+          },
+          {
+            "key": "authRequestParams",
+            "value": [],
+            "type": "any"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": true,
+            "type": "boolean"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "{{frontend_redirect_uri}}",
+            "type": "string"
+          },
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "{{frontend_client_id}}",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "header",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [""]
+          }
         }
       ]
     },
@@ -389,6 +637,533 @@
           ]
         },
         {
+          "name": "Templates",
+          "item": [
+            {
+              "name": "Notify - List Templates",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates?page=1&limit=10",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "List all notification templates with pagination"
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Get Template",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates", "template-id-123"]
+                },
+                "description": "Get a specific notification template"
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Create Template - Handlebars",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"BC Parks Adventure Ready v3\",\n  \"description\": \"Complex Handlebars template for BC Parks pass activation and camping recommendations\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Your BC Parks Pass is Ready - {{parksCount}} Parks Await, {{userName}}!\",\n  \"body\": \"Howdy {{userName}}!\\n\\nWelcome to the British Columbia Parks Adventure Network! Your annual pass has been activated and you're ready to explore some of the most beautiful parks in Canada.\\n\\n-----------------------------------------\\nYOUR BC PARKS PASS\\n-----------------------------------------\\n\\nPass Type: {{passType}}\\nValidity: {{passYear}}\\nStatus: ACTIVE\\n\\n{{#if passType}}\\n{{#if passType 'equals' 'Gold'}}\\nGold Member Benefits:\\n   - Unlimited day-use entry to all BC Parks\\n   - Reserved parking at premium locations\\n   - 15% discount on camping fees\\n   - Exclusive access to backcountry areas\\n{{else if passType 'equals' 'Silver'}}\\nSilver Member Benefits:\\n   - Day-use entry to all BC Parks\\n   - 10% discount on camping fees\\n   - Access to select backcountry areas\\n{{else}}\\nStandard Pass Benefits:\\n   - Day-use entry to most BC Parks\\n   - Standard camping rates apply\\n{{/if}}\\n{{/if}}\\n\\n-----------------------------------------\\nFEATURED BC PARKS ({{featuredCount}})\\n-----------------------------------------\\n\\n{{#each featuredParks}}\\n{{#if this.parkName}}\\n{{#if this.region}}\\n{{this.parkName}} ({{this.region}})\\n{{else}}\\n{{this.parkName}}\\n{{/if}}\\n\\n   {{this.description}}\\n   \\n   {{#if this.difficulty}}\\n   Difficulty Level: {{this.difficulty}}/5\\n   {{/if}}\\n   \\n   {{#if this.activities}}\\n   Activities Available:\\n   {{#each this.activities}}\\n     - {{this}}\\n   {{/each}}\\n   {{/if}}\\n   \\n   {{#if this.campgroundsAvailable}}\\n   Campsites Available: {{this.availableSites}}/{{this.totalSites}}\\n   {{#if this.isFull}}\\n   [Almost full!]\\n   {{else if this.isGettingFull}}\\n   [Getting full, book soon!]\\n   {{else}}\\n   [Plenty of spots available!]\\n   {{/if}}\\n   {{/if}}\\n   \\n   {{#if this.beachAccess}}\\n   Beach Access Available\\n   {{/if}}\\n{{/if}}\\n\\n{{/each}}\\n\\n-----------------------------------------\\nSEASONAL RECOMMENDATIONS\\n-----------------------------------------\\n\\n{{#if season}}\\n{{#if season 'equals' 'summer'}}\\nSUMMER ADVENTURES:\\nPerfect time for high-elevation hikes! Check out:\\n{{#each summerRecommendations}}\\n   - {{this.parkName}}: {{this.reason}}\\n{{/each}}\\n\\n{{else if season 'equals' 'fall'}}\\nFALL FOLIAGE SEASON:\\nWitness the stunning autumn colors at these parks:\\n{{#each fallRecommendations}}\\n   - {{this.parkName}} (Peak foliage: {{this.peakDate}})\\n{{/each}}\\n\\n{{else if season 'equals' 'winter'}}\\nWINTER WONDERLAND:\\nSnowshoeing and backcountry skiing destinations:\\n{{#each winterRecommendations}}\\n   - {{this.parkName}} (Elevation: {{this.elevation}}m)\\n{{/each}}\\n\\n{{else}}\\nSPRING BLOOMS:\\nWildflowers and wildlife viewing at their best:\\n{{#each springRecommendations}}\\n   - {{this.parkName}} (Best viewing time: {{this.bloomDate}})\\n{{/each}}\\n{{/if}}\\n{{/if}}\\n\\n-----------------------------------------\\nPOPULAR ROUTES FROM {{userCity}}\\n-----------------------------------------\\n\\n{{#each nearestParks}}\\n{{#if this.parkName}}\\n{{this.parkName}}\\n   Distance: {{this.distance}} km\\n   Drive Time: {{this.driveTime}} minutes\\n   Road Conditions: {{this.roadConditions}}\\n   {{#if this.winterClosure}}\\n   [Winter Road Closure: {{this.closureMonths}}]\\n   {{/if}}\\n   {{#if this.wheelchairAccessible}}\\n   Accessibility: Yes\\n   {{else}}\\n   Accessibility: No\\n   {{/if}}\\n   {{#if this.petFriendly}}\\n   Pet-Friendly Trails Available\\n   {{/if}}\\n{{/if}}\\n\\n{{/each}}\\n\\n-----------------------------------------\\nWILDLIFE SPOTTING GUIDE\\n-----------------------------------------\\n\\n{{#each wildlife}}\\n{{#if this.species}}\\n{{#if this.endangered}}\\n{{this.species}} (ENDANGERED - Observe from distance)\\n{{else}}\\n{{this.species}}\\n{{/if}}\\n   Habitat: {{this.habitat}}\\n   Best Viewing Season: {{this.season}}\\n   {{#if this.highDanger}}\\n   [CAUTION: Keep 100m+ distance, carry bear spray]\\n   {{/if}}\\n{{/if}}\\n\\n{{/each}}\\n\\n-----------------------------------------\\nYOUR TRIP CHECKLIST\\n-----------------------------------------\\n\\nBefore heading out, make sure you have:\\n{{#each tripChecklist}}\\n{{#if this.essential}}\\nX {{this.item}} [ESSENTIAL]\\n{{else}}\\n- {{this.item}}\\n{{/if}}\\n{{/each}}\\n\\n-----------------------------------------\\nCHALLENGE: VISIT 10 PARKS BY {{challengeDeadline}}\\n-----------------------------------------\\n\\n{{#if userChallengeProgress}}\\nYour Progress: {{userChallengeProgress}}/10 Parks Visited\\n\\n{{#if challengeCompleted}}\\nCONGRATULATIONS! You've completed the challenge!\\nYou've earned:\\n   - {{challengeReward}}\\n   - Certificate of Exploration\\n   - Exclusive BC Parks merchandise\\n{{else if challengeHalfway}}\\nYou're over halfway there! Keep pushing to reach 10 parks!\\n{{else}}\\nGreat start! Keep exploring!\\n{{/if}}\\n{{else}}\\nGet started! Visit your first park this weekend!\\n{{/if}}\\n\\n-----------------------------------------\\nIMPORTANT REMINDERS\\n-----------------------------------------\\n\\n{{#if weatherAlerts}}\\nWEATHER ALERT:\\n{{#each weatherAlerts}}\\n   {{this.alertType}} in {{this.affectedArea}}\\n   {{this.alertMessage}}\\n{{/each}}\\n{{/if}}\\n\\n{{#if closedParks}}\\nTEMPORARILY CLOSED PARKS:\\n{{#each closedParks}}\\n   - {{this.parkName}} (Reason: {{this.reason}})\\n   - Expected reopening: {{this.reopenDate}}\\n{{/each}}\\n{{/if}}\\n\\n{{#if hasReservations}}\\nYou have {{reservationCount}} active camping reservations.\\nManage your bookings at: www.discovercamping.ca\\n{{/if}}\\n\\n-----------------------------------------\\n\\n{{#if isLocalResident}}\\nAs a BC resident, you have access to exclusive provincial discounts at participating parks!\\n{{/if}}\\n\\n{{#if isFirstTimeUser}}\\nWelcome to the BC Parks community! Join our online forum at parks.bc.ca/community to share photos and tips with other adventurers!\\n{{/if}}\\n\\nExplore. Discover. Protect. That's the BC Parks way!\\n\\nHappy Trails,\\nThe BC Parks Team\\n\\nP.S. - Remember to practice Leave No Trace principles to keep our parks pristine for future generations!\",\n  \"engineCode\": \"handlebars\"\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates"]
+                },
+                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Create Template - Moustache",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Mustache Newsletter\",\n  \"description\": \"Logic-less template with sections\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Newsletter for {{name}}\",\n  \"body\": \"Hello {{name}},\\n\\n{{#isSubscribed}}\\nYou are subscribed to our newsletter.\\n{{/isSubscribed}}\\n\\n{{#articles}}\\nArticle: {{title}}\\nBy {{author}}\\n\\n{{/articles}}\\n\\nCategories you follow:\\n{{#categories}}\\n- {{.}}\\n{{/categories}}\\n\\nUnsubscribe anytime.\",\n  \"engineCode\": \"mustache\"\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates"]
+                },
+                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Create Template - Legacy GC Notify",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Legacy GC Notify Order Confirmation\",\n  \"description\": \"Legacy syntax with conditional fallback\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Order ((orderNumber)) Confirmation\",\n  \"body\": \"Hello ((firstName)),\\n\\nYour order has been ((status??submitted for review)).\\n\\nOrder Details:\\nNumber: ((orderNumber))\\nTotal: $((amount))\\n\\nThank you!\",\n  \"engineCode\": \"legacy_gc_notify\"\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates"]
+                },
+                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Create Template - EJS",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"EJS Complex Template\",\n  \"description\": \"JavaScript template syntax with full logic\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Invoice <%= invoiceNumber %>\",\n  \"body\": \"Dear <%= customer.firstName %> <%= customer.lastName %>,\\n\\n<% if (customer.isVIP) { %>\\nThank you for being a VIP customer!\\n<% } %>\\n\\n<% if (items && items.length > 0) { %>\\nItems purchased:\\n<% items.forEach((item, index) => { %>\\n<%= index + 1 %>. <%= item.name %> - $<%= item.price %> x <%= item.quantity %>\\n<% }) %>\\n<% } %>\\n\\nSubtotal: $<%= subtotal %>\\n<% if (discountPercent > 0) { %>\\nDiscount (<%= discountPercent %>%): -$<%= discount %>\\n<% } %>\\nTotal: $<%= total %>\\n\\n<% if (daysUntilPayment < 7) { %>\\nPayment due in <%= daysUntilPayment %> days!\\n<% } %>\\n\\nThank you!\",\n  \"engineCode\": \"ejs\"\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates"]
+                },
+                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Update Template",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Welcome Email\",\n  \"body\": \"Hello {{name}}, welcome to {{service_name}}!\\n\\nYour account has been successfully created.\\n\\nIf you have any questions, contact support.\\n\\nBest regards,\\nNotify Team\",\n  \"tags\": [\"welcome\", \"onboarding\", \"v2\"]\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates", "template-id-123"]
+                },
+                "description": "Update an existing template. Creates a new version. Only include fields to update."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Preview Template - Handlebars",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"personalisation\": \n  {\n  \"userName\": \"Sarah\",\n  \"parksCount\": 47,\n  \"passType\": \"Gold\",\n  \"isGoldPass\": true,\n  \"isSilverPass\": false,\n  \"passYear\": \"2026\",\n  \"featuredCount\": 3,\n  \"isSummerSeason\": true,\n  \"isFallSeason\": false,\n  \"isWinterSeason\": false,\n  \"isSpringSeasonSeason\": false,\n  \"userCity\": \"Vancouver\",\n  \"userChallengeProgress\": 6,\n  \"challengeCompleted\": false,\n  \"challengeHalfway\": true,\n  \"challengeReward\": \"BC Parks Explorer Badge\",\n  \"challengeDeadline\": \"2026-12-31\",\n  \"hasReservations\": true,\n  \"reservationCount\": 2,\n  \"isLocalResident\": true,\n  \"isFirstTimeUser\": false,\n  \"featuredParks\": [\n    {\n      \"parkName\": \"Garibaldi Provincial Park\",\n      \"region\": \"Squamish-Whistler\",\n      \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n      \"difficulty\": 3,\n      \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n      \"campgroundsAvailable\": true,\n      \"availableSites\": 75,\n      \"totalSites\": 200,\n      \"isFull\": false,\n      \"isGettingFull\": false,\n      \"beachAccess\": false\n    },\n    {\n      \"parkName\": \"Joffre Lakes Provincial Park\",\n      \"region\": \"Pemberton\",\n      \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n      \"difficulty\": 2,\n      \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n      \"campgroundsAvailable\": false,\n      \"beachAccess\": false\n    },\n    {\n      \"parkName\": \"Cathedral Provincial Park\",\n      \"region\": \"Keremeos\",\n      \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n      \"difficulty\": 4,\n      \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n      \"campgroundsAvailable\": true,\n      \"availableSites\": 12,\n      \"totalSites\": 30,\n      \"isFull\": true,\n      \"isGettingFull\": false,\n      \"beachAccess\": false\n    }\n  ],\n  \"summerRecommendations\": [\n    {\n      \"parkName\": \"Mount Robson Provincial Park\",\n      \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n    },\n    {\n      \"parkName\": \"Strathcona Provincial Park\",\n      \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n    },\n    {\n      \"parkName\": \"Wells Gray Provincial Park\",\n      \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n    }\n  ],\n  \"fallRecommendations\": [],\n  \"winterRecommendations\": [],\n  \"springRecommendations\": [],\n  \"nearestParks\": [\n    {\n      \"parkName\": \"Lynn Headwaters Regional Park\",\n      \"distance\": 25,\n      \"driveTime\": 45,\n      \"roadConditions\": \"Excellent\",\n      \"winterClosure\": false,\n      \"wheelchairAccessible\": true,\n      \"petFriendly\": true\n    },\n    {\n      \"parkName\": \"Cultus Lake Provincial Park\",\n      \"distance\": 85,\n      \"driveTime\": 90,\n      \"roadConditions\": \"Excellent\",\n      \"winterClosure\": false,\n      \"wheelchairAccessible\": true,\n      \"petFriendly\": true\n    },\n    {\n      \"parkName\": \"Golden Ears Provincial Park\",\n      \"distance\": 60,\n      \"driveTime\": 75,\n      \"roadConditions\": \"Good\",\n      \"winterClosure\": true,\n      \"closureMonths\": \"November to April\",\n      \"wheelchairAccessible\": false,\n      \"petFriendly\": true\n    }\n  ],\n  \"wildlife\": [\n    {\n      \"species\": \"Black Bear\",\n      \"endangered\": false,\n      \"habitat\": \"Forested areas and alpine meadows\",\n      \"season\": \"June to September\",\n      \"highDanger\": true\n    },\n    {\n      \"species\": \"Mountain Goat\",\n      \"endangered\": false,\n      \"habitat\": \"Alpine peaks and rocky terrain\",\n      \"season\": \"Year-round\",\n      \"highDanger\": false\n    },\n    {\n      \"species\": \"Marbled Murrelet\",\n      \"endangered\": true,\n      \"habitat\": \"Old-growth forest\",\n      \"season\": \"April to August\",\n      \"highDanger\": false\n    },\n    {\n      \"species\": \"Pika\",\n      \"endangered\": false,\n      \"habitat\": \"Rocky alpine areas above treeline\",\n      \"season\": \"June to October\",\n      \"highDanger\": false\n    }\n  ],\n  \"tripChecklist\": [\n    {\n      \"item\": \"Water bottle (2-3 liters)\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"Waterproof jacket and pants\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"Proper hiking boots with good traction\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"First aid kit\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"Bear spray or bells\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"Map and compass or GPS device\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"High-energy snacks\",\n      \"essential\": true\n    },\n    {\n      \"item\": \"Sunscreen and insect repellent\",\n      \"essential\": false\n    },\n    {\n      \"item\": \"Camera or binoculars\",\n      \"essential\": false\n    },\n    {\n      \"item\": \"Headlamp or flashlight\",\n      \"essential\": false\n    }\n  ],\n  \"weatherAlerts\": [\n    {\n      \"alertType\": \"High Wind Warning\",\n      \"affectedArea\": \"Whistler and surrounding peaks\",\n      \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n    }\n  ],\n  \"closedParks\": [\n    {\n      \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n      \"reason\": \"Bridge maintenance and trail repairs\",\n      \"reopenDate\": \"2026-06-15\"\n    }\n  ]\n}\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/99444188-6ef4-4fff-97dc-dbedf9dd41e5/preview",
+                  "host": ["{{gateway_url}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "99444188-6ef4-4fff-97dc-dbedf9dd41e5",
+                    "preview"
+                  ]
+                },
+                "description": "Preview a template with sample personalisation data. Renders the template without sending anything."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Preview Template - Moustache",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"personalisation\": {\n    \"name\": \"Alex\",\n    \"isSubscribed\": true,\n    \"articles\": [\n      {\"title\": \"Getting Started\", \"author\": \"Team A\"},\n      {\"title\": \"Advanced Tips\", \"author\": \"Team B\"}\n    ],\n    \"categories\": [\"Technology\", \"Business\", \"Design\"]\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/a7836587-8fa1-4075-8823-2aa27819e63d/preview",
+                  "host": ["{{gateway_url}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "a7836587-8fa1-4075-8823-2aa27819e63d",
+                    "preview"
+                  ]
+                },
+                "description": "Preview a template with sample personalisation data. Renders the template without sending anything."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Preview Template - Legacy GC Notify",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"personalisation\": {\n    \"orderNumber\": \"ORD-12345\",\n    \"firstName\": \"John\",\n    \"status\": \"confirmed\",\n    \"amount\": \"156.99\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/ebbe1739-71bf-44ec-bb7d-f978816ab173/preview",
+                  "host": ["{{gateway_url}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "ebbe1739-71bf-44ec-bb7d-f978816ab173",
+                    "preview"
+                  ]
+                },
+                "description": "Preview a template with sample personalisation data. Renders the template without sending anything."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Preview Template - EJS",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"personalisation\": {\n    \"invoiceNumber\": \"INV-2026-001\",\n    \"customer\": {\n      \"firstName\": \"Michael\",\n      \"lastName\": \"Johnson\",\n      \"isVIP\": true\n    },\n    \"items\": [\n      {\"name\": \"Product A\", \"price\": 50, \"quantity\": 2},\n      {\"name\": \"Product B\", \"price\": 35, \"quantity\": 1}\n    ],\n    \"subtotal\": 135,\n    \"discountPercent\": 10,\n    \"discount\": 13.50,\n    \"total\": 121.50,\n    \"daysUntilPayment\": 5\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/8ba11b27-97e7-423c-a9bf-3ba12bfa5466/preview",
+                  "host": ["{{gateway_url}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "8ba11b27-97e7-423c-a9bf-3ba12bfa5466",
+                    "preview"
+                  ]
+                },
+                "description": "Preview a template with sample personalisation data. Renders the template without sending anything."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Delete Template",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{jwt_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "templates", "template-id-123"]
+                },
+                "description": "Soft-delete a template (sets archived_at timestamp). Returns 204 No Content."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "CSTAR",
+          "item": [
+            {
+              "name": "Tenants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://cstar-dev.apps.silver.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
+                  "protocol": "https",
+                  "host": ["cstar-dev", "apps", "silver", "devops", "gov", "bc", "ca"],
+                  "path": ["api", "v1", "users", ":ssoUserId", "tenants"],
+                  "variable": [
+                    {
+                      "key": "ssoUserId",
+                      "value": "9A65BBCD7A7F449ABE32D72729FDE441"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "refreshRequestParams",
+                "value": [],
+                "type": "any"
+              },
+              {
+                "key": "tokenRequestParams",
+                "value": [],
+                "type": "any"
+              },
+              {
+                "key": "authRequestParams",
+                "value": [],
+                "type": "any"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": true,
+                "type": "boolean"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "{{frontend_redirect_uri}}",
+                "type": "string"
+              },
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "{{frontend_client_id}}",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [""]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [""]
+              }
+            }
+          ]
+        },
+        {
           "name": "Notify - Simple Send",
           "request": {
             "auth": {
@@ -412,6 +1187,74 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": {\n    \"recipients\": [\"{{recipient_email}}\"],\n    \"subject\": \"Test Notification from Simple Send\",\n    \"body\": \"This is a test notification\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple"]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Delayed Send",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"recipients\": [\"{{recipient_email}}\"],\n    \"subject\": \"Test Notification from Simple Send\",\n    \"body\": \"This is a test notification\",\n    \"delayedSend\": \"2026-05-03 9:10 PDT\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple"]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Template",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateId\": \"5b1deace-0e1f-461a-883f-75efb6a08c5e\",\n  \"params\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"accountStatus\": \"active\",\n    \"isPremium\": true,\n    \"benefits\": [\"Priority Support\", \"Advanced Features\", \"Custom Integrations\"],\n    \"hasOrders\": true,\n    \"orders\": [\n      { \"id\": \"ORD-001\", \"amount\": \"99.99\" },\n      { \"id\": \"ORD-002\", \"amount\": \"49.99\" }\n    ]\n  },\n  \"email\": {\n    \"recipients\": [\"bfalk@salussystems.com\"]\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -733,58 +1576,6 @@
               "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
             },
             "description": "Delete a registered callback"
-          },
-          "response": []
-        },
-        {
-          "name": "Notify - List Templates",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{jwt_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/v1/templates",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "templates"]
-            },
-            "description": "List all notification templates"
-          },
-          "response": []
-        },
-        {
-          "name": "Notify - Get Template",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{jwt_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/v1/templates/template-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "templates", "template-id-123"]
-            },
-            "description": "Get a specific notification template"
           },
           "response": []
         },

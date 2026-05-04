@@ -1,24 +1,23 @@
 import { Module } from '@nestjs/common'
-import { TenantsModule } from '../../admin/tenants/tenants.module'
+import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ChesModule } from '../../ches/ches.module'
-import { NotificationModule } from '../../notification/notification.module'
 import { QueueModule } from '../../queue/queue.module'
+import { TemplatesModule } from '../templates/templates.module'
 import {
   NotifyController,
   NotifySimpleController,
   NotifyEventController,
-  TemplatesController,
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotificationModule } from '../notification/notification.module'
 
 @Module({
-  imports: [TenantsModule, ChesModule, NotificationModule, QueueModule],
+  imports: [TenantsModule, ChesModule, NotificationModule, QueueModule, TemplatesModule],
   controllers: [
     NotifySimpleController,
     NotifyEventController,
     NotifyController,
-    TemplatesController,
     ChesEmailController,
   ],
   providers: [NotifyService],

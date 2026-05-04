@@ -24,17 +24,17 @@ describe('codeTables.thunks', () => {
   describe('fetchCodeTables', () => {
     it('should fetch and transform code tables successfully', async () => {
       const mockStatusesData = [
-        { code: 'sent', description: 'Sent' },
-        { code: 'failed', description: 'Failed' },
-        { code: 'pending', description: 'Pending' },
+        { id: 'sent', label: 'Sent', description: 'Sent notification was sent' },
+        { id: 'failed', label: 'Failed', description: 'Notification delivery failed' },
+        { id: 'pending', label: 'Pending', description: 'Notification is pending' },
       ]
       const mockChannelsData = [
-        { channel_code: 'EMAIL', description: 'Email' },
-        { channel_code: 'SMS', description: 'SMS' },
+        { id: 'EMAIL', label: 'Email', description: 'Email notification channel' },
+        { id: 'SMS', label: 'SMS', description: 'SMS notification channel' },
       ]
       const mockEventTypesData = [
-        { event_type_code: 'PASSWORD_RESET', description: 'Password Reset' },
-        { event_type_code: 'INVOICE_SENT', description: 'Invoice Sent' },
+        { id: 'PASSWORD_RESET', label: 'Password Reset', description: 'User password reset event' },
+        { id: 'INVOICE_SENT', label: 'Invoice Sent', description: 'Invoice sent to user' },
       ]
 
       ;(api.get as any).mockResolvedValueOnce(mockStatusesData)
@@ -50,7 +50,7 @@ describe('codeTables.thunks', () => {
       expect(state.statuses[0]).toEqual({
         id: 'sent',
         label: 'Sent',
-        description: 'sent',
+        description: 'Sent notification was sent',
       })
     })
 
@@ -66,9 +66,9 @@ describe('codeTables.thunks', () => {
 
     it('should handle API error for channels', async () => {
       const mockStatusesData = [
-        { code: 'sent', description: 'Sent' },
-        { code: 'failed', description: 'Failed' },
-        { code: 'pending', description: 'Pending' },
+        { id: 'sent', label: 'Sent', description: 'Sent notification was sent' },
+        { id: 'failed', label: 'Failed', description: 'Notification delivery failed' },
+        { id: 'pending', label: 'Pending', description: 'Notification is pending' },
       ]
 
       ;(api.get as any).mockResolvedValueOnce(mockStatusesData)
@@ -82,17 +82,17 @@ describe('codeTables.thunks', () => {
 
     it('should make correct API calls', async () => {
       const mockStatusesData = [
-        { code: 'sent', description: 'Sent' },
-        { code: 'failed', description: 'Failed' },
-        { code: 'pending', description: 'Pending' },
+        { id: 'sent', label: 'Sent', description: 'Sent notification was sent' },
+        { id: 'failed', label: 'Failed', description: 'Notification delivery failed' },
+        { id: 'pending', label: 'Pending', description: 'Notification is pending' },
       ]
       const mockChannelsData = [
-        { channel_code: 'EMAIL', description: 'Email' },
-        { channel_code: 'SMS', description: 'SMS' },
+        { id: 'EMAIL', label: 'Email', description: 'Email notification channel' },
+        { id: 'SMS', label: 'SMS', description: 'SMS notification channel' },
       ]
       const mockEventTypesData = [
-        { event_type_code: 'PASSWORD_RESET', description: 'Password Reset' },
-        { event_type_code: 'INVOICE_SENT', description: 'Invoice Sent' },
+        { id: 'PASSWORD_RESET', label: 'Password Reset', description: 'User password reset event' },
+        { id: 'INVOICE_SENT', label: 'Invoice Sent', description: 'Invoice sent to user' },
       ]
 
       ;(api.get as any)
@@ -104,11 +104,13 @@ describe('codeTables.thunks', () => {
 
       expect(api.get as any).toHaveBeenCalledTimes(3)
       expect(api.generateApiParameters as any).toHaveBeenCalledWith(
-        '/api/v1/code-tables/notification-status',
+        '/api/v1/frontend/code-tables/notification-status',
       )
-      expect(api.generateApiParameters as any).toHaveBeenCalledWith('/api/v1/code-tables/channels')
       expect(api.generateApiParameters as any).toHaveBeenCalledWith(
-        '/api/v1/code-tables/event-types',
+        '/api/v1/frontend/code-tables/channels',
+      )
+      expect(api.generateApiParameters as any).toHaveBeenCalledWith(
+        '/api/v1/frontend/code-tables/event-types',
       )
     })
   })
