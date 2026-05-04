@@ -2,6 +2,21 @@ import { Controller, Get, Version, Logger } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './code-tables.service'
 
+/**
+ * Frontend Code Tables API Controller
+ *
+ * ARCHITECTURAL NOTE: This controller intentionally duplicates methods from CodeTablesController
+ * because the API Gateway requires separate routing:
+ * - CodeTablesController: /api/v1/code-tables (service-to-service auth)
+ * - CodeTablesFrontendController: /api/v1/frontend/code-tables (frontend auth)
+ *
+ * The different route prefixes enable the gateway to apply different authentication
+ * rules based on client type (internal service vs frontend application).
+ * Both controllers delegate to the same CodeTablesService for consistency.
+ *
+ * If the gateway configuration changes to support a single route with conditional auth,
+ * these controllers can be consolidated.
+ */
 @ApiTags('code-tables')
 @Controller('frontend/code-tables')
 @ApiBearerAuth()

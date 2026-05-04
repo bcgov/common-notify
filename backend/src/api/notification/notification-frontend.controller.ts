@@ -3,6 +3,21 @@ import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 
+/**
+ * Frontend Notification API Controller
+ *
+ * ARCHITECTURAL NOTE: This controller intentionally duplicates methods from NotificationController
+ * because the API Gateway requires separate routing:
+ * - NotificationController: /api/v1/notification_request (service-to-service auth)
+ * - NotificationFrontendController: /api/v1/frontend/notification_request (frontend auth)
+ *
+ * The different route prefixes enable the gateway to apply different authentication
+ * rules based on client type (internal service vs frontend application).
+ * Both controllers delegate to the same NotificationService for consistency.
+ *
+ * If the gateway configuration changes to support a single route with conditional auth,
+ * these controllers can be consolidated.
+ */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
 @ApiBearerAuth()

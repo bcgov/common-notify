@@ -303,27 +303,4 @@ export class NotificationService {
 
     return errors
   }
-
-  /**
-   * Find notifications stuck in PROCESSING or SENDING status
-   * @param since Notifications updated before this time are considered stuck
-   * @returns Array of stuck notifications
-   */
-  async findStuck(since: Date): Promise<any[]> {
-    // Filter by time using a more direct query
-    const result = await this.notificationRepository.query(
-      `SELECT id, tenant_id, status, updated_at
-       FROM notify.notification_request
-       WHERE status IN ('processing', 'sending')
-       AND updated_at < $1`,
-      [since],
-    )
-
-    return result.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      status: row.status,
-      updatedAt: row.updated_at,
-    }))
-  }
 }
