@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common'
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
 

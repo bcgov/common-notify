@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { TenantGuard } from './tenant.guard'
-import { TenantsService } from '../../admin/tenants/tenants.service'
+import { TenantsService } from '../../api/admin/tenants/tenants.service'
 
 // Type for request object with guard-added properties
 interface MockRequest {

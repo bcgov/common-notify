@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { NotificationStatus } from '../../../enum/notification-status.enum'
 
 /**
@@ -10,6 +10,12 @@ import { NotificationStatus } from '../../../enum/notification-status.enum'
 export class NotificationAcceptanceResponse {
   @ApiProperty({ format: 'uuid', description: 'Unique notification request ID' })
   notifyId: string
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Template ID if the notification was created using a template',
+  })
+  templateId?: string
 
   @ApiProperty({
     enum: [

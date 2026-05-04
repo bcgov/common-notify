@@ -14,32 +14,35 @@ export const fetchCodeTables = createAsyncThunk<
   }
 >('codeTables/fetchCodeTables', async (_, { rejectWithValue }) => {
   try {
-    // Fetch notification statuses
-    const statuses_data = await get<any[]>(
-      generateApiParameters('/api/v1/code-tables/notification-status'),
-    )
+    // Fetch all code tables in parallel for better performance
+    const [statuses_data, channels_data, eventTypes_data] = await Promise.all([
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/notification-status')),
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/channels')),
+      get<any[]>(generateApiParameters('/api/v1/frontend/code-tables/event-types')),
+    ])
+
+    // Map notification statuses
+    // API already returns: { id, label (displayName), description }
     const statuses = statuses_data.map((item: any) => ({
-      id: item.code,
-      label: item.description,
-      description: item.code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
-    // Fetch notification channels
-    const channels_data = await get<any[]>(generateApiParameters('/api/v1/code-tables/channels'))
+    // Map notification channels
+    // API already returns: { id, label (displayName), description }
     const channels = channels_data.map((item: any) => ({
-      id: item.channel_code,
-      label: item.description,
-      description: item.channel_code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
-    // Fetch notification event types
-    const eventTypes_data = await get<any[]>(
-      generateApiParameters('/api/v1/code-tables/event-types'),
-    )
+    // Map notification event types
+    // API already returns: { id, label (displayName), description }
     const eventTypes = eventTypes_data.map((item: any) => ({
-      id: item.event_type_code,
-      label: item.description,
-      description: item.event_type_code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
     return {

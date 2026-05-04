@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { NotificationStatusCode } from '../../notification/entities/notification-status-code.entity'
-import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
-import { NotificationEventTypeCode } from '../../notification/entities/notification-event-type-code.entity'
+import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
+import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
+import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 
 export class CodeTableItemDto {
   id: string
@@ -40,8 +40,8 @@ export class CodeTablesService {
       })
       return statuses.map((s) => ({
         id: s.code,
-        label: s.description,
-        description: s.code,
+        label: s.displayName || s.description,
+        description: s.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch status codes', error)
@@ -59,8 +59,8 @@ export class CodeTablesService {
       })
       return channels.map((c) => ({
         id: c.channelCode,
-        label: c.description,
-        description: c.channelCode,
+        label: c.displayName || c.description,
+        description: c.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch channel codes', error)
@@ -78,8 +78,8 @@ export class CodeTablesService {
       })
       return eventTypes.map((e) => ({
         id: e.eventTypeCode,
-        label: e.description,
-        description: e.eventTypeCode,
+        label: e.displayName || e.description,
+        description: e.description,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch event type codes', error)

@@ -6,7 +6,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common'
-import { TenantsService } from '../../admin/tenants/tenants.service'
+import { TenantsService } from '../../api/admin/tenants/tenants.service'
 
 /**
  * Guard that extracts tenant information from JWT or Kong headers
