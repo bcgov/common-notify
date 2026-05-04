@@ -1,6 +1,5 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -9,7 +8,6 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
-  let repository: TemplatesRepository
 
   const mockTemplate: Template = {
     id: 'template-123',
@@ -57,7 +55,6 @@ describe('TemplatesService', () => {
     }).compile()
 
     service = module.get<TemplatesService>(TemplatesService)
-    repository = module.get<TemplatesRepository>(TemplatesRepository)
 
     vi.clearAllMocks()
   })
@@ -183,7 +180,7 @@ describe('TemplatesService', () => {
       })
       mockRepository.createVersion.mockResolvedValue({})
 
-      const result = await service.createTemplate('tenant-123', createDto, 'user-123')
+      await service.createTemplate('tenant-123', createDto, 'user-123')
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
