@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import * as Handlebars from 'handlebars'
 import * as Mustache from 'mustache'
 import * as EJS from 'ejs'
+import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -17,7 +18,16 @@ import { TemplateResponseDto } from './schemas/template-response.dto'
  */
 @Injectable()
 export class TemplatesService {
-  constructor(private readonly templatesRepository: TemplatesRepository) {}
+  private readonly markdown: MarkdownIt
+
+  constructor(private readonly templatesRepository: TemplatesRepository) {
+    // Initialize markdown-it with safe defaults
+    this.markdown = new MarkdownIt({
+      html: true,
+      linkify: true,
+      typographer: false,
+    })
+  }
 
   /**
    * List all active templates for a tenant
@@ -88,6 +98,7 @@ export class TemplatesService {
       subject: createDto.subject,
       body: createDto.body,
       engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
+      renderAsMarkdown: createDto.renderAsMarkdown || false,
       version: 1,
       active: true,
       createdBy: userId,
@@ -104,6 +115,7 @@ export class TemplatesService {
       subject: template.subject,
       body: template.body,
       engineCode: template.engineCode,
+      renderAsMarkdown: template.renderAsMarkdown,
       createdBy: userId,
     })
 
@@ -152,6 +164,7 @@ export class TemplatesService {
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = updateDto.engineCode || template.engineCode
+    template.renderAsMarkdown = updateDto.renderAsMarkdown ?? template.renderAsMarkdown
     template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)
@@ -210,11 +223,25 @@ export class TemplatesService {
     template: Template,
     personalisation: Record<string, any> = {},
   ): { subject?: string; body: string } {
+    const subject = template.subject
+      ? this.renderText(template.subject, personalisation, template.engineCode as TemplateEngine)
+      : undefined
+
+    let body = this.renderText(
+      template.body,
+      personalisation,
+      template.engineCode as TemplateEngine,
+    )
+
+    // Apply markdown conversion to body only if enabled
+    // Note: Subject is never rendered as markdown (email subjects should be plain text)
+    if (template.renderAsMarkdown) {
+      body = this.renderMarkdown(body)
+    }
+
     return {
-      subject: template.subject
-        ? this.renderText(template.subject, personalisation, template.engineCode as TemplateEngine)
-        : undefined,
-      body: this.renderText(template.body, personalisation, template.engineCode as TemplateEngine),
+      subject,
+      body,
     }
   }
 
@@ -313,6 +340,20 @@ export class TemplatesService {
       return EJS.render(template, personalisation, { async: false })
     } catch (error) {
       throw new BadRequestException(`EJS rendering error: ${(error as Error).message}`)
+    }
+  }
+
+  /**
+   * Render markdown to HTML
+   * Converts markdown-formatted text to HTML
+   * @param markdown The markdown text to convert
+   * @returns HTML-formatted text
+   */
+  private renderMarkdown(markdown: string): string {
+    try {
+      return this.markdown.render(markdown)
+    } catch (error) {
+      throw new BadRequestException(`Markdown rendering error: ${(error as Error).message}`)
     }
   }
 

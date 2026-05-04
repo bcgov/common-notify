@@ -103,6 +103,12 @@ export class TemplateVersion {
   engine: TemplateEngineCode
 
   /**
+   * Whether markdown rendering was enabled for this version
+   */
+  @Column({ name: 'render_as_markdown', type: 'boolean', default: false })
+  renderAsMarkdown: boolean
+
+  /**
    * User or process that created this version
    */
   @Column({ name: 'created_by', length: 200 })
