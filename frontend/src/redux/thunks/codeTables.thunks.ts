@@ -22,24 +22,27 @@ export const fetchCodeTables = createAsyncThunk<
     ])
 
     // Map notification statuses
+    // API already returns: { id, label (displayName), description }
     const statuses = statuses_data.map((item: any) => ({
-      id: item.code,
-      label: item.description,
-      description: item.code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
     // Map notification channels
+    // API already returns: { id, label (displayName), description }
     const channels = channels_data.map((item: any) => ({
-      id: item.channel_code,
-      label: item.description,
-      description: item.channel_code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
     // Map notification event types
+    // API already returns: { id, label (displayName), description }
     const eventTypes = eventTypes_data.map((item: any) => ({
-      id: item.event_type_code,
-      label: item.description,
-      description: item.event_type_code,
+      id: item.id,
+      label: item.label,
+      description: item.description,
     }))
 
     return {
