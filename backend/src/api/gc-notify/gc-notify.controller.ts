@@ -33,7 +33,7 @@ import { SmsContent } from './schemas/sms-content'
 import { NotificationsListResponse } from './schemas/notifications-list-response'
 import { TemplatesListResponse } from './schemas/templates-list-response'
 import { FileAttachment } from './schemas/file-attachment'
-import { ApiKeyGuard } from 'src/common/guards/api-key.guard'
+import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 
 @ApiTags('GC Notify')
 @ApiExtraModels(EmailContent, SmsContent, FileAttachment)
