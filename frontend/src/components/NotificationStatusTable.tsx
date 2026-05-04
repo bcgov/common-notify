@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
-import { fetchNotifications } from '@/redux/thunks/notification.thunks'
+import { fetchNotifications, connectNotificationSSE } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 
 /**
@@ -23,6 +23,12 @@ const NotificationStatusTable: FC = () => {
   useEffect(() => {
     dispatch(fetchNotifications())
   }, [statusFilter, dispatch])
+
+  // Connect to SSE stream
+  useEffect(() => {
+    const controller = connectNotificationSSE(dispatch)
+    return () => controller.abort()
+  }, [dispatch])
 
   // Build status filter items from Redux
   const statusFilterItems = [

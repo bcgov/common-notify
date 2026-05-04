@@ -20,7 +20,7 @@ export const notificationApi = {
     try {
       const params = generateApiParameters('/api/v1/notification_request')
       const queryParams = status && status !== 'all' ? { status } : {}
-      return await get({ ...params, params: queryParams })
+      return await get<PaginatedResponse>({ ...params, params: queryParams })
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {
