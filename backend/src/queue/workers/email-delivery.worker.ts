@@ -1,10 +1,12 @@
-import { Logger } from '@nestjs/common'
+import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
+import { TemplatesRepository } from '../../api/templates/templates.repository'
+import { TemplatesService } from '../../api/templates/templates.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
-import { NotifyEmailChannel } from '../../api/notify/schemas'
+import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
 import { IEmailTransport } from '../../adapters'
 
 /**
@@ -29,6 +31,8 @@ export class EmailDeliveryWorker {
    * @param emailQueue The BullMQ queue instance for email delivery jobs
    * @param notificationService Service for database updates
    * @param configService Configuration service for queue settings
+   * @param templatesRepository Repository for template resolution
+   * @param templatesService Service for template rendering
    * @param emailAdapter Email transport adapter for sending emails
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
@@ -36,6 +40,8 @@ export class EmailDeliveryWorker {
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
+    templatesRepository: TemplatesRepository,
+    templatesService: TemplatesService,
     emailAdapter: IEmailTransport,
     concurrency: number = 2,
   ): Promise<void> {
@@ -46,11 +52,9 @@ export class EmailDeliveryWorker {
     // Register the job processor with configurable concurrency
     // Note: Don't await process() - it sets up listeners and never resolves
     emailQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId, tenantId, payload, attempt } = job.data
+      const { notifyId, tenantId, payload, request } = job.data
 
-      logger.debug(
-        `[${notifyId}] Processing email delivery job (attempt ${attempt + 1}/3) for tenant=${tenantId}`,
-      )
+      logger.debug(`[${notifyId}] Processing email delivery job for tenant=${tenantId}`)
 
       try {
         // Validate DeliveryJobPayload structure
@@ -60,9 +64,6 @@ export class EmailDeliveryWorker {
         if (!tenantId || typeof tenantId !== 'string') {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
-        if (typeof attempt !== 'number' || attempt < 0) {
-          throw new Error('Invalid delivery job: attempt is missing or invalid')
-        }
 
         // Validate job data
         if (!payload || typeof payload !== 'object') {
@@ -70,7 +71,42 @@ export class EmailDeliveryWorker {
         }
 
         // Cast payload to email channel type for type safety
-        const emailPayload = payload as NotifyEmailChannel
+        let emailPayload = payload as NotifyEmailChannel
+
+        // Resolve template if templateId is provided in the original request
+        // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
+        if (request?.templateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+          try {
+            const template = await templatesRepository.findById(tenantId, request.templateId)
+            if (!template) {
+              throw new NotFoundException(
+                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+              )
+            }
+
+            // Merge template content into email payload if channel matches
+            if (template.channelCode === 'EMAIL') {
+              // Render the template with personalisation data from request.params
+              const rendered = templatesService.renderTemplateContent(
+                template,
+                request.params || {},
+              )
+
+              emailPayload = {
+                ...emailPayload,
+                subject: rendered.subject || emailPayload.subject,
+                body: rendered.body,
+              }
+              logger.debug(`[${notifyId}] Template resolved and rendered into email payload`)
+            }
+          } catch (templateError) {
+            logger.error(
+              `[${notifyId}] Failed to resolve template: ${(templateError as Error).message}`,
+            )
+            throw templateError
+          }
+        }
 
         if (
           !emailPayload.recipients ||
@@ -88,7 +124,7 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
-        // Update status to SENDING
+        // Update status to SENDING (only after all validations pass)
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
@@ -115,14 +151,14 @@ export class EmailDeliveryWorker {
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
+        const attempt = (job.attemptsMade || 0) + 1
         logger.error(
-          `[${notifyId}] Failed to send email delivery job (attempt ${attempt + 1}/3): ${errorMessage}`,
+          `[${notifyId}] Failed to send email delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
 
-        // Update status to FAILED on final attempt
-        if (attempt >= 2) {
-          // Last attempt (0, 1, 2 = 3 total attempts)
+        // Update status to FAILED only on final attempt (when no retries left)
+        if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {
           await notificationService.update(notifyId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',

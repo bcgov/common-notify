@@ -39,9 +39,15 @@ export class NotifyEmailChannel {
   @IsEmail({}, { each: true })
   bcc?: string[]
 
-  @ApiProperty() @IsString() subject: string
+  @ApiPropertyOptional({ description: 'Email subject. Required if not using a template.' })
+  @IsOptional()
+  @IsString()
+  subject?: string
 
-  @ApiProperty() @IsString() body: string
+  @ApiPropertyOptional({ description: 'Email body content. Required if not using a template.' })
+  @IsOptional()
+  @IsString()
+  body?: string
 
   @ApiPropertyOptional({ enum: ['text', 'html'] })
   @IsOptional()

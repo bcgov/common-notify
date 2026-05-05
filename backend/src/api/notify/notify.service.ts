@@ -4,6 +4,8 @@ import { Injectable, Logger } from '@nestjs/common'
 export class NotifyService {
   private readonly logger = new Logger(NotifyService.name)
 
+  constructor() {}
+
   notImplemented() {
     return {
       error: 'Not implemented',
