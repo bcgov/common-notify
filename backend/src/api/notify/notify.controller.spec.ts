@@ -8,11 +8,10 @@ import {
   NotifySimpleController,
   NotifyEventController,
   NotifyController,
-  TemplatesController,
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
 import { TenantGuard } from '../../common/guards/tenant.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
@@ -65,7 +64,6 @@ describe('Notify Controllers', () => {
         NotifySimpleController,
         NotifyEventController,
         NotifyController,
-        TemplatesController,
         ChesEmailController,
       ],
       providers: [
@@ -297,29 +295,6 @@ describe('Notify Controllers', () => {
         return request(app.getHttpServer())
           .delete('/api/v1/notify/registerCallback/callback-123')
           .expect(501)
-      })
-    })
-  })
-
-  describe('TemplatesController', () => {
-    it('should be defined', () => {
-      const controller = app.get(TemplatesController)
-      expect(controller).toBeDefined()
-    })
-
-    describe('GET /api/v1/templates', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/templates').expect(501)
-      })
-
-      it('should accept query parameters', async () => {
-        return request(app.getHttpServer()).get('/api/v1/templates?limit=50&cursor=xyz').expect(501)
-      })
-    })
-
-    describe('GET /api/v1/templates/:templateId', () => {
-      it('should return 501 status', { timeout: 10000 }, async () => {
-        return request(app.getHttpServer()).get('/api/v1/templates/template-123').expect(501)
       })
     })
   })

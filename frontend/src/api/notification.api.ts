@@ -13,12 +13,12 @@ interface PaginatedResponse {
 export const notificationApi = {
   /**
    * List all notification requests for the authenticated tenant
-   * GET /api/v1/notification_request
+   * GET /api/v1/frontend/notification_request
    * @param status Optional status filter to apply on the backend
    */
   async listNotifications(status?: NotificationStatus | 'all') {
     try {
-      const params = generateApiParameters('/api/v1/notification_request')
+      const params = generateApiParameters('/api/v1/frontend/notification_request')
       const queryParams = status && status !== 'all' ? { status } : {}
       return await get<PaginatedResponse>({ ...params, params: queryParams })
     } catch (error) {

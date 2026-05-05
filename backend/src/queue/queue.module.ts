@@ -10,11 +10,14 @@ import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
-import { NotificationRequest } from '../notification/entities/notification-request.entity'
-import { NotificationService } from '../notification/notification.service'
-import { NotificationPubSubService } from '../notification/notification-pubsub.service'
+import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
+import { NotificationService } from '../api/notification/notification.service'
+import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
+import { TemplatesRepository } from '../api/templates/templates.repository'
+import { TemplatesService } from '../api/templates/templates.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
-import { TenantsModule } from '../admin/tenants/tenants.module'
+import { TenantsModule } from '../api/admin/tenants/tenants.module'
+import { TemplatesModule } from '../api/templates/templates.module'
 
 /**
  * Queue Module
@@ -30,7 +33,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
  * due to temporary Redis unavailability.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationRequest]), TenantsModule],
+  imports: [TypeOrmModule.forFeature([NotificationRequest]), TenantsModule, TemplatesModule],
   providers: [
     PendingNotificationRetryService,
     NotificationService,
@@ -165,6 +168,8 @@ export class QueueModule implements OnModuleInit {
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
     private readonly notificationService?: NotificationService,
+    private readonly templatesRepository?: TemplatesRepository,
+    private readonly templatesService?: TemplatesService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
@@ -210,6 +215,8 @@ export class QueueModule implements OnModuleInit {
         this.emailQueue,
         this.notificationService,
         this.configService,
+        this.templatesRepository,
+        this.templatesService,
         this.emailAdapter,
         emailConcurrency,
       )
@@ -225,6 +232,8 @@ export class QueueModule implements OnModuleInit {
         this.smsQueue,
         this.notificationService,
         this.configService,
+        this.templatesRepository,
+        this.templatesService,
         this.smsAdapter,
         smsConcurrency,
       )

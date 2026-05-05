@@ -317,7 +317,9 @@ describe('NotifySimpleRequest', () => {
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
-      expect(Object.keys(instance).sort()).toEqual(['email', 'msgApp', 'params', 'sms'].sort())
+      expect(Object.keys(instance).sort()).toEqual(
+        ['email', 'msgApp', 'params', 'sms', 'templateId'].sort(),
+      )
     })
 
     it('should handle deeply nested params', async () => {
@@ -462,6 +464,58 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.email?.delayedSend).toBeUndefined()
+    })
+  })
+
+  describe('Template ID Validation', () => {
+    it('should accept valid UUID templateId', async () => {
+      const data = {
+        templateId: '550e8400-e29b-41d4-a716-446655440000',
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.templateId).toBe('550e8400-e29b-41d4-a716-446655440000')
+    })
+
+    it('should reject invalid UUID templateId', async () => {
+      const data = {
+        templateId: 'not-a-uuid',
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      const templateIdErrors = errors.filter((err) => err.property === 'templateId')
+      expect(templateIdErrors.length).toBeGreaterThan(0)
+    })
+
+    it('should allow templateId to be optional', async () => {
+      const data = {
+        email: {
+          recipients: ['test@example.com'],
+          subject: 'Test',
+          body: 'Test body',
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.templateId).toBeUndefined()
     })
   })
 

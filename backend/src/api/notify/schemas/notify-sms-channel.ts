@@ -17,7 +17,10 @@ export class NotifySmsChannel {
   @IsString({ each: true })
   recipients: string[]
 
-  @ApiProperty() @IsString() body: string
+  @ApiPropertyOptional({ description: 'SMS body content. Required if not using a template.' })
+  @IsOptional()
+  @IsString()
+  body?: string
 
   @ApiPropertyOptional() @IsOptional() @IsString() renderer?: string
 
