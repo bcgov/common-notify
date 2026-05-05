@@ -28,11 +28,11 @@ describe('AppController (e2e)', () => {
       .useValue({
         onModuleInit: () => Promise.resolve(),
       })
-        .overrideProvider(NotificationPubSubService)
-        .useValue({
-          publish: () => Promise.resolve(),
-          onModuleDestroy: () => Promise.resolve(),
-        })
+      .overrideProvider(NotificationPubSubService)
+      .useValue({
+        publish: () => Promise.resolve(),
+        onModuleDestroy: () => Promise.resolve(),
+      })
       .compile()
 
     app = moduleFixture.createNestApplication()
