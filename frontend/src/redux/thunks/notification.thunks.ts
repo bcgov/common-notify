@@ -1,10 +1,8 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { notificationApi } from '@/api'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import type { RootState, AppDispatch } from '../store'
 import { upsertNotification } from '../slices/notification.slice'
-import UserService from '@/service/user-service'
 
 export const fetchNotifications = createAsyncThunk<
   NotificationRequest[],
@@ -22,42 +20,10 @@ export const fetchNotifications = createAsyncThunk<
   }
 })
 
-/**
- * Opens a persistent SSE connection to stream notification_request updates for the
- * authenticated tenant. Dispatches upsertNotification on each event.
- *
- * Returns an AbortController — call abort() to close the connection (e.g. on component unmount).
- */
+/** Connects to the notification SSE stream and dispatches upsertNotification for each event. */
 export function connectNotificationSSE(dispatch: AppDispatch): AbortController {
-  const controller = new AbortController()
-
-  // Refreshes the Keycloak token before every (re)connect attempt,
-  // preventing 401s when the access token expires during a long-lived connection.
-  const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
-    await UserService.updateToken(() => true)
-    const token = UserService.getToken()
-    return fetch(input, {
-      ...init,
-      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
-    })
-  }
-
-  fetchEventSource('/api/v1/notification_request/events', {
-    fetch: fetchWithFreshToken,
-    signal: controller.signal,
-    onmessage(event) {
-      if (event.event === 'keepalive' || !event.data) return
-      try {
-        const dto = JSON.parse(event.data) as NotificationRequest
-        dispatch(upsertNotification(dto))
-      } catch (err) {
-        console.error('Failed to parse SSE notification event', err)
-      }
-    },
-    onerror(err) {
-      console.error('SSE connection error', err)
-      // Returning normally lets the library retry automatically
-    },
-  })
-  return controller
+  return notificationApi.connectNotificationStream(
+    (dto) => dispatch(upsertNotification(dto)),
+    (err) => console.error('SSE connection error', err),
+  )
 }
