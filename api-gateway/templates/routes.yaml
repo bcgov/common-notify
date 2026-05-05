@@ -406,7 +406,7 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  # /api/v1/notification_request/events (frontend only)
+  # /api/v1/frontend/notification_request/events (frontend only)
   - name: ${ROUTE_PREFIX}notification-request-events-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
