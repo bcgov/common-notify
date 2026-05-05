@@ -7,6 +7,7 @@ import {
 import Bull from 'bull'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../notification/notification.service'
+import { NotificationPubSubService } from '../../notification/notification-pubsub.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
 
@@ -16,6 +17,7 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
  */
 export interface QueueableContext {
   notificationService: NotificationService
+  NotificationPubSubService?: NotificationPubSubService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -124,6 +126,31 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               tenantId,
             },
           )
+
+          // Publish initial record to SSE subscribers (fire-and-forget)
+          const updateSvc = (this as QueueableContext).NotificationPubSubService
+          if (updateSvc) {
+            updateSvc
+              .publish(tenantId, {
+                id: notificationRecord.id,
+                tenantId: notificationRecord.tenantId,
+                status: notificationRecord.status,
+                createdAt: notificationRecord.createdAt,
+                createdBy: notificationRecord.createdBy ?? undefined,
+                updatedAt: notificationRecord.updatedAt,
+                updatedBy: notificationRecord.updatedBy ?? undefined,
+                tenant: notificationRecord.tenant
+                  ? {
+                      id: notificationRecord.tenant.id,
+                      name: notificationRecord.tenant.name,
+                      slug: notificationRecord.tenant.slug,
+                    }
+                  : undefined,
+              })
+              .catch((err: Error) =>
+                logger.error('Failed to publish SSE event on create', { error: err.message }),
+              )
+          }
         } catch (dbError) {
           logger.error(`Failed to create notification record`, {
             tenantId,

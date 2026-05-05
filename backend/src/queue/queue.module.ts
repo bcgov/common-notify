@@ -12,6 +12,7 @@ import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
 import { NotificationRequest } from '../notification/entities/notification-request.entity'
 import { NotificationService } from '../notification/notification.service'
+import { NotificationPubSubService } from '../notification/notification-pubsub.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 
@@ -33,6 +34,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    NotificationPubSubService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {

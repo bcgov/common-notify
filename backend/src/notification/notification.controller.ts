@@ -1,6 +1,18 @@
-import { Controller, Get, Version, UseGuards, Logger, Query } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Version,
+  UseGuards,
+  Logger,
+  Query,
+  Sse,
+  MessageEvent,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { Observable, merge, interval } from 'rxjs'
+import { map } from 'rxjs'
 import { NotificationService } from './notification.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { PaginatedNotificationResponse } from './schemas'
 import { AuthJwtGuard } from 'src/auth/guards/auth.jwt-guard'
 import { RoleGuard } from 'src/common/guards/role.guard'
@@ -13,7 +25,10 @@ import { RequireRole } from 'src/auth/decorators/require-role.decorator'
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly notificationPubSubService: NotificationPubSubService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -48,5 +63,30 @@ export class NotificationController {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
     return this.notificationService.findAll(pageNum, limitNum, status)
+  }
+
+  @Version('1')
+  @Sse('events')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
+  @ApiOkResponse({
+    description: 'Server-sent stream of notification_request updates for the authenticated tenant',
+  })
+  streamEvents(): Observable<MessageEvent> {
+    // TODO: replace hardcoded tenantId with @GetTenant() once TenantGuard is wired in
+    const tenantId = 'bfa12621-67f2-4f77-b9be-a4168f7bd1ab'
+
+    // Observable stream
+    const updates$ = this.notificationPubSubService
+      .getObservable(tenantId)
+      .pipe(map((dto) => ({ data: dto }) as MessageEvent))
+
+    // Emit a named keepalive event every 25s to prevent proxy/LB idle-connection timeouts.
+    // The frontend's onmessage handler ignores events with type 'keepalive'.
+    const keepalive$ = interval(25_000).pipe(
+      map(() => ({ type: 'keepalive', data: '' }) as MessageEvent),
+    )
+
+    return merge(updates$, keepalive$)
   }
 }

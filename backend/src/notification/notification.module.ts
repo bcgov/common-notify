@@ -6,6 +6,7 @@ import { NotificationChannelCode } from './entities/notification-channel-code.en
 import { NotificationEventTypeCode } from './entities/notification-event-type-code.entity'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 
 @Module({
@@ -19,7 +20,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
     TenantsModule,
   ],
   controllers: [NotificationController],
-  providers: [NotificationService],
-  exports: [NotificationService],
+  providers: [NotificationService, NotificationPubSubService],
+  exports: [NotificationService, NotificationPubSubService],
 })
 export class NotificationModule {}
