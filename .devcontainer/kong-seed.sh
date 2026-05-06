@@ -98,6 +98,16 @@ echo "$ROUTE_CONFIGS" | while read -r route_config; do
     2>/dev/null || echo "    Route $route_key may already exist"
 done
 
+# Create SSE route for notification_request events (response buffering must be disabled for SSE)
+echo "Creating SSE route for notification_request/events..."
+curl -s -X POST "$KONG_ADMIN_URL/services/notify/routes" \
+  --data-urlencode "name=notify-notification-request-events-route" \
+  --data-urlencode "paths[]=/api/v1/notification_request/events" \
+  --data-urlencode "methods[]=GET" \
+  --data-urlencode "strip_path=false" \
+  --data-urlencode "response_buffering=false" \
+  2>/dev/null || echo "  SSE route may already exist"
+
 # Create OAuth2 Mock service
 echo "Setting up OAuth2 Mock Token service..."
 SERVICE_RESPONSE=$(curl -s -X POST "$KONG_ADMIN_URL/services" \

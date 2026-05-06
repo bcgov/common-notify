@@ -1,6 +1,9 @@
 import type { AxiosError } from 'axios'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import UserService from '@/service/user-service'
 
 interface PaginatedResponse {
   data: any[]
@@ -20,7 +23,7 @@ export const notificationApi = {
     try {
       const params = generateApiParameters('/api/v1/frontend/notification_request')
       const queryParams = status && status !== 'all' ? { status } : {}
-      return await get({ ...params, params: queryParams })
+      return await get<PaginatedResponse>({ ...params, params: queryParams })
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {
@@ -39,6 +42,48 @@ export const notificationApi = {
         }`,
       )
     }
+  },
+
+  /**
+   * Opens a persistent SSE connection that streams notification_request updates for the
+   * authenticated tenant. Calls onMessage for each notification event received.
+   *
+   * Returns an AbortController — call abort() to close the connection.
+   */
+  connectNotificationStream(
+    onMessage: (dto: NotificationRequest) => void,
+    onError?: (err: unknown) => void,
+  ): AbortController {
+    const controller = new AbortController()
+
+    // prevent unauthenticated SSE requests by updating the token manually
+    const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
+      await UserService.updateToken(() => true)
+      const token = UserService.getToken()
+      return fetch(input, {
+        ...init,
+        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+      })
+    }
+
+    fetchEventSource('/api/v1/frontend/notification_request/events', {
+      fetch: fetchWithFreshToken,
+      signal: controller.signal,
+      onmessage(event) {
+        if (event.event === 'keepalive' || !event.data) return
+        try {
+          const dto = JSON.parse(event.data) as NotificationRequest
+          onMessage(dto)
+        } catch (err) {
+          console.error('Failed to parse SSE notification event', err)
+        }
+      },
+      onerror(err) {
+        onError?.(err)
+      },
+    })
+
+    return controller
   },
 }
 

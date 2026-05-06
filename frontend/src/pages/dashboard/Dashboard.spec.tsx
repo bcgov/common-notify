@@ -14,6 +14,7 @@ vi.mock('@/redux/thunks/notification.thunks', async () => {
     fetchNotifications: createThunk<NotificationRequest[]>('notification/fetchAll', async () => {
       return []
     }),
+    connectNotificationSSE: vi.fn(() => new AbortController()),
   }
 })
 
