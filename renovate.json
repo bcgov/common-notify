@@ -1,12 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Renovate configuration for common-notify with batched updates and auto-merge",
-  "extends": [
-    "github>bcgov/renovate-config#2025.10.1"
-  ],
-  "schedule": [
-    "before 4am on Monday"
-  ],
+  "extends": ["github>bcgov/renovate-config#2025.10.1"],
+  "schedule": ["before 4am on Monday"],
   "prConcurrentLimit": 3,
   "packageRules": [
     {
@@ -64,11 +60,11 @@
   ],
   "helm-values": {
     "enabled": true,
-    "fileMatch": ["charts/.+/values\\.ya?ml$"]
+    "managerFilePatterns": ["/charts/.+/values\\.ya?ml$/"]
   },
   "helmv3": {
     "enabled": true,
-    "fileMatch": ["charts/.+/Chart\\.ya?ml$"]
+    "managerFilePatterns": ["/charts/.+/Chart\\.ya?ml$/"]
   },
   "vulnerabilityAlerts": {
     "enabled": true,
