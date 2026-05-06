@@ -398,7 +398,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderEmail(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
 
     it('should reject templates with process object access', async () => {
@@ -414,7 +419,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderEmail(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
 
     it('should reject templates with fs module access', async () => {
@@ -430,7 +440,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderEmail(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
 
     it('should reject templates with __dirname access', async () => {
@@ -446,7 +461,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderEmail(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
 
     it('should reject templates with registerHelper attempts', async () => {
@@ -462,7 +482,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderEmail(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
 
     it('should allow safe Handlebars syntax with variable access', async () => {
@@ -496,7 +521,12 @@ describe('HandlebarsTemplateRenderer', () => {
         personalisation: {},
       }
 
-      await expect(renderer.renderSms(context)).rejects.toThrow('potentially unsafe pattern')
+      try {
+        await renderer.renderSms(context)
+        expect(true).toBe(false) // Should not reach here
+      } catch (error: unknown) {
+        expect((error as Error).message).toContain('potentially unsafe pattern')
+      }
     })
   })
 })
