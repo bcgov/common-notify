@@ -2,10 +2,16 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 
 const mockNotificationService = {
   findAll: vi.fn(),
+}
+
+const mockNotificationPubSubService = {
+  publish: vi.fn(),
+  subscribe: vi.fn(),
 }
 
 describe('NotificationFrontendController', () => {
@@ -18,6 +24,10 @@ describe('NotificationFrontendController', () => {
         {
           provide: NotificationService,
           useValue: mockNotificationService,
+        },
+        {
+          provide: NotificationPubSubService,
+          useValue: mockNotificationPubSubService,
         },
       ],
     }).compile()

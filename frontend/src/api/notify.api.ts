@@ -19,8 +19,8 @@ const configureAxios = () => {
   // Request interceptor: Add auth token to all requests (register only once)
   // Response interceptor is handled globally in @/common/api to avoid duplicate handlers
   if (!requestInterceptorConfigured) {
-    axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-      const token = UserService.getToken()
+    axios.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+      const token = await UserService.getToken()
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }

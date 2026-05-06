@@ -56,10 +56,9 @@ export const notificationApi = {
   ): AbortController {
     const controller = new AbortController()
 
-    // prevent unauthenticated SSE requests by updating the token manually
+    // Use the new async getToken() method which automatically refreshes when needed
     const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
-      await UserService.updateToken(() => true)
-      const token = UserService.getToken()
+      const token = await UserService.getToken()
       return fetch(input, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
