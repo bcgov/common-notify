@@ -12,6 +12,7 @@ import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 
 @Injectable()
@@ -33,6 +34,7 @@ export class NotificationService {
     private readonly tenantsService: TenantsService,
     private readonly configService: ConfigService,
     private readonly templatesRepository: TemplatesRepository,
+    private readonly notificationPubSubService: NotificationPubSubService,
   ) {
     // Load validation limits from environment variables with sensible defaults
     this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
@@ -151,6 +153,8 @@ export class NotificationService {
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
     this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
+    await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
   }
 

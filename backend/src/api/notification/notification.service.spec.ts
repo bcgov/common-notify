@@ -8,6 +8,7 @@ import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { NotificationPubSubService } from './notification-pubsub.service'
 
 const mockRepository = {
   create: vi.fn(),
@@ -29,6 +30,10 @@ const mockTenantsService = {
 
 const mockTemplatesRepository = {
   findById: vi.fn(),
+}
+
+const mockNotificationPubSubService = {
+  publish: vi.fn(),
 }
 
 describe('NotificationService', () => {
@@ -53,6 +58,10 @@ describe('NotificationService', () => {
         {
           provide: TemplatesRepository,
           useValue: mockTemplatesRepository,
+        },
+        {
+          provide: NotificationPubSubService,
+          useValue: mockNotificationPubSubService,
         },
       ],
     }).compile()

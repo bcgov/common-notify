@@ -406,6 +406,20 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  # /api/v1/frontend/notification_request/events (frontend only)
+  - name: ${ROUTE_PREFIX}notification-request-events-frontend
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/notification_request/events
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: false
+    response_buffering: false
 plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS

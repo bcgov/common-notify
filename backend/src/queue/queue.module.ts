@@ -12,6 +12,7 @@ import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
 import { NotificationService } from '../api/notification/notification.service'
+import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
 import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
@@ -43,6 +44,7 @@ import { NotifyModule } from '../api/notify/notify.module'
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    NotificationPubSubService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
