@@ -94,10 +94,14 @@ export const deleteMethod = async <T, M = object>(
   })
 }
 
-export const post = async <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
-  const { url, requiresAuthentication, params } = parameters
+export const post = async <T, M = object>(
+  parameters: ApiRequestParameters<M> & { data?: M },
+): Promise<T> => {
+  const { url, requiresAuthentication, params, data } = parameters
   if (requiresAuthentication) await setAuthHeader()
-  return axios.post(url, params).then((response: AxiosResponse) => response.data as T)
+  // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
+  const bodyData = data || params
+  return axios.post(url, bodyData).then((response: AxiosResponse) => response.data as T)
 }
 
 export const patch = async <T, M = object>(

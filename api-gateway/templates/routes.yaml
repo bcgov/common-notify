@@ -420,6 +420,21 @@ routes:
     path_handling: v0
     request_buffering: false
     response_buffering: false
+
+  # /api/v1/frontend/admin/clients/link-to-tenants (frontend admin only)
+  - name: ${ROUTE_PREFIX}admin-clients-link-to-tenants
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/clients/link-to-tenants
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
 plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS
@@ -895,6 +910,34 @@ plugins:
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Clients Link to Tenants - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-clients-link-to-tenants
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}

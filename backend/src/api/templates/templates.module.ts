@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { TemplatesController } from './templates.controller'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
@@ -21,6 +22,7 @@ import { NotifyModule } from '../notify/notify.module'
 @Module({
   imports: [
     TenantsModule,
+    ClientTenantMappingModule,
     TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode]),
     RenderingModule,
     forwardRef(() => NotifyModule),

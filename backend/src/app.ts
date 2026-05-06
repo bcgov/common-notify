@@ -9,6 +9,7 @@ import { VersioningType, ValidationPipe } from '@nestjs/common'
 import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
+import { ValidationExceptionFilter } from './common/filters/validation.filter'
 
 /**
  *
@@ -32,6 +33,8 @@ export async function bootstrap() {
       transform: true,
     }),
   )
+
+  app.useGlobalFilters(new ValidationExceptionFilter())
 
   app.use(helmet())
   app.enableCors()

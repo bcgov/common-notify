@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappings/client-tenant-mapping.service'
 
 /**
  * Guard that extracts tenant information from JWT or Kong headers
@@ -18,14 +19,22 @@ import { TenantsService } from '../../api/admin/tenants/tenants.service'
  *
  * JWT authentication via Keycloak includes:
  * - Authorization: Bearer <JWT token>
+ * - For service clients (client credentials flow): client_id in 'sub' or 'azp' claim
+ * - For frontend users: user GUID in 'sub' claim
+ *
+ * Service clients are resolved to their accessible tenants via ClientTenantMapping.
  *
  * Attaches the tenant to request.tenant for use in route handlers.
+ * Also attaches request.accessibleTenants array for multi-tenant scenarios.
  */
 @Injectable()
 export class TenantGuard implements CanActivate {
   private readonly logger = new Logger(TenantGuard.name)
 
-  constructor(private tenantsService: TenantsService) {}
+  constructor(
+    private tenantsService: TenantsService,
+    private clientTenantMappingService: ClientTenantMappingService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
@@ -101,43 +110,85 @@ export class TenantGuard implements CanActivate {
 
         this.logger.log(`JWT Payload: ${JSON.stringify(payload, null, 2)}`)
 
-        // Extract tenant identifier from JWT claims
-        // The 'sub' claim contains the OAuth2 client ID (e.g., "test-client-a")
-        const clientId = payload.sub as string
-        if (!clientId) {
+        // Check if this is a service client (has 'azp' or client_id claim from client credentials flow)
+        const azp = payload.azp as string
+        const clientIdClaim = payload.client_id as string
+
+        if (azp || (clientIdClaim && this.isClientCredentialsFlow(payload))) {
+          // This is a service client from client credentials flow
+          const clientId = azp || clientIdClaim
+          this.logger.log(`Service client JWT detected. Client ID: ${clientId}`)
+
+          // Look up accessible tenants via ClientTenantMapping
+          const tenantIds = await this.clientTenantMappingService
+            .findTenantsByClientId(clientId)
+            .catch((error) => {
+              this.logger.warn(
+                `Error looking up ClientTenantMapping for ${clientId}: ${error.message}`,
+              )
+              return []
+            })
+
+          if (tenantIds.length === 0) {
+            this.logger.warn(
+              `Client ${clientId} has no mapped tenants in ClientTenantMapping table`,
+            )
+            throw new UnauthorizedException(
+              `Client ${clientId} is not authorized to access any tenants. Please contact an administrator.`,
+            )
+          }
+
+          this.logger.log(
+            `Client ${clientId} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
+          )
+
+          // Fetch the tenant objects
+          const tenants = await Promise.all(
+            tenantIds.map((id) => this.tenantsService.findOne(id)),
+          ).catch((error) => {
+            this.logger.error(`Failed to fetch tenant details: ${error.message}`)
+            throw new UnauthorizedException('Failed to resolve authorized tenants')
+          })
+
+          // Use first tenant as primary (can be overridden by route-specific logic)
+          request.tenant = tenants[0]
+          request.accessibleTenants = tenants
+          request.clientId = clientId
+          return true
+        }
+
+        // This is a frontend user JWT (has user identifier in 'sub' claim)
+        const sub = payload.sub as string
+        if (!sub) {
           throw new Error('JWT missing required "sub" claim')
         }
 
-        this.logger.log(`JWT client_id from 'sub' claim: ${clientId}`)
+        this.logger.log(`JWT user identifier from 'sub' claim: ${sub}`)
 
-        // Look up tenant by external ID (OAuth2 client ID stored in externalId)
-        let tenant = await this.tenantsService.findByExternalId(clientId).catch(() => null)
+        // Look up tenant by external ID (user identifier stored in externalId)
+        let tenant = await this.tenantsService.findByExternalId(sub).catch(() => null)
 
         if (!tenant) {
-          this.logger.log(
-            `Tenant not found for OAuth2 client_id: ${clientId}. Creating new tenant...`,
-          )
+          this.logger.log(`Tenant not found for user identifier: ${sub}. Creating new tenant...`)
           try {
             const createResult = await this.tenantsService.create({
-              name: clientId,
-              externalId: clientId,
+              name: sub,
+              externalId: sub,
             })
             tenant = createResult.tenant
-            this.logger.log(`Created new tenant: ${tenant.name} (Client ID: ${clientId})`)
+            this.logger.log(`Created new tenant: ${tenant.name} (User ID: ${sub})`)
           } catch (error) {
             this.logger.error(
-              `Failed to create tenant for OAuth2 client_id ${clientId}: ${error.message}`,
+              `Failed to create tenant for user identifier ${sub}: ${error.message}`,
             )
-            throw new UnauthorizedException(
-              `Failed to create tenant for OAuth2 client_id: ${clientId}`,
-            )
+            throw new UnauthorizedException(`Failed to create tenant for user identifier: ${sub}`)
           }
         }
 
-        this.logger.log(`Tenant authenticated via JWT: ${tenant.name} (Client ID: ${clientId})`)
+        this.logger.log(`Tenant authenticated via JWT: ${tenant.name} (User ID: ${sub})`)
 
         request.tenant = tenant
-        request.clientId = clientId
+        request.userGuid = sub
         return true
       } catch (error) {
         this.logger.error(`Failed to process JWT: ${error.message}`)
@@ -149,6 +200,27 @@ export class TenantGuard implements CanActivate {
     this.logger.error('No authentication headers found (Kong or JWT)')
     throw new BadRequestException(
       'Missing authentication. Provide either Kong consumer headers or JWT token.',
+    )
+  }
+
+  /**
+   * Check if JWT payload indicates a client credentials flow
+   * Service accounts typically have 'client_roles' or specific realm_access structure
+   */
+  private isClientCredentialsFlow(payload: any): boolean {
+    // Check for service account indicators
+    const realmAccess = payload.realm_access as any
+    const clientRoles = payload.client_roles as any
+
+    // Client credentials tokens often have resource_access instead of direct client_roles
+    const resourceAccess = payload.resource_access as any
+
+    return (
+      (realmAccess &&
+        Array.isArray(realmAccess.roles) &&
+        realmAccess.roles.includes('offline_access')) ||
+      clientRoles !== undefined ||
+      (resourceAccess && Object.keys(resourceAccess).length > 0)
     )
   }
 }
