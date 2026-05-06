@@ -23,7 +23,6 @@ describe('RoleGuard', () => {
     }).compile()
 
     guard = module.get<RoleGuard>(RoleGuard)
-    reflector = module.get<Reflector>(Reflector)
     vi.clearAllMocks()
   })
 

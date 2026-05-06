@@ -75,7 +75,6 @@ describe('CodeTablesFrontendController', () => {
       .compile()
 
     controller = module.get<CodeTablesFrontendController>(CodeTablesFrontendController)
-    service = module.get<CodeTablesService>(CodeTablesService)
 
     vi.clearAllMocks()
   })

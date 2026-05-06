@@ -23,7 +23,6 @@ describe('NotificationFrontendController', () => {
     }).compile()
 
     controller = module.get<NotificationFrontendController>(NotificationFrontendController)
-    service = module.get<NotificationService>(NotificationService)
   })
 
   afterEach(() => {

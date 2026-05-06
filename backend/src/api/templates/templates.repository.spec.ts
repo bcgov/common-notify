@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { vi } from 'vitest'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -71,8 +70,6 @@ describe('TemplatesRepository', () => {
     }).compile()
 
     repository = module.get<TemplatesRepository>(TemplatesRepository)
-    templateRepo = module.get<Repository<Template>>(getRepositoryToken(Template))
-    versionRepo = module.get<Repository<TemplateVersion>>(getRepositoryToken(TemplateVersion))
 
     vi.clearAllMocks()
   })

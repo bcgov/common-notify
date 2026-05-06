@@ -73,7 +73,6 @@ describe('TemplatesController', () => {
       .compile()
 
     controller = module.get<TemplatesController>(TemplatesController)
-    service = module.get<TemplatesService>(TemplatesService)
 
     vi.clearAllMocks()
   })
