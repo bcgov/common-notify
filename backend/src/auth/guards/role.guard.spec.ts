@@ -6,7 +6,6 @@ import { RoleGuard } from './role.guard'
 
 describe('RoleGuard', () => {
   let guard: RoleGuard
-  let reflector: Reflector
 
   const mockReflector = {
     getAllAndOverride: vi.fn(),

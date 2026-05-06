@@ -84,7 +84,7 @@ describe('InlineRenderingService', () => {
         body: 'Hello John',
       })
 
-      const result = await service.renderEmail(content, { name: 'John' })
+      await service.renderEmail(content, { name: 'John' })
 
       expect(mockRenderer.renderEmail).toHaveBeenCalled()
       const callArgs = mockRenderer.renderEmail.mock.calls[0][0]

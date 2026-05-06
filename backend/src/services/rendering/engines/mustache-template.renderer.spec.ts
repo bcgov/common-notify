@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { vi } from 'vitest'
+
 import { MustacheTemplateRenderer } from './mustache-template.renderer'
 import type { RenderContext } from '../../../adapters/interfaces'
 

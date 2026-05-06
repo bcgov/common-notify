@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
-import { BadGatewayException, BadRequestException, UnauthorizedException } from '@nestjs/common'
+import { BadGatewayException } from '@nestjs/common'
 import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
 import type { SendEmailOptions, SendEmailResult } from '../../../../../../src/adapters/interfaces'
 

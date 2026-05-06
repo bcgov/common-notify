@@ -7,7 +7,6 @@ import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('CodeTablesFrontendController', () => {
   let controller: CodeTablesFrontendController
-  let service: CodeTablesService
 
   const mockCodeTableItem: CodeTableItemDto = {
     code: 'SENT',
@@ -58,7 +57,7 @@ describe('CodeTablesFrontendController', () => {
 
   // Mock TenantGuard to bypass authentication
   const mockTenantGuard: CanActivate = {
-    canActivate: (context: ExecutionContext) => true,
+    canActivate: (_context: ExecutionContext) => true,
   }
 
   beforeEach(async () => {

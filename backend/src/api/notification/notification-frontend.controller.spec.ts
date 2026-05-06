@@ -10,7 +10,6 @@ const mockNotificationService = {
 
 describe('NotificationFrontendController', () => {
   let controller: NotificationFrontendController
-  let service: NotificationService
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

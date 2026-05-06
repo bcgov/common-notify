@@ -14,7 +14,6 @@ import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('TemplatesController', () => {
   let controller: TemplatesController
-  let service: TemplatesService
 
   const mockTenant: Tenant = {
     id: 'tenant-123',
@@ -56,7 +55,7 @@ describe('TemplatesController', () => {
 
   // Mock TenantGuard to bypass authentication
   const mockTenantGuard: CanActivate = {
-    canActivate: (context: ExecutionContext) => true,
+    canActivate: (_context: ExecutionContext) => true,
   }
 
   beforeEach(async () => {
@@ -104,7 +103,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      const result = await controller.listTemplates(mockTenant, 'invalid', '10')
+      await controller.listTemplates(mockTenant, 'invalid', '10')
 
       // parseInt will return NaN for 'invalid', which should default to 1
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
@@ -118,7 +117,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      const result = await controller.listTemplates(mockTenant, '1', 'invalid')
+      await controller.listTemplates(mockTenant, '1', 'invalid')
 
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',

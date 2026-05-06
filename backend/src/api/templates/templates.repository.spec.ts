@@ -10,8 +10,6 @@ import { TemplateEngine } from '../../enum/template-engine.enum'
 
 describe('TemplatesRepository', () => {
   let repository: TemplatesRepository
-  let templateRepo: Repository<Template>
-  let versionRepo: Repository<TemplateVersion>
 
   const mockTemplate: Template = {
     id: 'template-123',

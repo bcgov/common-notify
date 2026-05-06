@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common'
-import * as express from 'express'
 import { JwtUserExtractor } from './jwt-user-extractor'
 
 describe('JwtUserExtractor', () => {
