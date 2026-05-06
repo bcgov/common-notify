@@ -100,6 +100,13 @@ export class Template {
   engine: TemplateEngineCode
 
   /**
+   * Whether to render output as markdown to HTML
+   * After the template engine renders, the output is converted from markdown to HTML
+   */
+  @Column({ name: 'render_as_markdown', type: 'boolean', default: false })
+  renderAsMarkdown: boolean
+
+  /**
    * Current version number
    */
   @Column({ type: 'integer', default: 1 })
