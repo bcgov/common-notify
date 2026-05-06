@@ -1,9 +1,14 @@
 export interface SendEmailOptions {
-  to: string
+  to: string | string[]
   subject: string
   body: string
   from?: string
   replyTo?: string
+  // bodyType determines how adapter should handle the body content:
+  // 'text': send as plain text
+  // 'markdown': adapter should convert markdown to HTML
+  // 'html': send as HTML (assumed already formatted)
+  bodyType?: 'text' | 'markdown' | 'html'
   attachments?: Array<{
     filename: string
     content: Buffer | string

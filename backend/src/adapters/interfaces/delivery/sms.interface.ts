@@ -1,5 +1,5 @@
 export interface SendSmsOptions {
-  to: string
+  to: string | string[]
   body: string
   from?: string
 }

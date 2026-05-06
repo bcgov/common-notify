@@ -28,6 +28,13 @@ export default defineConfig({
         '**/*.config.*',
         '**/*.spec.ts',
         '**/*.e2e-spec.ts',
+        '**/schemas/**',
+        '**/interfaces/**',
+        '**/enums/**',
+        '**/*.dto.ts',
+        'app.ts', // Application bootstrap, tested via e2e
+        'main.ts', // Server entry point, tested via e2e
+        '**/index.ts', // Barrel files/exports, typically re-exports only
       ],
     },
   },

@@ -1,12 +1,4 @@
-import {
-  IsString,
-  IsEnum,
-  IsOptional,
-  IsBoolean,
-  MinLength,
-  MaxLength,
-  ValidateIf,
-} from 'class-validator'
+import { IsString, IsEnum, IsOptional, MinLength, MaxLength, ValidateIf } from 'class-validator'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../../enum/template-engine.enum'
 
@@ -69,12 +61,11 @@ export class CreateTemplateDto {
   engineCode?: TemplateEngine
 
   /**
-   * Whether to render output as markdown to HTML
-   * After the template engine renders (handlebars/mustache/ejs), the output is converted from markdown to HTML
-   * Defaults to false
-   * @example true
+   * Body content type for rendering: text (plain), markdown (markdown→HTML), html (raw HTML)
+   * Defaults to 'html'
+   * @example "markdown"
    */
   @IsOptional()
-  @IsBoolean()
-  renderAsMarkdown?: boolean
+  @IsEnum(['text', 'markdown', 'html'])
+  bodyType?: 'text' | 'markdown' | 'html'
 }

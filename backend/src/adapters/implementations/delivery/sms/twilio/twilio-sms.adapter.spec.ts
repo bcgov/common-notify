@@ -88,7 +88,7 @@ describe('TwilioSmsTransport', () => {
 
     expect(result).toEqual({
       messageId: 'SM123456',
-      providerResponse: 'queued',
+      providerResponse: 'sent to 1 recipient(s)',
     })
   })
 

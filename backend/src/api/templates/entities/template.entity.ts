@@ -100,11 +100,11 @@ export class Template {
   engine: TemplateEngineCode
 
   /**
-   * Whether to render output as markdown to HTML
-   * After the template engine renders, the output is converted from markdown to HTML
+   * Body content type: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
+   * Determines rendering behavior during template rendering
    */
-  @Column({ name: 'render_as_markdown', type: 'boolean', default: false })
-  renderAsMarkdown: boolean
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html' })
+  bodyType: 'text' | 'markdown' | 'html'
 
   /**
    * Current version number

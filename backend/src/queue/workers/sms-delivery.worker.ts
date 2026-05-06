@@ -5,6 +5,7 @@ import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
+import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
 
@@ -32,6 +33,7 @@ export class SmsDeliveryWorker {
    * @param configService Configuration service for queue settings
    * @param templatesRepository Repository for template resolution
    * @param templatesService Service for template rendering
+   * @param inlineRenderingService Service for inline template rendering
    * @param smsAdapter SMS transport adapter for sending SMS messages
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
@@ -41,6 +43,7 @@ export class SmsDeliveryWorker {
     configService: ConfigService,
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
     smsAdapter: ISmsTransport,
     concurrency: number = 2,
   ): Promise<void> {
@@ -84,14 +87,20 @@ export class SmsDeliveryWorker {
             // Merge template content into SMS payload if channel matches
             if (template.channelCode === 'SMS') {
               // Render the template with personalisation data from request.params
-              const rendered = templatesService.renderTemplateContent(
+              // Use request's bodyType if provided, otherwise template's default
+              const rendered = await templatesService.renderTemplateContent(
                 template,
                 request.params || {},
+                payload.content?.bodyType,
               )
 
               resolvedPayload = {
                 ...payload,
-                body: rendered.body,
+                content: {
+                  ...payload.content,
+                  body: rendered.body,
+                  bodyType: rendered.bodyType,
+                },
               }
               logger.debug(`[${notifyId}] Template resolved and rendered into SMS payload`)
             }
@@ -101,17 +110,43 @@ export class SmsDeliveryWorker {
             )
             throw templateError
           }
+        } else if (payload.content?.renderer) {
+          // Handle inline rendering if renderer is specified and no templateId
+          logger.debug(
+            `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
+          )
+          try {
+            const rendered = await inlineRenderingService.renderSms(
+              payload.content,
+              payload.params || request?.params,
+            )
+
+            resolvedPayload = {
+              ...payload,
+              content: {
+                ...payload.content,
+                body: rendered.body,
+              },
+            }
+            logger.debug(`[${notifyId}] Inline content rendered successfully`)
+          } catch (renderError) {
+            logger.error(
+              `[${notifyId}] Failed to render inline content: ${(renderError as Error).message}`,
+            )
+            throw renderError
+          }
         }
 
         if (
           !resolvedPayload.recipients ||
-          !Array.isArray(resolvedPayload.recipients) ||
-          resolvedPayload.recipients.length === 0
+          !resolvedPayload.recipients.to ||
+          !Array.isArray(resolvedPayload.recipients.to) ||
+          resolvedPayload.recipients.to.length === 0
         ) {
           throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
-        if (!resolvedPayload.body || typeof resolvedPayload.body !== 'string') {
+        if (!resolvedPayload.content?.body || typeof resolvedPayload.content.body !== 'string') {
           throw new Error('Invalid SMS payload: body is missing or invalid')
         }
 
@@ -195,14 +230,9 @@ export class SmsDeliveryWorker {
     notifyId: string,
     smsAdapter: ISmsTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(
-      `[${notifyId}] Sending SMS via ${smsAdapter.name} adapter to: ${payload.recipients}`,
-    )
+    logger.debug(`[${notifyId}] Sending SMS via ${smsAdapter.name} adapter`)
 
-    const result = await smsAdapter.send({
-      to: payload.recipients,
-      body: payload.body,
-    })
+    const result = await smsAdapter.send(payload as any)
 
     return {
       externalId: result.messageId || `${smsAdapter.name}-${Date.now()}`,

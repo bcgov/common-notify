@@ -7,7 +7,7 @@ import {
   RenderedSms,
   RenderOptions,
 } from '../../../../interfaces'
-import { splitPersonalisation } from '../utils/split-personalisation'
+import { splitPersonalisation } from '../../../../../services/rendering/utils/split-personalisation'
 
 /**
  * EJS template renderer. Syntax: <%= variable %>, <%- variable %>, <% code %>.
@@ -29,7 +29,7 @@ export class EjsTemplateRenderer implements ITemplateRenderer {
       body,
       attachments:
         attachments.length > 0
-          ? attachments.map((a) => ({
+          ? attachments.map((a: any) => ({
               filename: a.filename,
               content: a.content,
               sendingMethod: a.sendingMethod,

@@ -6,7 +6,7 @@ import {
   RenderedEmail,
   RenderedSms,
   RenderOptions,
-} from '../../../../interfaces'
+} from '../../../adapters/interfaces'
 import { splitPersonalisation } from '../utils/split-personalisation'
 
 /**

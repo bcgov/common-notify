@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { TemplatesController } from './templates.controller'
@@ -7,6 +7,8 @@ import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 import { TemplateEngineCode } from './entities/template-engine-code.entity'
+import { RenderingModule } from '../../services/rendering/rendering.module'
+import { NotifyModule } from '../notify/notify.module'
 
 /**
  * Feature Module for Templates
@@ -20,6 +22,8 @@ import { TemplateEngineCode } from './entities/template-engine-code.entity'
   imports: [
     TenantsModule,
     TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode]),
+    RenderingModule,
+    forwardRef(() => NotifyModule),
   ],
   controllers: [TemplatesController],
   providers: [TemplatesService, TemplatesRepository],

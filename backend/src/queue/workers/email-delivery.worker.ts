@@ -5,6 +5,7 @@ import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
+import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
 import { IEmailTransport } from '../../adapters'
@@ -33,6 +34,7 @@ export class EmailDeliveryWorker {
    * @param configService Configuration service for queue settings
    * @param templatesRepository Repository for template resolution
    * @param templatesService Service for template rendering
+   * @param inlineRenderingService Service for inline template rendering
    * @param emailAdapter Email transport adapter for sending emails
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
@@ -42,6 +44,7 @@ export class EmailDeliveryWorker {
     configService: ConfigService,
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
     concurrency: number = 2,
   ): Promise<void> {
@@ -88,15 +91,21 @@ export class EmailDeliveryWorker {
             // Merge template content into email payload if channel matches
             if (template.channelCode === 'EMAIL') {
               // Render the template with personalisation data from request.params
-              const rendered = templatesService.renderTemplateContent(
+              // Use request's bodyType if provided, otherwise template's default
+              const rendered = await templatesService.renderTemplateContent(
                 template,
                 request.params || {},
+                emailPayload.content?.bodyType,
               )
 
               emailPayload = {
                 ...emailPayload,
-                subject: rendered.subject || emailPayload.subject,
-                body: rendered.body,
+                content: {
+                  ...emailPayload.content,
+                  subject: rendered.subject || emailPayload.content?.subject,
+                  body: rendered.body,
+                  bodyType: rendered.bodyType,
+                },
               }
               logger.debug(`[${notifyId}] Template resolved and rendered into email payload`)
             }
@@ -106,21 +115,48 @@ export class EmailDeliveryWorker {
             )
             throw templateError
           }
+        } else if (emailPayload.content?.renderer) {
+          // Handle inline rendering if renderer is specified and no templateId
+          logger.debug(
+            `[${notifyId}] Rendering inline content with renderer: ${emailPayload.content.renderer}`,
+          )
+          try {
+            const rendered = await inlineRenderingService.renderEmail(
+              emailPayload.content,
+              emailPayload.params || request?.params,
+            )
+
+            emailPayload = {
+              ...emailPayload,
+              content: {
+                ...emailPayload.content,
+                subject: rendered.subject,
+                body: rendered.body,
+              },
+            }
+            logger.debug(`[${notifyId}] Inline content rendered successfully`)
+          } catch (renderError) {
+            logger.error(
+              `[${notifyId}] Failed to render inline content: ${(renderError as Error).message}`,
+            )
+            throw renderError
+          }
         }
 
         if (
           !emailPayload.recipients ||
-          !Array.isArray(emailPayload.recipients) ||
-          emailPayload.recipients.length === 0
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
         ) {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
-        if (!emailPayload.subject || typeof emailPayload.subject !== 'string') {
+        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
           throw new Error('Invalid email payload: subject is missing or invalid')
         }
 
-        if (!emailPayload.body || typeof emailPayload.body !== 'string') {
+        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
@@ -204,24 +240,9 @@ export class EmailDeliveryWorker {
     notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(
-      `[${notifyId}] Sending email via ${emailAdapter.name} adapter to: ${Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients}`,
-    )
+    logger.debug(`[${notifyId}] Sending email via ${emailAdapter.name} adapter`)
 
-    const result = await emailAdapter.send({
-      to: Array.isArray(payload.recipients) ? payload.recipients.join(', ') : payload.recipients,
-      subject: payload.subject,
-      body: payload.body,
-      ...(payload.attachments && {
-        attachments: payload.attachments
-          .filter((a) => a.filename && a.content)
-          .map(({ content, filename }) => ({
-            filename: filename!,
-            content: content!,
-            sendingMethod: 'attach' as const,
-          })),
-      }),
-    })
+    const result = await emailAdapter.send(payload as any)
 
     return {
       externalId: result.messageId || `${emailAdapter.name}-${Date.now()}`,

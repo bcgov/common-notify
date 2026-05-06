@@ -18,5 +18,5 @@ export class PreviewTemplateDto {
    */
   @IsOptional()
   @IsObject()
-  personalisation?: Record<string, any>
+  params?: Record<string, unknown>
 }

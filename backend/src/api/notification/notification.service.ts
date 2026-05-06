@@ -215,9 +215,9 @@ export class NotificationService {
     }
 
     // Ensure at least one channel has recipients
-    const emailRecipients = request.email?.recipients?.length ?? 0
-    const smsRecipients = request.sms?.recipients?.length ?? 0
-    const msgAppRecipients = request.msgApp?.recipients?.length ?? 0
+    const emailRecipients = request.email?.recipients?.to?.length ?? 0
+    const smsRecipients = request.sms?.recipients?.to?.length ?? 0
+    const msgAppRecipients = request.msgApp?.recipients?.to?.length ?? 0
     const totalRecipients = emailRecipients + smsRecipients + msgAppRecipients
 
     if (totalRecipients === 0) {
@@ -225,77 +225,86 @@ export class NotificationService {
     }
 
     // Validate email channel
-    if (request.email?.recipients) {
-      if (request.email.recipients.length > this.emailMaxRecipients) {
+    if (request.email?.recipients?.to) {
+      if (request.email.recipients.to.length > this.emailMaxRecipients) {
         errors.push(
-          `Too many email recipients (${request.email.recipients.length}). Max: ${this.emailMaxRecipients}`,
+          `Too many email recipients (${request.email.recipients.to.length}). Max: ${this.emailMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides subject/body)
       if (!request.templateId) {
-        if (!request.email.subject?.trim()) {
+        if (!request.email.content?.subject?.trim()) {
           errors.push('Email subject cannot be empty')
         }
 
-        if (request.email.subject && request.email.subject.length > this.emailMaxSubjectLength) {
+        if (
+          request.email.content?.subject &&
+          request.email.content.subject.length > this.emailMaxSubjectLength
+        ) {
           errors.push(
-            `Email subject too long (${request.email.subject.length}). Max: ${this.emailMaxSubjectLength}`,
+            `Email subject too long (${request.email.content.subject.length}). Max: ${this.emailMaxSubjectLength}`,
           )
         }
 
-        if (!request.email.body?.trim()) {
+        if (!request.email.content?.body?.trim()) {
           errors.push('Email body cannot be empty')
         }
 
-        if (request.email.body && request.email.body.length > this.emailMaxBodyLength) {
+        if (
+          request.email.content?.body &&
+          request.email.content.body.length > this.emailMaxBodyLength
+        ) {
           errors.push(
-            `Email body too long (${request.email.body.length}). Max: ${this.emailMaxBodyLength} characters`,
+            `Email body too long (${request.email.content.body.length}). Max: ${this.emailMaxBodyLength} characters`,
           )
         }
       }
     }
 
     // Validate SMS channel
-    if (request.sms?.recipients) {
-      if (request.sms.recipients.length > this.smsMaxRecipients) {
+    if (request.sms?.recipients?.to) {
+      if (request.sms.recipients.to.length > this.smsMaxRecipients) {
         errors.push(
-          `Too many SMS recipients (${request.sms.recipients.length}). Max: ${this.smsMaxRecipients}`,
+          `Too many SMS recipients (${request.sms.recipients.to.length}). Max: ${this.smsMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides body)
       if (!request.templateId) {
-        if (!request.sms.body?.trim()) {
+        if (!request.sms.content?.body?.trim()) {
           errors.push('SMS body cannot be empty')
         }
 
-        if (request.sms.body && request.sms.body.length > this.smsMaxBodyLength) {
+        if (request.sms.content?.body && request.sms.content.body.length > this.smsMaxBodyLength) {
           // SMS can be split across multiple messages, but warn if very long
           errors.push(
-            `SMS body too long (${request.sms.body.length}). Max: ${this.smsMaxBodyLength} characters`,
+            `SMS body too long (${request.sms.content.body.length}). Max: ${this.smsMaxBodyLength} characters`,
           )
         }
       }
     }
 
     // Validate msgApp channel
-    if (request.msgApp?.recipients) {
-      if (request.msgApp.recipients.length > this.msgAppMaxRecipients) {
+    if (request.msgApp?.recipients?.to) {
+      if (request.msgApp.recipients.to.length > this.msgAppMaxRecipients) {
         errors.push(
-          `Too many msgApp recipients (${request.msgApp.recipients.length}). Max: ${this.msgAppMaxRecipients}`,
+          `Too many msgApp recipients (${request.msgApp.recipients.to.length}). Max: ${this.msgAppMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides body)
       if (!request.templateId) {
-        if (!request.msgApp.body?.trim()) {
+        if (!request.msgApp.content?.body?.trim()) {
           errors.push('MsgApp body cannot be empty')
         }
 
-        if (request.msgApp.body && request.msgApp.body.length > this.msgAppMaxBodyLength) {
+        if (
+          request.msgApp.content?.body &&
+          request.msgApp.content.body.length > this.msgAppMaxBodyLength
+        ) {
           errors.push(
-            `MsgApp body too long (${request.msgApp.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
+            `MsgApp body too long (${request.msgApp.content.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
           )
         }
       }

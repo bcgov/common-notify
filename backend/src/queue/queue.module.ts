@@ -1,4 +1,4 @@
-import { Module, OnModuleInit, Inject, Logger } from '@nestjs/common'
+import { Module, OnModuleInit, Inject, Logger, forwardRef } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -14,9 +14,11 @@ import { NotificationRequest } from '../api/notification/entities/notification-r
 import { NotificationService } from '../api/notification/notification.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
+import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
+import { NotifyModule } from '../api/notify/notify.module'
 
 /**
  * Queue Module
@@ -32,7 +34,12 @@ import { TemplatesModule } from '../api/templates/templates.module'
  * due to temporary Redis unavailability.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationRequest]), TenantsModule, TemplatesModule],
+  imports: [
+    TypeOrmModule.forFeature([NotificationRequest]),
+    TenantsModule,
+    TemplatesModule,
+    forwardRef(() => NotifyModule),
+  ],
   providers: [
     PendingNotificationRetryService,
     NotificationService,
@@ -168,6 +175,7 @@ export class QueueModule implements OnModuleInit {
     private readonly notificationService?: NotificationService,
     private readonly templatesRepository?: TemplatesRepository,
     private readonly templatesService?: TemplatesService,
+    private readonly inlineRenderingService?: InlineRenderingService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
@@ -215,6 +223,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.templatesRepository,
         this.templatesService,
+        this.inlineRenderingService,
         this.emailAdapter,
         emailConcurrency,
       )
@@ -232,6 +241,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.templatesRepository,
         this.templatesService,
+        this.inlineRenderingService,
         this.smsAdapter,
         smsConcurrency,
       )

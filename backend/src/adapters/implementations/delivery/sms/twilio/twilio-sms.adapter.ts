@@ -20,28 +20,58 @@ export class TwilioSmsTransport implements ISmsTransport {
   }
 
   async send(options: SendSmsOptions): Promise<SendSmsResult> {
-    const from = options.from ?? this.configService.get<string>('twilio.fromNumber')
-    if (!from) {
+    // Handle both flat (SendSmsOptions) and nested (NotifySmsChannel) structures
+    let to: string | string[]
+    let body: string
+    let from: string | undefined
+
+    const opts = options as any
+
+    // Check if this is a nested NotifySmsChannel structure
+    if (opts.recipients && typeof opts.recipients === 'object') {
+      // Nested structure: NotifySmsChannel
+      to = opts.recipients.to || []
+      body = opts.content?.body || ''
+      from = opts.from
+    } else {
+      // Flat structure: SendSmsOptions
+      to = opts.to
+      body = opts.body
+      from = opts.from
+    }
+
+    const resolvedFrom = from ?? this.configService.get<string>('twilio.fromNumber')
+    if (!resolvedFrom) {
       throw new Error('SMS from number is required (set twilio.fromNumber or pass in options)')
     }
 
+    // Convert to array for consistent handling
+    const toNumbers = Array.isArray(to) ? to : [to]
+
     if (!this.client) {
-      this.logger.log(`[Dev mode] Would send SMS to ${options.to}: ${options.body.slice(0, 50)}...`)
+      this.logger.log(
+        `[Dev mode] Would send SMS to ${toNumbers.join(', ')}: ${body.slice(0, 50)}...`,
+      )
       return {
         messageId: `dev-${Date.now()}`,
         providerResponse: 'logged',
       }
     }
 
-    const message = await this.client.messages.create({
-      body: options.body,
-      from,
-      to: options.to,
-    })
+    // Send to each recipient (Twilio API only supports one recipient per request)
+    const results = []
+    for (const recipient of toNumbers) {
+      const message = await this.client.messages.create({
+        body,
+        from: resolvedFrom,
+        to: recipient,
+      })
+      results.push(message.sid)
+    }
 
     return {
-      messageId: message.sid,
-      providerResponse: message.status,
+      messageId: results[0] || `${Date.now()}`,
+      providerResponse: `sent to ${results.length} recipient(s)`,
     }
   }
 }

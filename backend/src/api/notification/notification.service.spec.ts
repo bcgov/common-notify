@@ -244,4 +244,922 @@ describe('NotificationService', () => {
       )
     })
   })
+
+  describe('validateBusinessRules', () => {
+    const mockTenant = {
+      id: 'tenant-123',
+      name: 'Test Tenant',
+      status: 'active',
+    }
+
+    beforeEach(() => {
+      mockTenantsService.findOne.mockResolvedValue(mockTenant)
+      mockTemplatesRepository.findById.mockResolvedValue(null)
+    })
+
+    describe('tenant validation', () => {
+      it('should return error when tenant not found', async () => {
+        mockTenantsService.findOne.mockResolvedValue(null)
+
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('invalid-tenant', request)
+
+        expect(errors).toContain("Tenant 'invalid-tenant' not found")
+      })
+
+      it('should return error when tenant is not active', async () => {
+        const inactiveTenant = { ...mockTenant, status: 'inactive' }
+        mockTenantsService.findOne.mockResolvedValue(inactiveTenant)
+
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('Tenant is not active (status: inactive)')
+      })
+
+      it('should succeed validation when tenant is active', async () => {
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).not.toContain('Tenant')
+      })
+
+      it('should stop validation if tenant not found', async () => {
+        mockTenantsService.findOne.mockResolvedValue(null)
+
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('invalid-tenant', request)
+
+        // Should not validate other rules if tenant not found
+        expect(errors.length).toBe(1)
+        expect(errors[0]).toContain('Tenant')
+      })
+    })
+
+    describe('recipients validation', () => {
+      it('should require at least one recipient', async () => {
+        const request: any = {
+          email: { recipients: { to: [] } },
+          sms: { recipients: { to: [] } },
+          msgApp: { recipients: { to: [] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+
+      it('should accept request with email recipients only', async () => {
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+          sms: { recipients: { to: [] } },
+          msgApp: { recipients: { to: [] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).not.toContain('At least one recipient is required')
+      })
+
+      it('should accept request with SMS recipients only', async () => {
+        const request: any = {
+          email: { recipients: { to: [] } },
+          sms: { recipients: { to: ['+12025551234'] } },
+          msgApp: { recipients: { to: [] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).not.toContain('At least one recipient is required')
+      })
+
+      it('should accept request with msgApp recipients only', async () => {
+        const request: any = {
+          email: { recipients: { to: [] } },
+          sms: { recipients: { to: [] } },
+          msgApp: { recipients: { to: ['user-123'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).not.toContain('At least one recipient is required')
+      })
+
+      it('should accept request with multiple channel recipients', async () => {
+        const request: any = {
+          email: { recipients: { to: ['test@example.com'] } },
+          sms: { recipients: { to: ['+12025551234'] } },
+          msgApp: { recipients: { to: ['user-123'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).not.toContain('At least one recipient is required')
+      })
+    })
+
+    describe('email validation', () => {
+      it('should validate email recipient count', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: Array(101).fill('test@example.com') },
+            content: { subject: 'Test', body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many email recipients'))).toBe(true)
+      })
+
+      it('should allow email recipients within limit', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: Array(50).fill('test@example.com') },
+            content: { subject: 'Test', body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many email recipients'))).toBe(false)
+      })
+
+      it('should require email subject when not using template', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: '', body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('Email subject cannot be empty')
+      })
+
+      it('should require email body when not using template', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: '' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('Email body cannot be empty')
+      })
+
+      it('should allow email subject with whitespace only to be empty', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: '   ', body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('Email subject cannot be empty')
+      })
+
+      it('should validate email subject length', async () => {
+        const longSubject = 'A'.repeat(501)
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: longSubject, body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Email subject too long'))).toBe(true)
+      })
+
+      it('should validate email body length', async () => {
+        const longBody = 'A'.repeat(50001)
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: longBody },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Email body too long'))).toBe(true)
+      })
+
+      it('should skip content validation when using template', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          email: {
+            recipients: { to: ['test@example.com'] },
+            // Missing required content
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        // Should not have content validation errors
+        expect(errors.some((e) => e.includes('Email subject'))).toBe(false)
+        expect(errors.some((e) => e.includes('Email body'))).toBe(false)
+      })
+    })
+
+    describe('SMS validation', () => {
+      it('should validate SMS recipient count', async () => {
+        const request: any = {
+          sms: {
+            recipients: { to: Array(51).fill('+12025551234') },
+            content: { body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many SMS recipients'))).toBe(true)
+      })
+
+      it('should allow SMS recipients within limit', async () => {
+        const request: any = {
+          sms: {
+            recipients: { to: Array(30).fill('+12025551234') },
+            content: { body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many SMS recipients'))).toBe(false)
+      })
+
+      it('should require SMS body when not using template', async () => {
+        const request: any = {
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { body: '' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('SMS body cannot be empty')
+      })
+
+      it('should validate SMS body length', async () => {
+        const longBody = 'A'.repeat(1601)
+        const request: any = {
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { body: longBody },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('SMS body too long'))).toBe(true)
+      })
+
+      it('should skip content validation when using template', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'SMS',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            // Missing required content
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        // Should not have content validation errors
+        expect(errors.some((e) => e.includes('SMS body'))).toBe(false)
+      })
+    })
+
+    describe('msgApp validation', () => {
+      it('should validate msgApp recipient count', async () => {
+        const request: any = {
+          msgApp: {
+            recipients: { to: Array(101).fill('user-123') },
+            content: { body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many msgApp recipients'))).toBe(true)
+      })
+
+      it('should allow msgApp recipients within limit', async () => {
+        const request: any = {
+          msgApp: {
+            recipients: { to: Array(50).fill('user-123') },
+            content: { body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Too many msgApp recipients'))).toBe(false)
+      })
+
+      it('should require msgApp body when not using template', async () => {
+        const request: any = {
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            content: { body: '' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('MsgApp body cannot be empty')
+      })
+
+      it('should validate msgApp body length', async () => {
+        const longBody = 'A'.repeat(50001)
+        const request: any = {
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            content: { body: longBody },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('MsgApp body too long'))).toBe(true)
+      })
+
+      it('should skip content validation when using template', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'MSGAPP',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            // Missing required content
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        // Should not have content validation errors
+        expect(errors.some((e) => e.includes('MsgApp body'))).toBe(false)
+      })
+    })
+
+    describe('template validation', () => {
+      it('should validate template exists when templateId provided', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(null)
+
+        const request: any = {
+          templateId: 'missing-template',
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes("Template 'missing-template' not found"))).toBe(true)
+      })
+
+      it('should succeed when template exists', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('not found'))).toBe(false)
+      })
+
+      it('should validate template channel matches requested channel', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          sms: { recipients: { to: ['+12025551234'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes("channel code 'EMAIL'"))).toBe(true)
+      })
+
+      it('should allow template when channel matches email', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('channel code'))).toBe(false)
+      })
+
+      it('should allow template when channel matches SMS', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'SMS',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          sms: { recipients: { to: ['+12025551234'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('channel code'))).toBe(false)
+      })
+
+      it('should allow template when channel matches msgApp', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'MSGAPP',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          msgApp: { recipients: { to: ['user-123'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('channel code'))).toBe(false)
+      })
+
+      it('should handle template retrieval errors gracefully', async () => {
+        mockTemplatesRepository.findById.mockRejectedValue(new Error('Database error'))
+
+        const request: any = {
+          templateId: 'template-123',
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('Failed to validate template'))).toBe(true)
+      })
+    })
+
+    describe('multiple channels validation', () => {
+      it('should validate all channels when multiple provided', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: Array(101).fill('test@example.com') },
+            content: { subject: 'Test', body: 'Test' },
+          },
+          sms: {
+            recipients: { to: Array(51).fill('+12025551234') },
+            content: { body: 'Test' },
+          },
+          msgApp: {
+            recipients: { to: Array(101).fill('user-123') },
+            content: { body: 'Test' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        // Should have errors for all three channels
+        expect(errors.some((e) => e.includes('email recipients'))).toBe(true)
+        expect(errors.some((e) => e.includes('SMS recipients'))).toBe(true)
+        expect(errors.some((e) => e.includes('msgApp recipients'))).toBe(true)
+      })
+
+      it('should accumulate all errors', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: [] },
+            content: { subject: '', body: '' },
+          },
+          sms: {
+            recipients: { to: [] },
+            content: { body: '' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.length).toBeGreaterThan(1)
+      })
+    })
+
+    describe('edge cases', () => {
+      it('should handle null recipients gracefully', async () => {
+        const request: any = {
+          email: { recipients: null },
+          sms: { recipients: null },
+          msgApp: { recipients: null },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+
+      it('should handle undefined recipients gracefully', async () => {
+        const request: any = {
+          email: { recipients: undefined },
+          sms: { recipients: undefined },
+          msgApp: { recipients: undefined },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+
+      it('should handle missing recipients.to field', async () => {
+        const request: any = {
+          email: { recipients: {} },
+          sms: { recipients: {} },
+          msgApp: { recipients: {} },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+
+      it('should handle missing content object', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: undefined,
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors.some((e) => e.includes('subject'))).toBe(true)
+      })
+
+      it('should validate empty request', async () => {
+        const request: any = {}
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+    })
+
+    describe('valid request scenarios', () => {
+      it('should return empty error array for valid email request', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+      })
+
+      it('should return empty error array for valid SMS request', async () => {
+        const request: any = {
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { body: 'Test message' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+      })
+
+      it('should return empty error array for valid msgApp request', async () => {
+        const request: any = {
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            content: { body: 'Test notification' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+      })
+
+      it('should return empty error array for valid multi-channel request', async () => {
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body' },
+          },
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { body: 'Test message' },
+          },
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            content: { body: 'Test notification' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+      })
+
+      it('should return empty error array for valid template-based request', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+      })
+    })
+  })
+
+  describe('getTenants', () => {
+    it('should call tenantsService.findAll and return all tenants', async () => {
+      const mockTenants = [
+        { id: 'tenant-1', name: 'Tenant 1', slug: 'tenant-1' },
+        { id: 'tenant-2', name: 'Tenant 2', slug: 'tenant-2' },
+      ]
+      mockTenantsService.findAll = vi.fn().mockResolvedValue(mockTenants)
+
+      const result = await service.getTenants()
+
+      expect(mockTenantsService.findAll).toHaveBeenCalled()
+      expect(result).toEqual(mockTenants)
+    })
+
+    it('should handle empty tenant list', async () => {
+      mockTenantsService.findAll = vi.fn().mockResolvedValue([])
+
+      const result = await service.getTenants()
+
+      expect(result).toEqual([])
+    })
+
+    it('should propagate errors from tenantsService', async () => {
+      const error = new Error('Database connection failed')
+      mockTenantsService.findAll = vi.fn().mockRejectedValue(error)
+
+      await expect(service.getTenants()).rejects.toThrow('Database connection failed')
+    })
+
+    it('should return multiple tenants with correct structure', async () => {
+      const mockTenants = [
+        {
+          id: 'tenant-uuid-1',
+          name: 'Test Org 1',
+          slug: 'test-org-1',
+          status: 'active',
+        },
+        {
+          id: 'tenant-uuid-2',
+          name: 'Test Org 2',
+          slug: 'test-org-2',
+          status: 'inactive',
+        },
+      ]
+      mockTenantsService.findAll = vi.fn().mockResolvedValue(mockTenants)
+
+      const result = await service.getTenants()
+
+      expect(result).toHaveLength(2)
+      expect(result[0].id).toBe('tenant-uuid-1')
+      expect(result[1].id).toBe('tenant-uuid-2')
+    })
+  })
+
+  describe('mapToDto', () => {
+    it('should map NotificationRequest entity to NotificationRequestDto', () => {
+      const entity: any = {
+        id: 'notif-123',
+        tenantId: 'tenant-456',
+        status: NotificationStatus.QUEUED,
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'user1',
+        updatedAt: new Date('2024-01-02'),
+        updatedBy: 'user2',
+        tenant: null,
+      }
+
+      // Access private method through any type casting
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.id).toBe('notif-123')
+      expect(dto.tenantId).toBe('tenant-456')
+      expect(dto.status).toBe(NotificationStatus.QUEUED)
+      expect(dto.createdAt).toEqual(new Date('2024-01-01'))
+      expect(dto.createdBy).toBe('user1')
+      expect(dto.updatedAt).toEqual(new Date('2024-01-02'))
+      expect(dto.updatedBy).toBe('user2')
+    })
+
+    it('should include tenant data when present', () => {
+      const mockTenant = {
+        id: 'tenant-123',
+        name: 'Test Tenant',
+        slug: 'test-tenant',
+      }
+      const entity: any = {
+        id: 'notif-123',
+        tenantId: 'tenant-123',
+        status: NotificationStatus.COMPLETED,
+        createdAt: new Date(),
+        createdBy: 'user1',
+        updatedAt: new Date(),
+        updatedBy: 'user2',
+        tenant: mockTenant,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.tenant).toBeDefined()
+      expect(dto.tenant.id).toBe('tenant-123')
+      expect(dto.tenant.name).toBe('Test Tenant')
+      expect(dto.tenant.slug).toBe('test-tenant')
+    })
+
+    it('should handle entity without tenant', () => {
+      const entity: any = {
+        id: 'notif-456',
+        tenantId: 'tenant-789',
+        status: NotificationStatus.FAILED,
+        createdAt: new Date(),
+        createdBy: 'user3',
+        updatedAt: new Date(),
+        updatedBy: 'user4',
+        tenant: null,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.tenant).toBeUndefined()
+    })
+
+    it('should handle entity with undefined tenant', () => {
+      const entity: any = {
+        id: 'notif-789',
+        tenantId: 'tenant-abc',
+        status: NotificationStatus.PROCESSING,
+        createdAt: new Date(),
+        createdBy: 'user5',
+        updatedAt: new Date(),
+        updatedBy: 'user6',
+        tenant: undefined,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.tenant).toBeUndefined()
+    })
+
+    it('should preserve all status values', () => {
+      const statuses = [
+        NotificationStatus.QUEUED,
+        NotificationStatus.PROCESSING,
+        NotificationStatus.COMPLETED,
+        NotificationStatus.FAILED,
+      ]
+
+      statuses.forEach((status) => {
+        const entity: any = {
+          id: 'notif-id',
+          tenantId: 'tenant-id',
+          status,
+          createdAt: new Date(),
+          createdBy: 'user',
+          updatedAt: new Date(),
+          updatedBy: 'user',
+          tenant: null,
+        }
+
+        const dto = (service as any).mapToDto(entity)
+
+        expect(dto.status).toBe(status)
+      })
+    })
+
+    it('should map all tenant properties correctly', () => {
+      const mockTenant = {
+        id: 'tenant-xyz',
+        name: 'Organization XYZ',
+        slug: 'org-xyz',
+        status: 'active',
+        description: 'Test org',
+      }
+      const entity: any = {
+        id: 'notif-123',
+        tenantId: 'tenant-xyz',
+        status: NotificationStatus.COMPLETED,
+        createdAt: new Date(),
+        createdBy: 'user1',
+        updatedAt: new Date(),
+        updatedBy: 'user2',
+        tenant: mockTenant,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      // Should only map specific tenant properties (id, name, slug)
+      expect(dto.tenant).toHaveProperty('id')
+      expect(dto.tenant).toHaveProperty('name')
+      expect(dto.tenant).toHaveProperty('slug')
+      // Extra properties should not be in mapped DTO
+      expect(dto.tenant).not.toHaveProperty('status')
+      expect(dto.tenant).not.toHaveProperty('description')
+    })
+
+    it('should handle null/undefined fields in entity', () => {
+      const entity: any = {
+        id: 'notif-null',
+        tenantId: 'tenant-null',
+        status: NotificationStatus.QUEUED,
+        createdAt: new Date(),
+        createdBy: null,
+        updatedAt: null,
+        updatedBy: null,
+        tenant: null,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.id).toBe('notif-null')
+      expect(dto.createdBy).toBeNull()
+      expect(dto.updatedAt).toBeNull()
+      expect(dto.updatedBy).toBeNull()
+      expect(dto.tenant).toBeUndefined()
+    })
+
+    it('should maintain date objects through mapping', () => {
+      const createdDate = new Date('2024-01-15T10:30:00Z')
+      const updatedDate = new Date('2024-01-16T14:45:00Z')
+      const entity: any = {
+        id: 'notif-dates',
+        tenantId: 'tenant-dates',
+        status: NotificationStatus.QUEUED,
+        createdAt: createdDate,
+        createdBy: 'user-creator',
+        updatedAt: updatedDate,
+        updatedBy: 'user-updater',
+        tenant: null,
+      }
+
+      const dto = (service as any).mapToDto(entity)
+
+      expect(dto.createdAt).toEqual(createdDate)
+      expect(dto.updatedAt).toEqual(updatedDate)
+      expect(dto.createdAt).toBeInstanceOf(Date)
+      expect(dto.updatedAt).toBeInstanceOf(Date)
+    })
+  })
 })
