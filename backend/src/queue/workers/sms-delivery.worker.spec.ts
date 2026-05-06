@@ -13,6 +13,7 @@ describe('SmsDeliveryWorker', () => {
   let mockConfigService: any
   let mockTemplatesRepository: any
   let mockTemplatesService: any
+  let mockInlineRenderingService: any
   let mockSmsAdapter: ISmsTransport
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
@@ -58,6 +59,15 @@ describe('SmsDeliveryWorker', () => {
       }),
     }
 
+    // Mock the inline rendering service
+    mockInlineRenderingService = {
+      renderContent: vi.fn().mockResolvedValue({
+        subject: 'Rendered Subject',
+        body: 'Rendered Body',
+        bodyType: 'html',
+      }),
+    }
+
     // Mock the SMS queue
     mockSmsQueue = {
       process: vi.fn().mockImplementation((...args) => {
@@ -90,6 +100,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -103,6 +114,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -119,6 +131,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -127,15 +140,10 @@ describe('SmsDeliveryWorker', () => {
           notifyId: 'notify-sms-123',
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
-          request: {
-            sms: {
-              recipients: ['+16135551234'],
-              body: 'Test SMS',
-            },
-          } as any,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Test SMS',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Test SMS', bodyType: 'html' },
           },
           attempt: 0,
         },
@@ -181,6 +189,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -217,6 +226,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -226,8 +236,9 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            body: 'Test body',
+            content: { body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -253,6 +264,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -263,7 +275,7 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           payload: {
-            recipients: ['+16135551234'],
+            recipients: { to: ['+16135551234'] },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -289,6 +301,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -298,9 +311,10 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Test body',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -326,6 +340,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -335,9 +350,10 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: null as any,
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Test body',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -363,6 +379,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -372,9 +389,10 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Test body',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Test body', bodyType: 'html' },
           },
           attempt: -1,
         } as DeliveryJobPayload,
@@ -401,6 +419,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -412,9 +431,10 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: 'tenant-fail',
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Will fail',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Will fail', bodyType: 'html' },
           },
           attempt: 2, // Final attempt (0, 1, 2 = 3 total)
         } as DeliveryJobPayload,
@@ -447,6 +467,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -456,9 +477,10 @@ describe('SmsDeliveryWorker', () => {
 
           tenantId: 'tenant-retry',
           channel: NotificationChannel.SMS,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Will retry',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Will retry', bodyType: 'html' },
           },
           attempt: 0, // First attempt
         } as DeliveryJobPayload,
@@ -501,6 +523,7 @@ describe('SmsDeliveryWorker', () => {
         mockConfigService,
         mockTemplatesRepository,
         mockTemplatesService,
+        mockInlineRenderingService,
         mockSmsAdapter,
       )
 
@@ -511,15 +534,10 @@ describe('SmsDeliveryWorker', () => {
           notifyId: 'notify-error',
           tenantId: 'tenant-error',
           channel: NotificationChannel.SMS,
-          request: {
-            sms: {
-              recipients: ['+16135551234'],
-              body: 'Will error',
-            },
-          } as any,
+          request: {},
           payload: {
-            recipients: ['+16135551234'],
-            body: 'Will error',
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Will error', bodyType: 'html' },
           },
           attempt: 0,
         },

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { ITemplateRenderer, ITemplateRendererRegistry } from '../../interfaces'
+import type { ITemplateRenderer, ITemplateRendererRegistry } from '../../adapters/interfaces'
 
 @Injectable()
 export class TemplateRendererRegistry implements ITemplateRendererRegistry {

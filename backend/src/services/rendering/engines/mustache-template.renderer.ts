@@ -1,28 +1,28 @@
 import { Injectable } from '@nestjs/common'
-import ejs from 'ejs'
+import Mustache from 'mustache'
 import {
   ITemplateRenderer,
   RenderContext,
   RenderedEmail,
   RenderedSms,
   RenderOptions,
-} from '../../../../interfaces'
+} from '../../../adapters/interfaces'
 import { splitPersonalisation } from '../utils/split-personalisation'
 
 /**
- * EJS template renderer. Syntax: <%= variable %>, <%- variable %>, <% code %>.
- * Use engine "ejs" when creating templates.
+ * Mustache template renderer. Logic-less syntax: {{ variable }}, {{# section }}, etc.
+ * Use engine "mustache" when creating templates.
  */
 @Injectable()
-export class EjsTemplateRenderer implements ITemplateRenderer {
-  readonly name = 'ejs'
+export class MustacheTemplateRenderer implements ITemplateRenderer {
+  readonly name = 'mustache'
 
   renderEmail(context: RenderContext, _options?: RenderOptions): Promise<RenderedEmail> {
     const { strings, attachments } = splitPersonalisation(context.personalisation)
     const subject = context.template.subject
-      ? ejs.render(context.template.subject, strings)
+      ? Mustache.render(context.template.subject, strings)
       : (context.defaultSubject ?? 'Notification')
-    const body = ejs.render(context.template.body, strings)
+    const body = Mustache.render(context.template.body, strings)
 
     return Promise.resolve({
       subject,
@@ -42,7 +42,7 @@ export class EjsTemplateRenderer implements ITemplateRenderer {
     context: RenderContext & { personalisation: Record<string, string> },
     _options?: RenderOptions,
   ): Promise<RenderedSms> {
-    const body = ejs.render(context.template.body, context.personalisation)
+    const body = Mustache.render(context.template.body, context.personalisation)
     return Promise.resolve({ body })
   }
 }

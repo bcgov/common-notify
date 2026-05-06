@@ -1,29 +1,38 @@
-import {
-  IsString,
-  IsArray,
-  IsOptional,
-  IsEnum,
-  IsUUID,
-  IsObject,
-  ArrayMinSize,
-} from 'class-validator'
+import { IsString, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
+import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
+import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { NotifyMsgAppRecipients } from './notify-msg-app-recipients'
+import { NotifyContent } from './notify-content'
 
+@ValidateTemplateOrRenderer()
 export class NotifyMsgAppChannel {
-  @ApiProperty({ type: [String], description: 'Message app recipients' })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsString({ each: true })
-  recipients: string[]
+  @ApiProperty({ type: NotifyMsgAppRecipients, description: 'Message app recipients' })
+  @ValidateNested()
+  @Type(() => NotifyMsgAppRecipients)
+  recipients: NotifyMsgAppRecipients
+
+  @ApiProperty({ type: NotifyContent, description: 'Message app content' })
+  @ValidateNested()
+  @Type(() => NotifyContent)
+  content: NotifyContent
 
   @ApiPropertyOptional() @IsOptional() @IsString() from?: string
 
   @ApiPropertyOptional() @IsOptional() @IsString() msgAppId?: string
 
-  @ApiProperty() @IsString() body: string
+  @ApiPropertyOptional({
+    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
+  })
+  @IsOptional()
+  @IsValidDateString()
+  delayedSend?: string
 
-  @ApiPropertyOptional() @IsOptional() @IsString() renderer?: string
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  @IsOptional()
+  @IsObject()
+  params?: Record<string, unknown>
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -34,23 +43,4 @@ export class NotifyMsgAppChannel {
   @IsOptional()
   @IsUUID()
   identityId?: string
-
-  @ApiPropertyOptional({
-    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
-  })
-  @IsOptional()
-  @IsValidDateString()
-  delayedSend?: string
-
-  @ApiPropertyOptional({ enum: ['low', 'normal', 'high'] })
-  @IsOptional()
-  @IsEnum(['low', 'normal', 'high'])
-  priority?: 'low' | 'normal' | 'high'
-
-  @ApiPropertyOptional() @IsOptional() @IsString() encoding?: string
-
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
-  @IsOptional()
-  @IsObject()
-  params?: Record<string, unknown>
 }
