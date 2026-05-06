@@ -1,8 +1,8 @@
 import type { FC } from 'react'
 import { Modal } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { selectTenant } from '@/redux/slices/auth.slice'
-import type { Tenant } from '@/interfaces/Tenant'
+import { selectTenant } from '@/redux/slices/tenant.slice'
+import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-selection-modal.scss'
 
 /**
@@ -10,7 +10,6 @@ import '@/scss/components/tenant-selection-modal.scss'
  *
  * V3 Modal-based Tenant Selection Component
  * Displays when user has multiple tenants to choose from.
- * Replaces the separate /select-tenant route page.
  *
  * User Flow:
  * 1. Modal appears on app load if multiple tenants exist
@@ -20,8 +19,8 @@ import '@/scss/components/tenant-selection-modal.scss'
 
 const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
-  const showModal = useAppSelector((state) => state.auth.showTenantModal)
-  const tenants = useAppSelector((state) => state.auth.tenants)
+  const showModal = useAppSelector((state) => state.tenant.showTenantModal)
+  const tenants = useAppSelector((state) => state.cstar.tenants)
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
@@ -58,8 +57,8 @@ const TenantSelectionModal: FC = () => {
               <div className="tenant-selection-radio" />
               <div className="tenant-selection-info">
                 <div className="tenant-selection-name">{tenant.name}</div>
-                {tenant.externalId && (
-                  <div className="tenant-selection-id">{tenant.externalId}</div>
+                {tenant.ministryName && (
+                  <div className="tenant-selection-id">{tenant.ministryName}</div>
                 )}
               </div>
             </button>

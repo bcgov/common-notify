@@ -1,8 +1,8 @@
 import type { FC } from 'react'
 import { useState, useRef, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { selectTenant } from '@/redux/slices/auth.slice'
-import type { Tenant } from '@/interfaces/Tenant'
+import { selectTenant } from '@/redux/slices/tenant.slice'
+import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
 
 /**
@@ -30,8 +30,8 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const tenants = useAppSelector((state) => state.auth.tenants)
-  const selectedTenant = useAppSelector((state) => state.auth.selectedTenant)
+  const tenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
   // Close dropdown when clicking outside
   useEffect(() => {

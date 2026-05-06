@@ -3,7 +3,7 @@ import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import UserService from '@/service/user-service'
-import { fetchTenants } from '@/redux/thunks/auth.thunks'
+import { fetchCstarTenants } from '@/redux/thunks/cstar.thunks'
 import LoadingSpinner from './LoadingSpinner'
 import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
@@ -18,26 +18,39 @@ type Props = {
 const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
 
-  // Get user and tenant state from Redux store
   const user = useAppSelector((state) => state.auth.user)
-  const selectedTenant = useAppSelector((state) => state.auth.selectedTenant)
-  const tenantLoading = useAppSelector((state) => state.auth.tenantLoading)
-  const tenantError = useAppSelector((state) => state.auth.tenantError)
-  const showTenantModal = useAppSelector((state) => state.auth.showTenantModal)
+  const isInitializing = useAppSelector((state) => state.auth.isInitializing)
+  const tenants = useAppSelector((state) => state.cstar.tenants)
+  const tenantLoading = useAppSelector((state) => state.cstar.isLoading)
+  const tenantError = useAppSelector((state) => state.cstar.error)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const showTenantModal = useAppSelector((state) => state.tenant.showTenantModal)
 
-  // Block rendering: show error if tenant fetch failed
-  if (user && tenantError) {
-    return <TenantError error={tenantError} onRetry={() => dispatch(fetchTenants())} />
+  if (isInitializing || !user || tenantLoading) {
+    return <LoadingSpinner isVisible />
   }
 
-  // Block rendering: show spinner while loading
-  if (!user || tenantLoading) {
-    return <LoadingSpinner />
+  if (tenantError) {
+    return (
+      <TenantError
+        error={tenantError}
+        onRetry={() => dispatch(fetchCstarTenants(user.id))}
+      />
+    )
   }
 
-  // Block rendering: show spinner if no tenant selected and modal not shown (should not happen normally)
+  if (tenants.length === 0) {
+    return (
+      <TenantError
+        title="No Tenants Available"
+        error="Your account is authenticated, but CSTAR did not return any tenants for you. Contact your administrator if you believe this is incorrect."
+        onRetry={() => dispatch(fetchCstarTenants(user.id))}
+      />
+    )
+  }
+
   if (!selectedTenant && !showTenantModal) {
-    return <LoadingSpinner />
+    return <LoadingSpinner isVisible />
   }
 
   const handleLogout = () => {
@@ -66,11 +79,7 @@ const Layout: FC<Props> = ({ children }) => {
             <div className="layout-header-nav">
               <div className="layout-header-user">
                 <TenantSwitcher />
-                {user && selectedTenant && (
-                  <span className="username">
-                    {user.displayName}
-                  </span>
-                )}
+                {user && selectedTenant && <span className="username">{user.displayName}</span>}
                 <button className="logout-button" onClick={handleLogout} title="Logout">
                   <i className="bi bi-box-arrow-right" />
                   <span>Logout</span>
