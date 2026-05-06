@@ -87,7 +87,7 @@ export class Template {
   body: string
 
   /**
-   * Template rendering engine (legacy_gc_notify, handlebars, mustache, ejs)
+   * Template rendering engine (legacy_gc_notify, handlebars, mustache)
    */
   @Column({ name: 'engine_code', length: 50, default: 'handlebars' })
   engineCode: string

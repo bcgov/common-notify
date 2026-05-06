@@ -383,4 +383,120 @@ describe('HandlebarsTemplateRenderer', () => {
       expect(renderer.name).toBe('handlebars')
     })
   })
+
+  describe('Security: Dangerous Pattern Detection', () => {
+    it('should reject templates with require() calls', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious',
+          type: 'email',
+          subject: 'Test',
+          body: 'Hello {{require("fs").readFileSync("/etc/passwd")}}',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+
+    it('should reject templates with process object access', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious',
+          type: 'email',
+          subject: 'Test',
+          body: 'Secret: {{process.env.DATABASE_URL}}',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+
+    it('should reject templates with fs module access', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious',
+          type: 'email',
+          subject: 'Test',
+          body: 'Files: {{fs.readdirSync(".")}}',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+
+    it('should reject templates with __dirname access', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious',
+          type: 'email',
+          subject: '{{__dirname}}',
+          body: 'Path: {{__dirname}}/config',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+
+    it('should reject templates with registerHelper attempts', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious',
+          type: 'email',
+          subject: 'Test',
+          body: 'Body {{registerHelper("evil", () => {})}}',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderEmail(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+
+    it('should allow safe Handlebars syntax with variable access', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Safe',
+          type: 'email',
+          subject: 'Welcome {{name}}',
+          body: 'Hello {{name}}, your email is {{email}}',
+          active: true,
+        },
+        personalisation: { name: 'John', email: 'john@example.com' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toBe('Hello John, your email is john@example.com')
+    })
+
+    it('should also validate SMS templates for dangerous patterns', async () => {
+      const context: RenderContext & { personalisation: Record<string, string> } = {
+        template: {
+          id: 'template-1',
+          name: 'Malicious SMS',
+          type: 'sms',
+          body: 'Message {{process.exit()}}',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      await expect(renderer.renderSms(context)).rejects.toThrow('potentially unsafe pattern')
+    })
+  })
 })

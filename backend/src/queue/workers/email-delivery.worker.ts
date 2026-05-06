@@ -16,7 +16,7 @@ import { IEmailTransport } from '../../adapters'
  * Processes email delivery jobs:
  * 1. Receives email delivery jobs from the EMAIL_DELIVERY queue
  * 2. Updates notification status to SENDING in database
- * 3. Gets the appropriate adapter (currently CHES, future: GC Notify)
+ * 3. Gets the appropriate adapter (currently CHES, future: SNS, SendGrid, etc)
  * 4. Sends email via adapter
  * 5. Updates notification status to COMPLETED on success, FAILED on error
  * 6. Implements retry logic with exponential backoff

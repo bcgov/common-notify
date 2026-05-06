@@ -147,7 +147,7 @@ describe('Rendering Strategy', () => {
           recipients: { to: ['user-123'] },
           content: {
             body: 'Test message',
-            renderer: 'ejs',
+            renderer: 'handlebars',
           },
         }
 
@@ -182,7 +182,7 @@ describe('Rendering Strategy', () => {
           recipients: { to: [] },
           content: {
             body: 'Test message',
-            renderer: 'ejs',
+            renderer: 'mustache',
           },
         }
 
@@ -252,7 +252,7 @@ describe('Rendering Strategy', () => {
       })
 
       it('should handle all different renderer types', () => {
-        const renderers = ['handlebars', 'mustache', 'ejs', 'legacy-gc-notify'] as const
+        const renderers = ['handlebars', 'mustache', 'legacy-gc-notify'] as const
 
         for (const renderer of renderers) {
           const channel: NotifyEmailChannel = {
@@ -344,7 +344,7 @@ describe('Rendering Strategy', () => {
         recipients: { to: ['user-123'] },
         content: {
           body: 'Test',
-          renderer: 'ejs',
+          renderer: 'mustache',
         },
       }
 

@@ -18,7 +18,7 @@ export function isFileAttachment(v: unknown): v is FileAttachmentValue {
  * 1. String values for template interpolation (e.g., name, email, boolean)
  * 2. File attachments that need to be processed separately
  *
- * This utility is essential because template engines (Handlebars, Mustache, EJS)
+ * This utility is essential because template engines (Handlebars, Mustache)
  * expect string values for variable substitution, but email payloads need to handle
  * file attachments separately. File data comes base64-encoded and must be converted
  * to Buffer objects before being added to the email.

@@ -223,7 +223,7 @@ describe('TemplatesController', () => {
         name: 'Template',
         channelCode: NotificationChannel.EMAIL,
         body: 'Body',
-        engineCode: TemplateEngine.EJS,
+        engineCode: TemplateEngine.HANDLEBARS,
       }
 
       const mockRequest = {

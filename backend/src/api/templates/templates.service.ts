@@ -289,8 +289,6 @@ export class TemplatesService {
         return 'handlebars'
       case TemplateEngine.MUSTACHE:
         return 'mustache'
-      case TemplateEngine.EJS:
-        return 'ejs'
       default:
         return 'handlebars' // default fallback
     }
