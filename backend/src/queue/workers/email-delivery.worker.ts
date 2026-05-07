@@ -263,7 +263,8 @@ export class EmailDeliveryWorker {
     const result = await emailAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || result.providerResponse || `${emailAdapter.name}-${Date.now()}`,
+      externalId:
+        result.messageId || result.providerResponse || `${emailAdapter.name}-${Date.now()}`,
       provider: emailAdapter.name,
     }
   }
