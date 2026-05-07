@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationDeliveryService } from '../../api/notification/notification-delivery.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
@@ -46,6 +47,7 @@ export class EmailDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
+    deliveryService: NotificationDeliveryService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -75,6 +77,18 @@ export class EmailDeliveryWorker {
 
         // Cast payload to email channel type for type safety
         let emailPayload = payload as NotifyEmailChannel
+
+        // Track per-recipient delivery status
+        if ((job.attemptsMade ?? 0) === 0) {
+          await deliveryService.createPending(
+            notifyId,
+            (payload as NotifyEmailChannel).recipients?.to ?? [],
+            'email',
+            tenantId,
+          )
+        } else {
+          await deliveryService.resetForRetry(notifyId)
+        }
 
         // Resolve template if templateId is provided in the original request
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
@@ -177,6 +191,9 @@ export class EmailDeliveryWorker {
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
+        // Mark delivery records as completed
+        await deliveryService.markCompleted(notifyId)
+
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.COMPLETED,
@@ -200,6 +217,7 @@ export class EmailDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await deliveryService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )

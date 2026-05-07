@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationDeliveryService } from '../../api/notification/notification-delivery.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
@@ -45,6 +46,7 @@ export class SmsDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     smsAdapter: ISmsTransport,
+    deliveryService: NotificationDeliveryService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)
@@ -73,6 +75,18 @@ export class SmsDeliveryWorker {
         }
 
         // Resolve template if templateId is provided in the original request
+        // Track per-recipient delivery status
+        if ((job.attemptsMade ?? 0) === 0) {
+          await deliveryService.createPending(
+            notifyId,
+            (payload as any).recipients?.to ?? [],
+            'sms',
+            tenantId,
+          )
+        } else {
+          await deliveryService.resetForRetry(notifyId)
+        }
+
         let resolvedPayload = payload
         if (request?.templateId) {
           logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
@@ -167,6 +181,9 @@ export class SmsDeliveryWorker {
 
         logger.debug(`[${notifyId}] SMS sent successfully: ${JSON.stringify(result)}`)
 
+        // Mark delivery records as completed
+        await deliveryService.markCompleted(notifyId)
+
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.COMPLETED,
@@ -190,6 +207,7 @@ export class SmsDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await deliveryService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )

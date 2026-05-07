@@ -1,6 +1,7 @@
-import { Controller, Get, Version, UseGuards, Logger, Query } from '@nestjs/common'
+import { Controller, Get, Version, UseGuards, Logger, Query, Param } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
+import { NotificationDeliveryService } from './notification-delivery.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
@@ -13,7 +14,10 @@ import { RequireRole } from '../../auth/decorators/require-role.decorator'
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly notificationDeliveryService: NotificationDeliveryService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -48,5 +52,13 @@ export class NotificationController {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
     return this.notificationService.findAll(pageNum, limitNum, status)
+  }
+
+  @Version('1')
+  @Get(':id/deliveries')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({ summary: 'List individual delivery records for a notification request' })
+  findDeliveries(@Param('id') id: string) {
+    return this.notificationDeliveryService.findByRequestId(id)
   }
 }

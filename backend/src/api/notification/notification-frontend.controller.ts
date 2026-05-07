@@ -1,6 +1,7 @@
-import { Controller, Get, Version, Logger, Query, Sse } from '@nestjs/common'
+import { Controller, Get, Version, Logger, Query, Sse, Param } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
+import { NotificationDeliveryService } from './notification-delivery.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
@@ -29,6 +30,7 @@ export class NotificationFrontendController {
 
   constructor(
     private readonly notificationService: NotificationService,
+    private readonly notificationDeliveryService: NotificationDeliveryService,
     private readonly notificationPubSubService: NotificationPubSubService,
   ) {}
 
@@ -89,5 +91,21 @@ export class NotificationFrontendController {
     )
 
     return merge(updates$, keepalive$)
+  }
+
+  @Version('1')
+  @Get('debug/deliveries')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({ summary: '[DEBUG] List all delivery records across all notification requests' })
+  findAllDeliveriesDebug() {
+    return this.notificationDeliveryService.findAllDebug()
+  }
+
+  @Version('1')
+  @Get(':id/deliveries')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({ summary: 'List individual delivery records for a notification request' })
+  findDeliveries(@Param('id') id: string) {
+    return this.notificationDeliveryService.findByRequestId(id)
   }
 }

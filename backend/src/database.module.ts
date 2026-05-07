@@ -6,6 +6,7 @@ import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
 import { TemplateEngineCode } from './api/templates/entities/template-engine-code.entity'
 import { NotificationRequest } from './api/notification/entities/notification-request.entity'
+import { NotificationDelivery } from './api/notification/entities/notification-delivery.entity'
 import { NotificationStatusCode } from './api/notification/entities/notification-status-code.entity'
 import { NotificationChannelCode } from './api/notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from './api/notification/entities/notification-event-type-code.entity'
@@ -31,6 +32,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         Tenant,
         TenantStatusCode,
         NotificationRequest,
+        NotificationDelivery,
         NotificationStatusCode,
         NotificationChannelCode,
         NotificationEventTypeCode,
