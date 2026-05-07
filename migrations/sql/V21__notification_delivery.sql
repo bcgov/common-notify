@@ -49,4 +49,4 @@ COMMENT ON COLUMN notification_delivery.updated_by IS 'User or system that last 
 -- Create indexes for common queries
 CREATE INDEX idx_notification_delivery_request_id ON notification_delivery(notification_request_id);
 CREATE INDEX idx_notification_delivery_status ON notification_delivery(status);
-CREATE INDEX idx_notification_delivery_recipient ON notification_delivery(recipient_email);
+CREATE INDEX idx_notification_delivery_recipient ON notification_delivery(recipient_address);
