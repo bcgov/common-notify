@@ -42,7 +42,12 @@ export class NotificationDeliveryService {
   async markSent(notificationRequestId: string, providerResponseId?: string): Promise<void> {
     await this.deliveryRepository.update(
       { notificationRequestId },
-      { status: 'sent', lastAttemptAt: new Date(), updatedBy: 'system', ...(providerResponseId && { providerResponseId }) },
+      {
+        status: 'sent',
+        lastAttemptAt: new Date(),
+        updatedBy: 'system',
+        ...(providerResponseId && { providerResponseId }),
+      },
     )
   }
 
