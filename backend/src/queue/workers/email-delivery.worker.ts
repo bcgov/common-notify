@@ -191,8 +191,8 @@ export class EmailDeliveryWorker {
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
-        // Mark delivery records as completed
-        await deliveryService.markCompleted(notifyId)
+        // Mark delivery records as sent (notification delivery doesn't use completed right now)
+        await deliveryService.markSent(notifyId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {

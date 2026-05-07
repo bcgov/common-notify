@@ -37,12 +37,12 @@ export class NotificationDeliveryService {
   }
 
   /**
-   * Mark all delivery records for a request as completed.
+   * Mark all delivery records for a request as sent.
    */
-  async markCompleted(notificationRequestId: string): Promise<void> {
+  async markSent(notificationRequestId: string): Promise<void> {
     await this.deliveryRepository.update(
       { notificationRequestId },
-      { status: 'completed', lastAttemptAt: new Date(), updatedBy: 'system' },
+      { status: 'sent', lastAttemptAt: new Date(), updatedBy: 'system' },
     )
   }
 
