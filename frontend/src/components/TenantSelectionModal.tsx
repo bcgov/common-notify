@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { Button, Modal, Select } from '@bcgov/design-system-react-components'
+import { AlertDialog, Button, Modal, Select } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import type { Tenant } from '@/interfaces/CstarTenant'
@@ -27,7 +27,7 @@ const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
   const showModal = useAppSelector((state) => state.tenant.showTenantModal)
   const tenants = useAppSelector((state) => state.cstar.tenants)
-  const [pendingTenantId, setPendingTenantId] = useState<string | null>(null)
+  const [pendingTenantId, setPendingTenantId] = useState<string | undefined>(undefined)
 
   const tenantItems = useMemo(
     () =>
@@ -43,7 +43,7 @@ const TenantSelectionModal: FC = () => {
   }
 
   const handleCancelSelection = () => {
-    setPendingTenantId(null)
+    setPendingTenantId(undefined)
   }
 
   const handleSignOut = () => {
@@ -73,57 +73,68 @@ const TenantSelectionModal: FC = () => {
     return null
   }
 
+  const buttons = isZeroTenantState ? (
+    <>
+      <Button variant="tertiary" type="button" onPress={handleSignOut}>
+        Sign out
+      </Button>
+      <Button variant="primary" type="button" onPress={handleTenantSetupRedirect}>
+        Create tenant
+      </Button>
+    </>
+  ) : (
+    <>
+      <Button variant="tertiary" type="button" onPress={handleSignOut}>
+        Sign out
+      </Button>
+      <Button
+        variant="primary"
+        type="button"
+        onPress={handleContinue}
+        isDisabled={!pendingTenantId}
+      >
+        Continue
+      </Button>
+    </>
+  )
+
   return (
     <Modal
       isOpen={isZeroTenantState || isMultiTenantState}
-      title={isZeroTenantState ? 'Set up your tenant' : 'Select a tenant'}
-      onClose={handleSignOut}
-      closeOnBackdropClick={false}
-      closeOnEscape={false}
+      isDismissable={false}
+      isKeyboardDismissDisabled
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          handleSignOut()
+        }
+      }}
     >
-      <div className="tenant-selection-modal-content">
-        {isZeroTenantState ? (
-          <>
+      <AlertDialog
+        title={isZeroTenantState ? 'Set up your tenant' : 'Select a tenant'}
+        isCloseable
+        buttons={buttons}
+      >
+        <div className="tenant-selection-modal-content">
+          {isZeroTenantState ? (
             <p className="tenant-selection-description">
               You do not have a tenant set up yet. Create one to get started.
             </p>
-            <div className="tenant-selection-footer">
-              <Button variant="tertiary" type="button" onClick={handleSignOut}>
-                Sign out
-              </Button>
-              <Button variant="primary" type="button" onClick={handleTenantSetupRedirect}>
-                Create tenant
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="tenant-selection-description">Please choose a tenant to continue.</p>
-            <div className="tenant-selection-field">
-              <Select
-                aria-label="Select a tenant"
-                items={tenantItems}
-                placeholder="Select a tenant"
-                selectedKey={(pendingTenantId ?? null) as any}
-                onSelectionChange={(key) => setPendingTenantId((key as string | null) ?? null)}
-              />
-            </div>
-            <div className="tenant-selection-footer">
-              <Button variant="tertiary" type="button" onClick={handleSignOut}>
-                Sign out
-              </Button>
-              <Button
-                variant="primary"
-                type="button"
-                onClick={handleContinue}
-                isDisabled={!pendingTenantId}
-              >
-                Continue
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <p className="tenant-selection-description">Please choose a tenant to continue.</p>
+              <div className="tenant-selection-field">
+                <Select
+                  aria-label="Select a tenant"
+                  items={tenantItems}
+                  placeholder="Select a tenant"
+                  selectedKey={pendingTenantId}
+                  onSelectionChange={(key) => setPendingTenantId((key as string | null) ?? undefined)}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </AlertDialog>
     </Modal>
   )
 }
