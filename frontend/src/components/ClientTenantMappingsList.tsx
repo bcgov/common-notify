@@ -16,11 +16,20 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
   const [mappings, setMappings] = useState<ClientTenantMapping[]>([])
   const [loading, setLoading] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
-  const { allUsers } = useAppSelector((state) => state.user)
+  const usersState = useAppSelector((state) => state.users)
+  const { allUsers = [] } = usersState
 
-  // Helper function to get username from store for audit trail display
-  const getUserUsername = (externalId: string): string => {
-    const user = allUsers.find((u) => u.externalId === externalId)
+  // Helper function to get username - prefer stored username, fallback to lookup, then fallback to ID
+  const getUserUsername = (externalId: string, storedUsername?: string): string => {
+    // If we have the username stored in the database, use it directly
+    if (storedUsername) {
+      return storedUsername
+    }
+
+    // Otherwise, try to look up from Redux store
+    // Handle case-insensitive matching and strip @azureidir suffix if present
+    const normalizedId = externalId.toLowerCase().split('@')[0]
+    const user = allUsers.find((u) => u.externalId.toLowerCase() === normalizedId)
     return user?.username || externalId
   }
 
@@ -93,7 +102,7 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                       {mapping.is_active ? 'Active' : 'Disabled'}
                     </span>
                   </td>
-                  <td>{getUserUsername(mapping.created_by)}</td>
+                  <td>{getUserUsername(mapping.created_by, mapping.created_by_username)}</td>
                   <td>
                     {new Date(mapping.created_at).toLocaleDateString()}{' '}
                     {new Date(mapping.created_at).toLocaleTimeString()}

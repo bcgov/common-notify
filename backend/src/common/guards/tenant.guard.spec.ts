@@ -76,25 +76,13 @@ describe('TenantGuard', () => {
       expect(request.kongConsumerId).toBe('kong-id-123')
     })
 
-    it('should create tenant if not found by Kong username', async () => {
-      const newTenant = {
-        id: 'uuid-2',
-        name: 'new-tenant',
-        slug: 'new-tenant',
-        externalId: 'kong-id-456',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isDeleted: false,
-      }
-
+    it('should throw UnauthorizedException if tenant not found by Kong username', async () => {
       mockTenantsService.findByExternalId.mockResolvedValue(null)
       mockTenantsService.findByName.mockResolvedValue(null)
-      mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
       const request: MockRequest = {
         headers: {
-          'x-consumer-username': 'new-tenant',
+          'x-consumer-username': 'unknown-tenant',
           'x-consumer-id': 'kong-id-456',
         },
         method: 'POST',
@@ -107,20 +95,14 @@ describe('TenantGuard', () => {
         }),
       } as ExecutionContext
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith({
-        name: 'new-tenant',
-        externalId: 'kong-id-456',
-      })
-      expect(request.tenant).toEqual(newTenant)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('kong-id-456')
+      expect(mockTenantsService.findByName).toHaveBeenCalledWith('unknown-tenant')
     })
 
-    it('should throw BadRequestException if Kong tenant creation fails', async () => {
+    it('should throw UnauthorizedException if Kong tenant creation is attempted', async () => {
       mockTenantsService.findByExternalId.mockResolvedValue(null)
       mockTenantsService.findByName.mockResolvedValue(null)
-      mockTenantsService.create.mockRejectedValue(new Error('DB error'))
 
       const request: MockRequest = {
         headers: {
@@ -137,7 +119,7 @@ describe('TenantGuard', () => {
         }),
       } as ExecutionContext
 
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
   })
 
@@ -182,23 +164,12 @@ describe('TenantGuard', () => {
       expect(request.clientId).toBe('test-client-a')
     })
 
-    it('should create tenant if not found by OAuth2 client ID', async () => {
-      const newTenant = {
-        id: 'uuid-4',
-        name: 'new-client',
-        slug: 'new-client',
-        externalId: 'new-client',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isDeleted: false,
-      }
-
+    it('should throw UnauthorizedException if tenant not found by user ID', async () => {
+      // JWT payload: {"sub":"unknown-user-id","iat":1775761243,"exp":1775761243}
       const jwtToken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZXctY2xpZW50IiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU3NjEyNDN9.test'
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1bmtub3duLXVzZXItaWQiLCJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTc2MTI0M30.test'
 
       mockTenantsService.findByExternalId.mockResolvedValue(null)
-      mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
 
       const request: MockRequest = {
         headers: {
@@ -214,17 +185,11 @@ describe('TenantGuard', () => {
         }),
       } as ExecutionContext
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith({
-        name: 'new-client',
-        externalId: 'new-client',
-      })
-      expect(request.tenant).toEqual(newTenant)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('unknown-user-id')
     })
 
-    it('should throw UnauthorizedException if JWT tenant creation fails', async () => {
+    it('should throw UnauthorizedException if user tenant creation is attempted', async () => {
       const jwtToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYWlsaW5nLWNsaWVudCIsImlhdCI6MTc3NTc2MTI0MywiZXhwIjoxNzc1NzYxMjQzfQ.test'
 

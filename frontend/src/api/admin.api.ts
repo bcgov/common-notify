@@ -1,10 +1,15 @@
 import type { AxiosError } from 'axios'
 import { post, get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 
+export interface TenantReference {
+  id: string
+  name: string
+}
+
 export interface LinkClientToTenantsRequest {
   client_id: string
   client_secret: string
-  tenant_ids: string[]
+  tenant_ids: TenantReference[]
 }
 
 export interface ClientTenantMapping {
@@ -15,6 +20,7 @@ export interface ClientTenantMapping {
   is_active: boolean
   created_at: string
   created_by: string
+  created_by_username?: string
   updated_at: string
   updated_by: string
   is_deleted: boolean

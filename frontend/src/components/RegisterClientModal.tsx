@@ -4,6 +4,7 @@ import { Button, Form, TextField, Select } from '@bcgov/design-system-react-comp
 import { adminApi } from '@/api/admin.api'
 import type { LinkClientToTenantsRequest } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
+import { useAppSelector } from '@/redux/hooks'
 
 interface FormState {
   client_id: string
@@ -23,10 +24,13 @@ interface RegisterClientModalProps {
  * Modal dialog for registering API Gateway clients with CSTAR tenants.
  */
 const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+
   const [formState, setFormState] = useState<FormState>({
     client_id: '',
     client_secret: '',
-    selected_tenant_ids: [],
+    selected_tenant_ids: selectedTenant ? [selectedTenant.id] : [],
   })
 
   const handleInputChange = (field: keyof FormState) => (value: string | string[]) => {
@@ -57,10 +61,23 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
     }
 
     try {
+      // Map selected tenant IDs to tenant objects with id and name
+      const selectedTenants = formState.selected_tenant_ids
+        .map((tenantId) => cstarTenants.find((t) => t.id === tenantId))
+        .filter((t) => t !== undefined)
+
+      if (selectedTenants.length !== formState.selected_tenant_ids.length) {
+        showErrorToast('One or more selected tenants could not be found')
+        return
+      }
+
       const request: LinkClientToTenantsRequest = {
         client_id: formState.client_id.trim(),
         client_secret: formState.client_secret.trim(),
-        tenant_ids: formState.selected_tenant_ids,
+        tenant_ids: selectedTenants.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+        })),
       }
 
       const response = await adminApi.linkClientToTenants(request)
@@ -80,11 +97,10 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
     }
   }
 
-  const mockTenants = [
-    { id: '9c7fa2db-fc59-4d3c-acff-aab78a251094', label: 'CSTAR Test Tenant 1' },
-    { id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', label: 'CSTAR Test Tenant 2' },
-    { id: '7ce9c880-2e0e-12e2-91c5-11d15fe441d9', label: 'CSTAR Test Tenant 3' },
-  ]
+  const tenants = cstarTenants.map((tenant) => ({
+    id: tenant.id,
+    label: tenant.name,
+  }))
 
   return (
     <>
@@ -142,7 +158,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
                     </>
                   }
                   placeholder="Choose tenants..."
-                  items={mockTenants}
+                  items={tenants}
                   value={formState.selected_tenant_ids}
                   onChange={(value) => handleInputChange('selected_tenant_ids')(value)}
                   multiple

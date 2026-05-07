@@ -1,8 +1,9 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository, In } from 'typeorm'
+import { Repository } from 'typeorm'
 import { ClientTenantMapping } from './entities/client-tenant-mapping.entity'
 import { Tenant } from '../tenants/entities/tenant.entity'
+import { TenantReference } from './schemas/link-client-to-tenants.dto'
 
 /**
  * ClientTenantMappingService
@@ -23,73 +24,112 @@ export class ClientTenantMappingService {
 
   /**
    * Link a client ID to one or more tenants
-   * Creates ClientTenantMapping records after verifying ownership of both client and tenants
+   * Creates ClientTenantMapping records, automatically creating tenant records if they don't exist.
+   * Treats the input tenant IDs as CSTAR external tenant IDs.
    *
    * @param clientId API Gateway client ID (extracted from OAuth token)
-   * @param tenantIds Array of tenant UUIDs to link to this client
+   * @param cstarTenants Array of CSTAR tenant references (with id and name) to link to this client
    * @param createdBy User GUID of the admin who authorized this mapping
    * @returns Array of created mappings
-   * @throws BadRequestException if tenants don't exist or client already linked
+   * @throws BadRequestException if validation fails
    */
   async linkClientToTenants(
     clientId: string,
-    tenantIds: string[],
+    cstarTenants: TenantReference[],
     createdBy: string,
   ): Promise<ClientTenantMapping[]> {
+    this.logger.debug(
+      `linkClientToTenants called: clientId=${clientId}, tenantCount=${cstarTenants.length}, createdBy=${createdBy}`,
+    )
+
     if (!clientId || !clientId.trim()) {
       throw new BadRequestException('client_id cannot be empty')
     }
 
-    if (!tenantIds || tenantIds.length === 0) {
-      throw new BadRequestException('At least one tenant_id must be provided')
+    if (!cstarTenants || cstarTenants.length === 0) {
+      throw new BadRequestException('At least one tenant must be provided')
     }
 
     if (!createdBy || !createdBy.trim()) {
       throw new BadRequestException('created_by cannot be empty')
     }
 
-    // Verify all tenants exist
-    const tenants = await this.tenantRepository.find({
-      where: { id: In(tenantIds), isDeleted: false },
-    })
-
-    if (tenants.length !== tenantIds.length) {
-      const foundIds = new Set(tenants.map((t) => t.id))
-      const missingIds = tenantIds.filter((id) => !foundIds.has(id))
-      throw new BadRequestException(
-        `The following tenant IDs do not exist or are deleted: ${missingIds.join(', ')}`,
-      )
-    }
-
     const mappings: ClientTenantMapping[] = []
+    const now = new Date()
 
-    for (const tenantId of tenantIds) {
-      // Check if mapping already exists (active or inactive)
+    for (const tenantRef of cstarTenants) {
+      if (!tenantRef.id || !tenantRef.id.trim()) {
+        throw new BadRequestException('tenant_id cannot be empty')
+      }
+
+      if (!tenantRef.name || !tenantRef.name.trim()) {
+        throw new BadRequestException('tenant_name cannot be empty')
+      }
+
+      this.logger.debug(`Processing CSTAR tenant: id=${tenantRef.id}, name=${tenantRef.name}`)
+
+      // Look up tenant by external_id (CSTAR tenant ID)
+      let tenant = await this.tenantRepository.findOne({
+        where: { externalId: tenantRef.id, isDeleted: false },
+      })
+
+      this.logger.debug(
+        `Tenant lookup by externalId=${tenantRef.id}: ${tenant ? `found (id=${tenant.id})` : 'not found'}`,
+      )
+
+      // If tenant doesn't exist, create it
+      if (!tenant) {
+        this.logger.debug(`Creating new tenant for CSTAR ID: ${tenantRef.id}`)
+
+        const slug = tenantRef.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+
+        tenant = this.tenantRepository.create({
+          externalId: tenantRef.id,
+          name: tenantRef.name,
+          slug,
+          status: 'active',
+          createdBy,
+          createdAt: now,
+          updatedAt: now,
+        })
+
+        tenant = await this.tenantRepository.save(tenant)
+
+        this.logger.debug(
+          `Created new tenant: id=${tenant.id}, externalId=${tenant.externalId}, name=${tenant.name}, slug=${tenant.slug}`,
+        )
+      }
+
+      // Create or reactivate client-tenant mapping
+      this.logger.debug(`Creating mapping: clientId=${clientId}, tenantId=${tenant.id}`)
+
       const existingMapping = await this.mappingRepository.findOne({
-        where: { clientId, tenantId, isDeleted: false },
+        where: { clientId, tenantId: tenant.id, isDeleted: false },
       })
 
       if (existingMapping) {
         if (existingMapping.isActive) {
-          throw new BadRequestException(
-            `Client '${clientId}' is already linked to tenant '${tenantId}'`,
-          )
+          const errorMsg = `Client '${clientId}' is already linked to tenant '${tenantRef.id}'`
+          this.logger.warn(errorMsg)
+          throw new BadRequestException(errorMsg)
         }
         // Reactivate existing inactive mapping
         existingMapping.isActive = true
         existingMapping.updatedBy = createdBy
-        existingMapping.updatedAt = new Date()
+        existingMapping.updatedAt = now
         const savedMapping = await this.mappingRepository.save(existingMapping)
         mappings.push(savedMapping)
         this.logger.debug(
-          `Reactivated mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${createdBy}`,
+          `Reactivated mapping: id=${savedMapping.id}, clientId=${clientId}, tenantId=${tenant.id}`,
         )
       } else {
         // Create new mapping
-        const now = new Date()
         const mapping = this.mappingRepository.create({
           clientId,
-          tenantId,
+          tenantId: tenant.id,
           createdBy,
           createdAt: now,
           updatedAt: now,
@@ -98,11 +138,14 @@ export class ClientTenantMappingService {
         const savedMapping = await this.mappingRepository.save(mapping)
         mappings.push(savedMapping)
         this.logger.debug(
-          `Created mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${createdBy}`,
+          `Created new mapping: id=${savedMapping.id}, clientId=${clientId}, tenantId=${tenant.id}`,
         )
       }
     }
 
+    this.logger.debug(
+      `linkClientToTenants completed successfully: ${mappings.length} mapping(s) created/reactivated`,
+    )
     return mappings
   }
 

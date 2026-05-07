@@ -1,17 +1,19 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './slices/auth.slice'
+import userReducer from './slices/user.slice'
+import usersReducer from './slices/users.slice'
 import cstarReducer from './slices/cstar.slice'
 import loadingReducer from './slices/loading.slice'
 import toastReducer from './slices/toast.slice'
 import notificationReducer from './slices/notification.slice'
 import codeTablesReducer from './slices/codeTables.slice'
-import userReducer from './slices/user.slice'
 import tenantReducer from './slices/tenant.slice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     user: userReducer,
+    users: usersReducer,
     cstar: cstarReducer,
     loading: loadingReducer,
     toast: toastReducer,

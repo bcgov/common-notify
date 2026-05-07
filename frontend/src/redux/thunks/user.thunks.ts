@@ -43,7 +43,7 @@ export const upsertCurrentUserAsync = createAsyncThunk<
 >('user/upsertCurrent', async (authUser: AuthUser, { rejectWithValue, getState }) => {
   try {
     const state = getState()
-    const users = state.user.allUsers || []
+    const users = state.users.allUsers || []
 
     // Find existing user by matching the id (which is externalId from JWT)
     const existingUser = users.find((u: any) => u.externalId === authUser.id)

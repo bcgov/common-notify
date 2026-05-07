@@ -52,43 +52,54 @@ export class TenantGuard implements CanActivate {
         `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
       )
 
-      // Try to find tenant by external ID (Kong consumer ID)
-      let tenant = kongConsumerId
-        ? await this.tenantsService.findByExternalId(kongConsumerId as string).catch(() => null)
-        : null
-
-      if (!tenant) {
-        // If not found by external ID, try by name
-        tenant = await this.tenantsService.findByName(kongUsername as string).catch(() => null)
+      // Kong consumer ID is actually the OAuth2 client ID (from API Gateway)
+      // Look up which tenant(s) this client is mapped to
+      if (!kongConsumerId) {
+        this.logger.error('Kong authentication present but missing X-Consumer-ID header')
+        throw new UnauthorizedException('Missing client ID in Kong headers')
       }
 
-      if (!tenant) {
-        this.logger.debug(
-          `Tenant not found for Kong username: ${kongUsername}. Creating new tenant...`,
+      const clientId = kongConsumerId as string
+      const tenantIds = await this.clientTenantMappingService
+        .findTenantsByClientId(clientId)
+        .catch((error) => {
+          this.logger.warn(
+            `Error looking up ClientTenantMapping for Kong client ${clientId}: ${error.message}`,
+          )
+          return []
+        })
+
+      if (tenantIds.length === 0) {
+        this.logger.error(
+          `Kong client ${clientId} (${kongUsername}) has no mapped tenants in ClientTenantMapping table. Register via link-client-to-tenants endpoint.`,
         )
-        try {
-          const createResult = await this.tenantsService.create({
-            name: kongUsername as string,
-            externalId: kongConsumerId as string,
-          })
-          tenant = createResult.tenant
-          this.logger.debug(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
-        } catch (error) {
-          this.logger.error(
-            `Failed to create tenant for Kong username ${kongUsername}: ${error.message}`,
-          )
-          throw new BadRequestException(
-            `Failed to create tenant for Kong username: ${kongUsername}`,
-          )
-        }
+        throw new UnauthorizedException(
+          `Client is not authorized to access any tenants. Please register this client via the admin API.`,
+        )
       }
 
       this.logger.debug(
-        `Tenant authenticated via Kong: ${tenant.name} (DB ID: ${tenant.id}, Kong ID: ${kongConsumerId})`,
+        `Kong client ${clientId} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
       )
 
-      request.tenant = tenant
+      // Fetch the tenant objects
+      const tenants = await Promise.all(
+        tenantIds.map((id) => this.tenantsService.findOne(id)),
+      ).catch((error) => {
+        this.logger.error(`Failed to fetch tenant details: ${error.message}`)
+        throw new UnauthorizedException('Failed to resolve authorized tenants')
+      })
+
+      // Use first tenant as primary (can be overridden by route-specific logic)
+      request.tenant = tenants[0]
+      request.accessibleTenants = tenants
+      request.clientId = clientId
       request.kongConsumerId = kongConsumerId
+
+      this.logger.debug(
+        `Tenant authenticated via Kong client: ${tenants[0].name} (DB ID: ${tenants[0].id}, Kong Client ID: ${clientId})`,
+      )
+
       return true
     }
 
@@ -166,23 +177,15 @@ export class TenantGuard implements CanActivate {
         this.logger.debug(`JWT user identifier from 'sub' claim: ${sub}`)
 
         // Look up tenant by external ID (user identifier stored in externalId)
-        let tenant = await this.tenantsService.findByExternalId(sub).catch(() => null)
+        const tenant = await this.tenantsService.findByExternalId(sub).catch(() => null)
 
         if (!tenant) {
-          this.logger.debug(`Tenant not found for user identifier: ${sub}. Creating new tenant...`)
-          try {
-            const createResult = await this.tenantsService.create({
-              name: sub,
-              externalId: sub,
-            })
-            tenant = createResult.tenant
-            this.logger.debug(`Created new tenant: ${tenant.name} (User ID: ${sub})`)
-          } catch (error) {
-            this.logger.error(
-              `Failed to create tenant for user identifier ${sub}: ${error.message}`,
-            )
-            throw new UnauthorizedException(`Failed to create tenant for user identifier: ${sub}`)
-          }
+          this.logger.error(
+            `Tenant not found for user identifier: ${sub}. User must be assigned to a tenant via administrator.`,
+          )
+          throw new UnauthorizedException(
+            `No tenant found for your account. Please contact an administrator.`,
+          )
         }
 
         this.logger.debug(`Tenant authenticated via JWT: ${tenant.name} (User ID: ${sub})`)

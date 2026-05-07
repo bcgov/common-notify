@@ -1,18 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import { upsertCurrentUserAsync, getAllUsersAsync } from '../thunks/user.thunks'
+import { upsertCurrentUserAsync } from '../thunks/user.thunks'
 import type { UserResponse } from '@/interfaces/User'
 
 interface UserState {
   current: UserResponse | null
-  allUsers: UserResponse[]
   isLoading: boolean
   error: string | null
 }
 
 const initialState: UserState = {
   current: null,
-  allUsers: [],
   isLoading: false,
   error: null,
 }
@@ -43,20 +41,6 @@ export const userSlice = createSlice({
       .addCase(upsertCurrentUserAsync.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload || 'Failed to upsert user'
-      })
-      // Get all users
-      .addCase(getAllUsersAsync.pending, (state) => {
-        state.isLoading = true
-        state.error = null
-      })
-      .addCase(getAllUsersAsync.fulfilled, (state, action) => {
-        state.allUsers = action.payload
-        state.isLoading = false
-        state.error = null
-      })
-      .addCase(getAllUsersAsync.rejected, (state, action) => {
-        state.isLoading = false
-        state.error = action.payload || 'Failed to fetch users'
       })
   },
 })

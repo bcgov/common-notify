@@ -55,6 +55,7 @@ export const notificationApi = {
     onError?: (err: unknown) => void,
   ): AbortController {
     const controller = new AbortController()
+    const params = generateApiParameters('/api/v1/frontend/notification_request/events')
 
     // Use the new async getToken() method which automatically refreshes when needed
     const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -65,7 +66,7 @@ export const notificationApi = {
       })
     }
 
-    fetchEventSource('/api/v1/frontend/notification_request/events', {
+    fetchEventSource(params.url, {
       fetch: fetchWithFreshToken,
       signal: controller.signal,
       onmessage(event) {

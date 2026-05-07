@@ -2,6 +2,7 @@ import type { PreloadedState } from '@reduxjs/toolkit'
 import { configureStore } from '@reduxjs/toolkit'
 import { upsertCurrentUserAsync, getAllUsersAsync } from './user.thunks'
 import userReducer from '../slices/user.slice'
+import usersReducer from '../slices/users.slice'
 import type { RootState } from '../store'
 import type { AuthUser } from '@/interfaces/AuthUser'
 import type { UserResponse } from '@/interfaces/User'
@@ -24,6 +25,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
     return configureStore({
       reducer: {
         user: userReducer,
+        users: usersReducer,
       },
       preloadedState,
     })
@@ -38,6 +40,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [],
           isLoading: false,
           error: null,
@@ -443,6 +449,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [],
           isLoading: false,
           error: null,

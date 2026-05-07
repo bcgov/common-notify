@@ -1,6 +1,31 @@
-import { IsString, IsArray, IsUUID, ArrayMinSize, Matches } from 'class-validator'
-import { Transform } from 'class-transformer'
+import { IsString, IsArray, ArrayMinSize, Matches, ValidateNested } from 'class-validator'
+import { Transform, Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
+
+/**
+ * Represents a tenant reference with both CSTAR ID and name
+ */
+export class TenantReference {
+  @ApiProperty({
+    description: 'CSTAR tenant ID (UUID string)',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  id: string
+
+  @ApiProperty({
+    description: 'Tenant name from CSTAR',
+    example: 'Ministry of Health',
+  })
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') {
+      return String(value).trim()
+    }
+    return value.trim()
+  })
+  @IsString()
+  name: string
+}
 
 /**
  * LinkClientToTenantsDto
@@ -41,22 +66,23 @@ export class LinkClientToTenantsDto {
   client_secret: string
 
   @ApiProperty({
-    description: 'Array of CSTAR tenant UUIDs this client should have access to.',
-    example: ['550e8400-e29b-41d4-a716-446655440000', '6ba7b810-9dad-11d1-80b4-00c04fd430c8'],
-    type: [String],
+    description: 'Array of CSTAR tenants (with ID and name) this client should have access to.',
+    example: [
+      { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Ministry of Health' },
+      { id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', name: 'Ministry of Finance' },
+    ],
+    type: [TenantReference],
   })
   @Transform(({ value }) => {
     // Ensure it's always an array
     if (!Array.isArray(value)) {
-      if (typeof value === 'string') {
-        return [value]
-      }
       return []
     }
     return value
   })
   @IsArray()
   @ArrayMinSize(1)
-  @IsUUID('4', { each: true })
-  tenant_ids: string[]
+  @ValidateNested({ each: true })
+  @Type(() => TenantReference)
+  tenant_ids: TenantReference[]
 }

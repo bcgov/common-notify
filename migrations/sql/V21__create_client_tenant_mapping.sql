@@ -46,7 +46,7 @@ COMMENT ON COLUMN notify.client_tenant_mapping.id IS 'Unique identifier for this
 
 COMMENT ON COLUMN notify.client_tenant_mapping.client_id IS 'API Gateway client ID (issued via API Portal). Not a foreign key as the API Gateway is external.';
 
-COMMENT ON COLUMN notify.client_tenant_mapping.tenant_id IS 'Foreign key to tenant.id. Identifies which CSTAR tenant this client_id can access.';
+COMMENT ON COLUMN notify.client_tenant_mapping.tenant_id IS 'Foreign key to tenant.id. Identifies which CSTAR tenant this client_id can access. The tenant record is created automatically when the mapping is created if it does not already exist.';
 
 COMMENT ON COLUMN notify.client_tenant_mapping.is_active IS 'Whether this mapping is currently active. Can be used to temporarily disable client access without deleting the record.';
 
