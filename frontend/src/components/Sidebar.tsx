@@ -8,14 +8,13 @@ import UserService from '@/service/user-service'
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import KeyboardDoubleArrowLeftOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowLeftOutlined'
-import KeyboardDoubleArrowRightOutlinedIcon from '@mui/icons-material/KeyboardDoubleArrowRightOutlined'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 
 const navItems = [
   {
@@ -33,14 +32,8 @@ const navItems = [
   {
     label: 'Templates',
     to: '/templates',
-    icon: <DescriptionOutlinedIcon />,
+    icon: <FolderOutlinedIcon />,
     ariaLabel: 'Navigate to Templates',
-  },
-  {
-    label: 'Distribution Lists',
-    to: '/distribution-lists',
-    icon: <GroupOutlinedIcon />,
-    ariaLabel: 'Navigate to Distribution Lists',
   },
   {
     label: 'Settings',
@@ -71,13 +64,11 @@ const Sidebar: FC = () => {
         aria-expanded={!collapsed}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        <span className="sidebar__icon" aria-hidden="true">
-          {collapsed ? (
-            <KeyboardDoubleArrowRightOutlinedIcon />
-          ) : (
-            <KeyboardDoubleArrowLeftOutlinedIcon />
-          )}
-        </span>
+        {collapsed ? (
+          <ChevronRightIcon style={{ fontSize: 14 }} aria-hidden="true" />
+        ) : (
+          <ChevronLeftIcon style={{ fontSize: 14 }} aria-hidden="true" />
+        )}
       </button>
 
       {/* Top nav */}
@@ -99,8 +90,8 @@ const Sidebar: FC = () => {
         ))}
       </nav>
 
-      {/* Bottom section */}
-      <div className="sidebar__bottom">
+      {/* Footer */}
+      <div className="sidebar__footer">
         {/* Help */}
         <div className="sidebar__item" title={collapsed ? 'Help' : ''} aria-label="Help">
           <span className="sidebar__icon" aria-hidden="true">
@@ -109,34 +100,37 @@ const Sidebar: FC = () => {
           <span className="sidebar__label">Help</span>
         </div>
 
-        {/* User */}
-        {user && (
+        {/* Bottom section */}
+        <div className="sidebar__bottom">
+          {/* User */}
+          {user && (
+            <div
+              className="sidebar__item sidebar__user"
+              title={collapsed ? user.displayName : ''}
+              aria-label={`Signed in as ${user.displayName}`}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                <PersonOutlinedIcon />
+              </span>
+              <span className="sidebar__label">{user.displayName}</span>
+            </div>
+          )}
+
+          {/* Logout */}
           <div
-            className="sidebar__item sidebar__user"
-            title={collapsed ? user.displayName : ''}
-            aria-label={`Signed in as ${user.displayName}`}
+            className="sidebar__item"
+            onClick={handleLogout}
+            title={collapsed ? 'Logout' : ''}
+            aria-label="Logout"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogout()}
           >
             <span className="sidebar__icon" aria-hidden="true">
-              <PersonOutlinedIcon />
+              <LogoutOutlinedIcon />
             </span>
-            <span className="sidebar__label">{user.displayName}</span>
+            <span className="sidebar__label">Logout</span>
           </div>
-        )}
-
-        {/* Logout */}
-        <div
-          className="sidebar__item"
-          onClick={handleLogout}
-          title={collapsed ? 'Logout' : ''}
-          aria-label="Logout"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleLogout()}
-        >
-          <span className="sidebar__icon" aria-hidden="true">
-            <LogoutOutlinedIcon />
-          </span>
-          <span className="sidebar__label">Logout</span>
         </div>
       </div>
     </aside>
