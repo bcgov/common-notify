@@ -16,9 +16,4 @@ export enum TemplateEngine {
    * Mustache template engine with logic-less syntax
    */
   MUSTACHE = 'mustache',
-
-  /**
-   * EJS template engine with full JavaScript support
-   */
-  EJS = 'ejs',
 }

@@ -103,10 +103,10 @@ export class TemplateVersion {
   engine: TemplateEngineCode
 
   /**
-   * Whether markdown rendering was enabled for this version
+   * Body content type for this version: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
    */
-  @Column({ name: 'render_as_markdown', type: 'boolean', default: false })
-  renderAsMarkdown: boolean
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html' })
+  bodyType: 'text' | 'markdown' | 'html'
 
   /**
    * User or process that created this version

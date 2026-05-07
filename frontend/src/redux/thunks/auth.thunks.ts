@@ -21,12 +21,12 @@ export const initializeAuthFromToken = createAsyncThunk<
 >('auth/initializeAuthFromToken', async (_, { rejectWithValue }) => {
   try {
     // Check if user is logged in
-    if (!UserService.isLoggedIn()) {
+    if (!(await UserService.isLoggedIn())) {
       return null
     }
 
     // Extract JWT token and parsed claims from Keycloak
-    const tokenParsed = UserService.getTokenParsed()
+    const tokenParsed = await UserService.getTokenParsed()
 
     if (!tokenParsed) {
       return null

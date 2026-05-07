@@ -48,8 +48,9 @@ if (!responseInterceptorRegistered) {
   responseInterceptorRegistered = true
 }
 
-const setAuthHeader = () => {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${UserService.getToken()}`
+const setAuthHeader = async () => {
+  const token = await UserService.getToken()
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 }
 
 export const generateApiParameters = <T = object>(
@@ -63,13 +64,13 @@ export const generateApiParameters = <T = object>(
   return result
 }
 
-export const get = <T, M = object>(
+export const get = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.get(url, requestConfig).then((response: AxiosResponse) => {
     if (!response) throw new Error('No response')
@@ -79,13 +80,13 @@ export const get = <T, M = object>(
 }
 
 // named deleteMethod because 'delete' is a reserved word in JavaScript
-export const deleteMethod = <T, M = object>(
+export const deleteMethod = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.delete(url, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
@@ -93,43 +94,43 @@ export const deleteMethod = <T, M = object>(
   })
 }
 
-export const post = <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
+export const post = async <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.post(url, params).then((response: AxiosResponse) => response.data as T)
 }
 
-export const patch = <T, M = object>(
+export const patch = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.patch(url, data, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
 }
 
-export const put = <T, M = object>(
+export const put = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.put(url, data, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
 }
 
-export const putFile = <T>(
+export const putFile = async <T>(
   parameters: ApiRequestParameters,
   headers: object,
   file: File,
 ): Promise<T> => {
   const { url, requiresAuthentication } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.put(url, file, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T

@@ -17,9 +17,13 @@ describe('TemplateOrContentValidator', () => {
     it('should accept request with email content only (no templateId)', () => {
       const request = new NotifySimpleRequest()
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.subject = 'Test Subject'
-      request.email.body = 'Test Body'
+      request.email.recipients = {
+        to: ['test@example.com'],
+      }
+      request.email.content = {
+        subject: 'Test Subject',
+        body: 'Test Body',
+      }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
@@ -28,8 +32,12 @@ describe('TemplateOrContentValidator', () => {
     it('should accept request with sms content only (no templateId)', () => {
       const request = new NotifySimpleRequest()
       request.sms = new NotifySmsChannel()
-      request.sms.recipients = ['+16045551234']
-      request.sms.body = 'Test SMS'
+      request.sms.recipients = {
+        to: ['+16045551234'],
+      }
+      request.sms.content = {
+        body: 'Test SMS',
+      }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
@@ -38,12 +46,20 @@ describe('TemplateOrContentValidator', () => {
     it('should accept request with both email and sms content (no templateId)', () => {
       const request = new NotifySimpleRequest()
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.subject = 'Test Subject'
-      request.email.body = 'Test Body'
+      request.email.recipients = {
+        to: ['test@example.com'],
+      }
+      request.email.content = {
+        subject: 'Test Subject',
+        body: 'Test Body',
+      }
       request.sms = new NotifySmsChannel()
-      request.sms.recipients = ['+16045551234']
-      request.sms.body = 'Test SMS'
+      request.sms.recipients = {
+        to: ['+16045551234'],
+      }
+      request.sms.content = {
+        body: 'Test SMS',
+      }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
@@ -53,9 +69,13 @@ describe('TemplateOrContentValidator', () => {
       const request = new NotifySimpleRequest()
       request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.subject = 'Test Subject'
-      request.email.body = 'Test Body'
+      request.email.recipients = {
+        to: ['test@example.com'],
+      }
+      request.email.content = {
+        subject: 'Test Subject',
+        body: 'Test Body',
+      }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
@@ -66,8 +86,12 @@ describe('TemplateOrContentValidator', () => {
       const request = new NotifySimpleRequest()
       request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.sms = new NotifySmsChannel()
-      request.sms.recipients = ['+16045551234']
-      request.sms.body = 'Test SMS'
+      request.sms.recipients = {
+        to: ['+16045551234'],
+      }
+      request.sms.content = {
+        body: 'Test SMS',
+      }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
@@ -86,8 +110,10 @@ describe('TemplateOrContentValidator', () => {
       const request = new NotifySimpleRequest()
       request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      // No subject/body
+      request.email.recipients = {
+        to: ['test@example.com'],
+      }
+      // No content
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
@@ -96,8 +122,12 @@ describe('TemplateOrContentValidator', () => {
     it('should accept request with email subject only (no body) when no templateId', () => {
       const request = new NotifySimpleRequest()
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.subject = 'Test Subject'
+      request.email.recipients = {
+        to: ['test@example.com'],
+      }
+      request.email.content = {
+        subject: 'Test Subject',
+      }
       // No body
 
       const result = TemplateOrContentValidator.validate(request)
@@ -107,8 +137,8 @@ describe('TemplateOrContentValidator', () => {
     it('should accept request with email body only (no subject) when no templateId', () => {
       const request = new NotifySimpleRequest()
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.body = 'Test Body'
+      request.email.recipients = { to: ['test@example.com'] }
+      request.email.content = { body: 'Test Body' }
       // No subject
 
       const result = TemplateOrContentValidator.validate(request)
@@ -119,8 +149,8 @@ describe('TemplateOrContentValidator', () => {
       const request = new NotifySimpleRequest()
       request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.subject = 'Test Subject'
+      request.email.recipients = { to: ['test@example.com'] }
+      request.email.content = { subject: 'Test Subject' }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
@@ -131,8 +161,8 @@ describe('TemplateOrContentValidator', () => {
       const request = new NotifySimpleRequest()
       request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
-      request.email.recipients = ['test@example.com']
-      request.email.body = 'Test Body'
+      request.email.recipients = { to: ['test@example.com'] }
+      request.email.content = { body: 'Test Body' }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)

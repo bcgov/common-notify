@@ -17,6 +17,7 @@ import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { EMAIL_ADAPTER } from '../../adapters/tokens'
+import { RenderingModule } from '../../services/rendering/rendering.module'
 
 // Mock TenantGuard to bypass authentication in tests
 const mockTenantGuard: CanActivate = {
@@ -60,6 +61,7 @@ describe('Notify Controllers', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [RenderingModule],
       controllers: [
         NotifySimpleController,
         NotifyEventController,
@@ -116,7 +118,12 @@ describe('Notify Controllers', () => {
 
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
-          .send({ email: { recipients: ['test@example.com'], subject: 'Test', body: 'Hello' } })
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
           .expect(202)
           .expect((res) => {
             expect(res.body.notifyId).toBeDefined()
@@ -137,9 +144,8 @@ describe('Notify Controllers', () => {
           .post('/api/v1/notifysimple')
           .send({
             email: {
-              recipients: ['test@example.com'],
-              subject: 'Test',
-              body: 'Hello',
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
             },
           })
           .expect(202)
@@ -155,9 +161,8 @@ describe('Notify Controllers', () => {
           .post('/api/v1/notifysimple')
           .send({
             email: {
-              recipients: ['test@example.com'],
-              subject: 'Test',
-              body: 'Hello',
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
               delayedSend: futureDate,
             },
           })
@@ -174,9 +179,8 @@ describe('Notify Controllers', () => {
           .post('/api/v1/notifysimple')
           .send({
             email: {
-              recipients: ['test@example.com'],
-              subject: 'Test',
-              body: 'Hello',
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
               delayedSend: pastDate,
             },
           })

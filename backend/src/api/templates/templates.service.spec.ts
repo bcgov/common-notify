@@ -5,6 +5,7 @@ import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { RenderingModule } from '../../services/rendering/rendering.module'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -18,7 +19,7 @@ describe('TemplatesService', () => {
     subject: 'Welcome to {{siteName}}!',
     body: 'Hello {{userName}}, welcome!',
     engineCode: TemplateEngine.HANDLEBARS,
-    renderAsMarkdown: false,
+    bodyType: 'html',
     version: 1,
     active: true,
     createdBy: 'user-123',
@@ -29,7 +30,7 @@ describe('TemplatesService', () => {
 
   const mockMarkdownTemplate: Template = {
     ...mockTemplate,
-    renderAsMarkdown: true,
+    bodyType: 'markdown',
     body: '# Welcome {{userName}}\n\nThis is **bold** text with [link](https://example.com)',
   }
 
@@ -45,6 +46,7 @@ describe('TemplatesService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [RenderingModule],
       providers: [
         TemplatesService,
         {
@@ -60,102 +62,111 @@ describe('TemplatesService', () => {
   })
 
   describe('renderTemplateContent', () => {
-    it('should render template without markdown when renderAsMarkdown is false', () => {
-      const result = service.renderTemplateContent(mockTemplate, {
+    it('should render template and return with bodyType', async () => {
+      const result = await service.renderTemplateContent(mockTemplate, {
         userName: 'John',
         siteName: 'MyApp',
       })
 
       expect(result.subject).toBe('Welcome to MyApp!')
       expect(result.body).toBe('Hello John, welcome!')
+      expect(result.bodyType).toBe('html')
     })
 
-    it('should render subject without markdown conversion (even if renderAsMarkdown is true)', () => {
-      const result = service.renderTemplateContent(mockMarkdownTemplate, {
+    it('should render markdown template and return bodyType without converting', async () => {
+      const result = await service.renderTemplateContent(mockMarkdownTemplate, {
         userName: 'John',
       })
 
-      // Subject should be plain text, not wrapped in <p> tags
+      // Body should be raw markdown, not converted to HTML (adapter handles that)
+      expect(result.body).toBe(
+        '# Welcome John\n\nThis is **bold** text with [link](https://example.com)',
+      )
+      expect(result.bodyType).toBe('markdown')
+      // Should NOT contain HTML tags from markdown conversion
+      expect(result.body).not.toContain('<h1>')
+      expect(result.body).not.toContain('<strong>')
+    })
+
+    it('should render subject without markdown syntax expansion', async () => {
+      const result = await service.renderTemplateContent(mockMarkdownTemplate, {
+        userName: 'John',
+      })
+
+      // Subject should be plain text, not wrapped in <p> tags or HTML
       expect(result.subject).not.toContain('<p>')
       expect(result.subject).not.toContain('</p>')
+      expect(result.subject).not.toContain('<h1>')
     })
 
-    it('should convert body to HTML when renderAsMarkdown is true', () => {
-      const result = service.renderTemplateContent(mockMarkdownTemplate, {
-        userName: 'John',
-      })
-
-      // Body should be converted to HTML
-      expect(result.body).toContain('<h1>')
-      expect(result.body).toContain('Welcome John')
-      expect(result.body).toContain('<strong>')
-      expect(result.body).toContain('<a ')
-    })
-
-    it('should handle markdown with undefined template values', () => {
+    it('should handle markdown with undefined template values', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '# Title\n\nHello {{unknownVar}}, welcome!',
       }
 
-      const result = service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, {})
 
-      expect(result.body).toContain('<h1>')
+      expect(result.body).toContain('# Title')
       expect(result.body).toContain('Hello , welcome!') // undefined vars render as empty
+      expect(result.bodyType).toBe('markdown') // markdown is returned raw, adapter converts to HTML
     })
 
-    it('should handle markdown with special characters', () => {
+    it('should handle markdown with special characters', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '# Title\n\n**Bold** and _italic_ & special chars',
       }
 
-      const result = service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, {})
 
-      expect(result.body).toContain('<strong>Bold</strong>')
-      expect(result.body).toContain('<em>italic</em>')
+      expect(result.body).toContain('**Bold**')
+      expect(result.body).toContain('_italic_')
       expect(result.body).toContain('special chars')
+      expect(result.bodyType).toBe('markdown')
     })
 
-    it('should handle markdown with code blocks', () => {
+    it('should handle markdown with code blocks', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '# Code Example\n\n```javascript\nconst x = 5;\n```',
       }
 
-      const result = service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, {})
 
-      expect(result.body).toContain('<pre><code')
+      expect(result.body).toContain('```javascript')
       expect(result.body).toContain('const x = 5;')
+      expect(result.bodyType).toBe('markdown')
     })
 
-    it('should handle markdown with lists', () => {
+    it('should handle markdown with lists', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '# Items\n\n- Item 1\n- Item 2\n- Item 3',
       }
 
-      const result = service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, {})
 
-      expect(result.body).toContain('<ul>')
-      expect(result.body).toContain('<li>')
+      expect(result.body).toContain('- Item 1')
+      expect(result.body).toContain('- Item 2')
+      expect(result.bodyType).toBe('markdown')
     })
 
-    it('should handle markdown with tables', () => {
+    it('should handle markdown with tables', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '| Name | Value |\n|------|-------|\n| A | 1 |\n| B | 2 |',
       }
 
-      const result = service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, {})
 
-      expect(result.body).toContain('<table>')
-      expect(result.body).toContain('<tr>')
-      expect(result.body).toContain('<td>')
+      expect(result.body).toContain('| Name | Value |')
+      expect(result.body).toContain('| A | 1 |')
+      expect(result.bodyType).toBe('markdown')
     })
 
-    it('should preserve undefined personalisation', () => {
-      const result = service.renderTemplateContent(mockTemplate)
+    it('should preserve undefined personalisation', async () => {
+      const result = await service.renderTemplateContent(mockTemplate)
 
       expect(result).toHaveProperty('subject')
       expect(result).toHaveProperty('body')
@@ -163,7 +174,7 @@ describe('TemplatesService', () => {
   })
 
   describe('createTemplate', () => {
-    it('should create template with renderAsMarkdown flag', async () => {
+    it('should create template with bodyType field', async () => {
       const createDto = {
         name: 'Test Template',
         description: 'Test',
@@ -171,7 +182,7 @@ describe('TemplatesService', () => {
         subject: 'Subject',
         body: '# Body',
         engineCode: TemplateEngine.HANDLEBARS,
-        renderAsMarkdown: true,
+        bodyType: 'markdown' as const,
       }
 
       mockRepository.create.mockResolvedValue({
@@ -184,18 +195,18 @@ describe('TemplatesService', () => {
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          renderAsMarkdown: true,
+          bodyType: 'markdown',
         }),
       )
 
       expect(mockRepository.createVersion).toHaveBeenCalledWith(
         expect.objectContaining({
-          renderAsMarkdown: true,
+          bodyType: 'markdown',
         }),
       )
     })
 
-    it('should default renderAsMarkdown to false if not provided', async () => {
+    it('should default bodyType to html if not provided', async () => {
       const createDto = {
         name: 'Test Template',
         description: 'Test',
@@ -208,7 +219,7 @@ describe('TemplatesService', () => {
       mockRepository.create.mockResolvedValue({
         ...mockTemplate,
         ...createDto,
-        renderAsMarkdown: false,
+        bodyType: 'html',
       })
       mockRepository.createVersion.mockResolvedValue({})
 
@@ -216,16 +227,16 @@ describe('TemplatesService', () => {
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          renderAsMarkdown: false,
+          bodyType: 'html',
         }),
       )
     })
   })
 
   describe('updateTemplate', () => {
-    it('should update renderAsMarkdown flag', async () => {
+    it('should update bodyType field', async () => {
       const updateDto = {
-        renderAsMarkdown: true,
+        bodyType: 'markdown' as const,
       }
 
       mockRepository.findById.mockResolvedValue(mockTemplate)
@@ -238,12 +249,12 @@ describe('TemplatesService', () => {
 
       expect(mockRepository.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          renderAsMarkdown: true,
+          bodyType: 'markdown',
         }),
       )
     })
 
-    it('should preserve renderAsMarkdown when not provided in update', async () => {
+    it('should preserve bodyType when not provided in update', async () => {
       const updateDto = {
         name: 'Updated Name',
       }
@@ -258,22 +269,23 @@ describe('TemplatesService', () => {
 
       expect(mockRepository.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          renderAsMarkdown: true,
+          bodyType: 'markdown',
         }),
       )
     })
   })
 
   describe('previewTemplate', () => {
-    it('should preview template with markdown rendering enabled', async () => {
+    it('should preview template returning raw markdown with bodyType flag', async () => {
       mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
 
       const result = await service.previewTemplate('tenant-123', 'template-123', {
-        personalisation: { userName: 'John' },
+        params: { userName: 'John' },
       })
 
-      expect(result.body).toContain('<h1>')
-      expect(result.subject).not.toContain('<p>')
+      expect(result.body).toContain('# Welcome John')
+      expect(result.body).toContain('**bold**')
+      expect(result.bodyType).toBe('markdown')
     })
   })
 })

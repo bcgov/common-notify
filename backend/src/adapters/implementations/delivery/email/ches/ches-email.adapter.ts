@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import MarkdownIt from 'markdown-it'
 import { IEmailTransport, SendEmailOptions, SendEmailResult } from '../../../../interfaces'
 
 interface ChesTokenResponse {
@@ -21,6 +22,8 @@ interface ChesEmailPayload {
   subject: string
   body: string
   bodyType: 'html' | 'text'
+  cc?: string[]
+  bcc?: string[]
   attachments?: Array<{
     content: string
     contentType: string
@@ -46,10 +49,68 @@ export class ChesEmailTransport implements IEmailTransport {
   private readonly logger = new Logger(ChesEmailTransport.name)
 
   private tokenCache: { token: string; expiresAt: number } | null = null
+  private readonly markdown: MarkdownIt
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    // Initialize markdown-it with safe defaults
+    this.markdown = new MarkdownIt({
+      html: true,
+      linkify: true, // converst urls and links to clickable links
+      typographer: true, // enables smart quotes and other typographic replacements
+    })
+  }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
+    // Handle both flat (SendEmailOptions) and nested (NotifyEmailChannel) structures
+    let to: string | string[]
+    let subject: string
+    let body: string
+    let bodyType: 'text' | 'markdown' | 'html' | undefined
+    let cc: string[] | undefined
+    let bcc: string[] | undefined
+    let attachments: SendEmailOptions['attachments'] | undefined
+
+    const opts = options as any
+
+    // Check if this is a nested NotifyEmailChannel structure
+    // (recipients is an object with 'to' property, not an array)
+    if (opts.recipients && typeof opts.recipients === 'object' && !Array.isArray(opts.recipients)) {
+      // Nested structure: NotifyEmailChannel with recipients: { to: [...], cc?: [...], bcc?: [...] }
+      to = opts.recipients.to || []
+      cc = opts.recipients.cc
+      bcc = opts.recipients.bcc
+      subject = opts.content?.subject || ''
+      body = opts.content?.body || ''
+      bodyType = opts.content?.bodyType
+      attachments = opts.attachments
+
+      this.logger.debug(
+        `[CHES] Received nested NotifyEmailChannel - to: ${JSON.stringify(to)}, subject: "${subject}", body length: ${body?.length || 0}`,
+      )
+    } else if (Array.isArray(opts.recipients)) {
+      // Old flat structure: recipients is a string array
+      to = opts.recipients
+      subject = opts.subject
+      body = opts.body
+      bodyType = opts.bodyType
+      attachments = opts.attachments
+
+      this.logger.debug(
+        `[CHES] Received old flat structure (recipients array) - to: ${JSON.stringify(to)}, subject: "${subject}", body length: ${body?.length || 0}`,
+      )
+    } else {
+      // Flat structure: SendEmailOptions
+      to = opts.to
+      subject = opts.subject
+      body = opts.body
+      bodyType = opts.bodyType
+      attachments = opts.attachments
+
+      this.logger.debug(
+        `[CHES] Received flat SendEmailOptions - to: ${JSON.stringify(to)}, subject: "${subject}", body length: ${body?.length || 0}`,
+      )
+    }
+
     const baseUrl = this.configService.get<string>('ches.baseUrl')
     const clientId = this.configService.get<string>('ches.clientId')
     const clientSecret = this.configService.get<string>('ches.clientSecret')
@@ -61,20 +122,58 @@ export class ChesEmailTransport implements IEmailTransport {
       )
     }
 
+    // Validate required fields before attempting to send
+    if (!to || (Array.isArray(to) && to.length === 0)) {
+      throw new Error('CHES adapter: "to" recipients are required')
+    }
+    if (!subject || typeof subject !== 'string') {
+      throw new Error('CHES adapter: "subject" is required and must be a string')
+    }
+    if (!body || typeof body !== 'string') {
+      throw new Error('CHES adapter: "body" is required and must be a string')
+    }
+
     const token = await this.getAccessToken(tokenUrl, clientId, clientSecret)
     const from =
-      options.from ??
+      opts.from ??
       this.configService.get<string>('ches.from') ??
       this.configService.get<string>('defaults.email.from', 'noreply@localhost')
 
+    // Convert body to HTML if markdown type
+    let finalBody = body
+    let chesBodyType: 'text' | 'html' = 'html'
+
+    if (bodyType === 'markdown') {
+      // Convert markdown to HTML
+      finalBody = this.markdown.render(finalBody)
+      chesBodyType = 'html'
+    } else if (bodyType === 'text') {
+      chesBodyType = 'text'
+    } else {
+      // Default to html
+      chesBodyType = 'html'
+    }
+
     const payload: ChesEmailPayload = {
       from,
-      to: [options.to],
-      subject: options.subject,
-      body: options.body,
-      bodyType: 'html',
-      attachments: this.mapAttachments(options.attachments),
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      body: finalBody,
+      bodyType: chesBodyType,
+      ...(cc && cc.length > 0 && { cc }),
+      ...(bcc && bcc.length > 0 && { bcc }),
+      attachments: this.mapAttachments(attachments),
     }
+
+    this.logger.debug(
+      `[CHES] Sending payload: ${JSON.stringify({
+        from: payload.from,
+        to: payload.to,
+        subject: payload.subject.substring(0, 50),
+        bodyType: payload.bodyType,
+        bodyLength: payload.body.length,
+      })}`,
+    )
 
     const response = await fetch(`${baseUrl.replace(/\/$/, '')}/email`, {
       method: 'POST',
@@ -87,6 +186,7 @@ export class ChesEmailTransport implements IEmailTransport {
 
     if (!response.ok) {
       const errText = await response.text()
+      this.logger.error(`[CHES] Response not OK: ${response.status} - ${errText}`)
       this.throwForChesApiFailure(response.status, errText, 'email')
     }
 
@@ -101,6 +201,9 @@ export class ChesEmailTransport implements IEmailTransport {
       this.logger.error(errMeta, 'CHES email: success response was not valid JSON')
       throw new BadGatewayException('CHES email returned a non-JSON response body')
     }
+
+    this.logger.debug(`[CHES] Response received: ${JSON.stringify(data)}`)
+
     const messageId = data.messages?.[0]?.msgId ?? data.txId
 
     return {
