@@ -77,6 +77,7 @@ gcnotify:/api/gcnotify/v2
 notification_request:/api/v1/notification_request
 notification_request-frontend:/api/v1/frontend/notification_request
 notification_request-deliveries-debug-frontend:/api/v1/frontend/notification_request/debug/deliveries
+notification_request-id-deliveries-frontend:~/api/v1/frontend/notification_request/[^/]+/deliveries
 code-tables:/api/v1/code-tables
 code-tables-status:/api/v1/code-tables/notification-status
 code-tables-channels:/api/v1/code-tables/channels
