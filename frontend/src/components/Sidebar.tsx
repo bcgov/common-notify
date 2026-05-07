@@ -1,7 +1,7 @@
 // Sidebar.tsx
 import { FC, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import '../scss/components/Sidebar.scss'
+import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 
