@@ -4,10 +4,12 @@ import loadingReducer from './slices/loading.slice'
 import toastReducer from './slices/toast.slice'
 import notificationReducer from './slices/notification.slice'
 import codeTablesReducer from './slices/codeTables.slice'
+import userReducer from './slices/user.slice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    user: userReducer,
     loading: loadingReducer,
     toast: toastReducer,
     notification: notificationReducer,

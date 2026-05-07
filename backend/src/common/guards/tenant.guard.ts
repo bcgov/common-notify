@@ -43,12 +43,12 @@ export class TenantGuard implements CanActivate {
     const kongUsername = request.headers['x-consumer-username']
     const kongConsumerId = request.headers['x-consumer-id']
 
-    this.logger.log(
+    this.logger.debug(
       `Incoming request: method=${request.method}, url=${request.url}, KongUsername=${kongUsername}, KongConsumerId=${kongConsumerId}`,
     )
 
     if (kongUsername) {
-      this.logger.log(
+      this.logger.debug(
         `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
       )
 
@@ -63,7 +63,7 @@ export class TenantGuard implements CanActivate {
       }
 
       if (!tenant) {
-        this.logger.log(
+        this.logger.debug(
           `Tenant not found for Kong username: ${kongUsername}. Creating new tenant...`,
         )
         try {
@@ -72,7 +72,7 @@ export class TenantGuard implements CanActivate {
             externalId: kongConsumerId as string,
           })
           tenant = createResult.tenant
-          this.logger.log(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
+          this.logger.debug(`Created new tenant: ${tenant.name} (Kong ID: ${kongConsumerId})`)
         } catch (error) {
           this.logger.error(
             `Failed to create tenant for Kong username ${kongUsername}: ${error.message}`,
@@ -83,7 +83,7 @@ export class TenantGuard implements CanActivate {
         }
       }
 
-      this.logger.log(
+      this.logger.debug(
         `Tenant authenticated via Kong: ${tenant.name} (DB ID: ${tenant.id}, Kong ID: ${kongConsumerId})`,
       )
 
@@ -96,7 +96,7 @@ export class TenantGuard implements CanActivate {
     const authHeader = request.headers.authorization
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7)
-      this.logger.log('JWT authentication detected')
+      this.logger.debug('JWT authentication detected')
 
       try {
         // Decode JWT manually - split by '.' and decode the payload (middle part)
@@ -108,7 +108,7 @@ export class TenantGuard implements CanActivate {
         // Decode the payload (second part)
         const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
 
-        this.logger.log(`JWT Payload: ${JSON.stringify(payload, null, 2)}`)
+        this.logger.debug(`JWT Payload: ${JSON.stringify(payload, null, 2)}`)
 
         // Check if this is a service client (has 'azp' or client_id claim from client credentials flow)
         const azp = payload.azp as string
@@ -117,7 +117,7 @@ export class TenantGuard implements CanActivate {
         if (azp || (clientIdClaim && this.isClientCredentialsFlow(payload))) {
           // This is a service client from client credentials flow
           const clientId = azp || clientIdClaim
-          this.logger.log(`Service client JWT detected. Client ID: ${clientId}`)
+          this.logger.debug(`Service client JWT detected. Client ID: ${clientId}`)
 
           // Look up accessible tenants via ClientTenantMapping
           const tenantIds = await this.clientTenantMappingService
@@ -138,7 +138,7 @@ export class TenantGuard implements CanActivate {
             )
           }
 
-          this.logger.log(
+          this.logger.debug(
             `Client ${clientId} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
           )
 
@@ -163,20 +163,20 @@ export class TenantGuard implements CanActivate {
           throw new Error('JWT missing required "sub" claim')
         }
 
-        this.logger.log(`JWT user identifier from 'sub' claim: ${sub}`)
+        this.logger.debug(`JWT user identifier from 'sub' claim: ${sub}`)
 
         // Look up tenant by external ID (user identifier stored in externalId)
         let tenant = await this.tenantsService.findByExternalId(sub).catch(() => null)
 
         if (!tenant) {
-          this.logger.log(`Tenant not found for user identifier: ${sub}. Creating new tenant...`)
+          this.logger.debug(`Tenant not found for user identifier: ${sub}. Creating new tenant...`)
           try {
             const createResult = await this.tenantsService.create({
               name: sub,
               externalId: sub,
             })
             tenant = createResult.tenant
-            this.logger.log(`Created new tenant: ${tenant.name} (User ID: ${sub})`)
+            this.logger.debug(`Created new tenant: ${tenant.name} (User ID: ${sub})`)
           } catch (error) {
             this.logger.error(
               `Failed to create tenant for user identifier ${sub}: ${error.message}`,
@@ -185,7 +185,7 @@ export class TenantGuard implements CanActivate {
           }
         }
 
-        this.logger.log(`Tenant authenticated via JWT: ${tenant.name} (User ID: ${sub})`)
+        this.logger.debug(`Tenant authenticated via JWT: ${tenant.name} (User ID: ${sub})`)
 
         request.tenant = tenant
         request.userGuid = sub

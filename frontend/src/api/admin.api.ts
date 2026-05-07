@@ -1,5 +1,5 @@
 import type { AxiosError } from 'axios'
-import { post, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { post, get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 
 export interface LinkClientToTenantsRequest {
   client_id: string
@@ -11,6 +11,7 @@ export interface ClientTenantMapping {
   id: string
   client_id: string
   tenant_id: string
+  tenant_name: string
   is_active: boolean
   created_at: string
   created_by: string
@@ -79,3 +80,40 @@ export const adminApi = {
 }
 
 export default adminApi
+
+/**
+ * Get all client-tenant mappings
+ */
+export async function getAllMappings() {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/clients/mappings')
+    return await get<{ mappings: ClientTenantMapping[]; count: number }>(params)
+  } catch (error) {
+    throw new Error(
+      `Failed to fetch client-tenant mappings: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
+    )
+  }
+}
+
+/**
+ * Toggle the active status of a mapping
+ */
+export async function toggleMappingActiveStatus(id: string) {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/admin/clients/mappings/${id}/toggle-active`,
+    )
+    return await patch<{ mapping: ClientTenantMapping; message: string }>(params)
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    throw new Error(
+      `Failed to toggle mapping status: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}

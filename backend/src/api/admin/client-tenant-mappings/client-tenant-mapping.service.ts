@@ -81,7 +81,7 @@ export class ClientTenantMappingService {
         existingMapping.updatedAt = new Date()
         const savedMapping = await this.mappingRepository.save(existingMapping)
         mappings.push(savedMapping)
-        this.logger.log(
+        this.logger.debug(
           `Reactivated mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${createdBy}`,
         )
       } else {
@@ -97,7 +97,7 @@ export class ClientTenantMappingService {
         })
         const savedMapping = await this.mappingRepository.save(mapping)
         mappings.push(savedMapping)
-        this.logger.log(
+        this.logger.debug(
           `Created mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${createdBy}`,
         )
       }
@@ -195,7 +195,7 @@ export class ClientTenantMappingService {
     mapping.isActive = false
     mapping.updatedBy = updatedBy
     const updated = await this.mappingRepository.save(mapping)
-    this.logger.log(
+    this.logger.debug(
       `Deactivated mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${updatedBy}`,
     )
     return updated
@@ -228,7 +228,7 @@ export class ClientTenantMappingService {
     mapping.isActive = true
     mapping.updatedBy = updatedBy
     const updated = await this.mappingRepository.save(mapping)
-    this.logger.log(
+    this.logger.debug(
       `Reactivated mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${updatedBy}`,
     )
     return updated
@@ -255,7 +255,7 @@ export class ClientTenantMappingService {
     mapping.isActive = false
     mapping.updatedBy = updatedBy
     const updated = await this.mappingRepository.save(mapping)
-    this.logger.log(
+    this.logger.debug(
       `Deleted mapping: client_id=${clientId}, tenant_id=${tenantId}, by=${updatedBy}`,
     )
     return updated
@@ -317,5 +317,44 @@ export class ClientTenantMappingService {
     }
 
     return query.orderBy('mapping.createdAt', 'DESC').getMany()
+  }
+
+  /**
+   * Get all non-deleted mappings
+   * Used for display in admin UI
+   *
+   * @returns Array of all active mappings
+   */
+  async findAll(): Promise<ClientTenantMapping[]> {
+    return this.mappingRepository.find({
+      where: { isDeleted: false },
+      relations: ['tenant'],
+      order: { createdAt: 'DESC' },
+    })
+  }
+
+  /**
+   * Toggle the active status of a mapping
+   * @param id Mapping UUID
+   * @param updatedBy User GUID performing the update
+   * @returns Updated mapping
+   * @throws NotFoundException if mapping doesn't exist
+   */
+  async toggleActiveStatus(id: string, updatedBy: string): Promise<ClientTenantMapping> {
+    const mapping = await this.mappingRepository.findOne({
+      where: { id, isDeleted: false },
+    })
+
+    if (!mapping) {
+      throw new NotFoundException(`Mapping with id ${id} not found`)
+    }
+
+    mapping.isActive = !mapping.isActive
+    mapping.updatedBy = updatedBy
+    mapping.updatedAt = new Date()
+
+    const updated = await this.mappingRepository.save(mapping)
+    this.logger.debug(`Toggled mapping ${id}: is_active=${updated.isActive}, by=${updatedBy}`)
+    return updated
   }
 }

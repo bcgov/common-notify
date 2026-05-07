@@ -1,5 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { notificationApi } from '@/api'
+import { notificationApi } from '@/api/notification.api'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import type { RootState, AppDispatch } from '../store'
 import { upsertNotification } from '../slices/notification.slice'

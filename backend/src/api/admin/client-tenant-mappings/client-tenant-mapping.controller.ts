@@ -1,8 +1,20 @@
-import { Controller, Post, Body, UseGuards, HttpException, Logger, Req } from '@nestjs/common'
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  HttpException,
+  Logger,
+  Req,
+} from '@nestjs/common'
 import {
   ApiTags,
   ApiOperation,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
@@ -111,7 +123,7 @@ export class ClientTenantMappingController {
         adminUserGuid,
       )
 
-      this.logger.log(
+      this.logger.debug(
         `Successfully linked client ${clientId} to ${mappings.length} tenant(s) by admin ${adminUserGuid}`,
       )
 
@@ -143,6 +155,81 @@ export class ClientTenantMappingController {
       }
 
       throw error
+    }
+  }
+
+  /**
+   * Get all client-tenant mappings
+   * @returns List of all mappings
+   */
+  @Get('mappings')
+  @ApiOperation({
+    summary: 'Get all client-tenant mappings',
+    description: 'List all active and inactive client-tenant mappings',
+  })
+  @ApiOkResponse({
+    description: 'List of mappings returned successfully',
+  })
+  async getAllMappings() {
+    const mappings = await this.mappingService.findAll()
+    return {
+      mappings: mappings.map((m) => ({
+        id: m.id,
+        client_id: m.clientId,
+        tenant_id: m.tenantId,
+        tenant_name: m.tenant?.name || m.tenantId,
+        is_active: m.isActive,
+        created_at: m.createdAt.toISOString(),
+        created_by: m.createdBy,
+        updated_at: m.updatedAt.toISOString(),
+        updated_by: m.updatedBy,
+      })),
+      count: mappings.length,
+    }
+  }
+
+  /**
+   * Toggle mapping active status
+   * @param id Mapping ID
+   * @param req Express request
+   * @returns Updated mapping
+   */
+  @Patch('mappings/:id/toggle-active')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({
+    summary: 'Toggle client-tenant mapping active status',
+    description: 'Enable or disable a client-tenant mapping without deleting it',
+  })
+  @ApiOkResponse({
+    description: 'Mapping status updated successfully',
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid mapping ID or mapping not found',
+  })
+  async toggleMappingActive(
+    @Param('id') id: string,
+    @Req() req: Express.Request & { user?: { sub: string; [key: string]: any } },
+  ) {
+    const user = req.user
+    if (!user || !user.sub) {
+      this.logger.error('Unable to extract user information from JWT')
+      throw new HttpException('Unable to identify authenticated user', 401)
+    }
+
+    const mapping = await this.mappingService.toggleActiveStatus(id, user.sub)
+
+    return {
+      mapping: {
+        id: mapping.id,
+        client_id: mapping.clientId,
+        tenant_id: mapping.tenantId,
+        is_active: mapping.isActive,
+        created_at: mapping.createdAt.toISOString(),
+        created_by: mapping.createdBy,
+        updated_at: mapping.updatedAt.toISOString(),
+        updated_by: mapping.updatedBy,
+      },
+      message: `Mapping ${mapping.isActive ? 'enabled' : 'disabled'} successfully`,
     }
   }
 
@@ -241,7 +328,7 @@ export class ClientTenantMappingController {
           )
         }
 
-        this.logger.log(`OAuth2 token verified for client ${extractedClientId}`)
+        this.logger.debug(`OAuth2 token verified for client ${extractedClientId}`)
         return extractedClientId as string
       } catch (decodeError) {
         this.logger.error(`Failed to decode OAuth2 token: ${decodeError.message}`)
