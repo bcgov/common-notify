@@ -35,10 +35,16 @@ export const initializeAuthFromToken = createAsyncThunk<
       return null
     }
 
+    const ssoUserId =
+      tokenParsed.idir_user_guid ||
+      tokenParsed.sub?.split('@')[0] ||
+      tokenParsed.user_guid ||
+      'unknown'
+
     // Map JWT claims to AuthUser interface
     const user: AuthUser = {
       // Core identifiers
-      id: tokenParsed.sub || tokenParsed.preferred_username || 'unknown',
+      id: ssoUserId,
       email: tokenParsed.email || '',
       displayName: tokenParsed.display_name || tokenParsed.name || '',
       username: tokenParsed.idir_username || '',
