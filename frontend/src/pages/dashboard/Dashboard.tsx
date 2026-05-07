@@ -5,6 +5,7 @@ import { fetchNotifications } from '@/redux/thunks/notification.thunks'
 import PageHeading from '@/components/PageHeading'
 import NotificationStatusTable from '@/components/NotificationStatusTable'
 import { Col, Row } from 'react-bootstrap'
+import NotificationDeliveryTable from '@/components/NotificationDeliveryTable'
 
 const Dashboard: FC = () => {
   const dispatch = useAppDispatch()
@@ -19,6 +20,7 @@ const Dashboard: FC = () => {
       <Row>
         <Col md={12}>
           <NotificationStatusTable />
+          <NotificationDeliveryTable />
         </Col>
       </Row>
     </div>

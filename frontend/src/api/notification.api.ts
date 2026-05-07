@@ -2,7 +2,7 @@ import type { AxiosError } from 'axios'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import type { NotificationRequest, NotificationDelivery } from '@/interfaces/NotificationRequest'
 import UserService from '@/service/user-service'
 
 interface PaginatedResponse {
@@ -42,6 +42,27 @@ export const notificationApi = {
         }`,
       )
     }
+  },
+
+  /**
+   * Fetch individual delivery records for a notification request
+   * GET /api/v1/frontend/notification_request/:id/deliveries
+   */
+  async listDeliveries(notificationRequestId: string): Promise<NotificationDelivery[]> {
+    const params = generateApiParameters(
+      `/api/v1/frontend/notification_request/${notificationRequestId}/deliveries`,
+    )
+    return get<NotificationDelivery[]>(params)
+  },
+
+  /**
+   * DEBUG: Fetch all delivery records across all notification requests.
+   * GET /api/v1/frontend/notification_request/debug/deliveries
+   * Remove when per-request filtering is confirmed working.
+   */
+  async listDeliveriesDebug(): Promise<NotificationDelivery[]> {
+    const params = generateApiParameters('/api/v1/frontend/notification_request/debug/deliveries')
+    return get<NotificationDelivery[]>(params)
   },
 
   /**

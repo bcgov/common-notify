@@ -18,3 +18,17 @@ export interface NotificationRequest {
   updatedBy?: string
   errorReason?: string
 }
+
+export interface NotificationDelivery {
+  id: string
+  notificationRequestId: string
+  recipientAddress: string
+  channel: string
+  status: string
+  providerResponseId?: string
+  errorMessage?: string
+  attemptCount: number
+  lastAttemptAt?: string
+  createdAt: string
+  updatedAt: string
+}
