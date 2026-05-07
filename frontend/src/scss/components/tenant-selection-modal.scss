@@ -1,82 +1,65 @@
-/**
- * TenantSelectionModal Styles
- *
- * V3 Modal-based tenant selection UI
- * BC Design System aligned styling
- */
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) {
+  width: 600px;
+}
+
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) .bcds-react-aria-AlertDialog--Header {
+  min-height: 64px;
+  padding: var(--layout-padding-medium) var(--layout-padding-large);
+}
+
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) .bcds-react-aria-AlertDialog--children {
+  padding: var(--layout-padding-large);
+}
 
 .tenant-selection-modal-content {
-  padding: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-margin-small);
+  min-height: 184px;
+  justify-content: center;
+}
 
-  .tenant-selection-description {
-    margin: 0 0 1.5rem 0;
-    font-size: 0.95rem;
-    color: var(--text-secondary, #333);
-    font-weight: 500;
-  }
+.tenant-selection-description {
+  margin: 0;
+  color: #2d2d2d;
+  font-family: 'BCSans', sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 27px;
+  text-align: center;
+}
 
-  .tenant-selection-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
+.tenant-selection-field {
+  width: 235px;
+  align-self: center;
+}
 
-  .tenant-selection-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: 4px;
-    background-color: var(--background-light, #f9f9f9);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-align: left;
+.tenant-selection-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--layout-margin-small);
+  min-height: 72px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--layout-padding-medium) 0 0;
+  border-top: 1px solid #d8d8d8;
+}
 
-    &:hover {
-      background-color: var(--background-hover, #f0f0f0);
-      border-color: var(--primary-color, #003366);
-    }
+.tenant-selection-footer .bcds-react-aria-Button.medium {
+  min-width: 82px;
+}
 
-    &:focus {
-      outline: 2px solid var(--primary-color, #003366);
-      outline-offset: 2px;
-    }
+.tenant-selection-footer .bcds-react-aria-Button.tertiary {
+  padding-right: var(--layout-padding-none);
+  padding-left: var(--layout-padding-none);
+}
 
-    .tenant-selection-radio {
-      width: 20px;
-      height: 20px;
-      min-width: 20px;
-      border: 2px solid var(--border-color, #999);
-      border-radius: 50%;
-      background-color: white;
-      margin-top: 2px;
-      transition: all 0.2s ease;
-    }
+.tenant-selection-footer .bcds-react-aria-Button.primary {
+  min-width: 101px;
+}
 
-    .tenant-selection-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .tenant-selection-name {
-      font-weight: 600;
-      font-size: 1rem;
-      color: var(--text-dark, #222);
-      margin-bottom: 0.25rem;
-      word-break: break-word;
-    }
-
-    .tenant-selection-id {
-      font-size: 0.85rem;
-      color: var(--text-secondary, #666);
-      font-weight: 400;
-    }
-
-    &:hover .tenant-selection-radio,
-    &:focus .tenant-selection-radio {
-      border-color: var(--primary-color, #003366);
-      background-color: var(--primary-light, #e6f0f7);
-    }
-  }
+.tenant-selection-modal-content:has(.tenant-selection-footer .bcds-react-aria-Button.primary) {
+  width: 100%;
 }

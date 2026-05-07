@@ -39,17 +39,7 @@ const Layout: FC<Props> = ({ children }) => {
     )
   }
 
-  if (tenants.length === 0) {
-    return (
-      <TenantError
-        title="No Tenants Available"
-        error="Your account is authenticated, but CSTAR did not return any tenants for you. Contact your administrator if you believe this is incorrect."
-        onRetry={() => dispatch(fetchCstarTenants(user.id))}
-      />
-    )
-  }
-
-  if (!selectedTenant && !showTenantModal) {
+  if (!selectedTenant && !showTenantModal && tenants.length > 0) {
     return <LoadingSpinner isVisible />
   }
 
