@@ -42,7 +42,10 @@ describe('tenant slice', () => {
   })
 
   it('clears the selection when CSTAR returns no tenants', () => {
-    const selectedState = tenantReducer(undefined, selectTenant(buildTenant('tenant-1', 'Tenant One')))
+    const selectedState = tenantReducer(
+      undefined,
+      selectTenant(buildTenant('tenant-1', 'Tenant One')),
+    )
     const state = tenantReducer(
       selectedState,
       fetchCstarTenants.fulfilled([], 'request-id', 'user-1'),
@@ -53,7 +56,10 @@ describe('tenant slice', () => {
   })
 
   it('clears the selection when CSTAR fails', () => {
-    const selectedState = tenantReducer(undefined, selectTenant(buildTenant('tenant-1', 'Tenant One')))
+    const selectedState = tenantReducer(
+      undefined,
+      selectTenant(buildTenant('tenant-1', 'Tenant One')),
+    )
     const state = tenantReducer(
       selectedState,
       fetchCstarTenants.rejected(new Error('boom'), 'request-id', 'user-1', 'Failed to fetch'),

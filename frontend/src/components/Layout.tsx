@@ -31,12 +31,7 @@ const Layout: FC<Props> = ({ children }) => {
   }
 
   if (tenantError) {
-    return (
-      <TenantError
-        error={tenantError}
-        onRetry={() => dispatch(fetchCstarTenants(user.id))}
-      />
-    )
+    return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants(user.id))} />
   }
 
   if (!selectedTenant && !showTenantModal && tenants.length > 0) {

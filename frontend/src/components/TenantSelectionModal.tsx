@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FC } from 'react'
 import { Button, Modal, Select } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -19,7 +19,8 @@ import '@/scss/components/tenant-selection-modal.scss'
  * 3. Modal closes and app loads with selected tenant context
  */
 
-const CSTAR_TENANT_SETUP_URL = import.meta.env.VITE_CSTAR_TENANT_SETUP_URL ||
+const CSTAR_TENANT_SETUP_URL =
+  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL ||
   'https://cstar-dev.apps.silver.devops.gov.bc.ca'
 
 const TenantSelectionModal: FC = () => {
@@ -36,12 +37,6 @@ const TenantSelectionModal: FC = () => {
       })),
     [tenants],
   )
-
-  useEffect(() => {
-    if (!showModal) {
-      setPendingTenantId(null)
-    }
-  }, [showModal])
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
@@ -103,9 +98,7 @@ const TenantSelectionModal: FC = () => {
           </>
         ) : (
           <>
-            <p className="tenant-selection-description">
-              Please choose a tenant to continue.
-            </p>
+            <p className="tenant-selection-description">Please choose a tenant to continue.</p>
             <div className="tenant-selection-field">
               <Select
                 aria-label="Select a tenant"

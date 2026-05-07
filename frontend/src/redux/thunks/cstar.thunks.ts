@@ -13,8 +13,6 @@ export const fetchCstarTenants = createAsyncThunk<
     const response = await cstarApi.fetchUserTenants(ssoUserId)
     return response.data.tenants
   } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : 'Failed to fetch tenants',
-    )
+    return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch tenants')
   }
 })
