@@ -182,7 +182,7 @@ export class SmsDeliveryWorker {
         logger.debug(`[${notifyId}] SMS sent successfully: ${JSON.stringify(result)}`)
 
         // Mark delivery records as sent (notification delivery doesn't use completed right now)
-        await deliveryService.markSent(notifyId)
+        await deliveryService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -253,7 +253,7 @@ export class SmsDeliveryWorker {
     const result = await smsAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || `${smsAdapter.name}-${Date.now()}`,
+      externalId: result.messageId || result.providerResponse || `${smsAdapter.name}-${Date.now()}`,
       provider: smsAdapter.name,
     }
   }
