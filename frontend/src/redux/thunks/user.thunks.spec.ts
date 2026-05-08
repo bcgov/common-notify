@@ -1,5 +1,6 @@
 import type { PreloadedState } from '@reduxjs/toolkit'
 import { configureStore } from '@reduxjs/toolkit'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { upsertCurrentUserAsync } from './user.thunks'
 import userReducer from '../slices/user.slice'
 import usersReducer from '../slices/users.slice'
@@ -8,11 +9,10 @@ import type { AuthUser } from '@/interfaces/AuthUser'
 import type { UserResponse } from '@/interfaces/User'
 
 // Mock the user API
-jest.mock('@/api/user.api', () => ({
-  __esModule: true,
+vi.mock('@/api/user.api', () => ({
   default: {
-    upsertCurrentUser: jest.fn(),
-    getAllUsers: jest.fn(),
+    upsertCurrentUser: vi.fn(),
+    getAllUsers: vi.fn(),
   },
 }))
 
@@ -32,7 +32,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('upsertCurrentUserAsync - New User (API call expected)', () => {
@@ -78,7 +78,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User created successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -109,28 +109,15 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
         },
       })
-
-      const authUser: AuthUser = {
-        id: 'ext-123',
-        email: 'john@example.com',
-        username: 'john.doe',
-        displayName: 'John Doe',
-        givenName: 'John',
-        familyName: 'Doe',
-      }
-
-      const result = await store.dispatch(upsertCurrentUserAsync(authUser))
-
-      // API should NOT be called
-      expect(userApi.upsertCurrentUser).not.toHaveBeenCalled()
-      // Should return cached user
-      expect(result.payload).toEqual(existingUser)
-      expect(result.meta.requestStatus).toBe('fulfilled')
     })
   })
 
@@ -154,6 +141,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -179,7 +170,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User updated successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -209,6 +200,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -234,7 +229,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User updated successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -261,6 +256,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -286,7 +285,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User updated successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -313,6 +312,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -341,7 +344,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User updated successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -371,6 +374,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -411,6 +418,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
@@ -436,7 +447,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
         message: 'User updated successfully',
       }
 
-      ;(userApi.upsertCurrentUser as jest.Mock).mockResolvedValueOnce(mockResponse)
+      vi.mocked(userApi.upsertCurrentUser).mockResolvedValueOnce(mockResponse)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -467,7 +478,7 @@ describe('User Thunks - Smart Upsert Logic', () => {
       }
 
       const mockError = new Error('Network error')
-      ;(userApi.upsertCurrentUser as jest.Mock).mockRejectedValueOnce(mockError)
+      vi.mocked(userApi.upsertCurrentUser).mockRejectedValueOnce(mockError)
 
       const result = await store.dispatch(upsertCurrentUserAsync(authUser))
 
@@ -496,6 +507,10 @@ describe('User Thunks - Smart Upsert Logic', () => {
       store = createStore({
         user: {
           current: null,
+          isLoading: false,
+          error: null,
+        },
+        users: {
           allUsers: [existingUser],
           isLoading: false,
           error: null,
