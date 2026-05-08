@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import Card from '@/components/Card'
@@ -16,13 +16,12 @@ const Templates: FC = () => {
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await getTemplates(page, limit)
+      const response = await getTemplates(page, 10)
       // Handle both array and paginated response formats
       const templateList = Array.isArray(response) ? response : response.templates || []
       setTemplates(templateList)
@@ -36,11 +35,11 @@ const Templates: FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page])
 
   useEffect(() => {
     fetchTemplates()
-  }, [page, limit])
+  }, [fetchTemplates])
 
   const getChannelBadgeClass = (channel: NotificationChannel | string): string => {
     switch (channel) {

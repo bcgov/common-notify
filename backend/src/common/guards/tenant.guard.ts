@@ -195,13 +195,33 @@ export class TenantGuard implements CanActivate {
           return true
         }
 
-        // No X-Tenant-ID and no azp - cannot determine tenant
-        this.logger.error(
-          `JWT missing both X-Tenant-ID header and azp claim. Cannot determine tenant context.`,
+        // REGULAR USER PATH: No X-Tenant-ID header, no azp claim - look up user by externalId (sub claim)
+        // This is for regular frontend users who authenticate with JWT but don't have a selected tenant yet
+        this.logger.debug(
+          `Regular user JWT (no X-Tenant-ID, no azp). Looking up user by externalId: ${sub}`,
         )
-        throw new UnauthorizedException(
-          `Missing tenant context. Frontend users must select a tenant; service clients must be registered.`,
+
+        const tenant = await this.tenantsService.findByExternalId(sub).catch((error) => {
+          this.logger.warn(`Error looking up tenant by externalId ${sub}: ${error.message}`)
+          return null
+        })
+
+        if (!tenant) {
+          this.logger.error(
+            `No tenant found for user externalId: ${sub}. User may not have been registered.`,
+          )
+          throw new UnauthorizedException(
+            `No tenant found for user. Please contact an administrator.`,
+          )
+        }
+
+        this.logger.debug(
+          `Regular user authenticated via externalId lookup: ${tenant.name} (DB ID: ${tenant.id})`,
         )
+
+        request.tenant = tenant
+        request.userGuid = sub
+        return true
       } catch (error) {
         this.logger.error(`Failed to process JWT: ${error.message}`)
         throw new UnauthorizedException(`Invalid JWT token: ${error.message}`)

@@ -80,7 +80,7 @@ export const tenantSlice = createSlice({
           state.showTenantModal = false
         }
       })
-      .addCase(clearUser, (state) => {
+      .addCase(clearUser, (_state) => {
         // Clear localStorage when user logs out
         localStorage.removeItem(SELECTED_TENANT_STORAGE_KEY)
         return initialState
