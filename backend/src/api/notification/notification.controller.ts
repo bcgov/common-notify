@@ -1,4 +1,4 @@
-import { Controller, Get, Version, UseGuards, Logger, Query, Inject } from '@nestjs/common'
+import { Controller, Get, Version, UseGuards, Logger, Query } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'

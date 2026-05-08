@@ -1,6 +1,6 @@
 import type { PreloadedState } from '@reduxjs/toolkit'
 import { configureStore } from '@reduxjs/toolkit'
-import { upsertCurrentUserAsync, getAllUsersAsync } from './user.thunks'
+import { upsertCurrentUserAsync } from './user.thunks'
 import userReducer from '../slices/user.slice'
 import usersReducer from '../slices/users.slice'
 import type { RootState } from '../store'

@@ -23,9 +23,10 @@ export const fetchNotifications = createAsyncThunk<
 })
 
 /** Connects to the notification SSE stream and dispatches upsertNotification for each event. */
-export function connectNotificationSSE(dispatch: AppDispatch): AbortController {
+export function connectNotificationSSE(dispatch: AppDispatch, tenantId?: string): AbortController {
   return notificationApi.connectNotificationStream(
     (dto) => dispatch(upsertNotification(dto)),
     (err) => console.error('SSE connection error', err),
+    tenantId,
   )
 }

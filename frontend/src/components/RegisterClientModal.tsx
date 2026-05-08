@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FC } from 'react'
-import { Button, Form, TextField, Select } from '@bcgov/design-system-react-components'
+import { Button, Form } from '@bcgov/design-system-react-components'
+import { TextField, Select } from '@/components/InputWrappers'
 import { adminApi } from '@/api/admin.api'
 import type { LinkClientToTenantsRequest } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
@@ -61,10 +62,11 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
     }
 
     try {
-      // Map selected tenant IDs to tenant objects with id and name
+      // Map selected tenant IDs to TenantReference objects
       const selectedTenants = formState.selected_tenant_ids
         .map((tenantId) => cstarTenants.find((t) => t.id === tenantId))
         .filter((t) => t !== undefined)
+        .map((t) => ({ id: t!.id, name: t!.name }))
 
       if (selectedTenants.length !== formState.selected_tenant_ids.length) {
         showErrorToast('One or more selected tenants could not be found')
@@ -74,10 +76,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
       const request: LinkClientToTenantsRequest = {
         client_id: formState.client_id.trim(),
         client_secret: formState.client_secret.trim(),
-        tenant_ids: selectedTenants.map((tenant) => ({
-          id: tenant.id,
-          name: tenant.name,
-        })),
+        tenant_ids: selectedTenants,
       }
 
       const response = await adminApi.linkClientToTenants(request)
@@ -123,11 +122,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
             <div className="modal-body">
               <Form className="d-flex flex-column gap-3" onSubmit={handleSubmit}>
                 <TextField
-                  label={
-                    <>
-                      Client ID <span className="text-danger">*</span>
-                    </>
-                  }
+                  label="Client ID"
                   placeholder="e.g., my-service-client"
                   value={formState.client_id}
                   onChange={(value) => handleInputChange('client_id')(value)}
@@ -137,12 +132,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
                 />
 
                 <TextField
-                  label={
-                    <>
-                      Client Secret <span className="text-danger">*</span>
-                    </>
-                  }
-                  type="password"
+                  label="Client Secret"
                   placeholder="Enter your client secret"
                   value={formState.client_secret}
                   onChange={(value) => handleInputChange('client_secret')(value)}
@@ -152,11 +142,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
                 />
 
                 <Select
-                  label={
-                    <>
-                      Select Tenants <span className="text-danger">*</span>
-                    </>
-                  }
+                  label="Select Tenants"
                   placeholder="Choose tenants..."
                   items={tenants}
                   value={formState.selected_tenant_ids}

@@ -41,7 +41,8 @@ export const usersSlice = createSlice({
       })
       .addCase(getAllUsersAsync.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload || 'Failed to fetch users'
+        state.error =
+          (typeof action.payload === 'string' ? action.payload : null) || 'Failed to fetch users'
       })
   },
 })

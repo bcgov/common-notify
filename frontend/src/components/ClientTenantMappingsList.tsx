@@ -108,10 +108,9 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                   </td>
                   <td>
                     <Button
-                      size="small"
-                      variant={mapping.is_active ? 'danger' : 'success'}
-                      onClick={() => handleToggleStatus(mapping)}
-                      disabled={togglingId === mapping.id}
+                      variant={mapping.is_active ? 'secondary' : 'primary'}
+                      onPress={() => handleToggleStatus(mapping)}
+                      isDisabled={togglingId === mapping.id}
                     >
                       {togglingId === mapping.id
                         ? 'Loading...'

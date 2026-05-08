@@ -1,5 +1,5 @@
 import type { AxiosError } from 'axios'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
@@ -58,9 +58,13 @@ export const notificationApi = {
   connectNotificationStream(
     onMessage: (dto: NotificationRequest) => void,
     onError?: (err: unknown) => void,
+    tenantId?: string,
   ): AbortController {
     const controller = new AbortController()
-    const params = generateApiParameters('/api/v1/frontend/notification_request/events')
+    const baseUrl = generateApiParameters('/api/v1/frontend/notification_request/events').url
+
+    // Build URL with tenantId query parameter
+    const url = tenantId ? `${baseUrl}?tenantId=${encodeURIComponent(tenantId)}` : baseUrl
 
     // Use the new async getToken() method which automatically refreshes when needed
     const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -71,10 +75,10 @@ export const notificationApi = {
       })
     }
 
-    fetchEventSource(params.url, {
+    fetchEventSource(url, {
       fetch: fetchWithFreshToken,
       signal: controller.signal,
-      onmessage(event) {
+      onmessage(event: EventSourceMessage) {
         if (event.event === 'keepalive' || !event.data) return
         try {
           const dto = JSON.parse(event.data) as NotificationRequest
@@ -83,7 +87,7 @@ export const notificationApi = {
           console.error('Failed to parse SSE notification event', err)
         }
       },
-      onerror(err) {
+      onerror(err: Error) {
         onError?.(err)
       },
     })

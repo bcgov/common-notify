@@ -1,13 +1,11 @@
-import { Controller, Get, Version, Logger, Query, Sse, UseGuards } from '@nestjs/common'
+import { Controller, Get, Version, Logger, Query, Sse, BadRequestException } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
-import { TenantGuard } from '../../common/guards/tenant.guard'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
-import type { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 /**
  * Frontend Notification API Controller
@@ -33,6 +31,7 @@ export class NotificationFrontendController {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly notificationPubSubService: NotificationPubSubService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   @Version('1')
@@ -79,13 +78,26 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Sse('events')
-  @UseGuards(TenantGuard)
   @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
+  @ApiQuery({
+    name: 'tenantId',
+    required: true,
+    type: String,
+    description: 'CSTAR external tenant ID to filter by',
+  })
   @ApiOkResponse({
     description: 'Server-sent stream of notification_request updates for the authenticated tenant',
   })
-  streamEvents(@GetTenant() tenant: Tenant): Observable<MessageEvent> {
+  async streamEvents(
+    @Query('tenantId') tenantExternalId: string,
+  ): Promise<Observable<MessageEvent>> {
+    // Convert external tenant ID to internal UUID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
+    }
+
     const tenantId = tenant.id
 
     // Observable stream

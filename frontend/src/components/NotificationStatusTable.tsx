@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
-import { fetchNotifications } from '@/redux/thunks/notification.thunks'
+import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 
 /**
@@ -28,12 +28,14 @@ const NotificationStatusTable: FC = () => {
     }
   }, [statusFilter, selectedTenant, dispatch])
 
-  // TODO: Re-enable SSE connection after fixing tenant filtering for SSE endpoint
-  // Connect to SSE stream
-  // useEffect(() => {
-  //   const controller = connectNotificationSSE(dispatch)
-  //   return () => controller.abort()
-  // }, [dispatch])
+  // Connect to SSE stream when tenant is selected
+  useEffect(() => {
+    if (!selectedTenant) {
+      return
+    }
+    const controller = connectNotificationSSE(dispatch, selectedTenant.id)
+    return () => controller.abort()
+  }, [dispatch, selectedTenant])
 
   // Build status filter items from Redux
   const statusFilterItems = [
