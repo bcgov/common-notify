@@ -82,7 +82,7 @@ export class EmailDeliveryWorker {
         if ((job.attemptsMade ?? 0) === 0) {
           await deliveryService.createPending(
             notifyId,
-            (payload as NotifyEmailChannel).recipients?.to ?? [],
+            (payload as NotifyEmailChannel).recipients.to,
             'email',
             tenantId,
           )
