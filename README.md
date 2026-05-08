@@ -96,9 +96,13 @@ notification tenant to other shared services - for example workflow or forms.
    notification payload (after all defaults have been resolved). If this is identical to a
    notification on the queue within a configurable time period, no action is taken UNLESS an
    override switch is set in the call.
-
-1. The final design principles cover important API usage parameters such as **_rate-limiting,
-   correlation id's, cursor-based pagination_** and **_error handling_**. For these, details are
+  
+1. The fifth design principle covers the use of downstream services. Services are configured in the Admin UI and are  called at runtime during notification processing.  Current services comprise :
+**Subscriptions**   - called to determine recipients and channels for a particular notification event. Subscription services cover such things as opt-in/out , notification defaults for individual users or mailing lists.
+**Templates** - for rendering notification content with substitutable parameters to customise the notification at runtime. Multiple template engines are supported, as well as inline parameter substitution and CDOGS. 
+**Templated attachments** - a service which passes substitutable parameters into a predefined template, renders the output and attaches it to a notification - all at runtime. This powerful feature allows items like templated PDF documents to be added directly to emails without the calling application needing to render and attach them to the notification. 
+1. The final design principles cover important API usage parameters such as **_rate-limiting_**, 
+   **_correlation id's_** , **_cursor-based pagination_** and **_error handling_**. For these, details are
    provided in the User Guide.
 
 ---
@@ -131,6 +135,23 @@ province of an administrator, a subscription service or a team service (CSTAR) *
 design caters to complete or partial overriding of any or all defaults configured in Notification
 Events through the last element of the cascade, the Notification Request.
 
+> [!NOTE]
+>
+> **Notification Event** - The application-specific description of the event for which the
+> notification is required
+>
+> **Notification Event Type** - The user-defined unique shortname for the notification event. This
+> is the "hook" on which the notification defaults are hung, and what is passed into the API.
+>
+> Examples : 
+> 
+> | Notification Event | Notification Event Type |
+> | --- | --- | 
+> |Application Received | AppRec | 
+> |Permit Issued| PermitIssued |
+> | Payment Received | RecPayment |
+
+
 **Notification Request**. This is what is sent into the API from the calling application - mostly
 via a POST request. Every aspect of the notification can be specified here - there is no need to use
 Notification Events if not required - however the capability to OVERRIDDE or AUGMENT any or all
@@ -141,19 +162,10 @@ The rule is simple: **if the request specifies it, that wins; if not, it inherit
 above**. This means a tenant can set sensible defaults once and individual requests only need to
 specify what's different.
 
-> [!NOTE]
->
-> **Notification Event** - The application-specific description of the event for which the
-> notification is required
->
-> **Notification Event Type** - The user-defined unique shortname for the notification event. This
-> is the "hook" on which the notification defaults are hung, and what is passed into the API.
->
-> Examples : | Notification Event | Notification Event Type | | --- | --- | |Application Received |
-> AppRec | |Permit Issued| PermitIssued | | Payment Received | PaymentRec |
+**Substitutable parameters**
+These are arbitrary name-value pair parameters passed in as part of the notification request by the calling application in a field named "params". They are often used to substitute for template variables or get passed into downstream services to customise the output of the notification. These, too, are cascading - the top level "params" structure can be augmented or overridden by channel or service "params" fields. The channel or service receives all the values of the parent JSON structure as well as its own custom values. In most cases the single, top-level "params" field will suffice as it gets passed into all channels and services anyway but it does provide flexibility for more complex scenarios.
 
 ---
-
 ## Other key features
 
 ## Extensibility and plugins
@@ -187,124 +199,152 @@ transition to the universal API.
 
 ## Examples
 
+> [!NOTE]
+> All the following examples comprise 3 sections :
+> * Admin UI which describes the one-time setup required in the Notify Administrative interface to make use of the feature. 
+> * API - the API endpoint
+> * Payload - the JSON payload sent to the endpoint
+
 ### 1. Simple send
 
 #### 1.1 Send an email
 
 Send a single email through the tenant default email channel using NO defaults NO templates NO
-parameters **Admin UI** No setup except tenant sender email address. **API** POST to
-/notifysimple/email **Payload**
+parameters 
+
+**Admin UI** No setup except tenant sender email address. 
+**API** POST to /notifysimple/email 
+**Payload**
 
 ```json
-{
-  "to": ["me@example.com", "you@example.com"],
-  "cc": ["copyto@example.com"],
-  "bcc": ["blindcopyto@example.com"],
-  "subject": "A really simple email",
-  "body": "This is an example of how simple the API can be",
-  "bodyType": "text"
+{ 
+  "recipients" : {
+    "to": ["me@example.com", "you@example.com"],
+    "cc": ["copyto@example.com"],
+    "bcc": ["blindcopyto@example.com"]
+  },
+  "content" : {
+    "subject": "A really simple email",
+    "body": "This is an example of how simple the API can be",
+    "bodyType": "text"
+  }
 }
 ```
 
-alternatively - POST to /notifysimple **Payload**
+alternatively - 
+POST to /notifysimple 
+**Payload**
 
 ```json
 {
   "email": {
-    "to": ["me@example.com", "you@example.com"],
-    "cc": ["copyto@example.com"],
-    "bcc": ["blindcopyto@example.com"],
-    "subject": "A really simple email",
-    "body": "This is an example of how simple the API can be",
-    "bodyType": "text"
+    "recipients" : {
+      "to": ["me@example.com", "you@example.com"],
+      "cc": ["copyto@example.com"],
+      "bcc": ["blindcopyto@example.com"]
+    },
+    "content" : {
+      "subject": "A really simple email",
+      "body": "This is an example of how simple the API can be",
+      "bodyType": "text"
+    }
   }
 }
 ```
 
 #### 1.2 Same as 1.1 except add SMS
 
-**Admin UI** No setup except tenant sender email address. **API** POST to /notifysimple **Payload**
+**Admin UI** No setup except tenant sender email address. 
+**API** POST to /notifysimple 
+**Payload**
 
 ```json
 {
   "email": {
-    "to": [ "me@example.com", "you@example.com"],
-    "cc": ["copyto@example.com"],
-    "bcc": [ "blindcopyto@example.com"],
-    "subject": "A really simple email",
-    "body": "This is an example of how simple the API can be",
-    "bodyType": "text"
-  },
+    "recipients" : {
+      "to": ["me@example.com", "you@example.com"],
+      "cc": ["copyto@example.com"],
+      "bcc": ["blindcopyto@example.com"]
+    },
+    "content" : {
+      "subject": "A really simple email",
+      "body": "This is an example of how simple the API can be",
+      "bodyType": "text"
+    }
+  }
   "sms": {
-        "to": [+17787001234"],
-        "message": "This is a sample SMS"
+    "recipients" : {
+      "to": ["+17787001234"]
+    },
+    "content" : {
+      "body": "This is an example of how simple the API can be",
+      "bodyType": "text"  }
   }
 }
 ```
 
 ### 2. Use of templates and parameter substitution
 
-#### 2.1 Send an email using an inline template
+#### 2.1 Send an email using  inline templating
 
-Pass a template into the API, add parameter substitution
+Add templated content and email addresses using the "handlebars" templating engine (double curly braces) , add parameter substitution
 
-**Admin UI** No setup except tenant sender email address. **API** POST to /notifysimple/email
+**Admin UI** 
+No setup except tenant sender email address. 
+**API** POST to /notifysimple/email
 **Payload**
 
 ```json
 {
-  "to": ["{{substitute-my-email}}", "you@example.com"],
-  "cc": ["copyto@example.com"],
-  "bcc": ["blindcopyto@example.com"],
-  "template": {
-    "subject": "{{subject}}",
-    "body": "This is an example of {{body-part}}"
-  },
   "params": {
     "substitute-my-email": "me@example.com",
     "subject": "Sample subject",
     "body-part": "templating and parameter substitution"
+  }  
+  "recipients" : {
+    "to": ["{{substitute-my-email}}", "you@example.com"],
+    "cc": ["copyto@example.com"],
+    "bcc": ["blindcopyto@example.com"]
   }
+  "content": {
+    "subject": "{{subject}}",
+    "body": "This is an example of {{body-part}}",
+    "renderer" : "handlebar"
+  },
 }
 ```
-
+In this case, the "to" address is substituted with "my@example.com" the subject is replaced  with "Sample Subject" and the body with "This is an example of templating and parameter substitution"
 #### 2.2 Preview 2.1
 
 Preview the output of the previous example, no actual sending
 
-**Admin UI** No setup except tenant sender email address. **API** POST to
-/notifysimple/email/preview **Payload**
 
-```json
-{
-  "to": ["{{substitute-my-email}}", "you@example.com"],
-  "cc": ["copyto@example.com"],
-  "bcc": ["blindcopyto@example.com"],
-  "template": {
-    "subject": "{{subject}}",
-    "body": "This is an example of {{body-part}}"
-  },
-  "params": {
-    "substitute-my-email": "me@example.com",
-    "subject": "Sample subject",
-    "body-part": "templating and parameter substitution"
-  }
-}
-```
+**Admin UI**
+ No setup except tenant sender email address. 
+ > [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
+
+ **API** POST to /notifysimple/email/preview 
+**Payload**
+
+As per 2.1
+
 
 **Return**
 
 ```json
 {
-  "email": {
+  "recipients" : {
     "to": ["me@example.com", "you@example.com"],
     "cc": ["copyto@example.com"],
-    "bcc": ["blindcopyto@example.com"],
+    "bcc": ["blindcopyto@example.com"]
+  }
+  "content": {
     "subject": "Sample subject",
     "body": "This is an example of templating and parameter substitution",
-    "bodyType": "text"
-  }
+    "renderer" : "handlebar"
+  },
 }
+
 ```
 
 > [!NOTE]
@@ -313,13 +353,12 @@ Preview the output of the previous example, no actual sending
 > - Variable substititions are performed on recipient fields
 > - The result is exactly what would be sent to the SMTP email gateway or SMS API
 
-#### 2.3 Send an email using a default template
+#### 2.3 Send an email using a server template
 
-Pass a templateId into the API, add parameter substitution
+Pass a templateId into the API, with parameter substitution
 
 **Admin UI**
-
-- Create a template using the template UI - say "Sample template". The template might look like the
+Create a template using the template UI - say "Sample template". The template might look like the
   following
 
 ```json
@@ -328,23 +367,28 @@ Pass a templateId into the API, add parameter substitution
   "body": "This is an example of {{body-part}}"
 }
 ```
-
 **API**
 
-- GET the template with a GET on /templates?name="Sample template" This returns a GUID of the
+- GET the template with a GET reqest to /templates?name="Sample template" This returns a GUID of the
   template, say \<GUID>
-- POST to /notifysimple/email **Payload**
+- POST to /notifysimple/email
+  
+**Payload**
 
 ```json
 {
-  "to": ["{{substitute-my-email}}", "you@example.com"],
-  "cc": ["copyto@example.com"],
-  "bcc": ["blindcopyto@example.com"],
-  "templateId": "<GUID>",
   "params": {
     "substitute-my-email": "me@example.com",
     "subject": "Sample subject",
     "body-part": "templating and parameter substitution"
+  }
+  "recipients" : {
+    "to": ["me@example.com", "you@example.com"],
+    "cc": ["copyto@example.com"],
+    "bcc": ["blindcopyto@example.com"]
+  }
+  "content": {
+    "templateId": "<GUID>"
   }
 }
 ```
@@ -354,13 +398,59 @@ Pass a templateId into the API, add parameter substitution
 > - The advantage of this is that the template is no longer part of the calling application and can
 >   be managed by a separate team / skill.
 > - If "/preview" were appended to the URL the result would be the same as 2.2
+> - Previews of templates are supported in the Admin UI.
 
-### 3. Use of Notification Defaults
+#### 2.4 Send an email with inline attachments at a specified  time
 
-##### 3.1 Send a notification from an application using ALL defaults.
+Extend 2.3 with inline base64 encoded attachments and delayed send
 
-Send a notification from an "approved funding application" using notification defaults. Notify the
-successful applicant and internal staff using predefined templates, default addresses, channels and
+**Admin UI**
+As per 2.3
+**API**
+ POST to /notifysimple/email
+ **Payload**
+
+```json
+{
+  "params": {
+    "substitute-my-email": "me@example.com",
+    "subject": "Sample subject",
+    "body-part": "templating and parameter substitution"
+  },
+  "recipients" : {
+    "to": ["me@example.com", "you@example.com"],
+    "cc": ["copyto@example.com"],
+    "bcc": ["blindcopyto@example.com"]
+  },
+  "content": {
+    "templateId": "<GUID>"
+  },
+  "attachments" : [
+                  { "content": "PGI+SGVsbG8gV29ybGRcITwvYj4=",
+                    "contentType": "image/png",
+                    "filename": "myimage.png"},
+                  { "content": "PGI+CHESswe8893wsdfsdggTYYW=",
+                    "contentType": "application/pdf",
+                    "filename": "mypdf.pdf"}
+  ],
+  "delayedSend" : "2025-06-25T15:15:00"
+}
+
+
+
+```
+
+> [!NOTE]
+>
+> - Attachment contents must be base64 encoded. Size limits apply. 
+> - DelayedSend date-time  is relative to UTC and is ISO8601 format
+
+### 3. Use of Notification Events
+
+##### 3.1 Send a notification from an application using a Notification Event.
+
+Send a notification from a "Funding Application webapp" using notification defaults. Notify the
+successful applicant and internal staff using predefined templates, default addresses and channels assocated with a Notification Event, customised with substitutable parameters. 
 parameter substitution
 
 **Admin UI**
@@ -383,7 +473,9 @@ parameter substitution
   "message": "Hey {{firstname}} {{lastname}} You just got awarded ${{amount}} for {{program}}"
 }
 ```
-
+> [!NOTE]
+>
+> - For SMS templates there is no subject. 
 - Create a **Notification Event Type** called "funding-approved".
 - Under **Email defaults**
   - Add the **Funding Approved Email** template to the "**template**" field
@@ -393,9 +485,12 @@ parameter substitution
 - Under **SMS Defaults**
   - Add the **Funding Approved Email** template to the "**template**" field
   - Add recipient "**{{phonenumber}}**" to the "**to**" field.
-    > [!NOTE] Variable substitution can occur in "to" and other recipient fields
+> [!NOTE]
+   Variable substitution can occur in "to" and other recipient fields
     >
-    > **API** POST to /notifyevent **Payload**
+  **API** 
+  POST to /notifyevent
+     **Payload**
 
 ```json
 {
@@ -420,37 +515,34 @@ parameter substitution
 
 As per 3.1 , but don't actually send the notification, just preview exactly what would be sent
 
-**API** POST to /notifyevent/preview **Payload**
-
-```json
-{
-"notificationEventType": "funding-approval",
-  "params": {
-    "firstname": "Lucky",
-    "lastname" : "Applicant",
-    "program" : "Small Business Development Fund",
-    "amount" : "1000",
-    "emailaddress":"lucky@me.com",
-    "phonenumber":"7787001234"
-  }
-```
-
-**Return** **API**
+**API** 
+POST to /notifyevent/preview 
+**Payload**
+As per 3.1
+**Return**
+ **API**
 
 ```json
 {
   "email": {
-    "to": ["lucky@me.com"],
-    "cc": ["fred@gov.bc.ca", "joan@gov.bc.ca"],
-    "subject": "Notification of funding approval for Small Business Development Fund",
-    "body": "Dear Lucky Applicant \n
+      "recipients": {
+        "to": ["lucky@me.com"],
+        "cc": ["fred@gov.bc.ca", "joan@gov.bc.ca"]
+      }
+      "content" : {
+        "subject" : "Nofication of funding approval for Small Business Development Fund",
+        "body": "Dear Lucky Applicant \n
            Your funding to the amount of $1000 for program Small Business Development fund has been approved",
-    "bodyType": "text",
- },
+        "bodyType": "text",
+      },
   "sms": {
-    "to": ["7787001234"],
-    "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund",
+    "recipients" :{
+      "to": ["7787001234"]
     }
+    "content" : {
+      "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund"
+    }
+  }
 }
 ```
 
@@ -460,10 +552,14 @@ As per 3.1 , but don't actually send the notification, just preview exactly what
 > - Variable substitutions are performed on templates
 > - Variable substititions are performed on recipient fields
 > - The result is exactly what would be sent to the SMTP email gateway or SMS API
+> - This result can be viewed directly in the preview capability of the admin UI - it is required to provide the substitutable params
 
 ##### 3.3 SMS Overrides
 
-As per 3.1 but overrride so that no SMS is sent **API** POST to /notifyevent **Payload**
+As per 3.1 but overrride so that no SMS is sent 
+**API** 
+POST to /notifyevent 
+**Payload**
 
 ```json
 {
@@ -484,7 +580,10 @@ As per 3.1 but overrride so that no SMS is sent **API** POST to /notifyevent **P
 
 ##### 3.4 Template Overrides
 
-As per 3.3 but overrride the email template POST to /notifyevent **Payload**
+As per 3.3 but overrride the email template with one on the server (given by \<guid\> )
+**API**
+ POST to /notifyevent 
+**Payload**
 
 ```json
 {
@@ -499,11 +598,11 @@ As per 3.3 but overrride the email template POST to /notifyevent **Payload**
   }
   "overrides" : {
     "email" : {
-      "template" : {
-                "subject" : "Funding rejected",
-                "body" : "Dear {{firstname}} {{lastname}} \n
-                      Your funding to the amount of ${{amount}} for program {{program}} has been rejected"
-                  }
+      "content": {
+        "template" : {
+            "templateId": "<guid>"
+        }
+      }
     }
     "sms" :{}
   }
@@ -512,8 +611,10 @@ As per 3.3 but overrride the email template POST to /notifyevent **Payload**
 
 ##### 3.5 Augment recipients
 
-As per 3.4 but add an additional recipient to the CC list. POST to /notifyevent **Payload**
-
+As per 3.4 but add an additional recipient to the CC list.
+**API**
+ POST to /notifyevent 
+**Payload**
 ```json
 {
 "notificationEventType": "funding-approval",
@@ -524,25 +625,30 @@ As per 3.4 but add an additional recipient to the CC list. POST to /notifyevent 
     "amount" : "1000",
     "emailaddress":"lucky@me.com",
     "phonenumber":"7787001234"
-  }
+  },
   "overrides" : {
     "email" : {
-      "template" : {
-                "subject" : "Funding rejected",
-                "body" : "Dear {{firstname}} {{lastname}} \n
-                      Your funding to the amount of ${{amount}} for program {{program}} has been rejected"
-                  }
-    }
-    "sms" :{}
-  }
+      "content": {
+        "template" : {
+            "templateId": "<guid>"
+        }
+      }
+    },
+    "sms" :{},
+  },
   "augments" : {
-    "email" : {
-      "cc": ["tom@gov.bc.ca"]
-     }
-    "sms" :{}
+    "email":{
+      "recipients" : {
+        "cc": ["tom@gov.bc.ca"]
+      }
+    }
   }
 }
-````
 
+````
+> [!NOTE]
+>
+> - A combination of augments and overrides can replace or supplement almost any part of the notification 
+> -  This is not expected to be the normal use of Notification Event Types, but it does provide flexibility where needed or for testing purposes
 
 <!-- Testing API gateway automation -->
