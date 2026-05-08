@@ -81,11 +81,8 @@ export class ClientTenantMappingService {
       if (!tenant) {
         this.logger.debug(`Creating new tenant for CSTAR ID: ${tenantRef.id}`)
 
-        const slug = tenantRef.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+/, '')
-          .replace(/-+$/, '')
+        // Generate slug using linear-time character iteration (avoids polynomial regex)
+        const slug = this.generateSlug(tenantRef.name)
 
         tenant = this.tenantRepository.create({
           externalId: tenantRef.id,
@@ -400,5 +397,36 @@ export class ClientTenantMappingService {
     const updated = await this.mappingRepository.save(mapping)
     this.logger.debug(`Toggled mapping ${id}: is_active=${updated.isActive}, by=${updatedBy}`)
     return updated
+  }
+
+  /**
+   * Generate a URL-friendly slug from a tenant name
+   * Uses linear-time character iteration to avoid polynomial regex performance issues
+   * Converts to lowercase, replaces non-alphanumeric sequences with hyphens,
+   * and removes leading/trailing hyphens
+   *
+   * @param name Tenant name to slugify
+   * @returns URL-friendly slug (or empty string if name has no valid characters)
+   */
+  private generateSlug(name: string): string {
+    let slug = ''
+    let lastCharWasHyphen = false
+
+    for (const char of name.toLowerCase()) {
+      if (/[a-z0-9]/.test(char)) {
+        slug += char
+        lastCharWasHyphen = false
+      } else if (!lastCharWasHyphen && slug.length > 0) {
+        slug += '-'
+        lastCharWasHyphen = true
+      }
+    }
+
+    // Remove trailing hyphen if present
+    if (slug.endsWith('-')) {
+      slug = slug.slice(0, -1)
+    }
+
+    return slug
   }
 }

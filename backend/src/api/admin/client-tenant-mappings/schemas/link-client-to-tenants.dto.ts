@@ -19,6 +19,8 @@ export class TenantReference {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsString()
+  @MinLength(1, { message: 'tenant id cannot be empty' })
+  @MaxLength(36, { message: 'tenant id must not exceed 36 characters (UUID length)' })
   id: string
 
   @ApiProperty({
@@ -32,6 +34,8 @@ export class TenantReference {
     return value.trim()
   })
   @IsString()
+  @MinLength(1, { message: 'tenant name cannot be empty' })
+  @MaxLength(256, { message: 'tenant name must not exceed 256 characters' })
   name: string
 }
 
