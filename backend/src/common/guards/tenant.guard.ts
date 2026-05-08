@@ -121,36 +121,63 @@ export class TenantGuard implements CanActivate {
 
         this.logger.debug(`JWT Payload: ${JSON.stringify(payload, null, 2)}`)
 
-        // Check if this is a service client (has 'azp' or client_id claim from client credentials flow)
         const azp = payload.azp as string
-        const clientIdClaim = payload.client_id as string
+        const sub = payload.sub as string
+        const xTenantId = request.headers['x-tenant-id'] as string
 
-        if (azp || (clientIdClaim && this.isClientCredentialsFlow(payload))) {
-          // This is a service client from client credentials flow
-          const clientId = azp || clientIdClaim
-          this.logger.debug(`Service client JWT detected. Client ID: ${clientId}`)
+        if (!sub) {
+          throw new Error('JWT missing required "sub" claim')
+        }
 
-          // Look up accessible tenants via ClientTenantMapping
-          const tenantIds = await this.clientTenantMappingService
-            .findTenantsByClientId(clientId)
-            .catch((error) => {
-              this.logger.warn(
-                `Error looking up ClientTenantMapping for ${clientId}: ${error.message}`,
-              )
-              return []
-            })
+        // FRONTEND USER PATH: Has X-Tenant-ID header (user selected a tenant from CSTAR)
+        // This takes priority - frontend requests should not use azp for ClientTenantMapping
+        if (xTenantId) {
+          this.logger.debug(
+            `Frontend user JWT with tenant selection. User sub: ${sub}, X-Tenant-ID: ${xTenantId}`,
+          )
 
-          if (tenantIds.length === 0) {
-            this.logger.warn(
-              `Client ${clientId} has no mapped tenants in ClientTenantMapping table`,
+          // Look up tenant by external ID (CSTAR tenant GUID stored in tenants.external_id)
+          const tenant = await this.tenantsService.findByExternalId(xTenantId).catch(() => null)
+
+          if (!tenant) {
+            this.logger.error(
+              `Tenant not found for CSTAR ID: ${xTenantId}. User ${sub} may not have access to this tenant.`,
             )
             throw new UnauthorizedException(
-              `Client ${clientId} is not authorized to access any tenants. Please contact an administrator.`,
+              `Tenant ${xTenantId} not found or you do not have access.`,
             )
           }
 
           this.logger.debug(
-            `Client ${clientId} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
+            `Tenant authenticated via X-Tenant-ID header: ${tenant.name} (DB ID: ${tenant.id}, CSTAR ID: ${xTenantId})`,
+          )
+
+          request.tenant = tenant
+          request.userGuid = sub
+          return true
+        }
+
+        // SERVICE CLIENT PATH: No X-Tenant-ID header, uses azp for ClientTenantMapping
+        if (azp) {
+          this.logger.debug(`Service client JWT detected. Client ID (azp): ${azp}`)
+
+          // Look up accessible tenants via ClientTenantMapping
+          const tenantIds = await this.clientTenantMappingService
+            .findTenantsByClientId(azp)
+            .catch((error) => {
+              this.logger.warn(`Error looking up ClientTenantMapping for ${azp}: ${error.message}`)
+              return []
+            })
+
+          if (tenantIds.length === 0) {
+            this.logger.warn(`Client ${azp} has no mapped tenants in ClientTenantMapping table`)
+            throw new UnauthorizedException(
+              `Client ${azp} is not authorized to access any tenants. Please contact an administrator.`,
+            )
+          }
+
+          this.logger.debug(
+            `Client ${azp} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
           )
 
           // Fetch the tenant objects
@@ -164,35 +191,17 @@ export class TenantGuard implements CanActivate {
           // Use first tenant as primary (can be overridden by route-specific logic)
           request.tenant = tenants[0]
           request.accessibleTenants = tenants
-          request.clientId = clientId
+          request.clientId = azp
           return true
         }
 
-        // This is a frontend user JWT (has user identifier in 'sub' claim)
-        const sub = payload.sub as string
-        if (!sub) {
-          throw new Error('JWT missing required "sub" claim')
-        }
-
-        this.logger.debug(`JWT user identifier from 'sub' claim: ${sub}`)
-
-        // Look up tenant by external ID (user identifier stored in externalId)
-        const tenant = await this.tenantsService.findByExternalId(sub).catch(() => null)
-
-        if (!tenant) {
-          this.logger.error(
-            `Tenant not found for user identifier: ${sub}. User must be assigned to a tenant via administrator.`,
-          )
-          throw new UnauthorizedException(
-            `No tenant found for your account. Please contact an administrator.`,
-          )
-        }
-
-        this.logger.debug(`Tenant authenticated via JWT: ${tenant.name} (User ID: ${sub})`)
-
-        request.tenant = tenant
-        request.userGuid = sub
-        return true
+        // No X-Tenant-ID and no azp - cannot determine tenant
+        this.logger.error(
+          `JWT missing both X-Tenant-ID header and azp claim. Cannot determine tenant context.`,
+        )
+        throw new UnauthorizedException(
+          `Missing tenant context. Frontend users must select a tenant; service clients must be registered.`,
+        )
       } catch (error) {
         this.logger.error(`Failed to process JWT: ${error.message}`)
         throw new UnauthorizedException(`Invalid JWT token: ${error.message}`)
@@ -203,27 +212,6 @@ export class TenantGuard implements CanActivate {
     this.logger.error('No authentication headers found (Kong or JWT)')
     throw new BadRequestException(
       'Missing authentication. Provide either Kong consumer headers or JWT token.',
-    )
-  }
-
-  /**
-   * Check if JWT payload indicates a client credentials flow
-   * Service accounts typically have 'client_roles' or specific realm_access structure
-   */
-  private isClientCredentialsFlow(payload: any): boolean {
-    // Check for service account indicators
-    const realmAccess = payload.realm_access as any
-    const clientRoles = payload.client_roles as any
-
-    // Client credentials tokens often have resource_access instead of direct client_roles
-    const resourceAccess = payload.resource_access as any
-
-    return (
-      (realmAccess &&
-        Array.isArray(realmAccess.roles) &&
-        realmAccess.roles.includes('offline_access')) ||
-      clientRoles !== undefined ||
-      (resourceAccess && Object.keys(resourceAccess).length > 0)
     )
   }
 }

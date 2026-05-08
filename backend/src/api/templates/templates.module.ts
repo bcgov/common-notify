@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { TemplatesController } from './templates.controller'
+import { TemplatesFrontendController } from './templates-frontend.controller'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -27,7 +28,7 @@ import { NotifyModule } from '../notify/notify.module'
     RenderingModule,
     forwardRef(() => NotifyModule),
   ],
-  controllers: [TemplatesController],
+  controllers: [TemplatesController, TemplatesFrontendController],
   providers: [TemplatesService, TemplatesRepository],
   exports: [TemplatesService, TemplatesRepository],
 })

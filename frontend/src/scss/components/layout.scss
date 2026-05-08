@@ -50,9 +50,11 @@
 
   .username {
     color: $primary-color;
-    font-weight: 700;
+    font-weight: 500;
     font-size: $font-size-lg;
     white-space: nowrap;
+    letter-spacing: 0.3px;
+    transition: opacity 0.2s ease;
 
     @media (max-width: $breakpoint-sm) {
       display: none;

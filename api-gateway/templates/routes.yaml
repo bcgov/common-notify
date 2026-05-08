@@ -496,6 +496,54 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/templates (frontend variant - list and create)
+  - name: ${ROUTE_PREFIX}templates-frontend-list
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates
+    methods:
+      - GET
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates/:id (frontend variant - get by id, update, delete)
+  - name: ${ROUTE_PREFIX}templates-frontend-by-id
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates/*
+    methods:
+      - GET
+      - PATCH
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates/:id/preview (frontend variant - preview templates)
+  - name: ${ROUTE_PREFIX}templates-frontend-preview
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates/*/preview
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
 plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS
@@ -1055,6 +1103,90 @@ plugins:
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - List and Create
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - Get by ID, Update, Delete
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-by-id
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - Preview
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-preview
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}

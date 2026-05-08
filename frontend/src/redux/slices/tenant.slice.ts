@@ -9,8 +9,20 @@ interface TenantState {
   showTenantModal: boolean
 }
 
+const SELECTED_TENANT_STORAGE_KEY = 'notify_selected_tenant'
+
+// Load selected tenant from localStorage if available
+const loadSelectedTenantFromStorage = (): Tenant | null => {
+  try {
+    const stored = localStorage.getItem(SELECTED_TENANT_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+
 const initialState: TenantState = {
-  selectedTenant: null,
+  selectedTenant: loadSelectedTenantFromStorage(),
   showTenantModal: false,
 }
 
@@ -21,25 +33,28 @@ export const tenantSlice = createSlice({
     selectTenant: (state, action: PayloadAction<Tenant>) => {
       state.selectedTenant = action.payload
       state.showTenantModal = false
+      // Persist to localStorage
+      localStorage.setItem(SELECTED_TENANT_STORAGE_KEY, JSON.stringify(action.payload))
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchCstarTenants.pending, (state) => {
-        state.showTenantModal = false
-      })
+      // Don't modify showTenantModal on pending - wait for the result
+      // This prevents the modal from flashing open/closed
       .addCase(fetchCstarTenants.fulfilled, (state, action) => {
         const tenants = action.payload
 
         if (tenants.length === 0) {
           state.selectedTenant = null
           state.showTenantModal = false
+          localStorage.removeItem(SELECTED_TENANT_STORAGE_KEY)
           return
         }
 
         if (tenants.length === 1) {
           state.selectedTenant = tenants[0]
           state.showTenantModal = false
+          localStorage.setItem(SELECTED_TENANT_STORAGE_KEY, JSON.stringify(tenants[0]))
           return
         }
 
@@ -50,12 +65,26 @@ export const tenantSlice = createSlice({
 
         state.selectedTenant = matchingTenant
         state.showTenantModal = matchingTenant === null
+        // Update localStorage if tenant is still valid
+        if (matchingTenant) {
+          localStorage.setItem(SELECTED_TENANT_STORAGE_KEY, JSON.stringify(matchingTenant))
+        } else {
+          localStorage.removeItem(SELECTED_TENANT_STORAGE_KEY)
+        }
       })
       .addCase(fetchCstarTenants.rejected, (state) => {
-        state.selectedTenant = null
-        state.showTenantModal = false
+        // Only clear tenant if we don't have one already
+        // If user has a selected tenant, keep it even if CSTAR fetch fails
+        // The CSTAR error is only critical if we need to select a tenant
+        if (!state.selectedTenant) {
+          state.showTenantModal = false
+        }
       })
-      .addCase(clearUser, () => initialState)
+      .addCase(clearUser, (state) => {
+        // Clear localStorage when user logs out
+        localStorage.removeItem(SELECTED_TENANT_STORAGE_KEY)
+        return initialState
+      })
   },
 })
 
