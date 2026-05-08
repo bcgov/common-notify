@@ -98,19 +98,14 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                 <tr key={mapping.id}>
                   <td>{mapping.client_id}</td>
                   <td>{mapping.tenant_name}</td>
-                  <td
-                    style={{
-                      width: '120px',
-                      textAlign: 'center',
-                    }}
-                  >
+                  <td style={{ width: '120px', textAlign: 'center' }}>
                     <StatusBadge isActive={mapping.is_active} />
                   </td>
                   <td>{getUserUsername(mapping.created_by, mapping.created_by_username)}</td>
                   <td title={new Date(mapping.created_at).toLocaleString()}>
                     {new Date(mapping.created_at).toLocaleDateString()}
                   </td>
-                  <td style={{ verticalAlign: 'middle', padding: '0.25rem 0.5rem' }}>
+                  <td>
                     <Toggle
                       checked={mapping.is_active}
                       onChange={() => handleToggleStatus(mapping)}

@@ -1,4 +1,12 @@
-import { IsString, IsArray, ArrayMinSize, Matches, ValidateNested } from 'class-validator'
+import {
+  IsString,
+  IsArray,
+  ArrayMinSize,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
 
@@ -46,6 +54,8 @@ export class LinkClientToTenantsDto {
     return value.trim()
   })
   @IsString()
+  @MinLength(1, { message: 'client_id cannot be empty' })
+  @MaxLength(128, { message: 'client_id must not exceed 128 characters' })
   @Matches(/^[a-zA-Z0-9._-]+$/, {
     message: 'client_id must contain only alphanumeric characters, dots, hyphens, and underscores',
   })
@@ -63,6 +73,8 @@ export class LinkClientToTenantsDto {
     return value
   })
   @IsString()
+  @MinLength(1, { message: 'client_secret cannot be empty' })
+  @MaxLength(256, { message: 'client_secret must not exceed 256 characters' })
   client_secret: string
 
   @ApiProperty({
