@@ -82,12 +82,12 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
         <div className="p-3 text-muted">No client-tenant mappings found</div>
       ) : (
         <div className="table-responsive">
-          <table className="table table-sm table-hover">
+          <table className="table table-sm table-hover" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 <th>Client ID</th>
                 <th>Tenant Name</th>
-                <th>Status</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
                 <th>Created By</th>
                 <th>Created At</th>
                 <th>Action</th>
@@ -98,13 +98,17 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                 <tr key={mapping.id}>
                   <td>{mapping.client_id}</td>
                   <td>{mapping.tenant_name}</td>
-                  <td>
+                  <td
+                    style={{
+                      width: '120px',
+                      textAlign: 'center',
+                    }}
+                  >
                     <StatusBadge isActive={mapping.is_active} />
                   </td>
                   <td>{getUserUsername(mapping.created_by, mapping.created_by_username)}</td>
-                  <td>
-                    {new Date(mapping.created_at).toLocaleDateString()}{' '}
-                    {new Date(mapping.created_at).toLocaleTimeString()}
+                  <td title={new Date(mapping.created_at).toLocaleString()}>
+                    {new Date(mapping.created_at).toLocaleDateString()}
                   </td>
                   <td>
                     <Button
