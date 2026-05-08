@@ -47,8 +47,8 @@ const AdminClients: FC = () => {
                 and generate client credentials
               </li>
               <li className="mb-2">
-                <strong>Provide Credentials:</strong> Click &quot;Register New Client&quot; and
-                enter your client ID and secret (secret is used only for verification)
+                <strong>Provide Credentials:</strong> Click &quot;Register New Client&quot; (to the
+                left) and enter your client ID and secret (secret is used only for verification)
               </li>
               <li className="mb-2">
                 <strong>Select Tenants:</strong> Choose which CSTAR tenants this client can access
@@ -58,7 +58,7 @@ const AdminClients: FC = () => {
                 complete the setup
               </li>
               <li>
-                <strong>Manage:</strong> View and disable/enable clients below as needed
+                <strong>Manage:</strong> View and disable/enable clients as needed
               </li>
             </ol>
           </Card>

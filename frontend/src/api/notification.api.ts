@@ -17,12 +17,17 @@ export const notificationApi = {
   /**
    * List all notification requests for the authenticated tenant
    * GET /api/v1/frontend/notification_request
+   * @param tenantId Required CSTAR external tenant ID to filter by
    * @param status Optional status filter to apply on the backend
    */
-  async listNotifications(status?: NotificationStatus | 'all') {
+  async listNotifications(tenantId: string, status?: NotificationStatus | 'all') {
     try {
       const params = generateApiParameters('/api/v1/frontend/notification_request')
-      const queryParams = status && status !== 'all' ? { status } : {}
+      const queryParams: any = {}
+      queryParams.tenantId = tenantId
+      if (status && status !== 'all') {
+        queryParams.status = status
+      }
       return await get<PaginatedResponse>({ ...params, params: queryParams })
     } catch (error) {
       const axiosError = error as AxiosError

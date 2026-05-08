@@ -12,7 +12,9 @@ export const fetchNotifications = createAsyncThunk<
   try {
     const state = getState()
     const status = state.notification.statusFilter
-    const response = await notificationApi.listNotifications(status)
+    const selectedTenant = state.tenant.selectedTenant
+    const tenantId = selectedTenant?.id
+    const response = await notificationApi.listNotifications(tenantId!, status)
     // Extract the data array from the paginated response
     return (response.data || response) as NotificationRequest[]
   } catch (error) {

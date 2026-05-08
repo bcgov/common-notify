@@ -2,6 +2,7 @@ import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 import { useAppSelector } from '@/redux/hooks'
 import { Button } from '@bcgov/design-system-react-components'
 import Card from '@/components/Card'
+import { StatusBadge } from '@/components/StatusBadge'
 import { getAllMappings, toggleMappingActiveStatus } from '@/api/admin.api'
 import type { ClientTenantMapping } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
@@ -98,9 +99,7 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                   <td>{mapping.client_id}</td>
                   <td>{mapping.tenant_name}</td>
                   <td>
-                    <span className={`badge ${mapping.is_active ? 'bg-success' : 'bg-secondary'}`}>
-                      {mapping.is_active ? 'Active' : 'Disabled'}
-                    </span>
+                    <StatusBadge isActive={mapping.is_active} />
                   </td>
                   <td>{getUserUsername(mapping.created_by, mapping.created_by_username)}</td>
                   <td>

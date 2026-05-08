@@ -37,7 +37,14 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Get()
+  @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
+  @ApiQuery({
+    name: 'tenantId',
+    required: true,
+    type: String,
+    description: 'CSTAR external tenant ID to filter by',
+  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -60,13 +67,14 @@ export class NotificationFrontendController {
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
   findAll(
+    @Query('tenantId') tenantExternalId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(pageNum, limitNum, status)
+    return this.notificationService.findAll(tenantExternalId, pageNum, limitNum, status)
   }
 
   @Version('1')
