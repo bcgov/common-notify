@@ -4,16 +4,16 @@ on:
   push:
     branches: [main, crunchy-demo]
     paths-ignore:
-      - '*.md'
-      - '.github/**'
-      - '.github/graphics/**'
-      - '!.github/workflows/**'
+      - "*.md"
+      - ".github/**"
+      - ".github/graphics/**"
+      - "!.github/workflows/**"
   workflow_dispatch:
     inputs:
       tag:
         description: "Image tag set to deploy; e.g. PR number or prod"
         type: string
-        default: 'prod'
+        default: "prod"
 
 concurrency:
   # Do not interrupt previous workflows
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-24.04
     concurrency:
       group: gateway-config-apply
-      cancel-in-progress: false  # Queue instead of canceling
+      cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
       - name: Generate gateway configuration
@@ -102,7 +102,7 @@ jobs:
       environment: DEV
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set frontend.secrets.enabled=false
+      params: --set frontend.secrets.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: dev
@@ -116,7 +116,7 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set frontend.secrets.enabled=false
+      params: --set frontend.secrets.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: test

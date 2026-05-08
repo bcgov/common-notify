@@ -3,10 +3,10 @@ name: PR
 on:
   pull_request:
     paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.devcontainer/**'
-      - 'LICENSE'
+      - "**.md"
+      - "docs/**"
+      - ".devcontainer/**"
+      - "LICENSE"
 
 concurrency:
   # Cancel in progress for PR open and close
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-24.04
     concurrency:
       group: gateway-config-apply
-      cancel-in-progress: false  # Queue instead of canceling
+      cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
 
@@ -98,7 +98,7 @@ jobs:
       oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
-      params: --set global.secrets.persist=false --set frontend.secrets.enabled=false
+      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
