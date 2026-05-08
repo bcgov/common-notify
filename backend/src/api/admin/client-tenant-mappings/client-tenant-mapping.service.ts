@@ -84,7 +84,8 @@ export class ClientTenantMappingService {
         const slug = tenantRef.name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '')
+          .replace(/^-+/, '')
+          .replace(/-+$/, '')
 
         tenant = this.tenantRepository.create({
           externalId: tenantRef.id,
