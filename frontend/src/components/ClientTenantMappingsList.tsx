@@ -1,8 +1,8 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 import { useAppSelector } from '@/redux/hooks'
-import { Button } from '@bcgov/design-system-react-components'
 import Card from '@/components/Card'
 import { StatusBadge } from '@/components/StatusBadge'
+import { Toggle } from '@/components/Toggle'
 import { getAllMappings, toggleMappingActiveStatus } from '@/api/admin.api'
 import type { ClientTenantMapping } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
@@ -110,18 +110,16 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
                   <td title={new Date(mapping.created_at).toLocaleString()}>
                     {new Date(mapping.created_at).toLocaleDateString()}
                   </td>
-                  <td>
-                    <Button
-                      variant={mapping.is_active ? 'secondary' : 'primary'}
-                      onPress={() => handleToggleStatus(mapping)}
-                      isDisabled={togglingId === mapping.id}
-                    >
-                      {togglingId === mapping.id
-                        ? 'Loading...'
-                        : mapping.is_active
-                          ? 'Disable'
-                          : 'Enable'}
-                    </Button>
+                  <td style={{ verticalAlign: 'middle', padding: '0.25rem 0.5rem' }}>
+                    <Toggle
+                      checked={mapping.is_active}
+                      onChange={() => handleToggleStatus(mapping)}
+                      disabled={togglingId === mapping.id}
+                      ariaLabel={
+                        mapping.is_active ? 'Disable client mapping' : 'Enable client mapping'
+                      }
+                      title={mapping.is_active ? 'Click to disable' : 'Click to enable'}
+                    />
                   </td>
                 </tr>
               ))}

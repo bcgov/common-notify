@@ -41,6 +41,7 @@ const AdminClients: FC = () => {
                   href="https://api.gov.bc.ca/devportal/api-directory"
                   target="_blank"
                   rel="noopener noreferrer"
+                  style={{ color: '#003366', fontWeight: 'bold', textDecoration: 'underline' }}
                 >
                   API Portal
                 </a>{' '}
