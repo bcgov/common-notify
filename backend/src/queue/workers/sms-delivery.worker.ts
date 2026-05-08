@@ -1,8 +1,11 @@
-import { Logger } from '@nestjs/common'
+import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
-import { NotificationService } from '../../notification/notification.service'
+import { NotificationService } from '../../api/notification/notification.service'
+import { TemplatesRepository } from '../../api/templates/templates.repository'
+import { TemplatesService } from '../../api/templates/templates.service'
+import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
 
@@ -28,6 +31,9 @@ export class SmsDeliveryWorker {
    * @param smsQueue The BullMQ queue instance for SMS delivery jobs
    * @param notificationService Service for database updates
    * @param configService Configuration service for queue settings
+   * @param templatesRepository Repository for template resolution
+   * @param templatesService Service for template rendering
+   * @param inlineRenderingService Service for inline template rendering
    * @param smsAdapter SMS transport adapter for sending SMS messages
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
@@ -35,6 +41,9 @@ export class SmsDeliveryWorker {
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
+    templatesRepository: TemplatesRepository,
+    templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
     smsAdapter: ISmsTransport,
     concurrency: number = 2,
   ): Promise<void> {
@@ -45,11 +54,9 @@ export class SmsDeliveryWorker {
     // Register the job processor with configurable concurrency
     // Note: Don't await process() - it sets up listeners and never resolves
     smsQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId, tenantId, payload, attempt } = job.data
+      const { notifyId, tenantId, payload, request } = job.data
 
-      logger.debug(
-        `[${notifyId}] Processing SMS delivery job (attempt ${attempt + 1}/3) for tenant=${tenantId}`,
-      )
+      logger.debug(`[${notifyId}] Processing SMS delivery job for tenant=${tenantId}`)
 
       try {
         // Validate DeliveryJobPayload structure
@@ -59,24 +66,87 @@ export class SmsDeliveryWorker {
         if (!tenantId || typeof tenantId !== 'string') {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
-        if (typeof attempt !== 'number' || attempt < 0) {
-          throw new Error('Invalid delivery job: attempt is missing or invalid')
-        }
 
         // Validate job data
         if (!payload || typeof payload !== 'object') {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
+        // Resolve template if templateId is provided in the original request
+        let resolvedPayload = payload
+        if (request?.templateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+          try {
+            const template = await templatesRepository.findById(tenantId, request.templateId)
+            if (!template) {
+              throw new NotFoundException(
+                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+              )
+            }
+
+            // Merge template content into SMS payload if channel matches
+            if (template.channelCode === 'SMS') {
+              // Render the template with personalisation data from request.params
+              // Use request's bodyType if provided, otherwise template's default
+              const rendered = await templatesService.renderTemplateContent(
+                template,
+                request.params || {},
+                payload.content?.bodyType,
+              )
+
+              resolvedPayload = {
+                ...payload,
+                content: {
+                  ...payload.content,
+                  body: rendered.body,
+                  bodyType: rendered.bodyType,
+                },
+              }
+              logger.debug(`[${notifyId}] Template resolved and rendered into SMS payload`)
+            }
+          } catch (templateError) {
+            logger.error(
+              `[${notifyId}] Failed to resolve template: ${(templateError as Error).message}`,
+            )
+            throw templateError
+          }
+        } else if (payload.content?.renderer) {
+          // Handle inline rendering if renderer is specified and no templateId
+          logger.debug(
+            `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
+          )
+          try {
+            const rendered = await inlineRenderingService.renderSms(
+              payload.content,
+              payload.params || request?.params,
+            )
+
+            resolvedPayload = {
+              ...payload,
+              content: {
+                ...payload.content,
+                body: rendered.body,
+              },
+            }
+            logger.debug(`[${notifyId}] Inline content rendered successfully`)
+          } catch (renderError) {
+            logger.error(
+              `[${notifyId}] Failed to render inline content: ${(renderError as Error).message}`,
+            )
+            throw renderError
+          }
+        }
+
         if (
-          !payload.recipients ||
-          !Array.isArray(payload.recipients) ||
-          payload.recipients.length === 0
+          !resolvedPayload.recipients ||
+          !resolvedPayload.recipients.to ||
+          !Array.isArray(resolvedPayload.recipients.to) ||
+          resolvedPayload.recipients.to.length === 0
         ) {
           throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
-        if (!payload.body || typeof payload.body !== 'string') {
+        if (!resolvedPayload.content?.body || typeof resolvedPayload.content.body !== 'string') {
           throw new Error('Invalid SMS payload: body is missing or invalid')
         }
 
@@ -89,7 +159,7 @@ export class SmsDeliveryWorker {
 
         // Send SMS using the injected adapter
         const result = await SmsDeliveryWorker.sendSmsViaAdapter(
-          payload,
+          resolvedPayload,
           logger,
           notifyId,
           smsAdapter,
@@ -107,14 +177,14 @@ export class SmsDeliveryWorker {
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
+        const attempt = (job.attemptsMade || 0) + 1
         logger.error(
-          `[${notifyId}] Failed to send SMS delivery job (attempt ${attempt + 1}/3): ${errorMessage}`,
+          `[${notifyId}] Failed to send SMS delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
 
-        // Update status to FAILED on final attempt
-        if (attempt >= 2) {
-          // Last attempt (0, 1, 2 = 3 total attempts)
+        // Update status to FAILED only on final attempt (when no retries left)
+        if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {
           await notificationService.update(notifyId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',
@@ -160,14 +230,9 @@ export class SmsDeliveryWorker {
     notifyId: string,
     smsAdapter: ISmsTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(
-      `[${notifyId}] Sending SMS via ${smsAdapter.name} adapter to: ${payload.recipients}`,
-    )
+    logger.debug(`[${notifyId}] Sending SMS via ${smsAdapter.name} adapter`)
 
-    const result = await smsAdapter.send({
-      to: payload.recipients,
-      body: payload.body,
-    })
+    const result = await smsAdapter.send(payload as any)
 
     return {
       externalId: result.messageId || `${smsAdapter.name}-${Date.now()}`,

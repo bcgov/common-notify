@@ -3,9 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { CodeTablesService } from './code-tables.service'
-import { NotificationStatusCode } from '../../notification/entities/notification-status-code.entity'
-import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
-import { NotificationEventTypeCode } from '../../notification/entities/notification-event-type-code.entity'
+import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
+import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
+import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 
 describe('CodeTablesService', () => {
   let service: CodeTablesService
@@ -17,6 +17,7 @@ describe('CodeTablesService', () => {
     {
       code: 'sent',
       description: 'Notification sent successfully',
+      displayName: 'Sent',
       createdAt: new Date(),
       createdBy: 'system',
       updatedAt: new Date(),
@@ -25,6 +26,7 @@ describe('CodeTablesService', () => {
     {
       code: 'failed',
       description: 'Notification failed to send',
+      displayName: 'Failed',
       createdAt: new Date(),
       createdBy: 'system',
       updatedAt: new Date(),
@@ -33,6 +35,7 @@ describe('CodeTablesService', () => {
     {
       code: 'pending',
       description: 'Notification pending',
+      displayName: 'Pending',
       createdAt: new Date(),
       createdBy: 'system',
       updatedAt: new Date(),
@@ -44,6 +47,7 @@ describe('CodeTablesService', () => {
     {
       channelCode: 'EMAIL',
       description: 'Email notification channel',
+      displayName: 'Email',
       createdAt: new Date(),
       createdBy: 'system',
       updatedAt: new Date(),
@@ -52,6 +56,7 @@ describe('CodeTablesService', () => {
     {
       channelCode: 'SMS',
       description: 'SMS notification channel',
+      displayName: 'SMS',
       createdAt: new Date(),
       createdBy: 'system',
       updatedAt: new Date(),
@@ -63,6 +68,7 @@ describe('CodeTablesService', () => {
     {
       eventTypeCode: 'PASSWORD_RESET',
       description: 'Password reset notification',
+      displayName: 'Password Reset',
       is_mandatory: true,
       createdAt: new Date(),
       createdBy: 'system',
@@ -72,6 +78,7 @@ describe('CodeTablesService', () => {
     {
       eventTypeCode: 'INVOICE_SENT',
       description: 'Invoice sent notification',
+      displayName: 'Invoice Sent',
       is_mandatory: false,
       createdAt: new Date(),
       createdBy: 'system',
@@ -120,8 +127,8 @@ describe('CodeTablesService', () => {
       expect(result).toHaveLength(3)
       expect(result[0]).toEqual({
         id: 'sent',
-        label: 'Notification sent successfully',
-        description: 'sent',
+        label: 'Sent',
+        description: 'Notification sent successfully',
       })
       expect(statusCodeRepo.find).toHaveBeenCalledWith({
         order: { code: 'ASC' },
@@ -153,8 +160,8 @@ describe('CodeTablesService', () => {
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
         id: 'EMAIL',
-        label: 'Email notification channel',
-        description: 'EMAIL',
+        label: 'Email',
+        description: 'Email notification channel',
       })
       expect(channelCodeRepo.find).toHaveBeenCalledWith({
         order: { channelCode: 'ASC' },
@@ -186,8 +193,8 @@ describe('CodeTablesService', () => {
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
         id: 'PASSWORD_RESET',
-        label: 'Password reset notification',
-        description: 'PASSWORD_RESET',
+        label: 'Password Reset',
+        description: 'Password reset notification',
       })
       expect(eventTypeCodeRepo.find).toHaveBeenCalledWith({
         order: { eventTypeCode: 'ASC' },

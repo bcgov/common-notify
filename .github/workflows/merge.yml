@@ -58,8 +58,10 @@ jobs:
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           commands: |
-            # Import dev tag
-            oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev ${{ matrix.package }}:dev --source=docker --reference-policy=local
+            # Import dev tag with scheduled re-import to prevent caching issues
+            oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev ${{ matrix.package }}:dev --source=docker --reference-policy=local --scheduled
+            # Force immediate re-import to ensure latest image is pulled (non-fatal if it conflicts)
+            oc import-image ${{ matrix.package }}:dev --from=ghcr.io/${{ github.repository }}/${{ matrix.package }}:dev --confirm || true
             # Tag as test for TEST environment
             oc tag ${{ matrix.package }}:dev ${{ matrix.package }}:test
 

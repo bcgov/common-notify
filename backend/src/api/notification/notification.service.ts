@@ -1,0 +1,319 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { NotificationRequest } from './entities/notification-request.entity'
+import {
+  CreateNotificationRequestDto,
+  NotificationStatus,
+} from './schemas/create-notification-request'
+import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
+import { NotificationRequestDto } from './schemas/notification-request'
+import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import { TenantsService } from '../admin/tenants/tenants.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
+import { TemplatesRepository } from '../templates/templates.repository'
+
+@Injectable()
+export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name)
+
+  // Validation limits (configurable via environment variables)
+  private readonly emailMaxRecipients: number
+  private readonly emailMaxSubjectLength: number
+  private readonly emailMaxBodyLength: number
+  private readonly smsMaxRecipients: number
+  private readonly smsMaxBodyLength: number
+  private readonly msgAppMaxRecipients: number
+  private readonly msgAppMaxBodyLength: number
+
+  constructor(
+    @InjectRepository(NotificationRequest)
+    private readonly notificationRepository: Repository<NotificationRequest>,
+    private readonly tenantsService: TenantsService,
+    private readonly configService: ConfigService,
+    private readonly templatesRepository: TemplatesRepository,
+    private readonly notificationPubSubService: NotificationPubSubService,
+  ) {
+    // Load validation limits from environment variables with sensible defaults
+    this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
+    this.emailMaxSubjectLength =
+      this.configService.get<number>('VALIDATE_EMAIL_MAX_SUBJECT_LENGTH') ?? 500
+    this.emailMaxBodyLength =
+      this.configService.get<number>('VALIDATE_EMAIL_MAX_BODY_LENGTH') ?? 50000
+    this.smsMaxRecipients = this.configService.get<number>('VALIDATE_SMS_MAX_RECIPIENTS') ?? 50
+    this.smsMaxBodyLength = this.configService.get<number>('VALIDATE_SMS_MAX_BODY_LENGTH') ?? 1600
+    this.msgAppMaxRecipients =
+      this.configService.get<number>('VALIDATE_MSGAPP_MAX_RECIPIENTS') ?? 100
+    this.msgAppMaxBodyLength =
+      this.configService.get<number>('VALIDATE_MSGAPP_MAX_BODY_LENGTH') ?? 50000
+  }
+
+  /**
+   * Maps NotificationRequest entity to NotificationRequestDto with tenant data
+   */
+  private mapToDto(entity: NotificationRequest): NotificationRequestDto {
+    return {
+      id: entity.id,
+      tenantId: entity.tenantId,
+      status: entity.status,
+      createdAt: entity.createdAt,
+      createdBy: entity.createdBy,
+      updatedAt: entity.updatedAt,
+      updatedBy: entity.updatedBy,
+      tenant: entity.tenant
+        ? {
+            id: entity.tenant.id,
+            name: entity.tenant.name,
+            slug: entity.tenant.slug,
+          }
+        : undefined,
+    }
+  }
+
+  async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
+    const notification = this.notificationRepository.create({
+      tenantId: dto.tenantId,
+      status: dto.status ?? NotificationStatus.QUEUED,
+      createdBy: dto.createdBy,
+      payload: dto.payload,
+    })
+    const saved = await this.notificationRepository.save(notification)
+    this.logger.debug(`Created notification request: ${saved.id}`)
+    return saved
+  }
+
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+  ): Promise<PaginatedNotificationResponse> {
+    // Ensure page and limit are valid
+    const pageNum = Math.max(1, page)
+    const limitNum = Math.min(Math.max(1, limit), 100) // Cap at 100 to prevent abuse
+
+    const skip = (pageNum - 1) * limitNum
+
+    // Build where clause - include status filter if provided
+    const where: any = {}
+    if (status && status !== 'all') {
+      where.status = status
+    }
+
+    // Get both the data and total count
+    const [notifications, total] = await this.notificationRepository.findAndCount({
+      where,
+      skip,
+      take: limitNum,
+      order: { createdAt: 'DESC' },
+    })
+
+    const totalPages = Math.ceil(total / limitNum)
+
+    return {
+      data: notifications.map((n) => this.mapToDto(n)),
+      count: total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+    }
+  }
+
+  async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
+    const notification = await this.notificationRepository.findOne({ where: { id, tenantId } })
+    if (!notification) {
+      throw new NotFoundException(`Notification request with id '${id}' not found`)
+    }
+    return notification
+  }
+
+  // Demo route, to be removed
+  async getTenants(): Promise<any> {
+    return this.tenantsService.findAll()
+  }
+
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateNotificationRequestDto,
+  ): Promise<NotificationRequest> {
+    // Verify the record exists first
+    await this.findOne(id, tenantId)
+
+    // Build update object with only fields that were provided
+    const updateData: any = {}
+    if (dto.status !== undefined) updateData.status = dto.status
+    if (dto.updatedBy !== undefined) updateData.updatedBy = dto.updatedBy
+    if (dto.errorReason !== undefined) updateData.errorReason = dto.errorReason
+
+    // Use query builder for explicit update (status field is part of FK constraint so TypeORM won't track it normally)
+    await this.notificationRepository.update({ id, tenantId }, updateData)
+
+    // Fetch and return updated record
+    const updated = await this.findOne(id, tenantId)
+    this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
+    await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
+    return updated
+  }
+
+  /**
+   * Validates business rules before queuing a notification.
+   * This complements the DTO validation which only checks structure/format.
+   *
+   * Business rules checked:
+   * - Tenant exists and is active
+   * - At least one channel has recipients
+   * - Recipients counts are within reasonable limits
+   * - Content is present and reasonable length
+   *
+   * @param tenantId UUID of the tenant making the request
+   * @param request The NotifySimpleRequest to validate
+   * @returns Array of validation error messages (empty if valid)
+   */
+  async validateBusinessRules(tenantId: string, request: NotifySimpleRequest): Promise<string[]> {
+    const errors: string[] = []
+
+    // Verify tenant exists and is active
+    const tenant = await this.tenantsService.findOne(tenantId)
+    if (!tenant) {
+      errors.push(`Tenant '${tenantId}' not found`)
+      return errors // Stop here, can't proceed without valid tenant
+    }
+
+    if (tenant.status !== 'active') {
+      errors.push(`Tenant is not active (status: ${tenant.status})`)
+    }
+
+    // Validate template if templateId is provided
+    if (request.templateId) {
+      try {
+        const template = await this.templatesRepository.findById(tenantId, request.templateId)
+        if (!template) {
+          errors.push(
+            `Template '${request.templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
+          )
+        } else {
+          // Verify template has required channel codes for requested channels
+          const requestedChannels = []
+          if (request.email?.recipients) requestedChannels.push('EMAIL')
+          if (request.sms?.recipients) requestedChannels.push('SMS')
+          if (request.msgApp?.recipients) requestedChannels.push('MSGAPP')
+
+          const templateChannelCode = template.channelCode
+
+          for (const channel of requestedChannels) {
+            if (templateChannelCode !== channel) {
+              errors.push(
+                `Template '${request.templateId}' has channel code '${templateChannelCode}' but requested channel is '${channel}'.`,
+              )
+            }
+          }
+        }
+      } catch (error) {
+        errors.push(
+          `Failed to validate template: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
+
+    // Ensure at least one channel has recipients
+    const emailRecipients = request.email?.recipients?.to?.length ?? 0
+    const smsRecipients = request.sms?.recipients?.to?.length ?? 0
+    const msgAppRecipients = request.msgApp?.recipients?.to?.length ?? 0
+    const totalRecipients = emailRecipients + smsRecipients + msgAppRecipients
+
+    if (totalRecipients === 0) {
+      errors.push('At least one recipient is required (email, SMS, or msgApp)')
+    }
+
+    // Validate email channel
+    if (request.email?.recipients?.to) {
+      if (request.email.recipients.to.length > this.emailMaxRecipients) {
+        errors.push(
+          `Too many email recipients (${request.email.recipients.to.length}). Max: ${this.emailMaxRecipients}`,
+        )
+      }
+
+      // Only validate content if not using a template (template provides subject/body)
+      if (!request.templateId) {
+        if (!request.email.content?.subject?.trim()) {
+          errors.push('Email subject cannot be empty')
+        }
+
+        if (
+          request.email.content?.subject &&
+          request.email.content.subject.length > this.emailMaxSubjectLength
+        ) {
+          errors.push(
+            `Email subject too long (${request.email.content.subject.length}). Max: ${this.emailMaxSubjectLength}`,
+          )
+        }
+
+        if (!request.email.content?.body?.trim()) {
+          errors.push('Email body cannot be empty')
+        }
+
+        if (
+          request.email.content?.body &&
+          request.email.content.body.length > this.emailMaxBodyLength
+        ) {
+          errors.push(
+            `Email body too long (${request.email.content.body.length}). Max: ${this.emailMaxBodyLength} characters`,
+          )
+        }
+      }
+    }
+
+    // Validate SMS channel
+    if (request.sms?.recipients?.to) {
+      if (request.sms.recipients.to.length > this.smsMaxRecipients) {
+        errors.push(
+          `Too many SMS recipients (${request.sms.recipients.to.length}). Max: ${this.smsMaxRecipients}`,
+        )
+      }
+
+      // Only validate content if not using a template (template provides body)
+      if (!request.templateId) {
+        if (!request.sms.content?.body?.trim()) {
+          errors.push('SMS body cannot be empty')
+        }
+
+        if (request.sms.content?.body && request.sms.content.body.length > this.smsMaxBodyLength) {
+          // SMS can be split across multiple messages, but warn if very long
+          errors.push(
+            `SMS body too long (${request.sms.content.body.length}). Max: ${this.smsMaxBodyLength} characters`,
+          )
+        }
+      }
+    }
+
+    // Validate msgApp channel
+    if (request.msgApp?.recipients?.to) {
+      if (request.msgApp.recipients.to.length > this.msgAppMaxRecipients) {
+        errors.push(
+          `Too many msgApp recipients (${request.msgApp.recipients.to.length}). Max: ${this.msgAppMaxRecipients}`,
+        )
+      }
+
+      // Only validate content if not using a template (template provides body)
+      if (!request.templateId) {
+        if (!request.msgApp.content?.body?.trim()) {
+          errors.push('MsgApp body cannot be empty')
+        }
+
+        if (
+          request.msgApp.content?.body &&
+          request.msgApp.content.body.length > this.msgAppMaxBodyLength
+        ) {
+          errors.push(
+            `MsgApp body too long (${request.msgApp.content.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
+          )
+        }
+      }
+    }
+
+    return errors
+  }
+}

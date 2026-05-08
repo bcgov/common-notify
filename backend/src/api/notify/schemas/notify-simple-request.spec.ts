@@ -10,9 +10,12 @@ describe('NotifySimpleRequest', () => {
     it('should create a valid instance with email channel', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -21,14 +24,18 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.email).toBeDefined()
-      expect(instance.email?.recipients).toEqual(['test@example.com'])
+      expect(instance.email?.recipients.to).toEqual(['test@example.com'])
     })
 
     it('should create a valid instance with sms channel', async () => {
       const data = {
         sms: {
-          recipients: ['+16045551234', '+16045555678'],
-          body: 'Test SMS',
+          recipients: {
+            to: ['+16045551234', '+16045555678'],
+          },
+          content: {
+            body: 'Test SMS',
+          },
         },
       }
 
@@ -42,13 +49,20 @@ describe('NotifySimpleRequest', () => {
     it('should create a valid instance with email and sms channels', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
         sms: {
-          recipients: ['+16045551234', '+16045555678'],
-          body: 'Test SMS',
+          recipients: {
+            to: ['+16045551234', '+16045555678'],
+          },
+          content: {
+            body: 'Test SMS',
+          },
         },
       }
 
@@ -68,9 +82,12 @@ describe('NotifySimpleRequest', () => {
           custom: 'value',
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -101,9 +118,12 @@ describe('NotifySimpleRequest', () => {
     it('should allow only email channel', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -117,8 +137,12 @@ describe('NotifySimpleRequest', () => {
     it('should allow only sms channel', async () => {
       const data = {
         sms: {
-          recipients: ['+16045551234'],
-          body: 'Test SMS',
+          recipients: {
+            to: ['+16045551234'],
+          },
+          content: {
+            body: 'Test SMS',
+          },
         },
       }
 
@@ -139,9 +163,12 @@ describe('NotifySimpleRequest', () => {
           key3: true,
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -160,9 +187,12 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: {},
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -177,9 +207,12 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: 'not an object',
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -196,32 +229,35 @@ describe('NotifySimpleRequest', () => {
     it('should transform email to NotifyEmailChannel instance', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          cc: ['cc@example.com'],
-          bcc: ['bcc@example.com'],
-          subject: 'Test',
-          body: 'Test body',
-          bodyType: 'html',
-          priority: 'high',
+          recipients: {
+            to: ['test@example.com'],
+            cc: ['cc@example.com'],
+            bcc: ['bcc@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+            renderer: 'handlebars',
+          },
         },
       }
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
       expect(instance.email).toBeInstanceOf(NotifyEmailChannel)
-      expect(instance.email?.recipients).toEqual(['test@example.com'])
-      expect(instance.email?.cc).toEqual(['cc@example.com'])
-      expect(instance.email?.bcc).toEqual(['bcc@example.com'])
-      expect(instance.email?.bodyType).toBe('html')
-      expect(instance.email?.priority).toBe('high')
+      expect(instance.email?.recipients.to).toEqual(['test@example.com'])
+      expect(instance.email?.recipients.cc).toEqual(['cc@example.com'])
+      expect(instance.email?.recipients.bcc).toEqual(['bcc@example.com'])
     })
 
     it('should transform sms to NotifySmsChannel instance', async () => {
       const data = {
         sms: {
-          recipients: ['+16045551234'],
-          body: 'Test SMS',
-          priority: 'normal',
+          recipients: {
+            to: ['+16045551234'],
+          },
+          content: {
+            body: 'Test SMS',
+          },
         },
       }
 
@@ -244,9 +280,12 @@ describe('NotifySimpleRequest', () => {
           timestamp: 1234567890,
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -265,9 +304,12 @@ describe('NotifySimpleRequest', () => {
           isDeleted: false,
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -286,9 +328,12 @@ describe('NotifySimpleRequest', () => {
           undefinedValue: undefined,
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          },
         },
       }
 
@@ -305,9 +350,8 @@ describe('NotifySimpleRequest', () => {
       const data = {
         params: { key: 'value' },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
         sms: {
           recipients: '+16045551234',
@@ -317,7 +361,9 @@ describe('NotifySimpleRequest', () => {
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
-      expect(Object.keys(instance).sort()).toEqual(['email', 'msgApp', 'params', 'sms'].sort())
+      expect(Object.keys(instance).sort()).toEqual(
+        ['email', 'msgApp', 'params', 'sms', 'templateId'].sort(),
+      )
     })
 
     it('should handle deeply nested params', async () => {
@@ -330,9 +376,8 @@ describe('NotifySimpleRequest', () => {
           },
         },
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -349,9 +394,8 @@ describe('NotifySimpleRequest', () => {
     it('should accept ISO 8601 date format with Z for delayedSend', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           delayedSend: '2026-04-28T10:00:00Z',
         },
       }
@@ -366,9 +410,8 @@ describe('NotifySimpleRequest', () => {
     it('should accept ISO 8601 date format with offset for delayedSend', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           delayedSend: '2026-04-28T10:00:00-07:00',
         },
       }
@@ -383,9 +426,8 @@ describe('NotifySimpleRequest', () => {
     it('should accept relaxed date format with timezone abbreviation', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           delayedSend: '2026-04-28 10:00:00 PST',
         },
       }
@@ -400,9 +442,8 @@ describe('NotifySimpleRequest', () => {
     it('should reject date format without timezone', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           delayedSend: '2026-04-28 10:00:00',
         },
       }
@@ -417,9 +458,8 @@ describe('NotifySimpleRequest', () => {
     it('should reject invalid date format for delayedSend', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           delayedSend: 'not a valid date',
         },
       }
@@ -434,7 +474,7 @@ describe('NotifySimpleRequest', () => {
     it('should allow delayedSend with sms channel', async () => {
       const data = {
         sms: {
-          recipients: ['+16045551234'],
+          recipients: { to: ['+16045551234'] },
           body: 'Test SMS',
           delayedSend: '2026-04-28T10:00:00Z',
         },
@@ -450,9 +490,8 @@ describe('NotifySimpleRequest', () => {
     it('should be optional field', async () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
           // No delayedSend field
         },
       }
@@ -462,6 +501,55 @@ describe('NotifySimpleRequest', () => {
 
       expect(errors).toHaveLength(0)
       expect(instance.email?.delayedSend).toBeUndefined()
+    })
+  })
+
+  describe('Template ID Validation', () => {
+    it('should accept valid UUID templateId', async () => {
+      const data = {
+        templateId: '550e8400-e29b-41d4-a716-446655440000',
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.templateId).toBe('550e8400-e29b-41d4-a716-446655440000')
+    })
+
+    it('should reject invalid UUID templateId', async () => {
+      const data = {
+        templateId: 'not-a-uuid',
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      const templateIdErrors = errors.filter((err) => err.property === 'templateId')
+      expect(templateIdErrors.length).toBeGreaterThan(0)
+    })
+
+    it('should allow templateId to be optional', async () => {
+      const data = {
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.templateId).toBeUndefined()
     })
   })
 
@@ -481,9 +569,8 @@ describe('NotifySimpleRequest', () => {
     it('should filter out extra properties not in schema', () => {
       const data = {
         email: {
-          recipients: ['test@example.com'],
-          subject: 'Test',
-          body: 'Test body',
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
         extraPropertyNotInSchema: 'should be ignored',
         anotherExtra: 123,

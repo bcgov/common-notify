@@ -20,6 +20,7 @@ jobs:
     secrets:
       oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
       oc_token: ${{ secrets.OC_DEV_TOKEN }}
+      oc_server: https://api.silver.devops.gov.bc.ca:6443
     with:
       cleanup: helm
       packages: backend frontend migrations

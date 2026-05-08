@@ -4,13 +4,16 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EmailDeliveryWorker } from './email-delivery.worker'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { NotificationStatus } from '../../notification/schemas'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 import { IEmailTransport } from '../../adapters'
 
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockConfigService: any
+  let mockTemplatesRepository: any
+  let mockTemplatesService: any
+  let mockInlineRenderingService: any
   let mockEmailAdapter: IEmailTransport
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
@@ -41,6 +44,28 @@ describe('EmailDeliveryWorker', () => {
           'queue.jobBackoffDelay': 2000,
         }
         return config[key]
+      }),
+    }
+
+    // Mock the templates repository
+    mockTemplatesRepository = {
+      findById: vi.fn().mockResolvedValue(null),
+    }
+
+    // Mock the templates service
+    mockTemplatesService = {
+      renderTemplateContent: vi.fn().mockReturnValue({
+        subject: 'Rendered Subject',
+        body: 'Rendered Body',
+      }),
+    }
+
+    // Mock the inline rendering service
+    mockInlineRenderingService = {
+      renderContent: vi.fn().mockResolvedValue({
+        subject: 'Rendered Subject',
+        body: 'Rendered Body',
+        bodyType: 'html',
       }),
     }
 
@@ -78,6 +103,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -89,6 +117,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -101,6 +132,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -109,13 +143,21 @@ describe('EmailDeliveryWorker', () => {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test Email',
-            body: 'Test body',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -149,6 +191,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -157,13 +202,25 @@ describe('EmailDeliveryWorker', () => {
           notifyId: 'notify-456',
           tenantId: 'tenant-456',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test1@example.com', 'test2@example.com', 'test3@example.com'],
-            subject: 'Multi-recipient Email',
-            body: 'Test for multiple recipients',
+            recipients: { to: ['test1@example.com', 'test2@example.com', 'test3@example.com'] },
+            content: {
+              subject: 'Multi-recipient Email',
+              body: 'Test for multiple recipients',
+              bodyType: 'html',
+            },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -177,6 +234,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -188,6 +248,14 @@ describe('EmailDeliveryWorker', () => {
           payload: undefined,
           attempt: 0,
         } as any as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -203,6 +271,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -212,12 +283,20 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            subject: 'Test',
-            body: 'Test body',
+            content: { subject: 'Test', body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -230,6 +309,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -239,12 +321,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            body: 'Test body',
+            recipients: { to: ['test@example.com'] },
+            content: { body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -257,6 +348,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -266,12 +360,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', bodyType: 'html' }, // body is missing
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -284,6 +387,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -293,13 +399,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test body',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -312,6 +426,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -321,13 +438,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: null as any,
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test body',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
@@ -340,6 +465,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -349,18 +477,27 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test body',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body', bodyType: 'html' },
           },
           attempt: -1,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
-      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Invalid delivery job: attempt is missing or invalid',
-      )
+      // Note: attempt field in payload is not validated/used by worker
+      // Worker uses job.attemptsMade from Bull queue metadata instead
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+      expect(result.success).toBe(true)
     })
 
     it('should mark notification as FAILED on final attempt (attempt 2)', async () => {
@@ -368,6 +505,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -380,13 +520,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-fail',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Will fail',
-            body: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Will fail', body: 'Test', bodyType: 'html' },
           },
           attempt: 2, // Final attempt (0, 1, 2 = 3 total)
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow('DB Error')
@@ -406,6 +554,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -415,13 +566,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-retry',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Will retry',
-            body: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Will retry', body: 'Test', bodyType: 'html' },
           },
           attempt: 0, // First attempt
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       // Mock adapter to throw error
@@ -460,6 +619,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -469,13 +631,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -492,6 +662,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -505,7 +678,13 @@ describe('EmailDeliveryWorker', () => {
           attempt: 0,
         } as any as DeliveryJobPayload,
         attemptsMade: 1,
-        opts: { attempts: 3 },
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
       }
 
       const error = new Error('Test error')
@@ -524,6 +703,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -533,13 +715,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -558,6 +748,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -567,13 +760,21 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['test@example.com'],
-            subject: 'Test',
-            body: 'Test',
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -593,6 +794,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
       )
 
@@ -602,15 +806,25 @@ describe('EmailDeliveryWorker', () => {
 
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
+          request: {},
           payload: {
-            recipients: ['recipient@example.com'],
-            cc: ['cc@example.com'],
-            bcc: ['bcc@example.com'],
-            subject: 'Test Email',
-            body: 'Test with CC/BCC',
+            recipients: {
+              to: ['recipient@example.com'],
+              cc: ['cc@example.com'],
+              bcc: ['bcc@example.com'],
+            },
+            content: { subject: 'Test Email', body: 'Test with CC/BCC', bodyType: 'html' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        } as any,
+        attemptsMade: 0,
       }
 
       const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
@@ -626,6 +840,9 @@ describe('EmailDeliveryWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
         mockEmailAdapter,
         5, // Custom concurrency
       )

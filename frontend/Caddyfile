@@ -31,7 +31,8 @@
 		respond `window.VITE_KEYCLOAK_URL="{$VITE_KEYCLOAK_URL}";
 window.VITE_KEYCLOAK_REALM="{$VITE_KEYCLOAK_REALM}";
 window.VITE_KEYCLOAK_CLIENT_ID="{$VITE_KEYCLOAK_CLIENT_ID}";
-window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";`
+window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";
+window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	}
 
 	root * /srv
@@ -53,7 +54,7 @@ window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";`
 		X-Content-Type-Options "nosniff"
 		Strict-Transport-Security "max-age=31536000"
 		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;;
-			script-src 'self'  https://*.gov.bc.ca ;
+			script-src 'self' 'unsafe-inline' https://*.gov.bc.ca ;
 			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
 			font-src 'self' https://fonts.gstatic.com;
 			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;

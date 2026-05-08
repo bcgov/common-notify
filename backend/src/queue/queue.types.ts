@@ -1,6 +1,8 @@
 import { NotificationStatus } from '../enum/notification-status.enum'
 import { NotificationChannel } from '../enum/notification-channel.enum'
-import { NotifySimpleRequest, NotifyEmailChannel, NotifySmsChannel } from '../api/notify/schemas'
+import { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
+import { NotifyEmailChannel } from '../api/notify/schemas/notify-email-channel'
+import { NotifySmsChannel } from '../api/notify/schemas/notify-sms-channel'
 
 /**
  * Union type for all supported request payloads
@@ -44,6 +46,7 @@ export interface DeliveryJobPayload {
   notifyId: string // Database notification_request.id
   tenantId: string
   channel: NotificationChannel
-  payload: DeliveryPayload
+  request: NotifyRequest // Original request (may contain templateId)
+  payload: DeliveryPayload // Channel-specific payload
   attempt: number
 }

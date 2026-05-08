@@ -1,17 +1,10 @@
-import {
-  IsString,
-  IsArray,
-  IsEmail,
-  IsOptional,
-  IsEnum,
-  IsUUID,
-  IsObject,
-  ValidateNested,
-  ArrayMinSize,
-} from 'class-validator'
+import { IsString, IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
+import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { NotifyEmailRecipients } from './notify-email-recipients'
+import { NotifyContent } from './notify-content'
 
 export class NotifyAttachment {
   @ApiPropertyOptional() @IsOptional() @IsString() content?: string
@@ -20,45 +13,18 @@ export class NotifyAttachment {
   @ApiPropertyOptional() @IsOptional() @IsString() disposition?: string
 }
 
+@ValidateTemplateOrRenderer()
 export class NotifyEmailChannel {
-  @ApiProperty({ type: [String], description: 'Email recipients' })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEmail({}, { each: true })
-  recipients: string[]
+  @ApiProperty({ type: NotifyEmailRecipients, description: 'Email recipients with to, cc, bcc' })
+  @ValidateNested()
+  @Type(() => NotifyEmailRecipients)
+  recipients: NotifyEmailRecipients
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({ type: NotifyContent, description: 'Email content (subject, body, etc.)' })
   @IsOptional()
-  @IsArray()
-  @IsEmail({}, { each: true })
-  cc?: string[]
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsEmail({}, { each: true })
-  bcc?: string[]
-
-  @ApiProperty() @IsString() subject: string
-
-  @ApiProperty() @IsString() body: string
-
-  @ApiPropertyOptional({ enum: ['text', 'html'] })
-  @IsOptional()
-  @IsEnum(['text', 'html'])
-  bodyType?: 'text' | 'html'
-
-  @ApiPropertyOptional() @IsOptional() @IsString() renderer?: string
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  templateId?: string
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  identityId?: string
+  @ValidateNested()
+  @Type(() => NotifyContent)
+  content?: NotifyContent
 
   @ApiPropertyOptional({ type: [NotifyAttachment] })
   @IsOptional()
@@ -74,15 +40,18 @@ export class NotifyEmailChannel {
   @IsValidDateString()
   delayedSend?: string
 
-  @ApiPropertyOptional({ enum: ['low', 'normal', 'high'] })
-  @IsOptional()
-  @IsEnum(['low', 'normal', 'high'])
-  priority?: 'low' | 'normal' | 'high'
-
-  @ApiPropertyOptional() @IsOptional() @IsString() encoding?: string
-
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  templateId?: string
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  identityId?: string
 }

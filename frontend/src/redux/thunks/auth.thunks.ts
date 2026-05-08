@@ -21,21 +21,27 @@ export const initializeAuthFromToken = createAsyncThunk<
 >('auth/initializeAuthFromToken', async (_, { rejectWithValue }) => {
   try {
     // Check if user is logged in
-    if (!UserService.isLoggedIn()) {
+    if (!(await UserService.isLoggedIn())) {
       return null
     }
 
     // Extract JWT token and parsed claims from Keycloak
-    const tokenParsed = UserService.getTokenParsed()
+    const tokenParsed = await UserService.getTokenParsed()
 
     if (!tokenParsed) {
       return null
     }
 
+    const ssoUserId =
+      tokenParsed.idir_user_guid ||
+      tokenParsed.sub?.split('@')[0] ||
+      tokenParsed.user_guid ||
+      'unknown'
+
     // Map JWT claims to AuthUser interface
     const user: AuthUser = {
       // Core identifiers
-      id: tokenParsed.sub || tokenParsed.preferred_username || 'unknown',
+      id: ssoUserId,
       email: tokenParsed.email || '',
       displayName: tokenParsed.display_name || tokenParsed.name || '',
       username: tokenParsed.preferred_username || '',
