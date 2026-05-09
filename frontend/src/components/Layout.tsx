@@ -30,7 +30,9 @@ const Layout: FC<Props> = ({ children }) => {
     return <LoadingSpinner isVisible />
   }
 
-  if (tenantError) {
+  // Only block on CSTAR error if we don't have a selected tenant
+  // Once tenant is selected in Redux, we don't need CSTAR anymore
+  if (tenantError && !selectedTenant) {
     return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants(user.id))} />
   }
 

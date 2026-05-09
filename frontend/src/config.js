@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // Environment variable handling in production build images
 // Requires runtime placement of vars to prevent rebuilding the image
 // This application is run via Caddy file server with templates directive

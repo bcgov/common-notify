@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import tenantReducer, { selectTenant } from './tenant.slice'
 import { fetchCstarTenants } from '../thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
@@ -16,6 +16,11 @@ const buildTenant = (id: string, name: string): Tenant => ({
 })
 
 describe('tenant slice', () => {
+  beforeEach(() => {
+    // Clear localStorage before each test
+    localStorage.clear()
+    vi.clearAllMocks()
+  })
   it('auto-selects when CSTAR returns one tenant', () => {
     const tenant = buildTenant('tenant-1', 'Tenant One')
     const state = tenantReducer(
@@ -55,17 +60,16 @@ describe('tenant slice', () => {
     expect(state.showTenantModal).toBe(false)
   })
 
-  it('clears the selection when CSTAR fails', () => {
-    const selectedState = tenantReducer(
-      undefined,
-      selectTenant(buildTenant('tenant-1', 'Tenant One')),
-    )
+  it('preserves selected tenant when CSTAR fails (do not break existing selection)', () => {
+    const tenant = buildTenant('tenant-1', 'Tenant One')
+    const selectedState = tenantReducer(undefined, selectTenant(tenant))
     const state = tenantReducer(
       selectedState,
       fetchCstarTenants.rejected(new Error('boom'), 'request-id', 'user-1', 'Failed to fetch'),
     )
 
-    expect(state.selectedTenant).toBeNull()
+    // Should keep the selected tenant even if CSTAR fails
+    expect(state.selectedTenant).toEqual(tenant)
     expect(state.showTenantModal).toBe(false)
   })
 })

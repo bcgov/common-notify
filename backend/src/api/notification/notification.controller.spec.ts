@@ -12,7 +12,12 @@ import { RoleGuard } from '../../auth/guards/role.guard'
 const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const req = context.switchToHttp().getRequest()
-    req.tenant = { id: 'test-tenant-id' }
+    req.tenant = {
+      id: 'test-tenant-id',
+      externalId: 'cstar-tenant-external-id',
+      name: 'Test Tenant',
+      slug: 'test-tenant',
+    }
     return true
   },
 }
@@ -118,7 +123,12 @@ describe('NotificationController', () => {
         .get('/api/v1/notification_request?page=2&limit=20')
         .expect(200)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith(2, 20, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
+        'cstar-tenant-external-id',
+        2,
+        20,
+        undefined,
+      )
     })
 
     it('should call findAll with status filter parameter', async () => {
@@ -135,7 +145,12 @@ describe('NotificationController', () => {
         .get('/api/v1/notification_request?status=completed')
         .expect(200)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith(1, 10, 'completed')
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
+        'cstar-tenant-external-id',
+        1,
+        10,
+        'completed',
+      )
     })
   })
 

@@ -84,6 +84,12 @@ code-tables-frontend:/api/v1/frontend/code-tables
 code-tables-status-frontend:/api/v1/frontend/code-tables/notification-status
 code-tables-channels-frontend:/api/v1/frontend/code-tables/channels
 code-tables-event-types-frontend:/api/v1/frontend/code-tables/event-types
+admin-clients-link-to-tenants:/api/v1/frontend/admin/clients/link-to-tenants
+admin-clients-mappings-get:/api/v1/frontend/admin/clients/mappings
+admin-clients-mappings-toggle:/api/v1/frontend/admin/clients/mappings
+admin-users-upsert:/api/v1/frontend/users/me
+admin-users-list:/api/v1/frontend/users
+templates-frontend:/api/v1/frontend/templates
 "
 
 echo "$ROUTE_CONFIGS" | while read -r route_config; do

@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
-import { fetchNotifications, connectNotificationSSE } from '@/redux/thunks/notification.thunks'
+import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 
 /**
@@ -18,17 +18,24 @@ const NotificationStatusTable: FC = () => {
   const { statusFilter, isLoading } = useAppSelector((state) => state.notification)
   const notifications = useAppSelector(selectNotifications)
   const statuses = useAppSelector(selectStatuses)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
-  // Fetch notifications when status filter changes
+  // Fetch notifications when status filter or selected tenant changes
+  // Only fetch if a tenant is selected
   useEffect(() => {
-    dispatch(fetchNotifications())
-  }, [statusFilter, dispatch])
+    if (selectedTenant) {
+      dispatch(fetchNotifications())
+    }
+  }, [statusFilter, selectedTenant, dispatch])
 
-  // Connect to SSE stream
+  // Connect to SSE stream when tenant is selected
   useEffect(() => {
-    const controller = connectNotificationSSE(dispatch)
+    if (!selectedTenant) {
+      return
+    }
+    const controller = connectNotificationSSE(dispatch, selectedTenant.id)
     return () => controller.abort()
-  }, [dispatch])
+  }, [dispatch, selectedTenant])
 
   // Build status filter items from Redux
   const statusFilterItems = [
