@@ -26,24 +26,13 @@ export const STATUS_CODES = {
 
 const { KEYCLOAK_URL } = config
 
-// Configure axios with timeout and retry settings
-// These are critical for OpenShift stability where network conditions are less predictable
-axios.defaults.timeout = 30000 // 30 second timeout for all requests
-axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
-
-// Track retry attempts to log them
-interface RetryConfig extends AxiosRequestConfig {
-  __retryCount?: number
-  __maxRetries?: number
-}
-
 // Flag to prevent duplicate interceptor registration
 let responseInterceptorRegistered = false
 let requestInterceptorRegistered = false
 
 // Request interceptor to add X-Tenant-ID header from selected tenant
 if (!requestInterceptorRegistered) {
-  axios.interceptors.request.use((config: RetryConfig) => {
+  axios.interceptors.request.use((config) => {
     // Get selected tenant from localStorage (where we persist it)
     const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
     if (selectedTenantJson) {
@@ -61,59 +50,16 @@ if (!requestInterceptorRegistered) {
     } else {
       console.warn('[API] No selected tenant in localStorage for request to:', config.url)
     }
-
-    // Initialize retry counter
-    if (!config.__retryCount) {
-      config.__retryCount = 0
-    }
-    config.__maxRetries = 2 // Retry up to 2 times on failure
-
     return config
   })
   requestInterceptorRegistered = true
 }
 
-// Response interceptor to handle auth errors and implement retry logic
+// Response interceptor to handle auth errors (register only once)
 if (!responseInterceptorRegistered) {
   axios.interceptors.response.use(
     (response) => response,
-    async (error: AxiosError) => {
-      const config = error.config as RetryConfig
-
-      // Log the error for debugging
-      console.error('[API] Request failed:', {
-        url: config?.url,
-        status: error.response?.status,
-        message: error.message,
-        code: error.code,
-        retryCount: config?.__retryCount,
-      })
-
-      // Check if this is a network error or timeout that can be retried
-      const isRetryableError =
-        !error.response || // Network error
-        error.code === 'ECONNABORTED' || // Timeout
-        error.code === 'ERR_NETWORK' || // Network error
-        error.response?.status === STATUS_CODES.ServiceUnavailable || // 503
-        error.response?.status === STATUS_CODES.BadGateway // 502
-
-      // Retry logic: exponential backoff
-      if (
-        isRetryableError &&
-        config &&
-        (config.__retryCount ?? 0) < (config.__maxRetries ?? 0)
-      ) {
-        config.__retryCount = (config.__retryCount ?? 0) + 1
-        const delayMs = Math.pow(2, config.__retryCount) * 1000 // Exponential backoff: 2s, 4s, etc.
-
-        console.warn(
-          `[API] Retrying request to ${config.url} (attempt ${config.__retryCount}/${config.__maxRetries}) after ${delayMs}ms`,
-        )
-
-        await new Promise((resolve) => setTimeout(resolve, delayMs))
-        return axios(config) // Retry the request
-      }
-
+    (error: AxiosError) => {
       const { response } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
@@ -135,12 +81,6 @@ if (!responseInterceptorRegistered) {
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
         showErrorToast('You do not have permission to access this resource')
-      } else if (isRetryableError) {
-        // Network/timeout error that couldn't be retried further
-        const errorMsg = error.code === 'ECONNABORTED' ? 'Request timeout' : 'Network connection failed'
-        showErrorToast(
-          `${errorMsg}. If this persists, please refresh the page or check your internet connection.`,
-        )
       }
       return Promise.reject(error)
     },
@@ -151,6 +91,14 @@ if (!responseInterceptorRegistered) {
 const setAuthHeader = async () => {
   const token = await UserService.getToken()
   axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+}
+
+/**
+ * Gets the auth token and returns it without modifying global state
+ * This is safer for concurrent requests as it avoids shared state modifications
+ */
+const getAuthToken = async (): Promise<string> => {
+  return UserService.getToken()
 }
 
 export const generateApiParameters = <T = object>(
@@ -169,8 +117,18 @@ export const get = async <T, M = object>(
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
-  const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) await setAuthHeader()
+  const requestConfig: AxiosRequestConfig = { headers: headers || {} }
+  
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  // This is crucial for parallel requests - each request gets its own token without race conditions
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      ...requestConfig.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
   if (params) requestConfig.params = params
   return axios.get(url, requestConfig).then((response: AxiosResponse) => {
     if (!response) throw new Error('No response')
@@ -185,8 +143,17 @@ export const deleteMethod = async <T, M = object>(
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
-  const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) await setAuthHeader()
+  const requestConfig: AxiosRequestConfig = { headers: headers || {} }
+  
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      ...requestConfig.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
   if (params) requestConfig.params = params
   return axios.delete(url, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
@@ -198,10 +165,19 @@ export const post = async <T, M = object>(
   parameters: ApiRequestParameters<M> & { data?: M },
 ): Promise<T> => {
   const { url, requiresAuthentication, params, data } = parameters
-  if (requiresAuthentication) await setAuthHeader()
   // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
   const bodyData = data || params
-  return axios.post(url, bodyData).then((response: AxiosResponse) => response.data as T)
+  
+  const requestConfig: AxiosRequestConfig = {}
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
+  return axios.post(url, bodyData, requestConfig).then((response: AxiosResponse) => response.data as T)
 }
 
 export const patch = async <T, M = object>(
@@ -209,8 +185,18 @@ export const patch = async <T, M = object>(
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) await setAuthHeader()
-  return axios.patch(url, data, { headers }).then((response: AxiosResponse) => {
+  const requestConfig: AxiosRequestConfig = { headers: { ...headers } }
+  
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      ...requestConfig.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
+  return axios.patch(url, data, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
@@ -221,8 +207,18 @@ export const put = async <T, M = object>(
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) await setAuthHeader()
-  return axios.put(url, data, { headers }).then((response: AxiosResponse) => {
+  const requestConfig: AxiosRequestConfig = { headers: { ...headers } }
+  
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      ...requestConfig.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
+  return axios.put(url, data, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
@@ -234,8 +230,18 @@ export const putFile = async <T>(
   file: File,
 ): Promise<T> => {
   const { url, requiresAuthentication } = parameters
-  if (requiresAuthentication) await setAuthHeader()
-  return axios.put(url, file, { headers }).then((response: AxiosResponse) => {
+  const requestConfig: AxiosRequestConfig = { headers: { ...headers } }
+  
+  // Get auth token and pass it directly in request config to avoid global state modifications
+  if (requiresAuthentication) {
+    const token = await getAuthToken()
+    requestConfig.headers = {
+      ...requestConfig.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  }
+  
+  return axios.put(url, file, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
