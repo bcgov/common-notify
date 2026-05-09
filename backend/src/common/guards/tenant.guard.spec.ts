@@ -12,7 +12,7 @@ interface MockRequest {
   url: string
   tenant?: any
   accessibleTenants?: any[]
-  kongConsumerId?: string
+  kongUsername?: string
   clientId?: string
   userGuid?: string
 }
@@ -85,12 +85,12 @@ describe('TenantGuard', () => {
 
       expect(result).toBe(true)
       expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
-        'kong-id-123',
+        'test-tenant',
       )
       expect(mockTenantsService.findOne).toHaveBeenCalledWith('uuid-1')
       expect(request.tenant).toEqual(mockTenant)
-      expect(request.kongConsumerId).toBe('kong-id-123')
-      expect(request.clientId).toBe('kong-id-123')
+      expect(request.kongUsername).toBe('test-tenant')
+      expect(request.clientId).toBe('test-tenant')
     })
 
     it('should throw UnauthorizedException if tenant not found by Kong client', async () => {
@@ -113,7 +113,7 @@ describe('TenantGuard', () => {
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
       expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
-        'kong-id-456',
+        'unknown-tenant',
       )
     })
 
