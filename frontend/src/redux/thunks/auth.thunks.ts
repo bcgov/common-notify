@@ -1,6 +1,8 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
+import axios from 'axios'
 import UserService from '@/service/user-service'
 import { upsertCurrentUserAsync, getAllUsersAsync } from './user.thunks'
+import { setToken } from '../slices/auth.slice'
 import type { AuthUser } from '@/interfaces/AuthUser'
 import type { RootState } from '../store'
 
@@ -26,6 +28,15 @@ export const initializeAuthFromToken = createAsyncThunk<
     // Check if user is logged in
     if (!(await UserService.isLoggedIn())) {
       return null
+    }
+
+    // Get a fresh token (refreshing if it's about to expire) BEFORE making any API calls
+    // This ensures the Authorization header is set when upsertCurrentUserAsync runs
+    const freshToken = await UserService.getToken()
+    if (freshToken) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${freshToken}`
+      dispatch(setToken(freshToken))
+      console.log('[Auth Init] Token refreshed if needed and set in Authorization header')
     }
 
     // Extract JWT token and parsed claims from Keycloak

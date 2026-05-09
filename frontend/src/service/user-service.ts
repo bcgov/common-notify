@@ -68,7 +68,7 @@ const refreshTokenIfNeeded = async <T>(returnFn: () => T): Promise<T> => {
       }
     } catch (err) {
       console.error('Failed to refresh token:', err)
-      doLogin()
+      // Don't redirect to login - let response interceptor handle it
       throw err
     }
   })()

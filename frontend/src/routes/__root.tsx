@@ -18,12 +18,18 @@ function RootLayout() {
 
   // Track which user we've already fetched tenants for to avoid duplicate fetches
   const fetchedUserIdRef = useRef<string | null>(null)
+  const codeTablesLoadedRef = useRef(false)
 
+  // Fetch code tables once user is authenticated (auth header already set in auth.thunks.ts)
   useEffect(() => {
-    // Load code tables once when app starts
-    console.log('[App Init] Dispatching fetchCodeTables...')
-    dispatch(fetchCodeTables())
-  }, [dispatch])
+    if (!user) return
+
+    if (!codeTablesLoadedRef.current) {
+      codeTablesLoadedRef.current = true
+      console.log('[App Init] Fetching code tables...')
+      dispatch(fetchCodeTables())
+    }
+  }, [user, dispatch])
 
   useEffect(() => {
     // Fetch tenants only once per user session

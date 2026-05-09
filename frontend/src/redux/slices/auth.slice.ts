@@ -5,6 +5,7 @@ import type { AuthUser } from '@/interfaces/AuthUser'
 
 interface AuthState {
   user: AuthUser | null
+  token: string | null
   isAuthenticated: boolean
   isInitializing: boolean
   error: string | null
@@ -12,6 +13,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
+  token: null,
   isAuthenticated: false,
   isInitializing: true,
   error: null,
@@ -26,8 +28,12 @@ export const authSlice = createSlice({
       state.isAuthenticated = true
       state.error = null
     },
+    setToken: (state, action: PayloadAction<string>) => {
+      state.token = action.payload
+    },
     clearUser: (state) => {
       state.user = null
+      state.token = null
       state.isAuthenticated = false
     },
     setError: (state, action: PayloadAction<string | null>) => {
@@ -54,5 +60,5 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setUser, clearUser, setError } = authSlice.actions
+export const { setUser, setToken, clearUser, setError } = authSlice.actions
 export default authSlice.reducer
