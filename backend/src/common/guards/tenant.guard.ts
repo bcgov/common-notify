@@ -52,14 +52,14 @@ export class TenantGuard implements CanActivate {
         `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
       )
 
-      // Kong consumer ID is actually the OAuth2 client ID (from API Gateway)
+      // Kong X-Consumer-Username is the OAuth2 client ID (from API Gateway)
       // Look up which tenant(s) this client is mapped to
-      if (!kongConsumerId) {
-        this.logger.error('Kong authentication present but missing X-Consumer-ID header')
+      if (!kongUsername) {
+        this.logger.error('Kong authentication present but missing X-Consumer-Username header')
         throw new UnauthorizedException('Missing client ID in Kong headers')
       }
 
-      const clientId = kongConsumerId as string
+      const clientId = kongUsername as string
       const tenantIds = await this.clientTenantMappingService
         .findTenantsByClientId(clientId)
         .catch((error) => {
@@ -94,7 +94,7 @@ export class TenantGuard implements CanActivate {
       request.tenant = tenants[0]
       request.accessibleTenants = tenants
       request.clientId = clientId
-      request.kongConsumerId = kongConsumerId
+      request.kongUsername = kongUsername
 
       this.logger.debug(
         `Tenant authenticated via Kong client: ${tenants[0].name} (DB ID: ${tenants[0].id}, Kong Client ID: ${clientId})`,
