@@ -11,6 +11,7 @@ import { TemplateResponseDto } from './schemas/template-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 /**
  * Service for template business logic
@@ -22,6 +23,7 @@ export class TemplatesService {
 
   constructor(
     private readonly templatesRepository: TemplatesRepository,
+    private readonly tenantsService: TenantsService,
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
     private readonly rendererRegistry: ITemplateRendererRegistry,
   ) {
@@ -35,12 +37,12 @@ export class TemplatesService {
 
   /**
    * List all active templates for a tenant
-   * @param tenantId The tenant ID
+   * @param tenantExternalId The CSTAR external tenant ID
    * @param page Page number (1-indexed)
    * @param limit Items per page (max 100)
    */
   async listTemplates(
-    tenantId: string,
+    tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
   ): Promise<TemplateResponseDto[]> {
@@ -55,9 +57,15 @@ export class TemplatesService {
       throw new BadRequestException('Page must be at least 1')
     }
 
+    // Convert external tenant ID to internal UUID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
+    }
+
     // Convert page number to offset (1-indexed to 0-indexed)
     const offset = (page - 1) * limit
-    const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
+    const [templates] = await this.templatesRepository.findByTenantId(tenant.id, limit, offset)
     return templates.map((t) => this.toResponseDto(t))
   }
 

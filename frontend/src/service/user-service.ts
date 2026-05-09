@@ -38,20 +38,47 @@ const doLogin = _kc.login
 const doLogout = _kc.logout
 
 /**
+ * Prevents concurrent token refresh calls to avoid race conditions.
+ * Multiple simultaneous updateToken() calls can cause connection resets.
+ * This ensures only one refresh happens at a time.
+ */
+let tokenRefreshPromise: Promise<void> | null = null
+
+/**
  * Internal helper: Refreshes token if needed and returns the result of a callback.
  * Abstracts the common refresh-and-return pattern used by getToken() and getTokenParsed().
+ *
+ * IMPORTANT: This guard prevents concurrent updateToken() calls which can cause
+ * NS_ERROR_NET_RESET when multiple API requests hit in parallel (e.g., at app init).
+ * If a refresh is already in progress, subsequent callers wait for it to complete.
  */
 const refreshTokenIfNeeded = async <T>(returnFn: () => T): Promise<T> => {
-  try {
-    const wasRefreshed = await _kc.updateToken(5)
-    if (wasRefreshed) {
-      localStorage.setItem(AUTH_TOKEN, `${_kc.token}`)
-    }
+  // If a refresh is already in progress, wait for it instead of starting a new one
+  if (tokenRefreshPromise) {
+    await tokenRefreshPromise
     return returnFn()
-  } catch (err) {
-    console.error('Failed to refresh token:', err)
-    doLogin()
-    throw err
+  }
+
+  // Create and store the refresh promise so concurrent calls wait for it
+  tokenRefreshPromise = (async () => {
+    try {
+      const wasRefreshed = await _kc.updateToken(5)
+      if (wasRefreshed) {
+        localStorage.setItem(AUTH_TOKEN, `${_kc.token}`)
+      }
+    } catch (err) {
+      console.error('Failed to refresh token:', err)
+      doLogin()
+      throw err
+    }
+  })()
+
+  try {
+    await tokenRefreshPromise
+    return returnFn()
+  } finally {
+    // Clear the promise after refresh completes so next call can start a fresh refresh
+    tokenRefreshPromise = null
   }
 }
 

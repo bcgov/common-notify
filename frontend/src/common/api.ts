@@ -26,13 +26,24 @@ export const STATUS_CODES = {
 
 const { KEYCLOAK_URL } = config
 
+// Configure axios with timeout and retry settings
+// These are critical for OpenShift stability where network conditions are less predictable
+axios.defaults.timeout = 30000 // 30 second timeout for all requests
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
+
+// Track retry attempts to log them
+interface RetryConfig extends AxiosRequestConfig {
+  __retryCount?: number
+  __maxRetries?: number
+}
+
 // Flag to prevent duplicate interceptor registration
 let responseInterceptorRegistered = false
 let requestInterceptorRegistered = false
 
 // Request interceptor to add X-Tenant-ID header from selected tenant
 if (!requestInterceptorRegistered) {
-  axios.interceptors.request.use((config) => {
+  axios.interceptors.request.use((config: RetryConfig) => {
     // Get selected tenant from localStorage (where we persist it)
     const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
     if (selectedTenantJson) {
@@ -50,16 +61,59 @@ if (!requestInterceptorRegistered) {
     } else {
       console.warn('[API] No selected tenant in localStorage for request to:', config.url)
     }
+
+    // Initialize retry counter
+    if (!config.__retryCount) {
+      config.__retryCount = 0
+    }
+    config.__maxRetries = 2 // Retry up to 2 times on failure
+
     return config
   })
   requestInterceptorRegistered = true
 }
 
-// Response interceptor to handle auth errors (register only once)
+// Response interceptor to handle auth errors and implement retry logic
 if (!responseInterceptorRegistered) {
   axios.interceptors.response.use(
     (response) => response,
-    (error: AxiosError) => {
+    async (error: AxiosError) => {
+      const config = error.config as RetryConfig
+
+      // Log the error for debugging
+      console.error('[API] Request failed:', {
+        url: config?.url,
+        status: error.response?.status,
+        message: error.message,
+        code: error.code,
+        retryCount: config?.__retryCount,
+      })
+
+      // Check if this is a network error or timeout that can be retried
+      const isRetryableError =
+        !error.response || // Network error
+        error.code === 'ECONNABORTED' || // Timeout
+        error.code === 'ERR_NETWORK' || // Network error
+        error.response?.status === STATUS_CODES.ServiceUnavailable || // 503
+        error.response?.status === STATUS_CODES.BadGateway // 502
+
+      // Retry logic: exponential backoff
+      if (
+        isRetryableError &&
+        config &&
+        (config.__retryCount ?? 0) < (config.__maxRetries ?? 0)
+      ) {
+        config.__retryCount = (config.__retryCount ?? 0) + 1
+        const delayMs = Math.pow(2, config.__retryCount) * 1000 // Exponential backoff: 2s, 4s, etc.
+
+        console.warn(
+          `[API] Retrying request to ${config.url} (attempt ${config.__retryCount}/${config.__maxRetries}) after ${delayMs}ms`,
+        )
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+        return axios(config) // Retry the request
+      }
+
       const { response } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
@@ -81,6 +135,12 @@ if (!responseInterceptorRegistered) {
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
         showErrorToast('You do not have permission to access this resource')
+      } else if (isRetryableError) {
+        // Network/timeout error that couldn't be retried further
+        const errorMsg = error.code === 'ECONNABORTED' ? 'Request timeout' : 'Network connection failed'
+        showErrorToast(
+          `${errorMsg}. If this persists, please refresh the page or check your internet connection.`,
+        )
       }
       return Promise.reject(error)
     },

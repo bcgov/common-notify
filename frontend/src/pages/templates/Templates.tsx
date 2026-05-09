@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import Card from '@/components/Card'
-import { getTemplates } from '@/api/templates.api'
-import type { TemplateResponse, NotificationChannel } from '@/api/templates.api'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchTemplates } from '@/redux/thunks/templates.thunks'
+import type { NotificationChannel } from '@/api/templates.api'
 import { showErrorToast } from '@/redux/utils/toastUtils'
 
 /**
@@ -11,35 +12,31 @@ import { showErrorToast } from '@/redux/utils/toastUtils'
  *
  * Displays a list of all notification templates for the current tenant.
  * Templates can be email, SMS, or push notifications with different template engines.
+ *
+ * Listens to Redux for selected tenant changes and automatically fetches templates
+ * for the selected tenant.
  */
 const Templates: FC = () => {
-  const [templates, setTemplates] = useState<TemplateResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
+  const dispatch = useAppDispatch()
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const templates = useAppSelector((state) => state.templates.items)
+  const loading = useAppSelector((state) => state.templates.isLoading)
+  const error = useAppSelector((state) => state.templates.error)
 
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = await getTemplates(page, 10)
-      // Handle both array and paginated response formats
-      const templateList = Array.isArray(response) ? response : response.templates || []
-      setTemplates(templateList)
-
-      // Track count if available in response
-      if (response && typeof response === 'object' && 'count' in response) {
-        setTotalCount(response.count)
-      }
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : 'Failed to load templates')
-    } finally {
-      setLoading(false)
-    }
-  }, [page])
-
+  // Fetch templates when tenant is selected
+  // Only fetch if a tenant is selected
   useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
+    if (selectedTenant) {
+      dispatch(fetchTemplates())
+    }
+  }, [selectedTenant, dispatch])
+
+  // Show error toast if fetch fails
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error)
+    }
+  }, [error])
 
   const getChannelBadgeClass = (channel: NotificationChannel | string): string => {
     switch (channel) {
@@ -156,36 +153,6 @@ const Templates: FC = () => {
           </div>
         )}
       </Card>
-
-      {totalCount > 0 && (
-        <nav aria-label="Template pagination" className="mt-4">
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-              <button
-                className="page-link"
-                onClick={() => setPage(Math.max(1, page - 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </button>
-            </li>
-            <li className="page-item active">
-              <span className="page-link">
-                Page {page} of {Math.ceil(totalCount / limit)}
-              </span>
-            </li>
-            <li className={`page-item ${page * limit >= totalCount ? 'disabled' : ''}`}>
-              <button
-                className="page-link"
-                onClick={() => setPage(page + 1)}
-                disabled={page * limit >= totalCount}
-              >
-                Next
-              </button>
-            </li>
-          </ul>
-        </nav>
-      )}
     </div>
   )
 }

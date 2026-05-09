@@ -51,17 +51,23 @@ export class TemplatesFrontendController {
   constructor(private readonly templatesService: TemplatesService) {}
 
   /**
-   * List all templates for the tenant
+   * List all templates for the selected tenant
    *
-   * @param tenant Current tenant from JWT
+   * @param tenantId CSTAR external tenant ID to filter by
    * @param page Page number (1-indexed, default: 1)
    * @param limit Items per page (default: 10, max: 100)
-   * @returns Paginated list of templates
+   * @returns Paginated list of templates for the selected tenant
    */
   @Version('1')
   @Get()
   @HttpCode(200)
-  @ApiOperation({ summary: 'List all templates for the authenticated tenant' })
+  @ApiOperation({ summary: 'List all templates for the selected tenant' })
+  @ApiQuery({
+    name: 'tenantId',
+    required: true,
+    type: String,
+    description: 'CSTAR external tenant ID to filter by',
+  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -78,13 +84,13 @@ export class TemplatesFrontendController {
   })
   @ApiOkResponse({ type: [TemplateResponseDto] })
   async listTemplates(
-    @GetTenant() tenant: Tenant,
+    @Query('tenantId') tenantExternalId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ): Promise<TemplateResponseDto[]> {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.templatesService.listTemplates(tenant.id, pageNum, limitNum)
+    return this.templatesService.listTemplates(tenantExternalId, pageNum, limitNum)
   }
 
   /**

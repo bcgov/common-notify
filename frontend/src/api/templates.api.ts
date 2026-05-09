@@ -41,18 +41,21 @@ export interface GetTemplatesResponse {
 /**
  * Get all templates for the current tenant
  *
+ * @param tenantId CSTAR external tenant ID to filter by
  * @param page Page number (1-indexed, default: 1)
  * @param limit Items per page (default: 10, max: 100)
  * @returns List of templates for the tenant
  * @throws Error if fetch fails
  */
-export async function getTemplates(page: number = 1, limit: number = 10) {
+export async function getTemplates(tenantId: string, page: number = 1, limit: number = 10) {
   try {
-    const params = generateApiParameters('/api/v1/frontend/templates', {
+    const params = generateApiParameters('/api/v1/frontend/templates')
+    const queryParams = {
+      tenantId,
       page: String(page),
       limit: String(limit),
-    })
-    return await get<TemplateResponse[]>(params)
+    }
+    return await get<TemplateResponse[]>({ ...params, params: queryParams })
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}

@@ -8,6 +8,7 @@ import toastReducer from './slices/toast.slice'
 import notificationReducer from './slices/notification.slice'
 import codeTablesReducer from './slices/codeTables.slice'
 import tenantReducer from './slices/tenant.slice'
+import templatesReducer from './slices/templates.slice'
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     notification: notificationReducer,
     codeTables: codeTablesReducer,
     tenant: tenantReducer,
+    templates: templatesReducer,
   },
 })
 
