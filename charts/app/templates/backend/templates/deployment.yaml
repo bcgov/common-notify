@@ -85,6 +85,11 @@ spec:
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            - name: GATEWAY_OAUTH2_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: API_GATEWAY_TOKEN_URL
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
