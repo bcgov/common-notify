@@ -85,6 +85,7 @@ export class NotificationService {
   }
 
   async findAll(
+    tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
     status?: string,
@@ -95,8 +96,27 @@ export class NotificationService {
 
     const skip = (pageNum - 1) * limitNum
 
-    // Build where clause - include status filter if provided
+    // Build where clause - include status filter and tenantId
     const where: any = {}
+
+    // Look up tenant by external ID and get internal ID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      // Return empty result if tenant not found
+      this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
+      return {
+        data: [],
+        count: 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: 0,
+      }
+    }
+    this.logger.debug(
+      `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
+    )
+    where.tenantId = tenant.id
+
     if (status && status !== 'all') {
       where.status = status
     }

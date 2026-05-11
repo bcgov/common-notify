@@ -5,6 +5,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
+import tenantReducer from '@/redux/slices/tenant.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
@@ -47,6 +48,10 @@ describe('Dashboard with CodeTables', () => {
         isLoading: false,
         error: null,
       },
+      tenant: {
+        selectedTenant: null,
+        showTenantModal: false,
+      },
     }
   })
 
@@ -55,6 +60,7 @@ describe('Dashboard with CodeTables', () => {
       reducer: {
         codeTables: codeTablesReducer,
         notification: notificationReducer,
+        tenant: tenantReducer,
       },
       preloadedState: initialState,
     } as any)

@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "6690f38c-65d4-448e-8145-7356d3bb3560",
+    "_postman_id": "06182f39-0bcd-45d7-a6c7-3df85a76397f",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -68,9 +68,16 @@
               ]
             },
             "url": {
-              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token",
+              "raw": "{{keycloak_url}}/auth/realms/{{keycloak_realm}}/protocol/openid-connect/token",
               "host": ["{{keycloak_url}}"],
-              "path": ["realms", "{{keycloak_realm}}", "protocol", "openid-connect", "token"]
+              "path": [
+                "auth",
+                "realms",
+                "{{keycloak_realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
             },
             "description": "Get a JWT access token from Keycloak using client credentials flow (DEV environment).\n\n**Setup Required:**\n1. Load .env.notify-dev.json as environment\n2. Set Keycloak environment variables:\n   - `keycloak_url`: Keycloak instance URL\n   - `client_id`: Your OAuth2 client ID\n   - `client_secret`: Your OAuth2 client secret\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
           },
@@ -142,81 +149,6 @@
               "host": ["{{kong_token_url}}"]
             },
             "description": "Get an OAuth2 access token from Kong's OAuth2 plugin (DEV environment with Kong).\n\n**Prerequisites:**\n1. Kong is running in DEV environment\n2. Load .env.notify-dev.json as environment\n3. Set kong_token_url environment variable\n4. Kong seed script has created test credentials\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890\n- Client B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Client C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
-          },
-          "response": []
-        },
-        {
-          "name": "Get Frontend OAuth2 Token (Standard Realm - Interactive Login)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    const jsonData = pm.response.json();",
-                  "    pm.environment.set('frontend_jwt_token', jsonData.access_token);",
-                  "    pm.environment.set('frontend_token_expires_in', jsonData.expires_in || 3600);",
-                  "    pm.test('Frontend OAuth2 Token obtained successfully', function() {",
-                  "        pm.expect(jsonData.access_token).to.exist;",
-                  "    });",
-                  "    console.log('✅ Frontend OAuth2 Token saved to {{frontend_jwt_token}}');",
-                  "    console.log('Token type:', jsonData.token_type);",
-                  "    console.log('Token expires in:', jsonData.expires_in, 'seconds');",
-                  "} else {",
-                  "    pm.test('Failed to get Frontend OAuth2 token', function() {",
-                  "        pm.expect.fail('Could not obtain token: ' + pm.response.status + ' - ' + pm.response.text());",
-                  "    });",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/x-www-form-urlencoded",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "urlencoded",
-              "urlencoded": [
-                {
-                  "key": "grant_type",
-                  "value": "authorization_code",
-                  "type": "text"
-                },
-                {
-                  "key": "client_id",
-                  "value": "{{frontend_client_id}}",
-                  "type": "text"
-                },
-                {
-                  "key": "client_secret",
-                  "value": "{{frontend_client_secret}}",
-                  "type": "text"
-                },
-                {
-                  "key": "redirect_uri",
-                  "value": "{{frontend_redirect_uri}}",
-                  "type": "text"
-                },
-                {
-                  "key": "code",
-                  "value": "{{authorization_code}}",
-                  "type": "text"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
-              "host": ["{{keycloak_url}}"],
-              "path": ["auth", "realms", "standard", "protocol", "openid-connect", "token"]
-            },
-            "description": "Exchange authorization code for OAuth2 access token from Keycloak frontend realm (standard).\n\n**Setup Required:**\n1. First, navigate to Keycloak authorization endpoint in browser:\n   `{{keycloak_url}}/realms/standard/protocol/openid-connect/auth?client_id={{frontend_client_id}}&redirect_uri={{frontend_redirect_uri}}&response_type=code&scope=openid+profile+email`\n2. Login with your BC Government credentials\n3. Copy the authorization code from the redirect URL\n4. Set `authorization_code` environment variable with the code\n5. Run this request to exchange it for an access token\n\n**Environment Variables Required:**\n- `keycloak_url`: Keycloak instance URL (e.g., https://test.loginproxy.gov.bc.ca)\n- `frontend_client_id`: Frontend OAuth2 client ID (e.g., notify-6388)\n- `frontend_client_secret`: Frontend OAuth2 client secret\n- `frontend_redirect_uri`: Redirect URI for OAuth2 callback (e.g., http://localhost:3000/callback)\n- `authorization_code`: Authorization code obtained from Keycloak login\n\nThe token will be automatically saved to `{{frontend_jwt_token}}` for use in frontend API requests."
           },
           "response": []
         }
@@ -314,12 +246,12 @@
         "oauth2": [
           {
             "key": "accessTokenUrl",
-            "value": "{{keycloak_url}}/realms/standard/protocol/openid-connect/token",
+            "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/token",
             "type": "string"
           },
           {
             "key": "authUrl",
-            "value": "{{keycloak_url}}/realms/standard/protocol/openid-connect/auth",
+            "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
             "type": "string"
           },
           {
@@ -1291,7 +1223,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"templateId\": \"d56ca675-b0c2-44e6-9bcd-9224182a6de3\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
+              "raw": "{\n  \"templateId\": \"1aa1d783-6acb-4182-97b1-4ccbfebaf1d8\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1325,7 +1257,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"Hello {{name}}\",\n        \"bodyType\": \"html\",\n        \"renderer\": \"moustache\",\n        \"encoding\": \"string\"\n    },\n    \"params\": {\n    \"name\": \"Sarah\"\n    }\n  }\n}"
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"Hello {{name}}\",\n        \"bodyType\": \"html\",\n        \"renderer\": \"mustache\",\n        \"encoding\": \"string\"\n    },\n    \"params\": {\n    \"name\": \"Sarah\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",

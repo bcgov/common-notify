@@ -58,6 +58,7 @@ app.post('/', (req, res) => {
   const header = { alg: 'HS256', typ: 'JWT' }
   const payload = {
     sub: client_id,
+    azp: client_id, // Authorized Party - the client ID authorized to use this token
     scope: scope || 'notify',
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor((Date.now() + 3600000) / 1000),

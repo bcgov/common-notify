@@ -3,6 +3,7 @@ import { ExecutionContext, UnauthorizedException, BadRequestException } from '@n
 import { vi } from 'vitest'
 import { TenantGuard } from './tenant.guard'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappings/client-tenant-mapping.service'
 
 // Type for request object with guard-added properties
 interface MockRequest {
@@ -10,17 +11,24 @@ interface MockRequest {
   method: string
   url: string
   tenant?: any
-  kongConsumerId?: string
+  accessibleTenants?: any[]
+  kongUsername?: string
   clientId?: string
+  userGuid?: string
 }
 
 describe('TenantGuard', () => {
   let guard: TenantGuard
 
   const mockTenantsService = {
+    findOne: vi.fn(),
     findByExternalId: vi.fn(),
     findByName: vi.fn(),
     create: vi.fn(),
+  }
+
+  const mockClientTenantMappingService = {
+    findTenantsByClientId: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -30,6 +38,10 @@ describe('TenantGuard', () => {
         {
           provide: TenantsService,
           useValue: mockTenantsService,
+        },
+        {
+          provide: ClientTenantMappingService,
+          useValue: mockClientTenantMappingService,
         },
       ],
     }).compile()
@@ -51,7 +63,8 @@ describe('TenantGuard', () => {
         isDeleted: false,
       }
 
-      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
+      mockClientTenantMappingService.findTenantsByClientId.mockResolvedValue(['uuid-1'])
+      mockTenantsService.findOne.mockResolvedValue(mockTenant)
 
       const request: MockRequest = {
         headers: {
@@ -71,30 +84,21 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('kong-id-123')
+      expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
+        'test-tenant',
+      )
+      expect(mockTenantsService.findOne).toHaveBeenCalledWith('uuid-1')
       expect(request.tenant).toEqual(mockTenant)
-      expect(request.kongConsumerId).toBe('kong-id-123')
+      expect(request.kongUsername).toBe('test-tenant')
+      expect(request.clientId).toBe('test-tenant')
     })
 
-    it('should create tenant if not found by Kong username', async () => {
-      const newTenant = {
-        id: 'uuid-2',
-        name: 'new-tenant',
-        slug: 'new-tenant',
-        externalId: 'kong-id-456',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isDeleted: false,
-      }
-
-      mockTenantsService.findByExternalId.mockResolvedValue(null)
-      mockTenantsService.findByName.mockResolvedValue(null)
-      mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
+    it('should throw UnauthorizedException if tenant not found by Kong client', async () => {
+      mockClientTenantMappingService.findTenantsByClientId.mockResolvedValue([])
 
       const request: MockRequest = {
         headers: {
-          'x-consumer-username': 'new-tenant',
+          'x-consumer-username': 'unknown-tenant',
           'x-consumer-id': 'kong-id-456',
         },
         method: 'POST',
@@ -107,20 +111,16 @@ describe('TenantGuard', () => {
         }),
       } as ExecutionContext
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith({
-        name: 'new-tenant',
-        externalId: 'kong-id-456',
-      })
-      expect(request.tenant).toEqual(newTenant)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
+        'unknown-tenant',
+      )
     })
 
-    it('should throw BadRequestException if Kong tenant creation fails', async () => {
-      mockTenantsService.findByExternalId.mockResolvedValue(null)
-      mockTenantsService.findByName.mockResolvedValue(null)
-      mockTenantsService.create.mockRejectedValue(new Error('DB error'))
+    it('should throw UnauthorizedException if Kong client mapping fails', async () => {
+      mockClientTenantMappingService.findTenantsByClientId.mockRejectedValue(
+        new Error('Database error'),
+      )
 
       const request: MockRequest = {
         headers: {
@@ -137,26 +137,26 @@ describe('TenantGuard', () => {
         }),
       } as ExecutionContext
 
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
   })
 
   describe('JWT authentication', () => {
-    it('should authenticate with valid JWT Bearer token', async () => {
+    it('should authenticate with valid JWT Bearer token for frontend user', async () => {
       const mockTenant = {
         id: 'uuid-3',
-        name: 'test-client-a',
-        slug: 'test-client-a',
-        externalId: 'test-client-a',
+        name: 'test-tenant',
+        slug: 'test-tenant',
+        externalId: 'user-guid-123',
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
         isDeleted: false,
       }
 
-      // JWT with sub claim 'test-client-a'
+      // JWT with sub claim 'user-guid-123'
       const jwtToken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWNsaWVudC1hIiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU3NjEyNDN9.test'
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLWd1aWQtMTIzIiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU4NDc2NDN9.test'
 
       mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
 
@@ -177,28 +177,53 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('test-client-a')
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('user-guid-123')
       expect(request.tenant).toEqual(mockTenant)
-      expect(request.clientId).toBe('test-client-a')
+      expect(request.userGuid).toBe('user-guid-123')
     })
 
-    it('should create tenant if not found by OAuth2 client ID', async () => {
-      const newTenant = {
+    it('should throw UnauthorizedException if tenant not found for user JWT', async () => {
+      const jwtToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1bmtub3duLXVzZXIiLCJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTg0NzY0M30.test'
+
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
+
+      const request: MockRequest = {
+        headers: {
+          authorization: `Bearer ${jwtToken}`,
+        },
+        method: 'POST',
+        url: '/api/test',
+      }
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getRequest: () => request,
+        }),
+      } as ExecutionContext
+
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('unknown-user')
+    })
+
+    it('should authenticate with valid JWT Bearer token for service client', async () => {
+      const mockTenant = {
         id: 'uuid-4',
-        name: 'new-client',
-        slug: 'new-client',
-        externalId: 'new-client',
+        name: 'service-tenant',
+        slug: 'service-tenant',
+        externalId: 'client-123',
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
         isDeleted: false,
       }
 
+      // JWT with azp claim (service client from client credentials flow)
       const jwtToken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZXctY2xpZW50IiwiaWF0IjoxNzc1NzYxMjQzLCJleHAiOjE3NzU3NjEyNDN9.test'
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbGllbnQtMTIzIiwiYXpwIjoiY2xpZW50LTEyMyIsImlhdCI6MTc3NTc2MTI0MywiZXhwIjoxNzc1ODQ3NjQzfQ.test'
 
-      mockTenantsService.findByExternalId.mockResolvedValue(null)
-      mockTenantsService.create.mockResolvedValue({ tenant: newTenant })
+      mockClientTenantMappingService.findTenantsByClientId.mockResolvedValue(['uuid-4'])
+      mockTenantsService.findOne.mockResolvedValue(mockTenant)
 
       const request: MockRequest = {
         headers: {
@@ -217,19 +242,19 @@ describe('TenantGuard', () => {
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantsService.create).toHaveBeenCalledWith({
-        name: 'new-client',
-        externalId: 'new-client',
-      })
-      expect(request.tenant).toEqual(newTenant)
+      expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
+        'client-123',
+      )
+      expect(mockTenantsService.findOne).toHaveBeenCalledWith('uuid-4')
+      expect(request.tenant).toEqual(mockTenant)
+      expect(request.clientId).toBe('client-123')
     })
 
-    it('should throw UnauthorizedException if JWT tenant creation fails', async () => {
+    it('should throw UnauthorizedException if service client has no tenant mapping', async () => {
       const jwtToken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYWlsaW5nLWNsaWVudCIsImlhdCI6MTc3NTc2MTI0MywiZXhwIjoxNzc1NzYxMjQzfQ.test'
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1bmF1dGhvcml6ZWQtY2xpZW50IiwiYXpwIjoidW5hdXRob3JpemVkLWNsaWVudCIsImlhdCI6MTc3NTc2MTI0MywiZXhwIjoxNzc1ODQ3NjQzfQ.test'
 
-      mockTenantsService.findByExternalId.mockResolvedValue(null)
-      mockTenantsService.create.mockRejectedValue(new Error('DB error'))
+      mockClientTenantMappingService.findTenantsByClientId.mockResolvedValue([])
 
       const request: MockRequest = {
         headers: {
@@ -246,12 +271,17 @@ describe('TenantGuard', () => {
       } as ExecutionContext
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(mockClientTenantMappingService.findTenantsByClientId).toHaveBeenCalledWith(
+        'unauthorized-client',
+      )
     })
 
     it('should throw UnauthorizedException for invalid JWT format', async () => {
+      const invalidToken = 'invalid.jwt.format.extra'
+
       const request: MockRequest = {
         headers: {
-          authorization: 'Bearer invalid-token-format',
+          authorization: `Bearer ${invalidToken}`,
         },
         method: 'POST',
         url: '/api/test',
@@ -267,9 +297,8 @@ describe('TenantGuard', () => {
     })
 
     it('should throw UnauthorizedException if JWT missing "sub" claim', async () => {
-      // JWT without 'sub' claim
       const jwtToken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTc2MTI0M30.test'
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NzU3NjEyNDMsImV4cCI6MTc3NTg0NzY0M30.test'
 
       const request: MockRequest = {
         headers: {
@@ -289,8 +318,8 @@ describe('TenantGuard', () => {
     })
   })
 
-  describe('Authentication failure', () => {
-    it('should throw BadRequestException when no auth headers provided', async () => {
+  describe('No credentials', () => {
+    it('should throw BadRequestException if no Kong headers or JWT provided', async () => {
       const request: MockRequest = {
         headers: {},
         method: 'POST',
@@ -304,43 +333,6 @@ describe('TenantGuard', () => {
       } as ExecutionContext
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
-    })
-
-    it('should prioritize Kong headers over JWT', async () => {
-      const mockTenant = {
-        id: 'uuid-5',
-        name: 'kong-tenant',
-        slug: 'kong-tenant',
-        externalId: 'kong-id-999',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isDeleted: false,
-      }
-
-      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
-
-      const request: MockRequest = {
-        headers: {
-          'x-consumer-username': 'kong-tenant',
-          'x-consumer-id': 'kong-id-999',
-          authorization:
-            'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqd3QtY2xpZW50In0.test',
-        },
-        method: 'POST',
-        url: '/api/test',
-      }
-
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => request,
-        }),
-      } as ExecutionContext
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-      expect(mockTenantsService.findByExternalId).toHaveBeenCalled()
     })
   })
 })

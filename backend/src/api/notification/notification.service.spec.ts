@@ -26,6 +26,7 @@ const mockConfigService = {
 
 const mockTenantsService = {
   findOne: vi.fn(),
+  findByExternalId: vi.fn(),
 }
 
 const mockTemplatesRepository = {
@@ -121,17 +122,26 @@ describe('NotificationService', () => {
   })
 
   describe('findAll', () => {
+    const mockTenant = {
+      id: 'tenant-uuid',
+      externalId: 'cstar-external-id',
+      name: 'Test Tenant',
+      slug: 'test-tenant',
+    }
+
     it('should return paginated notifications', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       const mockNotifications = [
         { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
         { id: 'notif-2', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
       ]
       mockRepository.findAndCount.mockResolvedValue([mockNotifications, 2])
 
-      const result = await service.findAll(1, 10)
+      const result = await service.findAll('cstar-external-id', 1, 10)
 
+      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('cstar-external-id')
       expect(mockRepository.findAndCount).toHaveBeenCalledWith({
-        where: {},
+        where: { tenantId: 'tenant-uuid' },
         skip: 0,
         take: 10,
         order: { createdAt: 'DESC' },
@@ -143,24 +153,26 @@ describe('NotificationService', () => {
     })
 
     it('should return empty data array when no notifications exist', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       mockRepository.findAndCount.mockResolvedValue([[], 0])
 
-      const result = await service.findAll(1, 10)
+      const result = await service.findAll('cstar-external-id', 1, 10)
 
       expect(result.data).toEqual([])
       expect(result.count).toBe(0)
     })
 
     it('should filter by status when provided', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       const mockNotifications = [
         { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
       ]
       mockRepository.findAndCount.mockResolvedValue([mockNotifications, 1])
 
-      await service.findAll(1, 10, NotificationStatus.COMPLETED)
+      await service.findAll('cstar-external-id', 1, 10, NotificationStatus.COMPLETED)
 
       expect(mockRepository.findAndCount).toHaveBeenCalledWith({
-        where: { status: NotificationStatus.COMPLETED },
+        where: { tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
         skip: 0,
         take: 10,
         order: { createdAt: 'DESC' },
@@ -168,9 +180,10 @@ describe('NotificationService', () => {
     })
 
     it('should calculate totalPages correctly', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       mockRepository.findAndCount.mockResolvedValue([[], 25])
 
-      const result = await service.findAll(1, 10)
+      const result = await service.findAll('cstar-external-id', 1, 10)
 
       expect(result.totalPages).toBe(3)
     })

@@ -44,6 +44,8 @@ const navItems = [
   },
 ]
 
+const adminItems = [{ label: 'Register Client', to: '/admin/clients' }] as const
+
 const Sidebar: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   // Get user from Redux store (populated from JWT token)

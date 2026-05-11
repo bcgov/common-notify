@@ -1,5 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import UserService from '@/service/user-service'
+import { upsertCurrentUserAsync, getAllUsersAsync } from './user.thunks'
 import type { AuthUser } from '@/interfaces/AuthUser'
 import type { RootState } from '../store'
 
@@ -9,6 +10,8 @@ import type { RootState } from '../store'
  * This thunk extracts user data from the JWT token provided by Keycloak.
  * It's called on app initialization to populate Redux with the logged-in user's info.
  * All user data comes from the JWT token, not from separate API calls.
+ *
+ * Also triggers upsert of the user record in the backend notify_user table.
  */
 export const initializeAuthFromToken = createAsyncThunk<
   AuthUser | null,
@@ -18,7 +21,7 @@ export const initializeAuthFromToken = createAsyncThunk<
     rejectValue: string
     dispatch: any
   }
->('auth/initializeAuthFromToken', async (_, { rejectWithValue }) => {
+>('auth/initializeAuthFromToken', async (_, { rejectWithValue, dispatch }) => {
   try {
     // Check if user is logged in
     if (!(await UserService.isLoggedIn())) {
@@ -44,7 +47,7 @@ export const initializeAuthFromToken = createAsyncThunk<
       id: ssoUserId,
       email: tokenParsed.email || '',
       displayName: tokenParsed.display_name || tokenParsed.name || '',
-      username: tokenParsed.preferred_username || '',
+      username: tokenParsed.idir_username || '',
 
       // Name components
       givenName: tokenParsed.given_name,
@@ -61,6 +64,12 @@ export const initializeAuthFromToken = createAsyncThunk<
       tokenType: tokenParsed.token_type,
       sessionState: tokenParsed.session_state,
     }
+
+    // Upsert user record in backend and populate Redux user state
+    await dispatch(upsertCurrentUserAsync(user))
+
+    // Load all users into Redux for audit trail lookups
+    await dispatch(getAllUsersAsync())
 
     return user
   } catch (error) {

@@ -67,7 +67,7 @@ export class TenantsService {
       })
 
       const savedTenant = await this.tenantRepository.save(tenant)
-      this.logger.log(`Created tenant: ${name} (id: ${savedTenant.id})`)
+      this.logger.debug(`Created tenant: ${name} (id: ${savedTenant.id})`)
 
       return {
         tenant: savedTenant,
@@ -150,7 +150,7 @@ export class TenantsService {
 
     try {
       await this.tenantRepository.update(id, { isDeleted: true })
-      this.logger.log(`Soft deleted tenant: ${tenant.name}`)
+      this.logger.debug(`Soft deleted tenant: ${tenant.name}`)
     } catch (error) {
       this.logger.error(`Error deleting tenant: ${error}`)
       throw error

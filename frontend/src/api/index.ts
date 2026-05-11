@@ -1,3 +1,5 @@
-export { notifyApi } from './notify.api'
-export { notificationApi } from './notification.api'
-export { cstarApi } from './cstar.api'
+export { default as adminApi } from './admin.api'
+export { default as notificationApi } from './notification.api'
+export { default as notifyApi } from './notify.api'
+export { default as userApi } from './user.api'
+export { default as cstarApi } from './cstar.api'

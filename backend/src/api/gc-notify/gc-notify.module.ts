@@ -1,7 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common'
 import { GcNotifyApiClient } from './gc-notify-api.client'
 import { GcNotifyController } from './gc-notify.controller'
-import { TenantGuard } from '../../common/guards/tenant.guard'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 
 /** Reserved for future options. */
@@ -18,7 +17,7 @@ export class GcNotifyModule {
       global: true,
       imports: [TenantsModule],
       controllers: [GcNotifyController],
-      providers: [GcNotifyApiClient, TenantGuard],
+      providers: [GcNotifyApiClient],
       exports: [GcNotifyApiClient],
     }
   }

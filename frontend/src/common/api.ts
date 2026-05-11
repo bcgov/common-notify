@@ -28,6 +28,32 @@ const { KEYCLOAK_URL } = config
 
 // Flag to prevent duplicate interceptor registration
 let responseInterceptorRegistered = false
+let requestInterceptorRegistered = false
+
+// Request interceptor to add X-Tenant-ID header from selected tenant
+if (!requestInterceptorRegistered) {
+  axios.interceptors.request.use((config) => {
+    // Get selected tenant from localStorage (where we persist it)
+    const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
+    if (selectedTenantJson) {
+      try {
+        const selectedTenant = JSON.parse(selectedTenantJson)
+        if (selectedTenant?.id) {
+          config.headers['X-Tenant-ID'] = selectedTenant.id
+          console.log(
+            `[API] Added X-Tenant-ID header: ${selectedTenant.id} for request to ${config.url}`,
+          )
+        }
+      } catch (e) {
+        console.error('[API] Failed to parse selected tenant from localStorage:', e)
+      }
+    } else {
+      console.warn('[API] No selected tenant in localStorage for request to:', config.url)
+    }
+    return config
+  })
+  requestInterceptorRegistered = true
+}
 
 // Response interceptor to handle auth errors (register only once)
 if (!responseInterceptorRegistered) {
@@ -36,7 +62,21 @@ if (!responseInterceptorRegistered) {
     (error: AxiosError) => {
       const { response } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
-        // 401 = unauthenticated: redirect to Keycloak login
+        // 401 = unauthorized
+        // This could be either:
+        // 1. Expired token - redirect to Keycloak to refresh
+        // 2. Missing tenant context - show error to user
+
+        const responseData = (response.data as any) || {}
+        const errorMessage = responseData.message || ''
+
+        // If error message mentions tenant, don't redirect - show error instead
+        if (errorMessage.includes('tenant') || errorMessage.includes('Tenant')) {
+          showErrorToast(`Authorization failed: ${errorMessage}`)
+          return Promise.reject(error)
+        }
+
+        // Otherwise, assume token expired and redirect to Keycloak
         UserService.doLogin()
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
@@ -94,10 +134,14 @@ export const deleteMethod = async <T, M = object>(
   })
 }
 
-export const post = async <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
-  const { url, requiresAuthentication, params } = parameters
+export const post = async <T, M = object>(
+  parameters: ApiRequestParameters<M> & { data?: M },
+): Promise<T> => {
+  const { url, requiresAuthentication, params, data } = parameters
   if (requiresAuthentication) await setAuthHeader()
-  return axios.post(url, params).then((response: AxiosResponse) => response.data as T)
+  // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
+  const bodyData = data || params
+  return axios.post(url, bodyData).then((response: AxiosResponse) => response.data as T)
 }
 
 export const patch = async <T, M = object>(
