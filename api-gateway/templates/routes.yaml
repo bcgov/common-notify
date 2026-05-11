@@ -505,6 +505,20 @@ routes:
       - /api/v1/frontend/templates
     methods:
       - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates POST (frontend variant - create)
+  - name: ${ROUTE_PREFIX}templates-frontend-create
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates
+    methods:
       - POST
     strip_path: false
     https_redirect_status_code: 426
@@ -521,11 +535,11 @@ routes:
       - /api/v1/frontend/templates/*
     methods:
       - GET
-      - PATCH
+      - POST
       - DELETE
     strip_path: false
     https_redirect_status_code: 426
-    path_handling: v0
+    path_handling: v1
     request_buffering: true
     response_buffering: true
 
@@ -540,7 +554,7 @@ routes:
       - POST
     strip_path: false
     https_redirect_status_code: 426
-    path_handling: v0
+    path_handling: v1
     request_buffering: true
     response_buffering: true
 

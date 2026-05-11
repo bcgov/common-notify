@@ -5,23 +5,31 @@ import Card from '@/components/Card'
 import { getTemplates } from '@/api/templates.api'
 import type { TemplateResponse, NotificationChannel } from '@/api/templates.api'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { useAppSelector } from '@/redux/hooks'
+import PageHeading from '@/components/PageHeading'
 
 /**
  * Templates Page
  *
- * Displays a list of all notification templates for the current tenant.
+ * Displays a list of all notification templates for the selected tenant.
  * Templates can be email, SMS, or push notifications with different template engines.
  */
 const Templates: FC = () => {
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
   const fetchTemplates = useCallback(async () => {
+    if (!selectedTenant) {
+      setTemplates([])
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await getTemplates(page, 10)
+      const response = await getTemplates(selectedTenant.id, page, 10)
       // Handle both array and paginated response formats
       const templateList = Array.isArray(response) ? response : response.templates || []
       setTemplates(templateList)
@@ -35,7 +43,7 @@ const Templates: FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, selectedTenant])
 
   useEffect(() => {
     fetchTemplates()
@@ -79,7 +87,7 @@ const Templates: FC = () => {
     <div className="container-fluid">
       <div className="row mb-4">
         <div className="col">
-          <h1>Notification Templates</h1>
+          <PageHeading title="Notification Templates" />
           <p className="text-muted">
             Manage email, SMS, and push notification templates for your tenants
           </p>
