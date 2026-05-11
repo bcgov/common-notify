@@ -30,33 +30,38 @@ const { KEYCLOAK_URL } = config
 let responseInterceptorRegistered = false
 let requestInterceptorRegistered = false
 
-// Request interceptor to add X-Tenant-ID header from selected tenant
-if (!requestInterceptorRegistered) {
-  axios.interceptors.request.use((config) => {
-    // Get selected tenant from localStorage (where we persist it)
-    const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
-    if (selectedTenantJson) {
-      try {
-        const selectedTenant = JSON.parse(selectedTenantJson)
-        if (selectedTenant?.id) {
-          config.headers['X-Tenant-ID'] = selectedTenant.id
-          console.log(
-            `[API] Added X-Tenant-ID header: ${selectedTenant.id} for request to ${config.url}`,
-          )
+const registerRequestInterceptor = () => {
+  if (requestInterceptorRegistered) return
+
+  // Add X-Tenant-ID header to all requests if a tenant is selected
+  axios.interceptors.request.use(
+    (config) => {
+      const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
+      if (selectedTenantJson) {
+        try {
+          const selectedTenant = JSON.parse(selectedTenantJson)
+          if (selectedTenant?.id) {
+            config.headers['X-Tenant-ID'] = selectedTenant.id
+            console.log(
+              `[API Interceptor] Set X-Tenant-ID header to: ${selectedTenant.id} for ${config.method?.toUpperCase()} ${config.url}`,
+            )
+          }
+        } catch {
+          console.error('[API Interceptor] Failed to parse selected tenant from localStorage')
         }
-      } catch (e) {
-        console.error('[API] Failed to parse selected tenant from localStorage:', e)
+      } else {
+        console.warn('[API Interceptor] No selected tenant in localStorage')
       }
-    } else {
-      console.warn('[API] No selected tenant in localStorage for request to:', config.url)
-    }
-    return config
-  })
+      return config
+    },
+    (error) => Promise.reject(error),
+  )
   requestInterceptorRegistered = true
 }
 
 // Response interceptor to handle auth errors (register only once)
 if (!responseInterceptorRegistered) {
+  registerRequestInterceptor() // Also register request interceptor
   axios.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
@@ -91,6 +96,7 @@ if (!responseInterceptorRegistered) {
 const setAuthHeader = async () => {
   const token = await UserService.getToken()
   axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  registerRequestInterceptor()
 }
 
 export const generateApiParameters = <T = object>(

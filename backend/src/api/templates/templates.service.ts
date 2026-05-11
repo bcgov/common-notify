@@ -11,6 +11,7 @@ import { TemplateResponseDto } from './schemas/template-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 /**
  * Service for template business logic
@@ -24,6 +25,7 @@ export class TemplatesService {
     private readonly templatesRepository: TemplatesRepository,
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
     private readonly rendererRegistry: ITemplateRendererRegistry,
+    private readonly tenantsService: TenantsService,
   ) {
     // Initialize markdown-it with safe defaults
     this.markdown = new MarkdownIt({
@@ -59,6 +61,27 @@ export class TemplatesService {
     const offset = (page - 1) * limit
     const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
     return templates.map((t) => this.toResponseDto(t))
+  }
+
+  /**
+   * List all active templates for a tenant by external (CSTAR) ID
+   * @param tenantExternalId The tenant external ID
+   * @param page Page number (1-indexed)
+   * @param limit Items per page (max 100)
+   */
+  async listTemplatesByExternalId(
+    tenantExternalId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<TemplateResponseDto[]> {
+    // Look up tenant by external ID and get internal ID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with external ID '${tenantExternalId}' not found`)
+    }
+
+    // Use the internal tenant ID to list templates
+    return this.listTemplates(tenant.id, page, limit)
   }
 
   /**

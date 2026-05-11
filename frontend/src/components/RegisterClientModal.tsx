@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { Button, Form } from '@bcgov/design-system-react-components'
 import TextField from '@/components/InputWrappers/TextField'
-import Select from '@/components/InputWrappers/Select'
+import TenantCheckboxList from '@/components/TenantCheckboxList'
 import { adminApi } from '@/api/admin.api'
 import type { LinkClientToTenantsRequest } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
@@ -97,11 +97,6 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
     }
   }
 
-  const tenants = cstarTenants.map((tenant) => ({
-    id: tenant.id,
-    label: tenant.name,
-  }))
-
   return (
     <>
       {isOpen && <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>}
@@ -142,16 +137,11 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
                   description="This will only be used to verify client ownership and will not be stored"
                 />
 
-                <Select
-                  label="Select Tenants"
-                  placeholder="Choose tenants..."
-                  items={tenants}
-                  value={formState.selected_tenant_ids}
+                <TenantCheckboxList
+                  tenants={cstarTenants}
+                  selectedTenantIds={formState.selected_tenant_ids}
                   onChange={(value) => handleInputChange('selected_tenant_ids')(value)}
-                  multiple
-                  style={{ width: '100%' }}
                   required
-                  description="Choose which CSTAR tenants this client can access"
                 />
 
                 <div className="d-flex gap-2 justify-content-end">

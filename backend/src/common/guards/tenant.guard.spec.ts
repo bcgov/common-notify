@@ -70,6 +70,7 @@ describe('TenantGuard', () => {
         headers: {
           'x-consumer-username': 'test-tenant',
           'x-consumer-id': 'kong-id-123',
+          'x-tenant-id': 'kong-id-123',
         },
         method: 'POST',
         url: '/api/test',

@@ -142,6 +142,7 @@ describe('NotificationService', () => {
       expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('cstar-external-id')
       expect(mockRepository.findAndCount).toHaveBeenCalledWith({
         where: { tenantId: 'tenant-uuid' },
+        relations: ['tenant'],
         skip: 0,
         take: 10,
         order: { createdAt: 'DESC' },
@@ -173,6 +174,7 @@ describe('NotificationService', () => {
 
       expect(mockRepository.findAndCount).toHaveBeenCalledWith({
         where: { tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
+        relations: ['tenant'],
         skip: 0,
         take: 10,
         order: { createdAt: 'DESC' },
@@ -198,7 +200,10 @@ describe('NotificationService', () => {
 
       const result = await service.findOne(id, tenantId)
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id, tenantId } })
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { id, tenantId },
+        relations: ['tenant'],
+      })
       expect(result).toEqual(mockNotification)
     })
 
