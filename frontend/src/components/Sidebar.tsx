@@ -1,5 +1,6 @@
 // Sidebar.tsx
-import { FC, useState } from 'react'
+import { useState } from 'react'
+import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
