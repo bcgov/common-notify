@@ -90,14 +90,30 @@ export class TenantGuard implements CanActivate {
         throw new UnauthorizedException('Failed to resolve authorized tenants')
       })
 
-      // Use first tenant as primary (can be overridden by route-specific logic)
-      request.tenant = tenants[0]
+      // Require explicit tenant selection via X-Tenant-ID header
+      const xTenantId = request.headers['x-tenant-id'] as string
+      if (!xTenantId) {
+        this.logger.error(
+          `Kong client ${clientId} attempted request without X-Tenant-ID header. Must explicitly specify which tenant.`,
+        )
+        throw new BadRequestException(
+          'X-Tenant-ID header is required. Please specify which tenant you want to access.',
+        )
+      }
+
+      const selectedTenant = tenants.find((t) => t.externalId === xTenantId)
+      if (!selectedTenant) {
+        this.logger.error(`Kong client ${clientId} requested unauthorized tenant ${xTenantId}`)
+        throw new UnauthorizedException(`You are not authorized to access tenant ${xTenantId}`)
+      }
+
+      request.tenant = selectedTenant
       request.accessibleTenants = tenants
       request.clientId = clientId
       request.kongUsername = kongUsername
 
       this.logger.debug(
-        `Tenant authenticated via Kong client: ${tenants[0].name} (DB ID: ${tenants[0].id}, Kong Client ID: ${clientId})`,
+        `Tenant authenticated via Kong client: ${selectedTenant.name} (DB ID: ${selectedTenant.id}, Kong Client ID: ${clientId})`,
       )
 
       return true
@@ -144,7 +160,7 @@ export class TenantGuard implements CanActivate {
               `Tenant not found for CSTAR ID: ${xTenantId}. User ${sub} may not have access to this tenant.`,
             )
             throw new UnauthorizedException(
-              `Tenant ${xTenantId} not found or you do not have access.`,
+              `Tenant ${xTenantId} not found or you do not have access.  Please register your clients and tennants with the administrator if you believe this is an error.`,
             )
           }
 

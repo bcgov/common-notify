@@ -685,6 +685,11 @@
                     "key": "Content-Type",
                     "value": "application/json",
                     "type": "text"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                    "type": "text"
                   }
                 ],
                 "body": {
@@ -1150,6 +1155,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
                 "type": "text"
               }
             ],

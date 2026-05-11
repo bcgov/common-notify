@@ -3,7 +3,7 @@ import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@bcgov/design-system-react-components'
 import Card from '@/components/Card'
-import { getTemplateById } from '@/api/templates.api'
+import { getTemplateById, updateTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
@@ -60,10 +60,13 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     e.preventDefault()
     setSaving(true)
     try {
-      // TODO: Implement save API call
-      // await updateTemplate(templateId, formData)
+      await updateTemplate(templateId, {
+        name: formData.name,
+        description: formData.description,
+        body: formData.body,
+      })
       showSuccessToast('Template saved successfully')
-      // navigate({ to: '/templates' })
+      navigate({ to: '/templates' })
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : 'Failed to save template')
     } finally {

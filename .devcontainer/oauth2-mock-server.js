@@ -8,16 +8,16 @@ app.use(express.json())
 // Test credentials (must match kong-seed.sh and Kong JWT credentials)
 // Note: These secrets are used to sign JWTs expected by Kong's JWT plugin
 const testClients = {
-  'test-client-a': 'test-client-secret-a-12345678901234567890',
-  'test-client-b': 'test-client-secret-b-98765432109876543210',
-  'test-client-c': 'test-client-secret-c-11111111111111111111',
+  'LOCAL001-ABC123': 'LOCAL001-SECRET-ABC123XYZ789',
+  'LOCAL002-DEF456': 'LOCAL002-SECRET-DEF456XYZ789',
+  'LOCAL003-GHI789': 'LOCAL003-SECRET-GHI789XYZ789',
 }
 
 // JWT signing secrets (must match Kong JWT credentials created with 'secret' field)
 const jwtSecrets = {
-  'test-client-a': 'test-secret-a',
-  'test-client-b': 'test-secret-b',
-  'test-client-c': 'test-secret-c',
+  'LOCAL001-ABC123': 'jwt-secret-local001',
+  'LOCAL002-DEF456': 'jwt-secret-local002',
+  'LOCAL003-GHI789': 'jwt-secret-local003',
 }
 
 // Health check endpoint
@@ -108,7 +108,7 @@ app.listen(PORT, () => {
   console.log(`   GET  http://localhost:${PORT}/health - Health check`)
   console.log('')
   console.log('Test credentials (from kong-seed.sh):')
-  console.log('  - test-client-a: test-client-secret-a-12345678901234567890')
-  console.log('  - test-client-b: test-client-secret-b-98765432109876543210')
-  console.log('  - test-client-c: test-client-secret-c-11111111111111111111')
+  console.log('  - LOCAL001-ABC123: LOCAL001-SECRET-ABC123XYZ789')
+  console.log('  - LOCAL002-DEF456: LOCAL002-SECRET-DEF456XYZ789')
+  console.log('  - LOCAL003-GHI789: LOCAL003-SECRET-GHI789XYZ789')
 })

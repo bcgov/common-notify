@@ -81,7 +81,12 @@ export class NotificationService {
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
-    return saved
+    // Reload with tenant relation for full data in SSE stream
+    const fullNotification = await this.notificationRepository.findOne({
+      where: { id: saved.id },
+      relations: ['tenant'],
+    })
+    return fullNotification || saved
   }
 
   async findAll(
@@ -124,6 +129,7 @@ export class NotificationService {
     // Get both the data and total count
     const [notifications, total] = await this.notificationRepository.findAndCount({
       where,
+      relations: ['tenant'],
       skip,
       take: limitNum,
       order: { createdAt: 'DESC' },
@@ -141,7 +147,10 @@ export class NotificationService {
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
-    const notification = await this.notificationRepository.findOne({ where: { id, tenantId } })
+    const notification = await this.notificationRepository.findOne({
+      where: { id, tenantId },
+      relations: ['tenant'],
+    })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }

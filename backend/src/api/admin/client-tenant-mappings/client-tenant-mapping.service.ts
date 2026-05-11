@@ -101,27 +101,23 @@ export class ClientTenantMappingService {
         )
       }
 
-      // Create or reactivate client-tenant mapping
-      this.logger.debug(`Creating mapping: clientId=${clientId}, tenantId=${tenant.id}`)
+      // Upsert client-tenant mapping
+      this.logger.debug(`Upserting mapping: clientId=${clientId}, tenantId=${tenant.id}`)
 
       const existingMapping = await this.mappingRepository.findOne({
         where: { clientId, tenantId: tenant.id, isDeleted: false },
       })
 
+      let savedMapping: ClientTenantMapping
+
       if (existingMapping) {
-        if (existingMapping.isActive) {
-          const errorMsg = `Client '${clientId}' is already linked to tenant '${tenantRef.id}'`
-          this.logger.warn(errorMsg)
-          throw new BadRequestException(errorMsg)
-        }
-        // Reactivate existing inactive mapping
+        // Update existing mapping
         existingMapping.isActive = true
         existingMapping.updatedBy = createdBy
         existingMapping.updatedAt = now
-        const savedMapping = await this.mappingRepository.save(existingMapping)
-        mappings.push(savedMapping)
+        savedMapping = await this.mappingRepository.save(existingMapping)
         this.logger.debug(
-          `Reactivated mapping: id=${savedMapping.id}, clientId=${clientId}, tenantId=${tenant.id}`,
+          `Upserted existing mapping: id=${savedMapping.id}, clientId=${clientId}, tenantId=${tenant.id}`,
         )
       } else {
         // Create new mapping
@@ -133,12 +129,13 @@ export class ClientTenantMappingService {
           updatedAt: now,
           isActive: true,
         })
-        const savedMapping = await this.mappingRepository.save(mapping)
-        mappings.push(savedMapping)
+        savedMapping = await this.mappingRepository.save(mapping)
         this.logger.debug(
           `Created new mapping: id=${savedMapping.id}, clientId=${clientId}, tenantId=${tenant.id}`,
         )
       }
+
+      mappings.push(savedMapping)
     }
 
     this.logger.debug(
