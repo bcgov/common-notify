@@ -1,5 +1,5 @@
 import type { AxiosError } from 'axios'
-import { get, post, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 
 export enum NotificationChannel {
   EMAIL = 'email',

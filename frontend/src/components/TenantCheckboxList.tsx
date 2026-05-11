@@ -39,8 +39,6 @@ const TenantCheckboxList: FC<TenantCheckboxListProps> = ({
     onChange([])
   }
 
-  const areAllSelected = tenants.length > 0 && selectedTenantIds.length === tenants.length
-
   return (
     <div className="tenant-checkbox-list">
       <div className="d-flex justify-content-between align-items-center mb-3">
