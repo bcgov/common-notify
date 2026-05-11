@@ -14,6 +14,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -36,6 +37,12 @@ const navItems = [
     to: '/templates',
     icon: <FolderOutlinedIcon />,
     ariaLabel: 'Navigate to Templates',
+  },
+  {
+    label: 'Distribution Lists',
+    to: '/distribution-lists',
+    icon: <GroupsOutlinedIcon />,
+    ariaLabel: 'Navigate to Settings',
   },
   {
     label: 'Settings',
