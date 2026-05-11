@@ -6,6 +6,7 @@ import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { RenderingModule } from '../../services/rendering/rendering.module'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -44,6 +45,12 @@ describe('TemplatesService', () => {
     createVersion: vi.fn(),
   }
 
+  const mockTenantsService = {
+    findOne: vi.fn(),
+    findByExternalId: vi.fn(),
+    findAll: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -52,6 +59,10 @@ describe('TemplatesService', () => {
         {
           provide: TemplatesRepository,
           useValue: mockRepository,
+        },
+        {
+          provide: TenantsService,
+          useValue: mockTenantsService,
         },
       ],
     }).compile()
