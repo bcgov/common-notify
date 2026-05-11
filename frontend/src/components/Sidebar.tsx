@@ -14,6 +14,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 
@@ -44,12 +45,20 @@ const navItems = [
   },
 ]
 
-const adminItems = [{ label: 'Register Client', to: '/admin/clients' }] as const
+const adminItems = [
+  {
+    label: 'Admin',
+    to: '/admin/clients',
+    icon: <AdminPanelSettingsOutlinedIcon />,
+    ariaLabel: 'Navigate to Admin',
+  },
+] as const
 
 const Sidebar: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
+  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -91,6 +100,22 @@ const Sidebar: FC = () => {
             <span className="sidebar__label">{item.label}</span>
           </Link>
         ))}
+        {isAdmin &&
+          adminItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="sidebar__item"
+              activeProps={{ className: 'active' }}
+              aria-label={item.ariaLabel}
+              title={collapsed ? item.label : ''}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="sidebar__label">{item.label}</span>
+            </Link>
+          ))}
       </nav>
 
       {/* Footer */}
