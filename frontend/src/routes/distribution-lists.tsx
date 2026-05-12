@@ -1,10 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
 import DistributionLists from '@/pages/distribution-lists/DistributionLists'
+import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/distribution-lists')({
-  component: DistributionListsPage,
+  component: RouteComponent,
 })
 
-function DistributionListsPage() {
+function RouteComponent() {
   return <DistributionLists />
 }
