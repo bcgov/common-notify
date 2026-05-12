@@ -25,7 +25,7 @@
 
   &__toggle {
     position: absolute;
-    right: -10px;
+    right: -15px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 10;
@@ -35,8 +35,8 @@
     justify-content: center;
     cursor: pointer;
 
-    width: 20px;
-    height: 48px;
+    width: 30px;
+    height: 72px;
     border-radius: 8px;
 
     background-color: $secondary-color;

@@ -1,27 +1,30 @@
-import { useEffect } from 'react'
 import type { FC } from 'react'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchNotifications } from '@/redux/thunks/notification.thunks'
+import { useAppSelector } from '@/redux/hooks'
 import PageHeading from '@/components/PageHeading'
-import NotificationStatusTable from '@/components/NotificationStatusTable'
 import { Col, Row } from 'react-bootstrap'
+import TestNotificationForm from '@/pages/dashboard/sections/TestNotificationForm'
+import { NotificationStatusSection } from '@/pages/dashboard/sections/NotificationStatusSection'
+import { NotificationEventsSection } from '@/pages/dashboard/sections/NotificationEventsSection'
 
 const Dashboard: FC = () => {
-  const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-
-  useEffect(() => {
-    if (selectedTenant) {
-      dispatch(fetchNotifications())
-    }
-  }, [dispatch, selectedTenant])
 
   return (
     <div>
-      <PageHeading title="Dashboard" />
+      <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
+
+      <Row className="mb-5">
+        <Col md={7}>
+          <NotificationEventsSection />
+        </Col>
+        <Col md={5}>
+          <TestNotificationForm />
+        </Col>
+      </Row>
+
       <Row>
         <Col md={12}>
-          <NotificationStatusTable />
+          <NotificationStatusSection />
         </Col>
       </Row>
     </div>

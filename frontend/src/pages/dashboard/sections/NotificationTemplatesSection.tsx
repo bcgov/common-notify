@@ -1,0 +1,44 @@
+import { useEffect } from 'react'
+import type { FC } from 'react'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchTemplates } from '@/redux/thunks/templates.thunks'
+import { Button } from '@bcgov/design-system-react-components'
+import PageSubHeading from '../../../components/PageSubHeading'
+import { Link } from '@tanstack/react-router'
+
+/**
+ * Used on the Dashboard page
+ */
+export const NotificationTemplatesSection: FC = () => {
+  const dispatch = useAppDispatch()
+  const templates = useAppSelector((state) => state.templates.items)
+
+  useEffect(() => {
+    dispatch(fetchTemplates())
+  }, [dispatch])
+
+  return (
+    <section className="mb-4">
+      <PageSubHeading title="Notification Templates" />
+      <Button variant="primary">Create New Template</Button>
+      <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
+        {templates.map((template) => (
+          <li key={template.id}>
+            <Link
+              to="/template-edit/$templateId"
+              params={{ templateId: String(template.id) }}
+              style={{ color: 'black' }}
+            >
+              {template.name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2">
+        <Link to="/templates" style={{ color: '#255A90' }}>
+          Browse existing templates
+        </Link>
+      </div>
+    </section>
+  )
+}

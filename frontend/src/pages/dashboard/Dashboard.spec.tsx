@@ -9,6 +9,14 @@ import tenantReducer from '@/redux/slices/tenant.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
+vi.mock('@/pages/dashboard/sections/TestNotificationForm', () => ({
+  default: () => <div data-testid="test-notification-form" />,
+}))
+
+vi.mock('@/pages/dashboard/sections/NotificationEventsSection', () => ({
+  NotificationEventsSection: () => <div data-testid="notification-events-section" />,
+}))
+
 vi.mock('@/redux/thunks/notification.thunks', async () => {
   const { createAsyncThunk: createThunk } = await import('@reduxjs/toolkit')
   return {
