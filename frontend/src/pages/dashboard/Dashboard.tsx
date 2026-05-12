@@ -5,6 +5,7 @@ import { Col, Row } from 'react-bootstrap'
 import TestNotificationForm from '@/pages/dashboard/sections/TestNotificationForm'
 import { NotificationStatusSection } from '@/pages/dashboard/sections/NotificationStatusSection'
 import { NotificationEventsSection } from '@/pages/dashboard/sections/NotificationEventsSection'
+import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection'
 
 const Dashboard: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
@@ -16,6 +17,7 @@ const Dashboard: FC = () => {
       <Row className="mb-5">
         <Col md={7}>
           <NotificationEventsSection />
+          <NotificationTemplatesSection />
         </Col>
         <Col md={5}>
           <TestNotificationForm />
