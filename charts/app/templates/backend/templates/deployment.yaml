@@ -90,6 +90,21 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: API_GATEWAY_TOKEN_URL
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_FROM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: TWILIO_FROM_NUMBER
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
