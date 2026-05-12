@@ -164,6 +164,34 @@ export class TenantGuard implements CanActivate {
             )
           }
 
+          // If this is a service client (has azp), verify the mapping is active
+          if (azp) {
+            this.logger.debug(`Verifying service client mapping: azp=${azp}, tenantId=${tenant.id}`)
+
+            const activeTenantIds = await this.clientTenantMappingService
+              .findTenantsByClientId(azp)
+              .catch((error) => {
+                this.logger.warn(
+                  `Error looking up ClientTenantMapping for ${azp}: ${error.message}`,
+                )
+                return []
+              })
+
+            const mappingIsActive = activeTenantIds.includes(tenant.id)
+            if (!mappingIsActive) {
+              this.logger.error(
+                `Service client ${azp} does not have an active mapping for tenant ${tenant.id} (CSTAR ID: ${xTenantId})`,
+              )
+              throw new UnauthorizedException(
+                `Client is not authorized to access this tenant. The mapping may be inactive.`,
+              )
+            }
+
+            this.logger.debug(
+              `Service client ${azp} mapping verified as active for tenant ${tenant.id}`,
+            )
+          }
+
           this.logger.debug(
             `Tenant authenticated via X-Tenant-ID header: ${tenant.name} (DB ID: ${tenant.id}, CSTAR ID: ${xTenantId})`,
           )
