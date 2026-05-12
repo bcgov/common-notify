@@ -164,9 +164,12 @@ export class TenantGuard implements CanActivate {
             )
           }
 
-          // If this is a service client (has azp), verify the mapping is active
-          if (azp) {
-            this.logger.debug(`Verifying service client mapping: azp=${azp}, tenantId=${tenant.id}`)
+          // If this is a service client (azp === sub), verify the mapping is active
+          // For regular frontend users, sub will be different from azp (sub is user GUID)
+          if (azp && azp === sub) {
+            this.logger.debug(
+              `Service client detected (azp === sub). Verifying mapping: azp=${azp}, tenantId=${tenant.id}`,
+            )
 
             const activeTenantIds = await this.clientTenantMappingService
               .findTenantsByClientId(azp)
