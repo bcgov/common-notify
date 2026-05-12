@@ -17,6 +17,10 @@ vi.mock('@/pages/dashboard/sections/NotificationEventsSection', () => ({
   NotificationEventsSection: () => <div data-testid="notification-events-section" />,
 }))
 
+vi.mock('@/pages/dashboard/sections/NotificationTemplatesSection', () => ({
+  NotificationTemplatesSection: () => <div data-testid="notification-templates-section" />,
+}))
+
 vi.mock('@/redux/thunks/notification.thunks', async () => {
   const { createAsyncThunk: createThunk } = await import('@reduxjs/toolkit')
   return {

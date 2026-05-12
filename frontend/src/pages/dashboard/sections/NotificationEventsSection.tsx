@@ -14,7 +14,7 @@ const mockNotificationEvents = [
  */
 export const NotificationEventsSection: FC = () => {
   return (
-    <section>
+    <section className="mb-4">
       <PageSubHeading title="Notification Events"></PageSubHeading>
       <Button variant="primary">Create New Notification Event</Button>
       <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
