@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { FC } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
-import { Button } from '~/@bcgov/design-system-react-components/dist'
+import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 import { Link } from '@tanstack/react-router'
 

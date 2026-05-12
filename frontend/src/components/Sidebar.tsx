@@ -42,7 +42,7 @@ const navItems = [
     label: 'Distribution Lists',
     to: '/distribution-lists',
     icon: <GroupsOutlinedIcon />,
-    ariaLabel: 'Navigate to Settings',
+    ariaLabel: 'Navigate to Distribution Lists',
   },
   {
     label: 'Settings',

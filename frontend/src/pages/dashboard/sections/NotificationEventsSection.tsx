@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Button } from '~/@bcgov/design-system-react-components/dist'
+import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 
 // Mocked notification events data for now

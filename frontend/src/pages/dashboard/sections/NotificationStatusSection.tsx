@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import NotificationStatusTable from '../../../components/NotificationStatusTable'
+import NotificationStatusTable from './NotificationStatusTable'
 import PageSubHeading from '../../../components/PageSubHeading'
 
 /**
