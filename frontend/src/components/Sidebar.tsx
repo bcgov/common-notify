@@ -42,7 +42,7 @@ const navItems = [
     label: 'Distribution Lists',
     to: '/distribution-lists',
     icon: <GroupsOutlinedIcon />,
-    ariaLabel: 'Navigate to Settings',
+    ariaLabel: 'Navigate to Distribution Lists',
   },
   {
     label: 'Settings',
@@ -84,9 +84,9 @@ const Sidebar: FC = () => {
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {collapsed ? (
-          <ChevronRightIcon style={{ fontSize: 14 }} aria-hidden="true" />
+          <ChevronRightIcon style={{ fontSize: 20 }} aria-hidden="true" />
         ) : (
-          <ChevronLeftIcon style={{ fontSize: 14 }} aria-hidden="true" />
+          <ChevronLeftIcon style={{ fontSize: 20 }} aria-hidden="true" />
         )}
       </button>
 
@@ -128,7 +128,14 @@ const Sidebar: FC = () => {
       {/* Footer */}
       <div className="sidebar__footer">
         {/* Help */}
-        <div className="sidebar__item" title={collapsed ? 'Help' : ''} aria-label="Help">
+        {/* TODO add a link to Help page when it is created */}
+        <div
+          className="sidebar__item"
+          title={collapsed ? 'Help' : ''}
+          aria-label="Help"
+          role="button"
+          tabIndex={0}
+        >
           <span className="sidebar__icon" aria-hidden="true">
             <HelpOutlinedIcon />
           </span>
