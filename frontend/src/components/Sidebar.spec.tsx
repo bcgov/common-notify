@@ -6,7 +6,7 @@ import authReducer from '@/redux/slices/auth.slice'
 import Sidebar from './Sidebar'
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, className, activeProps, ...rest }: any) => (
+  Link: ({ children, to, className, _activeProps, ...rest }: any) => (
     <a href={to} className={className} {...rest}>
       {children}
     </a>
