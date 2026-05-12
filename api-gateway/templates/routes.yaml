@@ -457,7 +457,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/clients/mappings/*/toggle-active
+      - /api/v1/frontend/admin/clients/mappings/
     methods:
       - PATCH
     strip_path: false
