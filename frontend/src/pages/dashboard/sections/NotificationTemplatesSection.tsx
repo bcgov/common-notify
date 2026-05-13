@@ -12,10 +12,11 @@ import { Link } from '@tanstack/react-router'
 export const NotificationTemplatesSection: FC = () => {
   const dispatch = useAppDispatch()
   const templates = useAppSelector((state) => state.templates.items)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
   useEffect(() => {
     dispatch(fetchTemplates())
-  }, [dispatch])
+  }, [dispatch, selectedTenant])
 
   return (
     <section className="mb-4">

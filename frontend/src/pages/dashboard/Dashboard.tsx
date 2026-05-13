@@ -16,8 +16,8 @@ const Dashboard: FC = () => {
 
       <Row className="mb-5">
         <Col md={7}>
-          <NotificationEventsSection />
           <NotificationTemplatesSection />
+          <NotificationEventsSection />
         </Col>
         <Col md={5}>
           <TestNotificationForm />
