@@ -3,7 +3,8 @@ import { Select } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
 import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
+import PaginationControls from '@/components/PaginationControls'
+import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { fetchNotifications, connectNotificationSSE } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
@@ -15,14 +16,16 @@ import type { NotificationStatus } from '@/enum/notification-status.enum'
  */
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
-  const { statusFilter, isLoading } = useAppSelector((state) => state.notification)
+  const { statusFilter, page, limit, count, totalPages, isLoading } = useAppSelector(
+    (state) => state.notification,
+  )
   const notifications = useAppSelector(selectNotifications)
   const statuses = useAppSelector(selectStatuses)
 
-  // Fetch notifications when status filter changes
+  // Fetch notifications when filter or page changes
   useEffect(() => {
     dispatch(fetchNotifications())
-  }, [statusFilter, dispatch])
+  }, [statusFilter, page, dispatch])
 
   // Connect to SSE stream
   useEffect(() => {
@@ -81,6 +84,14 @@ const NotificationStatusTable: FC = () => {
           )}
         </tbody>
       </Table>
+      <PaginationControls
+        page={page}
+        totalPages={totalPages}
+        count={count}
+        limit={limit}
+        isLoading={isLoading}
+        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+      />
     </div>
   )
 }

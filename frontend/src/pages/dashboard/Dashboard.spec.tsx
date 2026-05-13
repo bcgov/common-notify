@@ -6,20 +6,40 @@ import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 
 vi.mock('@/redux/thunks/notification.thunks', async () => {
   const { createAsyncThunk: createThunk } = await import('@reduxjs/toolkit')
   return {
-    fetchNotifications: createThunk<NotificationRequest[]>('notification/fetchAll', async () => {
-      return []
-    }),
+    fetchNotifications: createThunk<PaginatedNotificationResponse>(
+      'notification/fetchAll',
+      async () => {
+        return {
+          data: [],
+          count: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 0,
+        }
+      },
+    ),
     connectNotificationSSE: vi.fn(() => new AbortController()),
   }
 })
 
 describe('Dashboard with CodeTables', () => {
   let preloadedState: any
+
+  const baseNotificationState = {
+    items: [],
+    statusFilter: 'all',
+    page: 1,
+    limit: 10,
+    count: 0,
+    totalPages: 0,
+    isLoading: false,
+    error: null,
+  }
 
   const mockCodeTablesState: CodeTablesState = {
     statuses: [
@@ -41,12 +61,7 @@ describe('Dashboard with CodeTables', () => {
 
     preloadedState = {
       codeTables: mockCodeTablesState,
-      notification: {
-        items: [],
-        statusFilter: 'all',
-        isLoading: false,
-        error: null,
-      },
+      notification: baseNotificationState,
     }
   })
 
@@ -118,12 +133,7 @@ describe('Dashboard with CodeTables', () => {
         ...mockCodeTablesState,
         isLoading: true,
       },
-      notification: {
-        items: [],
-        statusFilter: 'all',
-        isLoading: false,
-        error: null,
-      },
+      notification: baseNotificationState,
     }
 
     const store = createStore(loadingState)
@@ -147,12 +157,7 @@ describe('Dashboard with CodeTables', () => {
         isLoading: false,
         error: 'Failed to fetch code tables',
       },
-      notification: {
-        items: [],
-        statusFilter: 'all',
-        isLoading: false,
-        error: null,
-      },
+      notification: baseNotificationState,
     }
 
     const store = createStore(errorState)
@@ -188,12 +193,7 @@ describe('Dashboard with CodeTables', () => {
           { id: 'scheduled', label: 'Scheduled', description: 'scheduled' },
         ],
       },
-      notification: {
-        items: [],
-        statusFilter: 'all',
-        isLoading: false,
-        error: null,
-      },
+      notification: baseNotificationState,
     }
 
     const newStore = createStore(newState)

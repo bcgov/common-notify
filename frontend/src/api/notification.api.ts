@@ -2,28 +2,31 @@ import type { AxiosError } from 'axios'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
+import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import UserService from '@/service/user-service'
 
-interface PaginatedResponse {
-  data: any[]
-  count: number
-  page: number
-  limit: number
-  totalPages: number
+export interface ListNotificationsOptions {
+  page?: number
+  limit?: number
+  status?: NotificationStatus | 'all'
 }
 
 export const notificationApi = {
   /**
    * List all notification requests for the authenticated tenant
    * GET /api/v1/frontend/notification_request
-   * @param status Optional status filter to apply on the backend
+   * @param options Optional page, limit, and status filter values to apply on the backend
    */
-  async listNotifications(status?: NotificationStatus | 'all') {
+  async listNotifications(options: ListNotificationsOptions = {}) {
     try {
       const params = generateApiParameters('/api/v1/frontend/notification_request')
-      const queryParams = status && status !== 'all' ? { status } : {}
-      return await get<PaginatedResponse>({ ...params, params: queryParams })
+      const queryParams = {
+        page: options.page,
+        limit: options.limit,
+        ...(options.status && options.status !== 'all' ? { status: options.status } : {}),
+      }
+      return await get<PaginatedNotificationResponse>({ ...params, params: queryParams })
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {
@@ -31,10 +34,10 @@ export const notificationApi = {
         return {
           data: [],
           count: 0,
-          page: 1,
-          limit: 10,
+          page: options.page ?? 1,
+          limit: options.limit ?? 10,
           totalPages: 0,
-        } as PaginatedResponse
+        } as PaginatedNotificationResponse
       }
       throw new Error(
         `Failed to fetch notifications: ${

@@ -16,6 +16,10 @@ const config = {
     window.VITE_API_GATEWAY_NOTIFY_URL ||
     import.meta.env.VITE_API_GATEWAY_NOTIFY_URL ||
     'https://gw-cnotify-notify.dev.api.gov.bc.ca',
+  MAX_NOTIFICATION_RESULTS_PER_PAGE:
+    window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE ||
+    import.meta.env.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE ||
+    '',
   CSTAR_API_URL: window.VITE_CSTAR_API_URL || import.meta.env.VITE_CSTAR_API_URL || '',
   CSTAR_TENANT_SETUP_URL:
     window.VITE_CSTAR_TENANT_SETUP_URL || import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || '',
