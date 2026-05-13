@@ -108,10 +108,10 @@ export async function getAllMappings() {
  */
 export async function toggleMappingActiveStatus(id: string) {
   try {
-    const params = generateApiParameters(
-      `/api/v1/frontend/admin/clients/mappings/${id}/toggle-active`,
-    )
-    return await patch<{ mapping: ClientTenantMapping; message: string }>(params)
+    const params = generateApiParameters(`/api/v1/frontend/admin/clients/mappings/`)
+    return await patch<{ mapping: ClientTenantMapping; message: string }>(params, {
+      'X-Mapping-ID': id,
+    })
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}

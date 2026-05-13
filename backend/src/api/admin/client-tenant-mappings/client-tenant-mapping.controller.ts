@@ -4,7 +4,7 @@ import {
   Get,
   Patch,
   Body,
-  Param,
+  Headers,
   UseGuards,
   HttpException,
   Logger,
@@ -190,11 +190,12 @@ export class ClientTenantMappingController {
 
   /**
    * Toggle mapping active status
-   * @param id Mapping ID
+   * Mapping ID is extracted from X-Mapping-ID header
+   * @param mappingId Mapping ID (from header)
    * @param req Express request
    * @returns Updated mapping
    */
-  @Patch('mappings/:id/toggle-active')
+  @Patch('mappings')
   @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({
     summary: 'Toggle client-tenant mapping active status',
@@ -207,16 +208,21 @@ export class ClientTenantMappingController {
     description: 'Invalid mapping ID or mapping not found',
   })
   async toggleMappingActive(
-    @Param('id') id: string,
+    @Headers('x-mapping-id') mappingId: string,
     @Req() req: Express.Request & { user?: { sub: string; [key: string]: any } },
   ) {
+    if (!mappingId) {
+      this.logger.error('Missing X-Mapping-ID header')
+      throw new HttpException('Missing X-Mapping-ID header', 400)
+    }
+
     const user = req.user
     if (!user || !user.sub) {
       this.logger.error('Unable to extract user information from JWT')
       throw new HttpException('Unable to identify authenticated user', 401)
     }
 
-    const mapping = await this.mappingService.toggleActiveStatus(id, user.sub)
+    const mapping = await this.mappingService.toggleActiveStatus(mappingId, user.sub)
 
     return {
       mapping: {

@@ -58,10 +58,22 @@ export class NotificationService {
       id: entity.id,
       tenantId: entity.tenantId,
       status: entity.status,
+      channelCode: entity.channelCode,
+      channel: entity.channel
+        ? {
+            channelCode: entity.channel.channelCode,
+            displayName: entity.channel.displayName,
+            description: entity.channel.description,
+          }
+        : undefined,
+      recipients: entity.recipients,
+      delayedSendTime: entity.delayedSendTime,
+      payload: entity.payload,
       createdAt: entity.createdAt,
       createdBy: entity.createdBy,
       updatedAt: entity.updatedAt,
       updatedBy: entity.updatedBy,
+      errorReason: entity.errorReason,
       tenant: entity.tenant
         ? {
             id: entity.tenant.id,
@@ -72,12 +84,81 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Extract channel code, recipients, and delayed send time from notification payload
+   */
+  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    if (!payload) {
+      return { channel: null, recipients: null, delayedSendTime: null }
+    }
+
+    const channels: string[] = []
+    const recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } = {}
+    let delayedSendTime: Date | null = null
+
+    // Extract email channel
+    if (payload.email) {
+      channels.push('EMAIL')
+      recipients.email = [
+        ...(payload.email.recipients?.to || []),
+        ...(payload.email.recipients?.cc || []),
+        ...(payload.email.recipients?.bcc || []),
+      ]
+      if (payload.email.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.email.delayedSend)
+      }
+    }
+
+    // Extract SMS channel
+    if (payload.sms) {
+      channels.push('SMS')
+      recipients.sms = payload.sms.recipients?.to || []
+      if (payload.sms.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.sms.delayedSend)
+      }
+    }
+
+    // Extract MsgApp channel
+    if (payload.msgApp) {
+      channels.push('MSGAPP')
+      recipients.msgApp = payload.msgApp.recipients?.to || []
+      if (payload.msgApp.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.msgApp.delayedSend)
+      }
+    }
+
+    // Determine primary channel code
+    let channelCode: string | null = null
+    if (channels.length === 1) {
+      channelCode = channels[0]
+    } else if (channels.length > 1) {
+      channelCode = 'MULTIPLE'
+    }
+
+    return {
+      channel: channelCode,
+      recipients: Object.keys(recipients).length > 0 ? recipients : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
+    // Extract channel, recipients, and delayed send time from payload
+    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
       status: dto.status ?? NotificationStatus.QUEUED,
       createdBy: dto.createdBy,
       payload: dto.payload,
+      channelCode: channel,
+      recipients: recipients,
+      delayedSendTime: delayedSendTime,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)

@@ -130,6 +130,7 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
                 <TextField
                   label="Client Secret"
                   placeholder="Enter your client secret"
+                  type="password"
                   value={formState.client_secret}
                   onChange={(value) => handleInputChange('client_secret')(value)}
                   maxLength={100}
