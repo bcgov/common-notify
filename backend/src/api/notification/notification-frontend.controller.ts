@@ -1,4 +1,13 @@
-import { Controller, Get, Version, Logger, Query, Sse, BadRequestException } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Version,
+  Logger,
+  Query,
+  Sse,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
@@ -6,6 +15,8 @@ import { RequireRole } from '../../auth/decorators/require-role.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { RoleGuard } from '../../auth/guards/role.guard'
 
 /**
  * Frontend Notification API Controller
@@ -24,6 +35,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
  */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
+@UseGuards(AuthJwtGuard, RoleGuard)
 @ApiBearerAuth()
 export class NotificationFrontendController {
   private readonly logger = new Logger(NotificationFrontendController.name)
