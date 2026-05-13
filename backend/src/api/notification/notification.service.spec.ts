@@ -86,6 +86,10 @@ describe('NotificationService', () => {
         tenantId: 'tenant-uuid',
         status: NotificationStatus.QUEUED,
         createdBy: 'user1',
+        channelCode: null,
+        recipients: null,
+        delayedSendTime: null,
+        payload: undefined,
       }
       mockRepository.create.mockReturnValue(mockNotification)
       mockRepository.save.mockResolvedValue(mockNotification)
@@ -96,6 +100,10 @@ describe('NotificationService', () => {
         tenantId: dto.tenantId,
         status: NotificationStatus.QUEUED,
         createdBy: dto.createdBy,
+        channelCode: null,
+        recipients: null,
+        delayedSendTime: null,
+        payload: undefined,
       })
       expect(mockRepository.save).toHaveBeenCalledWith(mockNotification)
       expect(result).toEqual(mockNotification)
@@ -107,7 +115,16 @@ describe('NotificationService', () => {
         status: NotificationStatus.PROCESSING,
         createdBy: 'user1',
       }
-      const mockNotification = { id: 'notif-uuid', ...dto }
+      const mockNotification = {
+        id: 'notif-uuid',
+        tenantId: 'tenant-uuid',
+        status: NotificationStatus.PROCESSING,
+        createdBy: 'user1',
+        channelCode: null,
+        recipients: null,
+        delayedSendTime: null,
+        payload: undefined,
+      }
       mockRepository.create.mockReturnValue(mockNotification)
       mockRepository.save.mockResolvedValue(mockNotification)
 
@@ -117,6 +134,10 @@ describe('NotificationService', () => {
         tenantId: dto.tenantId,
         status: NotificationStatus.PROCESSING,
         createdBy: dto.createdBy,
+        channelCode: null,
+        recipients: null,
+        delayedSendTime: null,
+        payload: undefined,
       })
     })
   })
