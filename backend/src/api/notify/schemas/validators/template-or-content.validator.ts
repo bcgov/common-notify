@@ -24,12 +24,18 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
     const hasTemplateId = !!request.templateId
 
     // Check if content is provided in email channel
-    const emailHasContent = request.email && (request.email.subject || request.email.body)
+    const emailHasContent =
+      request.email &&
+      request.email.content &&
+      (request.email.content.subject || request.email.content.body)
 
     // Check if content is provided in sms channel
-    const smsHasContent = request.sms && request.sms.body
+    const smsHasContent = request.sms && request.sms.content && request.sms.content.body
 
-    const hasContent = emailHasContent || smsHasContent
+    // Check if content is provided in msgApp channel
+    const msgAppHasContent = request.msgApp && request.msgApp.content && request.msgApp.content.body
+
+    const hasContent = emailHasContent || smsHasContent || msgAppHasContent
 
     // If template is provided, content must NOT be provided
     if (hasTemplateId && hasContent) {

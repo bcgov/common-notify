@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // Environment variable handling in production build images
 // Requires runtime placement of vars to prevent rebuilding the image
 // This application is run via Caddy file server with templates directive
@@ -16,6 +17,9 @@ const config = {
     window.VITE_API_GATEWAY_NOTIFY_URL ||
     import.meta.env.VITE_API_GATEWAY_NOTIFY_URL ||
     'https://gw-cnotify-notify.dev.api.gov.bc.ca',
+  CSTAR_API_URL: window.VITE_CSTAR_API_URL || import.meta.env.VITE_CSTAR_API_URL || '',
+  CSTAR_TENANT_SETUP_URL:
+    window.VITE_CSTAR_TENANT_SETUP_URL || import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || '',
 }
 
 export default config

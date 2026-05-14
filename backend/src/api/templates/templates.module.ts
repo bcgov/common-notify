@@ -1,12 +1,16 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { TemplatesController } from './templates.controller'
+import { TemplatesFrontendController } from './templates-frontend.controller'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 import { TemplateEngineCode } from './entities/template-engine-code.entity'
+import { RenderingModule } from '../../services/rendering/rendering.module'
+import { NotifyModule } from '../notify/notify.module'
 
 /**
  * Feature Module for Templates
@@ -19,9 +23,12 @@ import { TemplateEngineCode } from './entities/template-engine-code.entity'
 @Module({
   imports: [
     TenantsModule,
+    ClientTenantMappingModule,
     TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode]),
+    RenderingModule,
+    forwardRef(() => NotifyModule),
   ],
-  controllers: [TemplatesController],
+  controllers: [TemplatesController, TemplatesFrontendController],
   providers: [TemplatesService, TemplatesRepository],
   exports: [TemplatesService, TemplatesRepository],
 })

@@ -7,7 +7,7 @@ import { Entity, Column, PrimaryColumn, CreateDateColumn, UpdateDateColumn } fro
 @Entity('template_engine_code')
 export class TemplateEngineCode {
   /**
-   * Engine code (e.g., legacy_gc_notify, handlebars, mustache, ejs)
+   * Engine code (e.g., legacy_gc_notify, handlebars, mustache)
    */
   @PrimaryColumn({ name: 'engine_code', length: 50 })
   engineCode: string

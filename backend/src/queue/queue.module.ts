@@ -1,4 +1,4 @@
-import { Module, OnModuleInit, Inject, Logger } from '@nestjs/common'
+import { Module, OnModuleInit, Inject, Logger, forwardRef } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -12,11 +12,14 @@ import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
 import { NotificationService } from '../api/notification/notification.service'
+import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
+import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
+import { NotifyModule } from '../api/notify/notify.module'
 
 /**
  * Queue Module
@@ -32,10 +35,16 @@ import { TemplatesModule } from '../api/templates/templates.module'
  * due to temporary Redis unavailability.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationRequest]), TenantsModule, TemplatesModule],
+  imports: [
+    TypeOrmModule.forFeature([NotificationRequest]),
+    TenantsModule,
+    TemplatesModule,
+    forwardRef(() => NotifyModule),
+  ],
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    NotificationPubSubService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -168,6 +177,7 @@ export class QueueModule implements OnModuleInit {
     private readonly notificationService?: NotificationService,
     private readonly templatesRepository?: TemplatesRepository,
     private readonly templatesService?: TemplatesService,
+    private readonly inlineRenderingService?: InlineRenderingService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
@@ -179,19 +189,19 @@ export class QueueModule implements OnModuleInit {
       return
     }
 
-    this.logger.log('Initializing queue workers...')
-    this.logger.log(
+    this.logger.debug('Initializing queue workers...')
+    this.logger.debug(
       `Dependency check - notificationService available: ${!!this.notificationService}`,
     )
 
     // Read concurrency configuration
     const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
-    this.logger.log(`Ingestion worker concurrency: ${concurrency}`)
+    this.logger.debug(`Ingestion worker concurrency: ${concurrency}`)
 
     // Initialize workers in background - don't block app startup
     // Workers will be ready when first job is queued
     try {
-      this.logger.log('About to initialize ingestion worker...')
+      this.logger.debug('About to initialize ingestion worker...')
       // Initialize ingestion worker - orchestrates fan-out to delivery queues
       IngestionWorker.initialize(
         this.ingestionQueue,
@@ -201,9 +211,9 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         concurrency,
       )
-      this.logger.log('Ingestion worker initialization started')
+      this.logger.debug('Ingestion worker initialization started')
 
-      this.logger.log('About to initialize email delivery worker...')
+      this.logger.debug('About to initialize email delivery worker...')
       // Initialize email delivery worker - handles email sending
       // IMPORTANT: Do NOT await these - initialize() does not await process()
       // and returns immediately after setting up listeners
@@ -215,6 +225,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.templatesRepository,
         this.templatesService,
+        this.inlineRenderingService,
         this.emailAdapter,
         emailConcurrency,
       )
@@ -232,6 +243,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.templatesRepository,
         this.templatesService,
+        this.inlineRenderingService,
         this.smsAdapter,
         smsConcurrency,
       )

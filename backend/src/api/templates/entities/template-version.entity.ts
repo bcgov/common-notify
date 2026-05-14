@@ -103,6 +103,12 @@ export class TemplateVersion {
   engine: TemplateEngineCode
 
   /**
+   * Body content type for this version: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
+   */
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html' })
+  bodyType: 'text' | 'markdown' | 'html'
+
+  /**
    * User or process that created this version
    */
   @Column({ name: 'created_by', length: 200 })

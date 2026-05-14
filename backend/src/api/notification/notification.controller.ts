@@ -5,6 +5,8 @@ import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
+import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 
 @ApiTags('notification_request')
 @Controller('notification_request')
@@ -41,12 +43,13 @@ export class NotificationController {
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
   findAll(
+    @GetTenant() tenant: Tenant,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(pageNum, limitNum, status)
+    return this.notificationService.findAll(tenant.externalId, pageNum, limitNum, status)
   }
 }

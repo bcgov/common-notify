@@ -7,7 +7,9 @@ import { NotificationEventTypeCode } from './entities/notification-event-type-co
 import { NotificationController } from './notification.controller'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { TemplatesModule } from '../templates/templates.module'
 
 @Module({
@@ -19,10 +21,11 @@ import { TemplatesModule } from '../templates/templates.module'
       NotificationEventTypeCode,
     ]),
     TenantsModule,
+    ClientTenantMappingModule,
     TemplatesModule,
   ],
   controllers: [NotificationController, NotificationFrontendController],
-  providers: [NotificationService],
-  exports: [NotificationService],
+  providers: [NotificationService, NotificationPubSubService],
+  exports: [NotificationService, NotificationPubSubService],
 })
 export class NotificationModule {}

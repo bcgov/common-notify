@@ -1,0 +1,65 @@
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) {
+  width: 600px;
+}
+
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) .bcds-react-aria-AlertDialog--Header {
+  min-height: 64px;
+  padding: var(--layout-padding-medium) var(--layout-padding-large);
+}
+
+.bcds-react-aria-Modal:has(.tenant-selection-modal-content) .bcds-react-aria-AlertDialog--children {
+  padding: var(--layout-padding-large);
+}
+
+.tenant-selection-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-margin-small);
+  min-height: 184px;
+  justify-content: center;
+}
+
+.tenant-selection-description {
+  margin: 0;
+  color: #2d2d2d;
+  font-family: 'BCSans', sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 27px;
+  text-align: center;
+}
+
+.tenant-selection-field {
+  width: 400px;
+  align-self: center;
+}
+
+.tenant-selection-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--layout-margin-small);
+  min-height: 72px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--layout-padding-medium) 0 0;
+  border-top: 1px solid #d8d8d8;
+}
+
+.tenant-selection-footer .bcds-react-aria-Button.medium {
+  min-width: 82px;
+}
+
+.tenant-selection-footer .bcds-react-aria-Button.tertiary {
+  padding-right: var(--layout-padding-none);
+  padding-left: var(--layout-padding-none);
+}
+
+.tenant-selection-footer .bcds-react-aria-Button.primary {
+  min-width: 101px;
+}
+
+.tenant-selection-modal-content:has(.tenant-selection-footer .bcds-react-aria-Button.primary) {
+  width: 100%;
+}

@@ -5,8 +5,21 @@ import { configureStore } from '@reduxjs/toolkit'
 import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
+import tenantReducer from '@/redux/slices/tenant.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+
+vi.mock('@/pages/dashboard/sections/TestNotificationForm', () => ({
+  default: () => <div data-testid="test-notification-form" />,
+}))
+
+vi.mock('@/pages/dashboard/sections/NotificationEventsSection', () => ({
+  NotificationEventsSection: () => <div data-testid="notification-events-section" />,
+}))
+
+vi.mock('@/pages/dashboard/sections/NotificationTemplatesSection', () => ({
+  NotificationTemplatesSection: () => <div data-testid="notification-templates-section" />,
+}))
 
 vi.mock('@/redux/thunks/notification.thunks', async () => {
   const { createAsyncThunk: createThunk } = await import('@reduxjs/toolkit')
@@ -14,6 +27,7 @@ vi.mock('@/redux/thunks/notification.thunks', async () => {
     fetchNotifications: createThunk<NotificationRequest[]>('notification/fetchAll', async () => {
       return []
     }),
+    connectNotificationSSE: vi.fn(() => new AbortController()),
   }
 })
 
@@ -46,6 +60,10 @@ describe('Dashboard with CodeTables', () => {
         isLoading: false,
         error: null,
       },
+      tenant: {
+        selectedTenant: null,
+        showTenantModal: false,
+      },
     }
   })
 
@@ -54,6 +72,7 @@ describe('Dashboard with CodeTables', () => {
       reducer: {
         codeTables: codeTablesReducer,
         notification: notificationReducer,
+        tenant: tenantReducer,
       },
       preloadedState: initialState,
     } as any)

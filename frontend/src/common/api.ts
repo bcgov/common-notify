@@ -28,15 +28,60 @@ const { KEYCLOAK_URL } = config
 
 // Flag to prevent duplicate interceptor registration
 let responseInterceptorRegistered = false
+let requestInterceptorRegistered = false
+
+const registerRequestInterceptor = () => {
+  if (requestInterceptorRegistered) return
+
+  // Add X-Tenant-ID header to all requests if a tenant is selected
+  axios.interceptors.request.use(
+    (config) => {
+      const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
+      if (selectedTenantJson) {
+        try {
+          const selectedTenant = JSON.parse(selectedTenantJson)
+          if (selectedTenant?.id) {
+            config.headers['X-Tenant-ID'] = selectedTenant.id
+            console.log(
+              `[API Interceptor] Set X-Tenant-ID header to: ${selectedTenant.id} for ${config.method?.toUpperCase()} ${config.url}`,
+            )
+          }
+        } catch {
+          console.error('[API Interceptor] Failed to parse selected tenant from localStorage')
+        }
+      } else {
+        console.warn('[API Interceptor] No selected tenant in localStorage')
+      }
+      return config
+    },
+    (error) => Promise.reject(error),
+  )
+  requestInterceptorRegistered = true
+}
 
 // Response interceptor to handle auth errors (register only once)
 if (!responseInterceptorRegistered) {
+  registerRequestInterceptor() // Also register request interceptor
   axios.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
       const { response } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
-        // 401 = unauthenticated: redirect to Keycloak login
+        // 401 = unauthorized
+        // This could be either:
+        // 1. Expired token - redirect to Keycloak to refresh
+        // 2. Missing tenant context - show error to user
+
+        const responseData = (response.data as any) || {}
+        const errorMessage = responseData.message || ''
+
+        // If error message mentions tenant, don't redirect - show error instead
+        if (errorMessage.includes('tenant') || errorMessage.includes('Tenant')) {
+          showErrorToast(`Authorization failed: ${errorMessage}`)
+          return Promise.reject(error)
+        }
+
+        // Otherwise, assume token expired and redirect to Keycloak
         UserService.doLogin()
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
@@ -48,8 +93,10 @@ if (!responseInterceptorRegistered) {
   responseInterceptorRegistered = true
 }
 
-const setAuthHeader = () => {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${UserService.getToken()}`
+const setAuthHeader = async () => {
+  const token = await UserService.getToken()
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  registerRequestInterceptor()
 }
 
 export const generateApiParameters = <T = object>(
@@ -63,13 +110,13 @@ export const generateApiParameters = <T = object>(
   return result
 }
 
-export const get = <T, M = object>(
+export const get = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.get(url, requestConfig).then((response: AxiosResponse) => {
     if (!response) throw new Error('No response')
@@ -79,13 +126,13 @@ export const get = <T, M = object>(
 }
 
 // named deleteMethod because 'delete' is a reserved word in JavaScript
-export const deleteMethod = <T, M = object>(
+export const deleteMethod = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
   const requestConfig: AxiosRequestConfig = { headers }
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.delete(url, requestConfig).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
@@ -93,43 +140,47 @@ export const deleteMethod = <T, M = object>(
   })
 }
 
-export const post = <T, M = object>(parameters: ApiRequestParameters<M>): Promise<T> => {
-  const { url, requiresAuthentication, params } = parameters
-  if (requiresAuthentication) setAuthHeader()
-  return axios.post(url, params).then((response: AxiosResponse) => response.data as T)
+export const post = async <T, M = object>(
+  parameters: ApiRequestParameters<M> & { data?: M },
+): Promise<T> => {
+  const { url, requiresAuthentication, params, data } = parameters
+  if (requiresAuthentication) await setAuthHeader()
+  // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
+  const bodyData = data || params
+  return axios.post(url, bodyData).then((response: AxiosResponse) => response.data as T)
 }
 
-export const patch = <T, M = object>(
+export const patch = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.patch(url, data, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
 }
 
-export const put = <T, M = object>(
+export const put = async <T, M = object>(
   parameters: ApiRequestParameters<M>,
   headers: object = {},
 ): Promise<T> => {
   const { url, requiresAuthentication, params: data } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.put(url, data, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T
   })
 }
 
-export const putFile = <T>(
+export const putFile = async <T>(
   parameters: ApiRequestParameters,
   headers: object,
   file: File,
 ): Promise<T> => {
   const { url, requiresAuthentication } = parameters
-  if (requiresAuthentication) setAuthHeader()
+  if (requiresAuthentication) await setAuthHeader()
   return axios.put(url, file, { headers }).then((response: AxiosResponse) => {
     if (response.status === STATUS_CODES.Unauthorized) window.location.href = KEYCLOAK_URL
     return response.data as T

@@ -12,6 +12,7 @@ import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 
 @Injectable()
@@ -33,6 +34,7 @@ export class NotificationService {
     private readonly tenantsService: TenantsService,
     private readonly configService: ConfigService,
     private readonly templatesRepository: TemplatesRepository,
+    private readonly notificationPubSubService: NotificationPubSubService,
   ) {
     // Load validation limits from environment variables with sensible defaults
     this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
@@ -56,10 +58,22 @@ export class NotificationService {
       id: entity.id,
       tenantId: entity.tenantId,
       status: entity.status,
+      channelCode: entity.channelCode,
+      channel: entity.channel
+        ? {
+            channelCode: entity.channel.channelCode,
+            displayName: entity.channel.displayName,
+            description: entity.channel.description,
+          }
+        : undefined,
+      recipients: entity.recipients,
+      delayedSendTime: entity.delayedSendTime,
+      payload: entity.payload,
       createdAt: entity.createdAt,
       createdBy: entity.createdBy,
       updatedAt: entity.updatedAt,
       updatedBy: entity.updatedBy,
+      errorReason: entity.errorReason,
       tenant: entity.tenant
         ? {
             id: entity.tenant.id,
@@ -70,19 +84,94 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Extract channel code, recipients, and delayed send time from notification payload
+   */
+  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    if (!payload) {
+      return { channel: null, recipients: null, delayedSendTime: null }
+    }
+
+    const channels: string[] = []
+    const recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } = {}
+    let delayedSendTime: Date | null = null
+
+    // Extract email channel
+    if (payload.email) {
+      channels.push('EMAIL')
+      recipients.email = [
+        ...(payload.email.recipients?.to || []),
+        ...(payload.email.recipients?.cc || []),
+        ...(payload.email.recipients?.bcc || []),
+      ]
+      if (payload.email.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.email.delayedSend)
+      }
+    }
+
+    // Extract SMS channel
+    if (payload.sms) {
+      channels.push('SMS')
+      recipients.sms = payload.sms.recipients?.to || []
+      if (payload.sms.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.sms.delayedSend)
+      }
+    }
+
+    // Extract MsgApp channel
+    if (payload.msgApp) {
+      channels.push('MSGAPP')
+      recipients.msgApp = payload.msgApp.recipients?.to || []
+      if (payload.msgApp.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.msgApp.delayedSend)
+      }
+    }
+
+    // Determine primary channel code
+    let channelCode: string | null = null
+    if (channels.length === 1) {
+      channelCode = channels[0]
+    } else if (channels.length > 1) {
+      channelCode = 'MULTIPLE'
+    }
+
+    return {
+      channel: channelCode,
+      recipients: Object.keys(recipients).length > 0 ? recipients : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
+    // Extract channel, recipients, and delayed send time from payload
+    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
       status: dto.status ?? NotificationStatus.QUEUED,
       createdBy: dto.createdBy,
       payload: dto.payload,
+      channelCode: channel,
+      recipients: recipients,
+      delayedSendTime: delayedSendTime,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
-    return saved
+    // Reload with tenant relation for full data in SSE stream
+    const fullNotification = await this.notificationRepository.findOne({
+      where: { id: saved.id },
+      relations: ['tenant'],
+    })
+    return fullNotification || saved
   }
 
   async findAll(
+    tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
     status?: string,
@@ -93,8 +182,27 @@ export class NotificationService {
 
     const skip = (pageNum - 1) * limitNum
 
-    // Build where clause - include status filter if provided
+    // Build where clause - include status filter and tenantId
     const where: any = {}
+
+    // Look up tenant by external ID and get internal ID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      // Return empty result if tenant not found
+      this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
+      return {
+        data: [],
+        count: 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: 0,
+      }
+    }
+    this.logger.debug(
+      `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
+    )
+    where.tenantId = tenant.id
+
     if (status && status !== 'all') {
       where.status = status
     }
@@ -102,6 +210,7 @@ export class NotificationService {
     // Get both the data and total count
     const [notifications, total] = await this.notificationRepository.findAndCount({
       where,
+      relations: ['tenant'],
       skip,
       take: limitNum,
       order: { createdAt: 'DESC' },
@@ -119,7 +228,10 @@ export class NotificationService {
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
-    const notification = await this.notificationRepository.findOne({ where: { id, tenantId } })
+    const notification = await this.notificationRepository.findOne({
+      where: { id, tenantId },
+      relations: ['tenant'],
+    })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }
@@ -151,6 +263,8 @@ export class NotificationService {
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
     this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
+    await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
   }
 
@@ -215,9 +329,9 @@ export class NotificationService {
     }
 
     // Ensure at least one channel has recipients
-    const emailRecipients = request.email?.recipients?.length ?? 0
-    const smsRecipients = request.sms?.recipients?.length ?? 0
-    const msgAppRecipients = request.msgApp?.recipients?.length ?? 0
+    const emailRecipients = request.email?.recipients?.to?.length ?? 0
+    const smsRecipients = request.sms?.recipients?.to?.length ?? 0
+    const msgAppRecipients = request.msgApp?.recipients?.to?.length ?? 0
     const totalRecipients = emailRecipients + smsRecipients + msgAppRecipients
 
     if (totalRecipients === 0) {
@@ -225,77 +339,86 @@ export class NotificationService {
     }
 
     // Validate email channel
-    if (request.email?.recipients) {
-      if (request.email.recipients.length > this.emailMaxRecipients) {
+    if (request.email?.recipients?.to) {
+      if (request.email.recipients.to.length > this.emailMaxRecipients) {
         errors.push(
-          `Too many email recipients (${request.email.recipients.length}). Max: ${this.emailMaxRecipients}`,
+          `Too many email recipients (${request.email.recipients.to.length}). Max: ${this.emailMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides subject/body)
       if (!request.templateId) {
-        if (!request.email.subject?.trim()) {
+        if (!request.email.content?.subject?.trim()) {
           errors.push('Email subject cannot be empty')
         }
 
-        if (request.email.subject && request.email.subject.length > this.emailMaxSubjectLength) {
+        if (
+          request.email.content?.subject &&
+          request.email.content.subject.length > this.emailMaxSubjectLength
+        ) {
           errors.push(
-            `Email subject too long (${request.email.subject.length}). Max: ${this.emailMaxSubjectLength}`,
+            `Email subject too long (${request.email.content.subject.length}). Max: ${this.emailMaxSubjectLength}`,
           )
         }
 
-        if (!request.email.body?.trim()) {
+        if (!request.email.content?.body?.trim()) {
           errors.push('Email body cannot be empty')
         }
 
-        if (request.email.body && request.email.body.length > this.emailMaxBodyLength) {
+        if (
+          request.email.content?.body &&
+          request.email.content.body.length > this.emailMaxBodyLength
+        ) {
           errors.push(
-            `Email body too long (${request.email.body.length}). Max: ${this.emailMaxBodyLength} characters`,
+            `Email body too long (${request.email.content.body.length}). Max: ${this.emailMaxBodyLength} characters`,
           )
         }
       }
     }
 
     // Validate SMS channel
-    if (request.sms?.recipients) {
-      if (request.sms.recipients.length > this.smsMaxRecipients) {
+    if (request.sms?.recipients?.to) {
+      if (request.sms.recipients.to.length > this.smsMaxRecipients) {
         errors.push(
-          `Too many SMS recipients (${request.sms.recipients.length}). Max: ${this.smsMaxRecipients}`,
+          `Too many SMS recipients (${request.sms.recipients.to.length}). Max: ${this.smsMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides body)
       if (!request.templateId) {
-        if (!request.sms.body?.trim()) {
+        if (!request.sms.content?.body?.trim()) {
           errors.push('SMS body cannot be empty')
         }
 
-        if (request.sms.body && request.sms.body.length > this.smsMaxBodyLength) {
+        if (request.sms.content?.body && request.sms.content.body.length > this.smsMaxBodyLength) {
           // SMS can be split across multiple messages, but warn if very long
           errors.push(
-            `SMS body too long (${request.sms.body.length}). Max: ${this.smsMaxBodyLength} characters`,
+            `SMS body too long (${request.sms.content.body.length}). Max: ${this.smsMaxBodyLength} characters`,
           )
         }
       }
     }
 
     // Validate msgApp channel
-    if (request.msgApp?.recipients) {
-      if (request.msgApp.recipients.length > this.msgAppMaxRecipients) {
+    if (request.msgApp?.recipients?.to) {
+      if (request.msgApp.recipients.to.length > this.msgAppMaxRecipients) {
         errors.push(
-          `Too many msgApp recipients (${request.msgApp.recipients.length}). Max: ${this.msgAppMaxRecipients}`,
+          `Too many msgApp recipients (${request.msgApp.recipients.to.length}). Max: ${this.msgAppMaxRecipients}`,
         )
       }
 
       // Only validate content if not using a template (template provides body)
       if (!request.templateId) {
-        if (!request.msgApp.body?.trim()) {
+        if (!request.msgApp.content?.body?.trim()) {
           errors.push('MsgApp body cannot be empty')
         }
 
-        if (request.msgApp.body && request.msgApp.body.length > this.msgAppMaxBodyLength) {
+        if (
+          request.msgApp.content?.body &&
+          request.msgApp.content.body.length > this.msgAppMaxBodyLength
+        ) {
           errors.push(
-            `MsgApp body too long (${request.msgApp.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
+            `MsgApp body too long (${request.msgApp.content.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
           )
         }
       }

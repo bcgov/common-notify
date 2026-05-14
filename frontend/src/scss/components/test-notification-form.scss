@@ -1,0 +1,78 @@
+@import '../variables.scss';
+
+.test-notification-form {
+  background-color: $light-bg;
+  border-radius: 8px;
+  padding: $spacing-xl;
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: 700;
+    margin-bottom: $spacing-md;
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+  }
+
+  &__recipient-label {
+    font-size: $font-size-sm;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  &__recipient-row {
+    display: flex;
+  }
+
+  &__recipient-input {
+    flex: 1;
+    padding: $spacing-sm;
+    border: 1px solid $border-default;
+    border-radius: 4px 0 0 4px;
+
+    &--last {
+      border-radius: 0 4px 4px 0;
+      border-left: none;
+    }
+  }
+
+  &__recipient-toggle {
+    width: 52px;
+    padding: 0;
+    border: 1px solid $border-default;
+    border-left: none;
+    background: $white;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    text-align: center;
+
+    &--last {
+      border-radius: 0 4px 4px 0;
+    }
+  }
+
+  &__cc-bcc-row {
+    display: flex;
+    margin-top: $spacing-sm;
+  }
+
+  &__cc-bcc-label {
+    width: 40px;
+    padding: $spacing-sm;
+    border: 1px solid $border-default;
+    border-radius: 4px 0 0 4px;
+    border-right: none;
+    font-size: $font-size-sm;
+    text-align: center;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: center;
+  }
+}

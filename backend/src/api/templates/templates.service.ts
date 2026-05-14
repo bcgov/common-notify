@@ -1,7 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
-import * as Handlebars from 'handlebars'
-import * as Mustache from 'mustache'
-import * as EJS from 'ejs'
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
+import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -10,6 +8,10 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
+import { ITemplateRendererRegistry } from '../../adapters/interfaces'
+import type { TemplateDefinition } from '../../adapters/interfaces'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 /**
  * Service for template business logic
@@ -17,7 +19,21 @@ import { TemplateResponseDto } from './schemas/template-response.dto'
  */
 @Injectable()
 export class TemplatesService {
-  constructor(private readonly templatesRepository: TemplatesRepository) {}
+  private readonly markdown: MarkdownIt
+
+  constructor(
+    private readonly templatesRepository: TemplatesRepository,
+    @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
+    private readonly rendererRegistry: ITemplateRendererRegistry,
+    private readonly tenantsService: TenantsService,
+  ) {
+    // Initialize markdown-it with safe defaults
+    this.markdown = new MarkdownIt({
+      html: true,
+      linkify: true,
+      typographer: false,
+    })
+  }
 
   /**
    * List all active templates for a tenant
@@ -45,6 +61,27 @@ export class TemplatesService {
     const offset = (page - 1) * limit
     const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
     return templates.map((t) => this.toResponseDto(t))
+  }
+
+  /**
+   * List all active templates for a tenant by external (CSTAR) ID
+   * @param tenantExternalId The tenant external ID
+   * @param page Page number (1-indexed)
+   * @param limit Items per page (max 100)
+   */
+  async listTemplatesByExternalId(
+    tenantExternalId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<TemplateResponseDto[]> {
+    // Look up tenant by external ID and get internal ID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with external ID '${tenantExternalId}' not found`)
+    }
+
+    // Use the internal tenant ID to list templates
+    return this.listTemplates(tenant.id, page, limit)
   }
 
   /**
@@ -88,6 +125,7 @@ export class TemplatesService {
       subject: createDto.subject,
       body: createDto.body,
       engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
+      bodyType: createDto.bodyType || 'html',
       version: 1,
       active: true,
       createdBy: userId,
@@ -104,6 +142,7 @@ export class TemplatesService {
       subject: template.subject,
       body: template.body,
       engineCode: template.engineCode,
+      bodyType: template.bodyType,
       createdBy: userId,
     })
 
@@ -152,6 +191,7 @@ export class TemplatesService {
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = updateDto.engineCode || template.engineCode
+    template.bodyType = updateDto.bodyType ?? template.bodyType
     template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)
@@ -189,130 +229,119 @@ export class TemplatesService {
     }
 
     // Use the same rendering logic as delivery workers to avoid code duplication
-    const rendered = this.renderTemplateContent(template, previewDto.personalisation || {})
+    const rendered = await this.renderTemplateContent(template, previewDto.params || {})
 
     return {
       templateId: template.id,
       channelCode: template.channelCode,
       subject: rendered.subject,
       body: rendered.body,
+      bodyType: rendered.bodyType,
     }
   }
 
   /**
    * Render template content (subject and/or body) with personalisation data
    * Used by delivery workers to render templates before sending
+   * Returns raw body with bodyType flag - adapter will handle format conversion
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
-   * @returns Object with rendered subject and body
+   * @param bodyType Optional override for body content type (text, markdown, html)
+   * @returns Object with rendered subject, body, and bodyType
    */
-  public renderTemplateContent(
+  public async renderTemplateContent(
     template: Template,
     personalisation: Record<string, any> = {},
-  ): { subject?: string; body: string } {
+    bodyType?: 'text' | 'markdown' | 'html',
+  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+    // Convert all personalisation values to strings for template rendering
+    const stringPersonalisation: Record<string, string> = {}
+    for (const [key, value] of Object.entries(personalisation)) {
+      stringPersonalisation[key] = value !== null && value !== undefined ? String(value) : ''
+    }
+
+    // Get the renderer for this template's engine
+    const engineName = this.mapEngineToRendererName(template.engineCode as TemplateEngine)
+    const renderer = this.rendererRegistry.getRenderer(engineName)
+
+    if (!renderer) {
+      throw new BadRequestException(
+        `Template renderer not found for engine: ${template.engineCode}`,
+      )
+    }
+
+    // Create template definition for the renderer
+    const templateDef: TemplateDefinition = {
+      id: template.id,
+      type: this.mapChannelToType(template.channelCode),
+      name: template.name,
+      description: template.description,
+      subject: template.subject,
+      body: template.body,
+      active: template.active,
+      engine: engineName,
+    }
+
+    // Render the template
+    const renderContext = {
+      template: templateDef,
+      personalisation: stringPersonalisation,
+    }
+
+    const rendered = await renderer.renderEmail(renderContext)
+
+    // Use provided bodyType or fall back to template's bodyType setting
+    const effectiveBodyType = bodyType ?? template.bodyType ?? 'html'
+
+    // Return rendered content with bodyType flag for adapter to process
     return {
-      subject: template.subject
-        ? this.renderText(template.subject, personalisation, template.engineCode as TemplateEngine)
-        : undefined,
-      body: this.renderText(template.body, personalisation, template.engineCode as TemplateEngine),
+      subject: rendered.subject,
+      body: rendered.body,
+      bodyType: effectiveBodyType,
     }
   }
 
   /**
-   * Render a template with the specified engine
-   * Routes to the appropriate rendering method based on template engine type
+   * Map TemplateEngine enum to renderer registry engine name
    */
-  private async renderTemplate(
-    template: Template,
-    personalisation: Record<string, any>,
-  ): Promise<string> {
-    // Delegate to engine-specific rendering method
-    switch (template.engineCode) {
-      case TemplateEngine.LEGACY_GC_NOTIFY:
-        return this.renderLegacyGcNotify(template.body, personalisation)
-      case TemplateEngine.HANDLEBARS:
-        return this.renderHandlebars(template.body, personalisation)
-      case TemplateEngine.MUSTACHE:
-        return this.renderMustache(template.body, personalisation)
-      case TemplateEngine.EJS:
-        return this.renderEjs(template.body, personalisation)
-      default:
-        throw new BadRequestException(`Unknown template engine: ${template.engineCode}`)
-    }
-  }
-
-  /**
-   * Render text with the specified engine
-   */
-  private renderText(
-    text: string,
-    personalisation: Record<string, any>,
-    engine: TemplateEngine,
-  ): string {
+  private mapEngineToRendererName(engine: TemplateEngine): string {
     switch (engine) {
       case TemplateEngine.LEGACY_GC_NOTIFY:
-        return this.renderLegacyGcNotify(text, personalisation)
+        return 'legacy_gc_notify'
       case TemplateEngine.HANDLEBARS:
-        return this.renderHandlebars(text, personalisation)
+        return 'handlebars'
       case TemplateEngine.MUSTACHE:
-        return this.renderMustache(text, personalisation)
-      case TemplateEngine.EJS:
-        return this.renderEjs(text, personalisation)
+        return 'mustache'
       default:
-        return text
+        return 'handlebars' // default fallback
     }
   }
 
   /**
-   * Render using legacy GC Notify syntax ((placeholder)) and ((placeholder??default))
-   * Supports both simple variables and conditional fallback syntax
+   * Map NotificationChannel to TemplateDefinition type
    */
-  private renderLegacyGcNotify(template: string, personalisation: Record<string, any>): string {
-    // Match both ((variable)) and ((variable??defaultValue))
-    return template.replace(/\(\((\w+)(?:\?\?([^)]*))?\)\)/g, (match, key, defaultValue) => {
-      const value = personalisation[key]
-      // If value exists, use it; otherwise use default if provided, otherwise return empty string
-      if (value !== undefined && value !== null) {
-        return value.toString()
-      }
-      return defaultValue || ''
-    })
-  }
-
-  /**
-   * Render using Handlebars
-   * Full support for conditionals, loops, and helpers
-   */
-  private renderHandlebars(template: string, personalisation: Record<string, any>): string {
-    try {
-      const compiled = Handlebars.compile(template)
-      return compiled(personalisation)
-    } catch (error) {
-      throw new BadRequestException(`Handlebars rendering error: ${(error as Error).message}`)
+  private mapChannelToType(channelCode: string): 'email' | 'sms' {
+    switch (channelCode) {
+      case NotificationChannel.EMAIL:
+        return 'email'
+      case NotificationChannel.SMS:
+        return 'sms'
+      default:
+        return 'email' // default fallback
     }
   }
 
   /**
-   * Render using Mustache
-   * Logic-less templates with sections and simple loops
+   * Render markdown to HTML
+   * Converts markdown-formatted text to HTML
+   * @param markdown The markdown text to convert
+   * @returns HTML-formatted text
    */
-  private renderMustache(template: string, personalisation: Record<string, any>): string {
+  private renderMarkdown(markdown: string): string {
     try {
-      return Mustache.render(template, personalisation)
+      return this.markdown.render(markdown)
     } catch (error) {
-      throw new BadRequestException(`Mustache rendering error: ${(error as Error).message}`)
-    }
-  }
-
-  /**
-   * Render using EJS
-   * Full JavaScript template syntax with conditionals and loops
-   */
-  private renderEjs(template: string, personalisation: Record<string, any>): string {
-    try {
-      return EJS.render(template, personalisation, { async: false })
-    } catch (error) {
-      throw new BadRequestException(`EJS rendering error: ${(error as Error).message}`)
+      throw new BadRequestException(`Markdown rendering error: ${(error as Error).message}`)
     }
   }
 

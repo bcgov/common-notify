@@ -58,6 +58,19 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Twilio SMS Service
+    twilio: {
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      fromNumber: process.env.TWILIO_FROM_NUMBER || defaultSmsFrom,
+    },
+
+    // Delivery Adapter Selection
+    delivery: {
+      email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
+      sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),

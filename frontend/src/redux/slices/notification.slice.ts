@@ -26,6 +26,14 @@ export const notificationSlice = createSlice({
     setStatusFilter(state, action: PayloadAction<NotificationStatus | 'all'>) {
       state.statusFilter = action.payload
     },
+    upsertNotification(state, action: PayloadAction<NotificationRequest>) {
+      const idx = state.items.findIndex((item) => item.id === action.payload.id)
+      if (idx !== -1) {
+        state.items[idx] = action.payload
+      } else if (state.statusFilter === 'all' || state.statusFilter === action.payload.status) {
+        state.items.unshift(action.payload)
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -44,7 +52,7 @@ export const notificationSlice = createSlice({
   },
 })
 
-export const { setStatusFilter } = notificationSlice.actions
+export const { setStatusFilter, upsertNotification } = notificationSlice.actions
 
 export const selectNotifications = (state: RootState) => state.notification.items
 

@@ -59,4 +59,13 @@ export class CreateTemplateDto {
   @IsOptional()
   @IsEnum(TemplateEngine)
   engineCode?: TemplateEngine
+
+  /**
+   * Body content type for rendering: text (plain), markdown (markdown→HTML), html (raw HTML)
+   * Defaults to 'html'
+   * @example "markdown"
+   */
+  @IsOptional()
+  @IsEnum(['text', 'markdown', 'html'])
+  bodyType?: 'text' | 'markdown' | 'html'
 }
