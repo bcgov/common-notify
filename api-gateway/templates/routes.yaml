@@ -66,6 +66,32 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/frontend/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
