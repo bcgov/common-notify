@@ -55,7 +55,7 @@ jobs:
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:${{ github.event.number }} ${{ matrix.package }}:${{ github.event.number }} --source=docker --reference-policy=local
 
   gateway-config:
-    name: Apply API Gateway Config
+    name: Apply PR API Gateway Config
     needs: [import]
     runs-on: ubuntu-24.04
     concurrency:
@@ -64,13 +64,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config for PR + permanent services
+      - name: Generate gateway config for PR environment only
         run: |
           chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate combined config with PR + permanent services (dev+test+prod)
-          api-gateway/scripts/generate-gateway-config.sh pr-with-permanent common-notify-${{ github.event.number }}
+          # Generate PR service config only
+          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-      - name: Apply gateway config
+      - name: Apply PR gateway config
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -86,8 +86,8 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply PR + permanent services (prevents deletion of dev/test/prod)
-          gwa apply -i api-gateway/generated/gw-services-pr-with-permanent.yaml
+          # Apply PR service only (adds to existing dev/test/prod services)
+          gwa apply -i api-gateway/generated/gw-routes-pr.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})
