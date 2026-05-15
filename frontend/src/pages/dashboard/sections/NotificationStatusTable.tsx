@@ -93,66 +93,68 @@ const NotificationStatusTable: FC = () => {
           onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
         />
       </div>
-      <Table bordered hover responsive>
-        <thead>
-          <tr>
-            <th>Tenant Name</th>
-            <th>Channel</th>
-            <th>Recipients</th>
-            <th>Delayed Send</th>
-            <th>Status</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
+      <div className="table-wrapper">
+        <Table bordered hover responsive>
+          <thead>
             <tr>
-              <td colSpan={6} className="text-center">
-                Loading...
-              </td>
+              <th>Tenant Name</th>
+              <th>Channel</th>
+              <th>Recipients</th>
+              <th>Delayed Send</th>
+              <th>Status</th>
+              <th>Created</th>
             </tr>
-          ) : notifications && notifications.length > 0 ? (
-            notifications.map((row) => (
-              <tr key={row.id}>
-                <td>{row.tenant?.name || row.tenantId}</td>
-                <td>{row.channel?.displayName || 'Unknown'}</td>
-                <td>
-                  {getTotalRecipientCount(row.recipients) > 0 ? (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => handleShowRecipients(row)}
-                      className="p-0"
-                    >
-                      {getTotalRecipientCount(row.recipients)} recipient
-                      {getTotalRecipientCount(row.recipients) !== 1 ? 's' : ''}
-                    </Button>
-                  ) : (
-                    <span className="text-muted">No recipients</span>
-                  )}
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="text-center">
+                  Loading...
                 </td>
-                <td>
-                  {row.delayedSendTime ? (
-                    new Date(row.delayedSendTime).toLocaleString()
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </td>
-                <td>
-                  <span className={getStatusBadgeClass(row.status)}>{row.status}</span>
-                </td>
-                <td>{new Date(row.createdAt).toLocaleString()}</td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={6} className="text-center">
-                No notifications found
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+            ) : notifications && notifications.length > 0 ? (
+              notifications.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.tenant?.name || row.tenantId}</td>
+                  <td>{row.channel?.displayName || 'Unknown'}</td>
+                  <td>
+                    {getTotalRecipientCount(row.recipients) > 0 ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => handleShowRecipients(row)}
+                        className="p-0"
+                      >
+                        {getTotalRecipientCount(row.recipients)} recipient
+                        {getTotalRecipientCount(row.recipients) !== 1 ? 's' : ''}
+                      </Button>
+                    ) : (
+                      <span className="text-muted">No recipients</span>
+                    )}
+                  </td>
+                  <td>
+                    {row.delayedSendTime ? (
+                      new Date(row.delayedSendTime).toLocaleString()
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={getStatusBadgeClass(row.status)}>{row.status}</span>
+                  </td>
+                  <td>{new Date(row.createdAt).toLocaleString()}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="text-center">
+                  No notifications found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </Table>
+      </div>
 
       <RecipientsModal
         show={showRecipientsModal}

@@ -1,6 +1,9 @@
 // Import variables first
 @import './variables.scss';
 
+// Import table styles
+@import './tables.scss';
+
 // Import component styles
 @import './components/layout.scss';
 @import './components/loading-spinner.scss';

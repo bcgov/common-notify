@@ -24,8 +24,8 @@ export const notificationApi = {
       const params = generateApiParameters('/api/v1/frontend/notification_request')
       const queryParams = {
         ...(options.tenantId ? { tenantId: options.tenantId } : {}),
-        page: options.page,
-        limit: options.limit,
+        ...(options.page ? { page: options.page } : {}),
+        ...(options.limit ? { limit: options.limit } : {}),
         ...(options.status && options.status !== 'all' ? { status: options.status } : {}),
       }
       return await get<PaginatedNotificationResponse>({ ...params, params: queryParams })
