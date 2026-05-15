@@ -1,6 +1,9 @@
 // Import variables first
 @import './variables.scss';
 
+// Import table styles
+@import './tables.scss';
+
 // Import component styles
 @import './components/layout.scss';
 @import './components/loading-spinner.scss';
@@ -31,3 +34,78 @@ body {
 // .bcds-header--line {
 //   display: none;
 // }
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: $spacing-lg;
+  font-family: 'BCSans', sans-serif;
+  font-size: $font-size-base;
+  font-weight: 400;
+  line-height: 27px;
+  text-align: center;
+  color: $dark-text;
+}
+
+.pagination-controls__items {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 33px;
+}
+
+.pagination-controls__page-button {
+  min-width: 26px;
+  height: 33px;
+  padding: 0 $spacing-sm;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $font-size-base;
+  line-height: 27px;
+  border-radius: 4px;
+}
+
+.pagination-controls__nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 33px;
+  font-size: $font-size-base;
+  line-height: 27px;
+  border-radius: 4px;
+}
+
+.pagination-controls__nav-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pagination-controls__ellipsis {
+  width: 15px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  font-size: $font-size-base;
+  line-height: 27px;
+}
+
+.pagination-controls__nav-button.btn,
+.pagination-controls__page-button.btn {
+  font-family: 'BCSans', sans-serif;
+  font-size: $font-size-base;
+  font-weight: 400;
+}
+
+.pagination-controls__nav-button.btn {
+  color: $dark-text;
+}
+
+.pagination-controls__page-button.btn-outline-secondary {
+  color: $dark-text;
+}
