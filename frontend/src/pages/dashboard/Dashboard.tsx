@@ -9,7 +9,6 @@ import { NotificationTemplatesSection } from './sections/NotificationTemplatesSe
 
 const Dashboard: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-
   return (
     <div>
       <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
