@@ -1,5 +1,4 @@
-import { Table, Button } from 'react-bootstrap'
-import { Select } from '@bcgov/design-system-react-components'
+import { Link, Select } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
 import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -8,6 +7,8 @@ import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import { DataTable } from '@/components/DataTable'
+import type { TableColumn } from '@/components/DataTable'
 import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
 
 /**
@@ -49,6 +50,16 @@ const NotificationStatusTable: FC = () => {
   const [selectedNotification, setSelectedNotification] = useState<NotificationRequest | null>(null)
   const [showRecipientsModal, setShowRecipientsModal] = useState(false)
 
+  {
+    /** delete this later */
+  }
+  const [variant, setVariant] = useState<'striped' | 'bordered' | 'plain'>('striped')
+  const [headerThemed, setHeaderThemed] = useState(false)
+  const [headerBordered, setHeaderBordered] = useState(false)
+  {
+    /*********************/
+  }
+
   // Fetch notifications when status filter or selected tenant changes
   // Only fetch if a tenant is selected
   useEffect(() => {
@@ -80,6 +91,58 @@ const NotificationStatusTable: FC = () => {
     setShowRecipientsModal(true)
   }
 
+  const columns: TableColumn<NotificationRequest>[] = [
+    {
+      key: 'tenant',
+      label: 'Tenant Name',
+      render: (_, row) => row.tenant?.name || row.tenantId,
+      sortable: true,
+    },
+    {
+      key: 'channel',
+      label: 'Channel',
+      render: (_, row) => row.channel?.displayName ?? '-',
+    },
+    {
+      key: 'recipients',
+      label: 'Recipients',
+      render: (_, row) => {
+        const count = getTotalRecipientCount(row.recipients)
+        return count > 0 ? (
+          <Link
+            onClick={() => handleShowRecipients(row)}
+            className="p-0"
+            style={{ textDecorationLine: 'underline', color: 'blue', cursor: 'pointer' }}
+          >
+            {count} recipient{count !== 1 ? 's' : ''}
+          </Link>
+        ) : (
+          <span className="text-muted">No recipients</span>
+        )
+      },
+    },
+    {
+      key: 'delayedSendTime',
+      label: 'Delayed Send',
+      render: (_, row) =>
+        row.delayedSendTime ? (
+          new Date(row.delayedSendTime).toLocaleString()
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (_, row) => <span className={getStatusBadgeClass(row.status)}>{row.status}</span>,
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      render: (_, row) => new Date(row.createdAt).toLocaleString(),
+    },
+  ]
+
   return (
     <div>
       <div className="mb-3" style={{ maxWidth: '220px' }}>
@@ -90,66 +153,66 @@ const NotificationStatusTable: FC = () => {
           onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
         />
       </div>
-      <Table bordered hover responsive>
-        <thead>
-          <tr>
-            <th>Tenant Name</th>
-            <th>Channel</th>
-            <th>Recipients</th>
-            <th>Delayed Send</th>
-            <th>Status</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <tr>
-              <td colSpan={6} className="text-center">
-                Loading...
-              </td>
-            </tr>
-          ) : notifications && notifications.length > 0 ? (
-            notifications.map((row) => (
-              <tr key={row.id}>
-                <td>{row.tenant?.name || row.tenantId}</td>
-                <td>{row.channel?.displayName || 'Unknown'}</td>
-                <td>
-                  {getTotalRecipientCount(row.recipients) > 0 ? (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => handleShowRecipients(row)}
-                      className="p-0"
-                    >
-                      {getTotalRecipientCount(row.recipients)} recipient
-                      {getTotalRecipientCount(row.recipients) !== 1 ? 's' : ''}
-                    </Button>
-                  ) : (
-                    <span className="text-muted">No recipients</span>
-                  )}
-                </td>
-                <td>
-                  {row.delayedSendTime ? (
-                    new Date(row.delayedSendTime).toLocaleString()
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </td>
-                <td>
-                  <span className={getStatusBadgeClass(row.status)}>{row.status}</span>
-                </td>
-                <td>{new Date(row.createdAt).toLocaleString()}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={6} className="text-center">
-                No notifications found
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+      {/** delete this later */}
+      <div>
+        <button
+          onClick={() => {
+            setVariant(
+              variant === 'striped' ? 'bordered' : variant === 'bordered' ? 'plain' : 'striped',
+            )
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '5px',
+            cursor: 'pointer',
+            color: 'black',
+          }}
+        >
+          Change Variant
+        </button>
+        <button
+          onClick={() => setHeaderThemed((prev) => !prev)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '5px',
+            cursor: 'pointer',
+            color: 'black',
+          }}
+        >
+          Toggle Header Color
+        </button>
+        <button
+          onClick={() => setHeaderBordered((prev) => !prev)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '5px',
+            cursor: 'pointer',
+            color: 'black',
+          }}
+        >
+          Toggle Header Border
+        </button>
+      </div>
+      {headerThemed && (
+        <style>{`.notification-status-table thead th { background-color: #013366; color: #ffffff; }`}</style>
+      )}
+      {headerBordered && (
+        <style>{`.notification-status-table thead th { border: 1px solid lightgray; }`}</style>
+      )}
+      {/*******************/}
+      <DataTable
+        columns={columns}
+        data={notifications ?? []}
+        keyExtractor={(row) => row.id}
+        isLoading={isLoading}
+        emptyMessage="No notifications found"
+        label="Notification Status"
+        variant={variant}
+        className={headerThemed || headerBordered ? 'notification-status-table' : ''} // delete later
+      />
 
       <RecipientsModal
         show={showRecipientsModal}

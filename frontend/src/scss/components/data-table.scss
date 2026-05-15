@@ -1,0 +1,166 @@
+@import '../variables.scss';
+
+// Base table wrapper and element
+.data-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: $white;
+  font-size: $font-size-base;
+
+  /* Variants */
+
+  &--striped {
+    border: 1px solid $border-default;
+
+    thead {
+      // border: 1px solid $border-default;
+      border-bottom: 1px solid $border-default;
+    }
+
+    tbody tr:nth-child(odd) {
+      background-color: $light-bg;
+    }
+  }
+
+  &--bordered {
+    border: 1px solid $border-default;
+
+    th,
+    td {
+      border: 1px solid $border-default;
+    }
+  }
+
+  &--plain {
+    // border: 1px solid $border-default;
+
+    th,
+    td {
+      border-bottom: 1px solid $border-default;
+    }
+  }
+
+  /* Sizes */
+
+  &--sm {
+    font-size: $font-size-sm;
+
+    th,
+    td {
+      padding: $spacing-xs $spacing-sm;
+    }
+  }
+
+  &--md {
+    th,
+    td {
+      padding: $spacing-sm $spacing-md;
+    }
+  }
+
+  &--lg {
+    th,
+    td {
+      padding: $spacing-md $spacing-lg;
+    }
+  }
+
+  /* Header */
+
+  thead {
+    // background-color: $primary-color;
+    // color: $white;
+
+    th {
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: middle;
+      // border: 1px solid lightgray;
+    }
+  }
+
+  /* Body */
+
+  tbody {
+    tr {
+      &:hover {
+        background-color: rgba($primary-color, 0.05);
+      }
+
+      &:focus-within {
+        outline: 1px solid $border-active;
+        outline-offset: -2px;
+      }
+    }
+
+    td {
+      vertical-align: middle;
+      color: $dark-text;
+    }
+  }
+
+  /* Footer */
+
+  tfoot {
+    td {
+      color: $text-secondary;
+      border-top: 2px solid $border-default;
+      font-size: $font-size-sm;
+    }
+  }
+
+  /* Sort button (inside <th>) */
+
+  &__sort-btn {
+    @include button-reset;
+
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+    color: inherit;
+    font-weight: inherit;
+    font-size: inherit;
+    text-align: left;
+    width: 100%;
+    padding: 0;
+    line-height: inherit;
+
+    &:focus-visible {
+      outline: 2px solid $white;
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  &__sort-icon {
+    flex-shrink: 0;
+    font-size: 0.75em;
+    opacity: 0.7;
+
+    &--active {
+      opacity: 1;
+    }
+  }
+
+  /* loading / empty rows */
+
+  &__loading-row,
+  &__empty-row {
+    td {
+      text-align: center;
+      color: $text-secondary;
+      font-style: italic;
+      padding: $spacing-xl $spacing-md;
+    }
+  }
+}
