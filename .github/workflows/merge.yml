@@ -74,12 +74,12 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate DEV gateway configuration
+      - name: Generate DEV-only gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate dev service config only
-          api-gateway/scripts/generate-gateway-config.sh dev
-      - name: Apply DEV gateway config
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          # Generate DEV only - this will remove TEST/PROD routes until they are re-approved
+          api-gateway/scripts/generate-gateway-for-stage.sh dev
+      - name: Apply DEV gateway config (removes TEST/PROD temporarily)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -89,8 +89,9 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply dev service
-          gwa apply -i api-gateway/generated/gw-routes-dev.yaml
+          # Apply DEV only - TEST and PROD routes will be removed until re-approved
+          echo "⚠️  Applying DEV config only - TEST and PROD routes will be temporarily removed"
+          gwa apply -i api-gateway/generated/gw-active-services.yaml
 
   deploy-dev:
     name: Deploy (DEV)
@@ -116,12 +117,12 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate TEST gateway configuration
+      - name: Generate DEV+TEST gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate test service config only
-          api-gateway/scripts/generate-gateway-config.sh test
-      - name: Apply TEST gateway config
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          # Generate DEV+TEST - this will restore TEST routes (PROD still removed)
+          api-gateway/scripts/generate-gateway-for-stage.sh test
+      - name: Apply DEV+TEST gateway config (PROD still removed)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -131,8 +132,9 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply test service
-          gwa apply -i api-gateway/generated/gw-routes-test.yaml
+          # Apply DEV+TEST - PROD routes remain removed until PROD approval
+          echo "✅ Applying DEV+TEST config - TEST routes restored, PROD still removed"
+          gwa apply -i api-gateway/generated/gw-active-services.yaml
 
   deploy-test:
     name: Deploy (TEST)
@@ -176,12 +178,12 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate PROD gateway configuration
+      - name: Generate DEV+TEST+PROD gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate prod service config only
-          api-gateway/scripts/generate-gateway-config.sh prod
-      - name: Apply PROD gateway config
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          # Generate DEV+TEST+PROD - this will restore all environments
+          api-gateway/scripts/generate-gateway-for-stage.sh prod
+      - name: Apply DEV+TEST+PROD gateway config (all environments active)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -191,8 +193,9 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply prod service
-          gwa apply -i api-gateway/generated/gw-routes-prod.yaml
+          # Apply all environments - full restoration
+          echo "✅ Applying DEV+TEST+PROD config - all environments active"
+          gwa apply -i api-gateway/generated/gw-active-services.yaml
 
   deploy-prod:
     name: Deploy (PROD)

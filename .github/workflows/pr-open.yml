@@ -64,13 +64,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config for PR environment only
+      - name: Generate gateway config with PR and permanent environments
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate PR service config only
-          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          # Generate combined config with dev+test+prod+PR (prevents deletion of permanent environments)
+          api-gateway/scripts/generate-gateway-for-stage.sh pr common-notify-${{ github.event.number }}
 
-      - name: Apply PR gateway config
+      - name: Apply PR gateway config with permanent environments
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -86,8 +86,9 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply PR service only (adds to existing dev/test/prod services)
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml
+          # Apply all services together (dev+test+prod+PR) to prevent accidental deletions
+          echo "✅ Applying DEV+TEST+PROD+PR config - adds PR without removing existing environments"
+          gwa apply -i api-gateway/generated/gw-active-services.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})
