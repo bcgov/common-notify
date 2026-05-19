@@ -64,13 +64,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config with PR and permanent environments
+      - name: Fetch current production configs from main branch
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate combined config with dev+test+prod+PR (prevents deletion of permanent environments)
-          api-gateway/scripts/generate-gateway-for-stage.sh pr common-notify-${{ github.event.number }}
+          # Save current PR branch configs
+          mkdir -p /tmp/pr-configs
+          cp -r api-gateway /tmp/pr-configs/
 
-      - name: Apply PR gateway config with permanent environments
+          # Fetch main branch to get production configs
+          git fetch origin main
+          git checkout origin/main -- api-gateway/
+
+          # Generate production configs (DEV+TEST+PROD) from main branch
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          api-gateway/scripts/generate-gateway-for-stage.sh prod
+
+          # Save production configs
+          cp api-gateway/generated/gw-active-services.yaml /tmp/prod-configs.yaml
+
+      - name: Generate PR config from PR branch
+        run: |
+          # Restore PR branch configs
+          rm -rf api-gateway
+          cp -r /tmp/pr-configs/api-gateway .
+
+          # Generate PR config only from PR branch code
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+
+          # Combine: Production configs (main) + PR config (PR branch)
+          cp /tmp/prod-configs.yaml api-gateway/generated/gw-combined-pr.yaml
+          echo "---" >> api-gateway/generated/gw-combined-pr.yaml
+          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-pr.yaml
+
+      - name: Apply PR config without touching production
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -86,9 +112,9 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply all services together (dev+test+prod+PR) to prevent accidental deletions
-          echo "✅ Applying DEV+TEST+PROD+PR config - adds PR without removing existing environments"
-          gwa apply -i api-gateway/generated/gw-active-services.yaml
+          # Apply: Production configs (from main) + New PR config (from PR branch)
+          echo "✅ Applying PR config with CURRENT production configs (DEV/TEST/PROD unchanged)"
+          gwa apply -i api-gateway/generated/gw-combined-pr.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})
