@@ -110,6 +110,7 @@ jobs:
     name: Apply TEST Gateway Config
     needs: [deploy-dev]
     runs-on: ubuntu-24.04
+    environment: TEST  # Requires approval if TEST environment protection is enabled
     concurrency:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
@@ -169,6 +170,7 @@ jobs:
     name: Apply PROD Gateway Config
     needs: [promote-test]
     runs-on: ubuntu-24.04
+    environment: PROD  # Requires approval if PROD environment protection is enabled
     concurrency:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
