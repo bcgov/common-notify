@@ -1,38 +1,51 @@
-import { Table, Button } from 'react-bootstrap'
-import { Select } from '@bcgov/design-system-react-components'
+import { Link, Select } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
 import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import PaginationControls from '@/components/PaginationControls'
 import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import { DataTable } from '@/components/DataTable'
+import type { TableColumn } from '@/components/DataTable'
 import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
 
 /**
- * Helper to get status badge CSS class
+ * Helper to get status dot color
  */
-function getStatusBadgeClass(status?: string): string {
+function getStatusColor(status?: string): string {
   switch (status) {
     case 'completed':
-      return 'badge bg-success text-white'
+      return '#42814A'
     case 'failed':
-      return 'badge bg-danger text-white'
-    case 'sending':
-      return 'badge bg-warning text-dark'
-    case 'processing':
-      return 'badge bg-primary text-white'
-    case 'queued':
-      return 'badge bg-secondary text-white'
-    case 'pending':
-      return 'badge bg-info text-dark'
-    case 'scheduled':
-      return 'badge bg-dark text-light'
+      return '#CE3E39'
     default:
-      return 'badge bg-secondary text-white'
+      return '#F8BB47'
   }
+}
+
+/**
+ * Status badge component with colored dot
+ */
+function StatusBadge({ status }: { status?: string }) {
+  const color = getStatusColor(status)
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : ''
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span
+        style={{
+          display: 'inline-block',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          backgroundColor: color,
+          flexShrink: 0,
+        }}
+      />
+      {label}
+    </span>
+  )
 }
 
 /**
@@ -42,7 +55,7 @@ function getStatusBadgeClass(status?: string): string {
  */
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
-  const { statusFilter, page, limit, count, totalPages, isLoading } = useAppSelector(
+  const { statusFilter, page, limit, count, isLoading, hasLoaded } = useAppSelector(
     (state) => state.notification,
   )
   const notifications = useAppSelector(selectNotifications)
@@ -83,6 +96,58 @@ const NotificationStatusTable: FC = () => {
     setShowRecipientsModal(true)
   }
 
+  const columns: TableColumn<NotificationRequest>[] = [
+    {
+      key: 'tenant',
+      label: 'Tenant Name',
+      render: (_, row) => row.tenant?.name || row.tenantId,
+      sortable: true,
+    },
+    {
+      key: 'channel',
+      label: 'Channel',
+      render: (_, row) => row.channel?.displayName ?? '-',
+    },
+    {
+      key: 'recipients',
+      label: 'Recipients',
+      render: (_, row) => {
+        const count = getTotalRecipientCount(row.recipients)
+        return count > 0 ? (
+          <Link
+            onClick={() => handleShowRecipients(row)}
+            className="p-0"
+            style={{ textDecorationLine: 'underline', color: 'blue', cursor: 'pointer' }}
+          >
+            {count} recipient{count !== 1 ? 's' : ''}
+          </Link>
+        ) : (
+          <span className="text-muted">No recipients</span>
+        )
+      },
+    },
+    {
+      key: 'delayedSendTime',
+      label: 'Delayed Send',
+      render: (_, row) =>
+        row.delayedSendTime ? (
+          new Date(row.delayedSendTime).toLocaleString()
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (_, row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      render: (_, row) => new Date(row.createdAt).toLocaleString(),
+    },
+  ]
+
   return (
     <div>
       <div className="mb-3" style={{ maxWidth: '220px' }}>
@@ -93,82 +158,25 @@ const NotificationStatusTable: FC = () => {
           onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
         />
       </div>
-      <div className="table-wrapper">
-        <Table bordered hover responsive>
-          <thead>
-            <tr>
-              <th>Tenant Name</th>
-              <th>Channel</th>
-              <th>Recipients</th>
-              <th>Delayed Send</th>
-              <th>Status</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={6} className="text-center">
-                  Loading...
-                </td>
-              </tr>
-            ) : notifications && notifications.length > 0 ? (
-              notifications.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.tenant?.name || row.tenantId}</td>
-                  <td>{row.channel?.displayName || 'Unknown'}</td>
-                  <td>
-                    {getTotalRecipientCount(row.recipients) > 0 ? (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        onClick={() => handleShowRecipients(row)}
-                        className="p-0"
-                      >
-                        {getTotalRecipientCount(row.recipients)} recipient
-                        {getTotalRecipientCount(row.recipients) !== 1 ? 's' : ''}
-                      </Button>
-                    ) : (
-                      <span className="text-muted">No recipients</span>
-                    )}
-                  </td>
-                  <td>
-                    {row.delayedSendTime ? (
-                      new Date(row.delayedSendTime).toLocaleString()
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={getStatusBadgeClass(row.status)}>{row.status}</span>
-                  </td>
-                  <td>{new Date(row.createdAt).toLocaleString()}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="text-center">
-                  No notifications found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </Table>
-      </div>
+
+      <DataTable
+        columns={columns}
+        data={notifications ?? []}
+        keyExtractor={(row) => row.id}
+        isLoading={isLoading && !hasLoaded}
+        emptyMessage="No notifications found"
+        label="Notification Status"
+        variant="bordered"
+        currentPage={page}
+        pageSize={limit}
+        totalCount={count}
+        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+      />
 
       <RecipientsModal
         show={showRecipientsModal}
         notification={selectedNotification}
         onHide={() => setShowRecipientsModal(false)}
-      />
-
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        count={count}
-        limit={limit}
-        isLoading={isLoading}
-        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
       />
     </div>
   )
