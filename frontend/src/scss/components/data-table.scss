@@ -51,6 +51,11 @@
     td {
       padding: $spacing-xs $spacing-sm;
     }
+
+    // Placeholder row height for sm
+    .data-table__padding-row {
+      height: 30.7px;
+    }
   }
 
   &--md {
@@ -58,12 +63,22 @@
     td {
       padding: $spacing-sm $spacing-md;
     }
+
+    // Placeholder row height for md
+    .data-table__padding-row {
+      height: 41.7px;
+    }
   }
 
   &--lg {
     th,
     td {
       padding: $spacing-md $spacing-lg;
+    }
+
+    // Placeholder row height for lg
+    .data-table__padding-row {
+      height: 57.7px;
     }
   }
 
@@ -79,6 +94,11 @@
   }
 
   /* Body */
+
+  .data-table__padding-row {
+    visibility: hidden;
+    pointer-events: none;
+  }
 
   tbody {
     tr {
