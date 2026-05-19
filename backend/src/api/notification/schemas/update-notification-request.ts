@@ -1,6 +1,7 @@
-import { IsString, IsOptional, IsEnum } from 'class-validator'
+import { IsString, IsOptional, IsEnum, IsObject } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { NotificationStatus } from './create-notification-request'
+import { QuarantineDetails } from '../entities/notification-request.entity'
 
 export class UpdateNotificationRequestDto {
   @ApiPropertyOptional({
@@ -20,4 +21,12 @@ export class UpdateNotificationRequestDto {
   @IsOptional()
   @IsString()
   errorReason?: string
+
+  @ApiPropertyOptional({
+    type: 'object',
+    description: 'Quarantine details when notification is flagged as malware',
+  })
+  @IsOptional()
+  @IsObject()
+  quarantineDetails?: QuarantineDetails
 }
