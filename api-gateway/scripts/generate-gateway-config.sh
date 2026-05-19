@@ -5,6 +5,9 @@ set -e
 #
 # Usage:
 #   ./generate-gateway-config.sh product                        # Generate Product config only
+#   ./generate-gateway-config.sh dev                            # Generate DEV routes only
+#   ./generate-gateway-config.sh test                           # Generate TEST routes only
+#   ./generate-gateway-config.sh prod                           # Generate PROD routes only
 #   ./generate-gateway-config.sh pr <release-name>              # Generate PR routes only
 #   ./generate-gateway-config.sh all                            # Generate Product + all services (dev+test+prod)
 #   ./generate-gateway-config.sh pr-with-permanent <release>    # Generate PR + permanent services (dev+test+prod+PR)
@@ -81,6 +84,24 @@ case "$COMMAND" in
     echo "✅ Done!"
     ;;
 
+  dev)
+    echo "Generating DEV configuration..."
+    generate_env_config "dev"
+    echo "✅ Done!"
+    ;;
+
+  test)
+    echo "Generating TEST configuration..."
+    generate_env_config "test"
+    echo "✅ Done!"
+    ;;
+
+  prod)
+    echo "Generating PROD configuration..."
+    generate_env_config "prod"
+    echo "✅ Done!"
+    ;;
+
   pr)
     if [ -z "$RELEASE_NAME" ]; then
       echo "Error: Release name required for PR config"
@@ -151,6 +172,9 @@ case "$COMMAND" in
     echo ""
     echo "Usage:"
     echo "  $0 product                        # Generate Product config"
+    echo "  $0 dev                            # Generate DEV routes only"
+    echo "  $0 test                           # Generate TEST routes only"
+    echo "  $0 prod                           # Generate PROD routes only"
     echo "  $0 pr <release-name>              # Generate PR routes only"
     echo "  $0 all                            # Generate Product + all services"
     echo "  $0 pr-with-permanent <release>    # Generate PR + permanent services"
