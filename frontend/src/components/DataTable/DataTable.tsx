@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import PaginationControls from '../PaginationControls'
 import { Table } from './Table'
 import { TableBody } from './TableBody'
 import { TableCell } from './TableCell'
@@ -66,6 +67,10 @@ export function DataTable<T extends object>({
   isLoading = false,
   isEmpty,
   emptyMessage = 'No data available.',
+  currentPage,
+  pageSize = 10,
+  totalCount,
+  onPageChange,
   label,
   variant = 'striped',
   size = 'md',
@@ -156,6 +161,16 @@ export function DataTable<T extends object>({
           </TableFooter>
         )}
       </Table>
+      {onPageChange != null && totalCount != null && currentPage != null && (
+        <PaginationControls
+          page={currentPage}
+          totalPages={Math.ceil(totalCount / pageSize)}
+          count={totalCount}
+          limit={pageSize}
+          isLoading={isLoading}
+          onPageChange={onPageChange}
+        />
+      )}
     </>
   )
 }

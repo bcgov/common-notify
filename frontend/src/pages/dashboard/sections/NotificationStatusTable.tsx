@@ -2,7 +2,6 @@ import { Link, Select } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
 import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import PaginationControls from '@/components/PaginationControls'
 import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
@@ -13,27 +12,40 @@ import type { TableColumn } from '@/components/DataTable'
 import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
 
 /**
- * Helper to get status badge CSS class
+ * Helper to get status dot color
  */
-function getStatusBadgeClass(status?: string): string {
+function getStatusColor(status?: string): string {
   switch (status) {
     case 'completed':
-      return 'badge bg-success text-white'
+      return '#42814A'
     case 'failed':
-      return 'badge bg-danger text-white'
-    case 'sending':
-      return 'badge bg-warning text-dark'
-    case 'processing':
-      return 'badge bg-primary text-white'
-    case 'queued':
-      return 'badge bg-secondary text-white'
-    case 'pending':
-      return 'badge bg-info text-dark'
-    case 'scheduled':
-      return 'badge bg-dark text-light'
+      return '#CE3E39'
     default:
-      return 'badge bg-secondary text-white'
+      return '#F8BB47'
   }
+}
+
+/**
+ * Status badge component with colored dot
+ */
+function StatusBadge({ status }: { status?: string }) {
+  const color = getStatusColor(status)
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : ''
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span
+        style={{
+          display: 'inline-block',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          backgroundColor: color,
+          flexShrink: 0,
+        }}
+      />
+      {label}
+    </span>
+  )
 }
 
 /**
@@ -43,7 +55,7 @@ function getStatusBadgeClass(status?: string): string {
  */
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
-  const { statusFilter, page, limit, count, totalPages, isLoading } = useAppSelector(
+  const { statusFilter, page, limit, count, isLoading, hasLoaded } = useAppSelector(
     (state) => state.notification,
   )
   const notifications = useAppSelector(selectNotifications)
@@ -52,16 +64,6 @@ const NotificationStatusTable: FC = () => {
 
   const [selectedNotification, setSelectedNotification] = useState<NotificationRequest | null>(null)
   const [showRecipientsModal, setShowRecipientsModal] = useState(false)
-
-  {
-    /** delete this later */
-  }
-  const [variant, setVariant] = useState<'striped' | 'bordered' | 'plain'>('striped')
-  const [headerThemed, setHeaderThemed] = useState(false)
-  const [headerBordered, setHeaderBordered] = useState(false)
-  {
-    /*********************/
-  }
 
   // Fetch notifications when status filter, page, or selected tenant changes
   // Only fetch if a tenant is selected
@@ -137,7 +139,7 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (_, row) => <span className={getStatusBadgeClass(row.status)}>{row.status}</span>,
+      render: (_, row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'createdAt',
@@ -156,80 +158,25 @@ const NotificationStatusTable: FC = () => {
           onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
         />
       </div>
-      {/** delete this later */}
-      <div>
-        <button
-          onClick={() => {
-            setVariant(
-              variant === 'striped' ? 'bordered' : variant === 'bordered' ? 'plain' : 'striped',
-            )
-          }}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '5px',
-            cursor: 'pointer',
-            color: 'black',
-          }}
-        >
-          Change Variant
-        </button>
-        <button
-          onClick={() => setHeaderThemed((prev) => !prev)}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '5px',
-            cursor: 'pointer',
-            color: 'black',
-          }}
-        >
-          Toggle Header Color
-        </button>
-        <button
-          onClick={() => setHeaderBordered((prev) => !prev)}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '5px',
-            cursor: 'pointer',
-            color: 'black',
-          }}
-        >
-          Toggle Header Border
-        </button>
-      </div>
-      {headerThemed && (
-        <style>{`.notification-status-table thead th { background-color: #013366; color: #ffffff; }`}</style>
-      )}
-      {headerBordered && (
-        <style>{`.notification-status-table thead th { border: 1px solid lightgray; }`}</style>
-      )}
-      {/*******************/}
+
       <DataTable
         columns={columns}
         data={notifications ?? []}
         keyExtractor={(row) => row.id}
-        isLoading={isLoading}
+        isLoading={isLoading && !hasLoaded}
         emptyMessage="No notifications found"
         label="Notification Status"
-        variant={variant}
-        className={headerThemed || headerBordered ? 'notification-status-table' : ''} // delete later
+        variant="bordered"
+        currentPage={page}
+        pageSize={limit}
+        totalCount={count}
+        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
       />
 
       <RecipientsModal
         show={showRecipientsModal}
         notification={selectedNotification}
         onHide={() => setShowRecipientsModal(false)}
-      />
-
-      <PaginationControls
-        page={page}
-        totalPages={totalPages}
-        count={count}
-        limit={limit}
-        isLoading={isLoading}
-        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
       />
     </div>
   )
