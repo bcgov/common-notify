@@ -8,6 +8,7 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
@@ -45,7 +46,7 @@ export class TemplatesService {
     tenantId: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
+  ): Promise<PaginatedTemplateResponse> {
     // Validate pagination limits
     if (limit > 100) {
       throw new BadRequestException('Limit must not exceed 100 items per page')
@@ -59,8 +60,18 @@ export class TemplatesService {
 
     // Convert page number to offset (1-indexed to 0-indexed)
     const offset = (page - 1) * limit
-    const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
-    return templates.map((t) => this.toResponseDto(t))
+    const [templates, total] = await this.templatesRepository.findByTenantId(
+      tenantId,
+      limit,
+      offset,
+    )
+    return {
+      data: templates.map((t) => this.toResponseDto(t)),
+      count: total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   /**
@@ -73,7 +84,7 @@ export class TemplatesService {
     tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
+  ): Promise<PaginatedTemplateResponse> {
     // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {

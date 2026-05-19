@@ -1,5 +1,6 @@
 import type { AxiosError } from 'axios'
 import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
+import type { PaginatedTemplateResponse } from '@/interfaces/PaginatedNotificationResponse'
 
 export enum NotificationChannel {
   EMAIL = 'email',
@@ -46,14 +47,18 @@ export interface GetTemplatesResponse {
  * @returns List of templates for the tenant
  * @throws Error if fetch fails
  */
-export async function getTemplates(tenantId: string, page: number = 1, limit: number = 10) {
+export async function getTemplates(
+  tenantId: string,
+  page: number = 1,
+  limit: number = 10,
+): Promise<PaginatedTemplateResponse> {
   try {
     const params = generateApiParameters('/api/v1/frontend/templates', {
       tenantId,
       page: String(page),
       limit: String(limit),
     })
-    return await get<TemplateResponse[]>(params)
+    return await get<PaginatedTemplateResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}
@@ -111,7 +116,7 @@ export async function getTemplateById(templateId: string) {
 export async function updateTemplate(templateId: string, updateData: Partial<TemplateResponse>) {
   try {
     const params = generateApiParameters(`/api/v1/frontend/templates/${templateId}`)
-    return await post<TemplateResponse>(params, updateData)
+    return await post<TemplateResponse>({ ...params, data: updateData })
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}

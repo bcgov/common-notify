@@ -24,6 +24,7 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 
 /**
  * Frontend Templates API Controller
@@ -81,12 +82,12 @@ export class TemplatesFrontendController {
     example: 10,
     description: 'Items per page (max 100)',
   })
-  @ApiOkResponse({ type: [TemplateResponseDto] })
+  @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
     @Query('tenantId') tenantExternalId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ): Promise<TemplateResponseDto[]> {
+  ): Promise<PaginatedTemplateResponse> {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
     return this.templatesService.listTemplatesByExternalId(tenantExternalId, pageNum, limitNum)
