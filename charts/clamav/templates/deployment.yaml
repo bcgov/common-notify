@@ -1,0 +1,68 @@
+{{- if .Values.clamav.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clamav.fullname" . }}
+  labels:
+    {{- include "clamav.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.clamav.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "clamav.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clamav.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.clamav.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: clamav
+        {{- with .Values.clamav.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        image: "{{ .Values.clamav.image.registry }}/{{ .Values.clamav.image.repository }}:{{ .Values.clamav.image.tag }}"
+        imagePullPolicy: {{ .Values.clamav.image.pullPolicy }}
+        ports:
+        - name: clamd
+          containerPort: 3310
+          protocol: TCP
+        {{- with .Values.clamav.env }}
+        env:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        envFrom:
+        - secretRef:
+            name: {{ .Values.clamav.existingSecret | default (include "clamav.fullname" .) }}
+        {{- with .Values.clamav.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- with .Values.clamav.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- with .Values.clamav.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- if .Values.clamav.persistence.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.clamav.persistence.mountPath }}
+        {{- end }}
+      {{- if .Values.clamav.persistence.enabled }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "clamav.fullname" . }}
+      {{- end }}
+      {{- with .Values.clamav.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

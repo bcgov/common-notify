@@ -1,0 +1,15 @@
+# Patterns to ignore when building packages.
+# This supports shell glob patterns.
+
+.DS_Store
+*.swp
+*.swo
+*~
+.#*
+.*.swp
+.*.swo
+*~
+.idea/
+*.iml
+.vscode/
+*.orig

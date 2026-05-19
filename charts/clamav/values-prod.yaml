@@ -1,0 +1,114 @@
+# ClamAV Production Values
+# High availability configuration for production deployments
+
+clamav:
+  enabled: true
+
+  image:
+    registry: ghcr.io
+    repository: clamav/clamav
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # -- Increase replicas for high availability in production
+  replicaCount: 2
+
+  service:
+    type: ClusterIP
+    port: 3310
+    targetPort: 3310
+
+  # -- Increase resources for production workloads
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # -- Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    fsGroup: 100
+
+  # -- Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  livenessProbe:
+    exec:
+      command:
+        - clamdscan
+        - --version
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    exec:
+      command:
+        - clamdscan
+        - --version
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  env:
+    - name: CLAMD_STARTUP_TIMEOUT
+      value: '600'
+
+  # -- Use the existing backend secret for ClamAV configuration (production)
+  # Created manually in the cluster, contains CVD_UPDATE_HOSTNAME and CVD_UPDATE_SCHEME
+  existingSecret: common-notify-prod-clamav
+
+  # -- These values are ignored if existingSecret is set
+  secrets:
+    CVD_UPDATE_HOSTNAME: clamav-mirror.apps.silver.devops.gov.bc.ca
+    CVD_UPDATE_SCHEME: https
+
+  # -- Enable persistence for production
+  persistence:
+    enabled: true
+    storageClass: netapp-block-standard
+    accessMode: ReadWriteOnce
+    size: 3Gi
+    mountPath: /var/lib/clamav
+
+  # -- Enable Network Policy for production
+  networkPolicy:
+    enabled: true
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: backend
+        ports:
+          - protocol: TCP
+            port: 3310
+
+  # -- Enable Pod Disruption Budget for high availability
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  # -- Pod anti-affinity to spread replicas across nodes
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - clamav
+            topologyKey: kubernetes.io/hostname

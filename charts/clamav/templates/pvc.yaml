@@ -1,0 +1,17 @@
+{{- if .Values.clamav.enabled }}
+{{- if .Values.clamav.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "clamav.fullname" . }}
+  labels:
+    {{- include "clamav.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.clamav.persistence.accessMode }}
+  storageClassName: {{ .Values.clamav.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.clamav.persistence.size }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,123 @@
+# ClamAV Helm Chart Values
+# Antivirus scanning service for attachment and file validation
+
+clamav:
+  # -- Enable or disable ClamAV deployment
+  enabled: true
+
+  # -- Image configuration
+  image:
+    registry: ghcr.io
+    repository: clamav/clamav
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # -- Replica count for ClamAV deployment (should be 1 or 2 for high availability)
+  replicaCount: 1
+
+  # -- Service configuration
+  service:
+    type: ClusterIP
+    port: 3310
+    targetPort: 3310
+    annotations: {}
+
+  # -- Resource requests and limits
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+
+  # -- Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    fsGroup: 100
+
+  # -- Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Health check probes
+  livenessProbe:
+    exec:
+      command:
+        - clamdscan
+        - --version
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    exec:
+      command:
+        - clamdscan
+        - --version
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # -- Environment variables for ClamAV configuration
+  env:
+    - name: CLAMD_STARTUP_TIMEOUT
+      value: '600'
+
+  # -- Use an existing Secret for ClamAV mirror configuration
+  # If set, Helm will not create a Secret and will use this one instead
+  # Must contain: CVD_UPDATE_HOSTNAME, CVD_UPDATE_SCHEME
+  existingSecret: ~
+
+  # -- Kubernetes Secret data for ClamAV mirror configuration
+  # Only used if existingSecret is not set. Helm creates the Secret.
+  secrets:
+    CVD_UPDATE_HOSTNAME: clamav-mirror.apps.silver.devops.gov.bc.ca
+    CVD_UPDATE_SCHEME: https
+
+  # -- Volume mounts for ClamAV data persistence
+  persistence:
+    enabled: true
+    storageClass: netapp-block-standard
+    accessMode: ReadWriteOnce
+    size: 2Gi
+    mountPath: /var/lib/clamav
+
+  # -- Network Policy configuration
+  networkPolicy:
+    enabled: true
+    # Allow traffic from backend pods in same release
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app: backend
+        ports:
+          - protocol: TCP
+            port: 3310
+
+  # -- Pod Disruption Budget for high availability
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+  # -- Node affinity for pod scheduling
+  affinity: {}
+  # Example:
+  # affinity:
+  #   nodeAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 50
+  #         preference:
+  #           matchExpressions:
+  #             - key: karpenter.sh/capacity-type
+  #               operator: In
+  #               values:
+  #                 - on-demand
