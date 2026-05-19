@@ -8,6 +8,9 @@ on:
         required: true
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
   restore-all-environments:
     name: Restore All Gateway Environments
