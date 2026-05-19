@@ -1,0 +1,178 @@
+@import '../variables.scss';
+
+// Base table wrapper and element
+.data-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: $white;
+  font-size: $font-size-base;
+
+  /* Variants */
+
+  &--striped {
+    border: 1px solid $border-default;
+
+    thead {
+      border-bottom: 1px solid $border-default;
+    }
+
+    tbody tr:nth-child(odd) {
+      background-color: $light-bg;
+    }
+  }
+
+  &--bordered {
+    border: 1px solid $border-default;
+
+    th,
+    td {
+      border: 1px solid $border-default;
+    }
+  }
+
+  &--plain {
+    th,
+    td {
+      border-bottom: 1px solid $border-default;
+    }
+  }
+
+  /* Sizes */
+
+  &--sm {
+    font-size: $font-size-sm;
+
+    th,
+    td {
+      padding: $spacing-xs $spacing-sm;
+    }
+
+    // Placeholder row height for sm
+    .data-table__padding-row {
+      height: 30.7px;
+    }
+  }
+
+  &--md {
+    th,
+    td {
+      padding: $spacing-sm $spacing-md;
+    }
+
+    // Placeholder row height for md
+    .data-table__padding-row {
+      height: 41.7px;
+    }
+  }
+
+  &--lg {
+    th,
+    td {
+      padding: $spacing-md $spacing-lg;
+    }
+
+    // Placeholder row height for lg
+    .data-table__padding-row {
+      height: 57.7px;
+    }
+  }
+
+  /* Header */
+
+  thead {
+    th {
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+  }
+
+  /* Body */
+
+  .data-table__padding-row {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  tbody {
+    tr {
+      &:hover {
+        background-color: rgba($primary-color, 0.05);
+      }
+
+      &:focus-within {
+        outline: 1px solid $border-active;
+        outline-offset: -2px;
+      }
+    }
+
+    td {
+      vertical-align: middle;
+      color: $dark-text;
+    }
+  }
+
+  /* Footer */
+
+  tfoot {
+    td {
+      color: $text-secondary;
+      border-top: 2px solid $border-default;
+      font-size: $font-size-sm;
+    }
+  }
+
+  /* Sort button (inside <th>) */
+
+  &__sort-btn {
+    @include button-reset;
+
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+    color: inherit;
+    font-weight: inherit;
+    font-size: inherit;
+    text-align: left;
+    width: 100%;
+    padding: 0;
+    line-height: inherit;
+
+    &:focus-visible {
+      outline: 2px solid $white;
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  &__sort-icon {
+    flex-shrink: 0;
+    font-size: 0.75em;
+    opacity: 0.7;
+
+    &--active {
+      opacity: 1;
+    }
+  }
+
+  /* loading / empty rows */
+
+  &__loading-row,
+  &__empty-row {
+    td {
+      text-align: center;
+      color: $text-secondary;
+      padding: $spacing-xl $spacing-md;
+    }
+  }
+}
