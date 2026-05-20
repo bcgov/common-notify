@@ -9,6 +9,7 @@ interface TemplatesState {
   limit: number
   count: number
   totalPages: number
+  search: string
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
@@ -20,6 +21,7 @@ const initialState: TemplatesState = {
   limit: 15,
   count: 0,
   totalPages: 0,
+  search: '',
   isLoading: false,
   hasLoaded: false,
   error: null,
@@ -34,6 +36,10 @@ export const templatesSlice = createSlice({
     },
     setLimit(state, action: PayloadAction<number>) {
       state.limit = action.payload
+      state.page = 1
+    },
+    setSearch(state, action: PayloadAction<string>) {
+      state.search = action.payload
       state.page = 1
     },
   },
@@ -59,6 +65,6 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage, setLimit } = templatesSlice.actions
+export const { setPage, setLimit, setSearch } = templatesSlice.actions
 
 export default templatesSlice.reducer

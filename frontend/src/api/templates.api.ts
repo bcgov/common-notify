@@ -51,12 +51,14 @@ export async function getTemplates(
   tenantId: string,
   page: number = 1,
   limit: number = 10,
+  search?: string,
 ): Promise<PaginatedTemplateResponse> {
   try {
     const params = generateApiParameters('/api/v1/frontend/templates', {
       tenantId,
       page: String(page),
       limit: String(limit),
+      ...(search ? { search } : {}),
     })
     return await get<PaginatedTemplateResponse>(params)
   } catch (error) {

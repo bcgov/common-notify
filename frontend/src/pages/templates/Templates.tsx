@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { setPage, setLimit } from '@/redux/slices/templates.slice'
+import { setPage, setLimit, setSearch } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
@@ -62,15 +62,22 @@ const Templates: FC = () => {
     page,
     limit,
     count,
+    search,
     isLoading,
   } = useAppSelector((state) => state.templates)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const [searchInput, setSearchInput] = useState(search)
 
   useEffect(() => {
     if (selectedTenant) {
       dispatch(fetchTemplates())
     }
-  }, [page, limit, selectedTenant, dispatch])
+  }, [page, limit, search, selectedTenant, dispatch])
+
+  function handleSearch() {
+    dispatch(setSearch(searchInput))
+    dispatch(fetchTemplates())
+  }
 
   function handleLimitChange(newLimit: number) {
     dispatch(setLimit(newLimit))
@@ -78,13 +85,26 @@ const Templates: FC = () => {
   }
 
   return (
-    <div className="container-fluid">
-      <div className="row mb-4">
-        <div className="col">
-          <PageHeading title="Notification Templates" />
-          <p className="text-muted">
-            Manage email, SMS, and push notification templates for your tenants
-          </p>
+    <div>
+      <PageHeading title="Notification Templates" />
+
+      <div className="row mb-3 g-2 align-items-center">
+        <div className="col-auto">
+          <input
+            type="search"
+            className="form-control"
+            style={{ width: '300px' }}
+            placeholder="Search Notification Templates..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            aria-label="Search templates"
+          />
+        </div>
+        <div className="col-auto">
+          <button className="btn btn-outline-secondary" type="button" onClick={handleSearch}>
+            Search
+          </button>
         </div>
       </div>
 

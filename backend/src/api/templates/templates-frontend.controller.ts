@@ -82,15 +82,29 @@ export class TemplatesFrontendController {
     example: 10,
     description: 'Items per page (max 100)',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    example: 'welcome',
+    description: 'Filter templates by name (case-insensitive, partial match)',
+  })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
     @Query('tenantId') tenantExternalId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ): Promise<PaginatedTemplateResponse> {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.templatesService.listTemplatesByExternalId(tenantExternalId, pageNum, limitNum)
+    const searchString = search ? search.trim().slice(0, 50) : undefined
+    return this.templatesService.listTemplatesByExternalId(
+      tenantExternalId,
+      pageNum,
+      limitNum,
+      searchString,
+    )
   }
 
   /**

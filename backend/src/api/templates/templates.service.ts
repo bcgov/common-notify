@@ -46,6 +46,7 @@ export class TemplatesService {
     tenantId: string,
     page: number = 1,
     limit: number = 10,
+    search?: string,
   ): Promise<PaginatedTemplateResponse> {
     // Validate pagination limits
     if (limit > 100) {
@@ -64,6 +65,7 @@ export class TemplatesService {
       tenantId,
       limit,
       offset,
+      search,
     )
     return {
       data: templates.map((t) => this.toResponseDto(t)),
@@ -84,6 +86,7 @@ export class TemplatesService {
     tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
+    search?: string,
   ): Promise<PaginatedTemplateResponse> {
     // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
@@ -92,7 +95,7 @@ export class TemplatesService {
     }
 
     // Use the internal tenant ID to list templates
-    return this.listTemplates(tenant.id, page, limit)
+    return this.listTemplates(tenant.id, page, limit, search)
   }
 
   /**
