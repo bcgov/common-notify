@@ -24,31 +24,26 @@ const navItems = [
     label: 'Dashboard',
     to: '/dashboard',
     icon: <HomeOutlinedIcon />,
-    ariaLabel: 'Navigate to Dashboard',
   },
   {
     label: 'Notification Events',
     to: '/notification-events',
     icon: <WorkspacesOutlinedIcon />,
-    ariaLabel: 'Navigate to Notification Events',
   },
   {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
-    ariaLabel: 'Navigate to Templates',
   },
   {
     label: 'Distribution Lists',
     to: '/distribution-lists',
     icon: <GroupsOutlinedIcon />,
-    ariaLabel: 'Navigate to Distribution Lists',
   },
   {
     label: 'Settings',
     to: '/settings',
     icon: <SettingsOutlinedIcon />,
-    ariaLabel: 'Navigate to Settings',
   },
 ]
 
@@ -57,7 +52,6 @@ const adminItems = [
     label: 'Admin',
     to: '/admin/clients',
     icon: <AdminPanelSettingsOutlinedIcon />,
-    ariaLabel: 'Navigate to Admin',
   },
 ] as const
 
@@ -98,7 +92,6 @@ const Sidebar: FC = () => {
             to={item.to}
             className="sidebar__item"
             activeProps={{ className: 'active' }}
-            aria-label={item.ariaLabel}
             title={collapsed ? item.label : ''}
           >
             <span className="sidebar__icon" aria-hidden="true">
@@ -114,7 +107,6 @@ const Sidebar: FC = () => {
               to={item.to}
               className="sidebar__item"
               activeProps={{ className: 'active' }}
-              aria-label={item.ariaLabel}
               title={collapsed ? item.label : ''}
             >
               <span className="sidebar__icon" aria-hidden="true">
@@ -129,18 +121,12 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <div
-          className="sidebar__item"
-          title={collapsed ? 'Help' : ''}
-          aria-label="Help"
-          role="button"
-          tabIndex={0}
-        >
+        <button type="button" className="sidebar__item" title={collapsed ? 'Help' : ''}>
           <span className="sidebar__icon" aria-hidden="true">
             <HelpOutlinedIcon />
           </span>
           <span className="sidebar__label">Help</span>
-        </div>
+        </button>
 
         {/* Bottom section */}
         <div className="sidebar__bottom">
@@ -159,20 +145,17 @@ const Sidebar: FC = () => {
           )}
 
           {/* Logout */}
-          <div
+          <button
+            type="button"
             className="sidebar__item"
             onClick={handleLogout}
             title={collapsed ? 'Logout' : ''}
-            aria-label="Logout"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogout()}
           >
             <span className="sidebar__icon" aria-hidden="true">
               <LogoutOutlinedIcon />
             </span>
             <span className="sidebar__label">Logout</span>
-          </div>
+          </button>
         </div>
       </div>
     </aside>

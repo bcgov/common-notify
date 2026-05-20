@@ -14,6 +14,7 @@ interface NotificationState {
   count: number
   totalPages: number
   isLoading: boolean
+  hasLoaded: boolean
   error: string | null
 }
 
@@ -25,6 +26,7 @@ const initialState: NotificationState = {
   count: 0,
   totalPages: 0,
   isLoading: false,
+  hasLoaded: false,
   error: null,
 }
 
@@ -56,6 +58,7 @@ export const notificationSlice = createSlice({
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.isLoading = false
+        state.hasLoaded = true
         state.items = action.payload.data
         state.count = action.payload.count
         state.page = action.payload.page
