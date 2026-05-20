@@ -72,6 +72,15 @@
       background-color 0.2s ease,
       color 0.2s ease;
 
+    // reset button styling in the sidebar (button is used for accessibility)
+    &:is(button) {
+      width: 100%;
+      background: none;
+      border: none;
+      font: inherit;
+      text-align: left;
+    }
+
     &:hover {
       background-color: rgba($primary-color, 0.08);
     }
