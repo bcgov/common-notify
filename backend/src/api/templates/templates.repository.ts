@@ -40,7 +40,7 @@ export class TemplatesRepository {
       relations: ['channel', 'engine'],
       take: limit,
       skip: offset,
-      order: { createdAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
     })
   }
 
