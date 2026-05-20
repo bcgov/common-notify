@@ -3,14 +3,15 @@ import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedTemplateResponse } from '@/interfaces/PaginatedNotificationResponse'
 
 export enum NotificationChannel {
-  EMAIL = 'email',
-  SMS = 'sms',
-  PUSH = 'push',
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
 }
 
 export enum TemplateEngine {
   HANDLEBARS = 'handlebars',
   MUSTACHE = 'mustache',
+  LEGACY_GC_NOTIFY = 'legacy_gc_notify',
+  EJS = 'ejs',
 }
 
 export interface TemplateResponse {
@@ -103,6 +104,45 @@ export async function getTemplateById(templateId: string) {
 
     throw new Error(
       `Failed to fetch template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
+  }
+}
+
+export interface PreviewTemplateResponse {
+  templateId: string
+  channelCode: NotificationChannel
+  subject?: string
+  body: string
+  bodyType: 'text' | 'markdown' | 'html'
+}
+
+/**
+ * Preview a template with optional sample data
+ *
+ * @param templateId Template ID
+ * @param params Optional key-value pairs for template rendering
+ * @returns Rendered template output
+ * @throws Error if preview fails
+ */
+export async function previewTemplate(
+  templateId: string,
+  params?: Record<string, string>,
+): Promise<PreviewTemplateResponse> {
+  try {
+    const apiParams = generateApiParameters(`/api/v1/frontend/templates/${templateId}/preview`)
+    return await post<PreviewTemplateResponse>({ ...apiParams, data: { params } })
+  } catch (error) {
+    const axiosError = error as AxiosError
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Template not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to preview this template')
+    }
+
+    throw new Error(
+      `Failed to preview template: ${error instanceof Error ? error.message : 'Unknown error'}`,
     )
   }
 }
