@@ -11,7 +11,7 @@ export const fetchTemplates = createAsyncThunk<
   try {
     const state = getState()
     const tenantId = state.tenant.selectedTenant?.id
-    if (!tenantId) return { data: [], count: 0, page: 1, limit: 10, totalPages: 0 }
+    if (!tenantId) return { data: [], count: 0, page: 1, limit: 15, totalPages: 0 }
     const { page, limit } = state.templates
     return await getTemplates(tenantId, page, limit)
   } catch (error) {

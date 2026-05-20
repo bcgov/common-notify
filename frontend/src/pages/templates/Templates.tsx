@@ -3,11 +3,12 @@ import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { setPage } from '@/redux/slices/templates.slice'
+import { setPage, setLimit } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
+import PageLimitControl from '@/components/PageLimitControl'
 
 const columns: TableColumn<TemplateResponse>[] = [
   {
@@ -69,7 +70,12 @@ const Templates: FC = () => {
     if (selectedTenant) {
       dispatch(fetchTemplates())
     }
-  }, [page, selectedTenant, dispatch])
+  }, [page, limit, selectedTenant, dispatch])
+
+  function handleLimitChange(newLimit: number) {
+    dispatch(setLimit(newLimit))
+    dispatch(fetchTemplates())
+  }
 
   return (
     <div className="container-fluid">
@@ -82,6 +88,7 @@ const Templates: FC = () => {
         </div>
       </div>
 
+      <PageLimitControl limit={limit} page={page} count={count} onLimitChange={handleLimitChange} />
       <DataTable
         columns={columns}
         data={templates}

@@ -17,7 +17,7 @@ interface TemplatesState {
 const initialState: TemplatesState = {
   items: [],
   page: 1,
-  limit: 10,
+  limit: 15,
   count: 0,
   totalPages: 0,
   isLoading: false,
@@ -31,6 +31,10 @@ export const templatesSlice = createSlice({
   reducers: {
     setPage(state, action: PayloadAction<number>) {
       state.page = Math.max(1, action.payload)
+    },
+    setLimit(state, action: PayloadAction<number>) {
+      state.limit = action.payload
+      state.page = 1
     },
   },
   extraReducers: (builder) => {
@@ -55,6 +59,6 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage } = templatesSlice.actions
+export const { setPage, setLimit } = templatesSlice.actions
 
 export default templatesSlice.reducer
