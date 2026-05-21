@@ -83,7 +83,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     return !Object.values(errors).some(Boolean)
   }
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.SyntheticEvent) => {
     e.preventDefault()
     if (!validate()) return
     setSaving(true)
@@ -97,11 +97,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save template'
-      if (message.includes('already exists')) {
-        setFormErrors((prev) => ({ ...prev, name: 'A template with this name already exists' }))
+      if ((error as any).status === 409) {
+        setFormErrors((prev) => ({ ...prev, name: (error as Error).message }))
       } else {
-        showErrorToast(message)
+        showErrorToast(error instanceof Error ? error.message : 'Failed to save template')
       }
     } finally {
       setSaving(false)
