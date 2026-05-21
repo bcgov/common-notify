@@ -11,7 +11,7 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined'
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
@@ -123,7 +123,7 @@ const Sidebar: FC = () => {
         {/* TODO add a link to Help page when it is created */}
         <button type="button" className="sidebar__item" title={collapsed ? 'Help' : ''}>
           <span className="sidebar__icon" aria-hidden="true">
-            <HelpOutlinedIcon />
+            <HelpOutlineOutlinedIcon />
           </span>
           <span className="sidebar__label">Help</span>
         </button>
