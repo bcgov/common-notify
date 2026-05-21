@@ -30,6 +30,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+    engineCode: '',
+    subject: '',
+    body: '',
+  })
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -56,10 +62,30 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const validate = (): boolean => {
+    const errors = { name: '', engineCode: '', subject: '', body: '' }
+    if (!formData.name.trim()) {
+      errors.name = ' '
+    }
+    if (!formData.engineCode) {
+      errors.engineCode = 'Please select an option to continue.'
+    }
+    if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
+      errors.subject = ' '
+    }
+    if (!formData.body.trim()) {
+      errors.body = ' '
+    }
+    setFormErrors(errors)
+    return !Object.values(errors).some(Boolean)
   }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) return
     setSaving(true)
     try {
       await updateTemplate(templateId, {
@@ -71,7 +97,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
     } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : 'Failed to save template')
+      const message = error instanceof Error ? error.message : 'Failed to save template'
+      if (message.includes('already exists')) {
+        setFormErrors((prev) => ({ ...prev, name: 'A template with this name already exists' }))
+      } else {
+        showErrorToast(message)
+      }
     } finally {
       setSaving(false)
     }
@@ -108,6 +139,8 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               value={formData.name}
               onChange={handleFieldChange('name')}
               style={{ maxWidth: '400px' }}
+              isInvalid={!!formErrors.name}
+              errorMessage={formErrors.name}
             />
           </div>
 
@@ -129,7 +162,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             </RadioGroup>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-4 error-after-label">
             <RadioGroup
               label={
                 (
@@ -139,7 +172,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 ) as any
               }
               value={formData.engineCode}
-              onChange={(value) => setFormData((prev) => ({ ...prev, engineCode: value }))}
+              onChange={(value) => {
+                setFormData((prev) => ({ ...prev, engineCode: value }))
+                setFormErrors((prev) => ({ ...prev, engineCode: '' }))
+              }}
+              isInvalid={!!formErrors.engineCode}
+              errorMessage={formErrors.engineCode}
             >
               <Radio value={TemplateEngine.HANDLEBARS}>Handlebars</Radio>
               <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
@@ -162,6 +200,8 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 value={formData.subject}
                 onChange={handleFieldChange('subject')}
                 style={{ width: '100%' }}
+                isInvalid={!!formErrors.subject}
+                errorMessage={formErrors.subject}
               />
             </div>
           )}
@@ -172,11 +212,14 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             </label>
             <textarea
               id="body"
-              className="form-control"
+              className={`form-control${formErrors.body ? ' is-invalid' : ''}`}
               value={formData.body}
               onChange={(e) => handleFieldChange('body')(e.target.value)}
               style={{ width: '100%', height: '16rem' }}
             />
+            {formErrors.body && (
+              <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
+            )}
           </div>
 
           <div className="d-flex justify-content-end gap-2">

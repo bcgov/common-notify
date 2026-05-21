@@ -7,3 +7,13 @@
     white-space: nowrap;
   }
 }
+
+.error-after-label {
+  .bcds-react-aria-RadioGroup--options {
+    order: 2;
+  }
+
+  .bcds-react-aria-RadioGroup--error {
+    order: 1;
+  }
+}
