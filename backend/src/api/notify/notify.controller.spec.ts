@@ -1,7 +1,13 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { VersioningType, CanActivate, ExecutionContext, ValidationPipe } from '@nestjs/common'
+import {
+  VersioningType,
+  CanActivate,
+  ExecutionContext,
+  ValidationPipe,
+  BadRequestException,
+} from '@nestjs/common'
 import { vi } from 'vitest'
 import request from 'supertest'
 import {
@@ -18,6 +24,7 @@ import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
+import { AttachmentValidationService } from './services/attachment-validation.service'
 
 // Mock TenantGuard to bypass authentication in tests
 const mockTenantGuard: CanActivate = {
@@ -47,7 +54,12 @@ const mockNotificationService = {
   getNotificationStatus: vi.fn(),
   createNotification: vi.fn(),
   create: vi.fn().mockResolvedValue({ id: 'mock-notification-id' }),
+  update: vi.fn().mockResolvedValue(undefined),
   validateBusinessRules: vi.fn().mockResolvedValue([]),
+}
+
+const mockAttachmentValidationService = {
+  validateAttachments: vi.fn().mockResolvedValue(undefined),
 }
 
 const mockIngestionQueue = {
@@ -71,6 +83,7 @@ describe('Notify Controllers', () => {
       providers: [
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
+        { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
         { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
@@ -189,6 +202,32 @@ describe('Notify Controllers', () => {
             expect(res.body.status).toBe('scheduled')
             expect(res.body.message).toContain('Notification scheduled for delivery')
           })
+      })
+
+      it('should return 400 and not persist when attachment validation fails', async () => {
+        mockAttachmentValidationService.validateAttachments.mockRejectedValueOnce(
+          new BadRequestException('Invalid attachment'),
+        )
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: '../bad.txt',
+                  mimeType: 'text/plain',
+                  data: 'SGVsbG8=',
+                },
+              ],
+            },
+          })
+          .expect(400)
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockNotificationService.validateBusinessRules).not.toHaveBeenCalled()
       })
     })
   })

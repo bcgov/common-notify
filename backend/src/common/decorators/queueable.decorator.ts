@@ -10,6 +10,7 @@ import { NotificationService } from '../../api/notification/notification.service
 import { NotificationPubSubService } from '../../api/notification/notification-pubsub.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
+import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
 
 /**
  * Context required by the Queueable decorator.
@@ -17,6 +18,7 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
  */
 export interface QueueableContext {
   notificationService: NotificationService
+  attachmentValidationService: AttachmentValidationService
   NotificationPubSubService?: NotificationPubSubService
   queueMap: Map<QueueName, Bull.Queue>
 }
@@ -69,6 +71,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           )
         }
 
+        if (!(this as QueueableContext).attachmentValidationService) {
+          throw new InternalServerErrorException(
+            'AttachmentValidationService not injected. Ensure controller constructor includes: readonly attachmentValidationService: AttachmentValidationService',
+          )
+        }
+
         // Validate queueMap exists and is a Map
         const queueMap = (this as QueueableContext).queueMap
         if (!(queueMap instanceof Map)) {
@@ -97,6 +105,10 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         // Payload is guaranteed to be valid by global ValidationPipe
         // (guards run before ValidationPipe in NestJS middleware chain)
         const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
+
+        await (this as QueueableContext).attachmentValidationService.validateAttachments(
+          validatedPayload,
+        )
 
         // Validate business rules (tenant active, recipient counts, content, etc)
         const businessErrors = await (
