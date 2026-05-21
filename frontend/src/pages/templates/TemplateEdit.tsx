@@ -63,6 +63,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     setSaving(true)
     try {
       await updateTemplate(templateId, {
+        name: formData.name,
         engineCode: formData.engineCode as TemplateEngine,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
@@ -99,13 +100,13 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               label={
                 (
                   <>
-                    <strong>Template title</strong>
+                    <strong>Template title</strong> (required)
                   </>
                 ) as any
               }
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
-              isDisabled
+              onChange={handleFieldChange('name')}
               style={{ maxWidth: '400px' }}
             />
           </div>
