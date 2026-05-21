@@ -10,6 +10,8 @@ import { NotificationService } from '../../api/notification/notification.service
 import { NotificationPubSubService } from '../../api/notification/notification-pubsub.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
+import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
+import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
 
 /**
@@ -19,6 +21,7 @@ import type { AttachmentValidationService } from '../../api/notify/services/atta
 export interface QueueableContext {
   notificationService: NotificationService
   attachmentValidationService: AttachmentValidationService
+  attachmentProcessingService: AttachmentProcessingService
   NotificationPubSubService?: NotificationPubSubService
   queueMap: Map<QueueName, Bull.Queue>
 }
@@ -77,6 +80,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           )
         }
 
+        if (!(this as QueueableContext).attachmentProcessingService) {
+          throw new InternalServerErrorException(
+            'AttachmentProcessingService not injected. Ensure controller constructor includes: readonly attachmentProcessingService: AttachmentProcessingService',
+          )
+        }
+
         // Validate queueMap exists and is a Map
         const queueMap = (this as QueueableContext).queueMap
         if (!(queueMap instanceof Map)) {
@@ -110,10 +119,14 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           validatedPayload,
         )
 
+        const processedPayload: ProcessedNotifySimpleRequest = await (
+          this as QueueableContext
+        ).attachmentProcessingService.processAttachments(validatedPayload)
+
         // Validate business rules (tenant active, recipient counts, content, etc)
         const businessErrors = await (
           this as QueueableContext
-        ).notificationService.validateBusinessRules(tenantId, validatedPayload)
+        ).notificationService.validateBusinessRules(tenantId, processedPayload)
         if (businessErrors.length > 0) {
           throw new UnprocessableEntityException({
             message: 'Request validation failed',
@@ -129,7 +142,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             tenantId,
             status: NotificationStatus.PENDING,
             createdBy: tenantId,
-            payload: validatedPayload, // Store request payload for retry purposes
+            payload: processedPayload, // Store sanitized request payload for retry purposes
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id}`,
@@ -176,15 +189,15 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         // Determine which channels are included in the request
         const channels: string[] = []
-        if (validatedPayload.email) channels.push('email')
-        if (validatedPayload.sms) channels.push('sms')
-        if (validatedPayload.msgApp) channels.push('msgApp')
+        if (processedPayload.email) channels.push('email')
+        if (processedPayload.sms) channels.push('sms')
+        if (processedPayload.msgApp) channels.push('msgApp')
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =
-          validatedPayload.email?.delayedSend ||
-          validatedPayload.sms?.delayedSend ||
-          validatedPayload.msgApp?.delayedSend
+          processedPayload.email?.delayedSend ||
+          processedPayload.sms?.delayedSend ||
+          processedPayload.msgApp?.delayedSend
 
         // Calculate delay in milliseconds if delayedSend is present
         let delayMs = 0
@@ -218,7 +231,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             const jobPayload = {
               notifyId: notificationRecord.id,
               tenantId,
-              request: validatedPayload,
+              request: processedPayload,
               requestedAt: new Date().toISOString(),
               ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
             }

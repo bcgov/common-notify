@@ -24,6 +24,7 @@ import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 
 // Mock TenantGuard to bypass authentication in tests
@@ -62,6 +63,10 @@ const mockAttachmentValidationService = {
   validateAttachments: vi.fn().mockResolvedValue(undefined),
 }
 
+const mockAttachmentProcessingService = {
+  processAttachments: vi.fn((request) => Promise.resolve(request)),
+}
+
 const mockIngestionQueue = {
   add: vi.fn(),
   process: vi.fn(),
@@ -84,6 +89,7 @@ describe('Notify Controllers', () => {
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
+        { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
         { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
@@ -228,6 +234,65 @@ describe('Notify Controllers', () => {
 
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockNotificationService.validateBusinessRules).not.toHaveBeenCalled()
+        expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      })
+
+      it('should process attachments before persisting and remove raw data from the stored payload', async () => {
+        const processedPayload = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+            attachments: [
+              {
+                filename: 'hello.txt',
+                mimeType: 'text/plain',
+                storageKey: 'ab/abcdef.bin',
+                sizeBytes: 11,
+                contentSha256:
+                  'b94d27b9934d3e08a52e52d7da7dabfade4f0f1b6d8d7e8e5a7a5f6d7c8b9a0f',
+                storageProvider: 'local',
+              },
+            ],
+          },
+        }
+
+        mockAttachmentProcessingService.processAttachments.mockResolvedValueOnce(
+          processedPayload as any,
+        )
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  data: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(202)
+
+        expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledTimes(1)
+        expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledTimes(1)
+        expect(mockNotificationService.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: processedPayload,
+          }),
+        )
+
+        const validationOrder =
+          mockAttachmentValidationService.validateAttachments.mock.invocationCallOrder[0]
+        const processingOrder =
+          mockAttachmentProcessingService.processAttachments.mock.invocationCallOrder[0]
+        const createOrder = mockNotificationService.create.mock.invocationCallOrder[0]
+
+        expect(validationOrder).toBeLessThan(processingOrder)
+        expect(processingOrder).toBeLessThan(createOrder)
       })
     })
   })

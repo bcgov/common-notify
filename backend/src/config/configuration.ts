@@ -71,6 +71,11 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
+    // Attachment Storage
+    attachments: {
+      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),

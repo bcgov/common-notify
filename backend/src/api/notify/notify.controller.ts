@@ -22,6 +22,7 @@ import { NotificationAcceptanceResponse } from './schemas/notification-acceptanc
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationService } from '../notification/notification.service'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
@@ -39,6 +40,7 @@ export class NotifySimpleController {
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
     readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])

@@ -14,7 +14,9 @@ import { NotifyService } from './notify.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
+import { LocalAttachmentStorageService } from './services/local-attachment-storage.service'
 import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 
@@ -35,7 +37,17 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
     NotifyController,
     ChesEmailController,
   ],
-  providers: [NotifyService, AttachmentValidationService],
-  exports: [NotifyService, RenderingModule, AttachmentValidationService],
+  providers: [
+    NotifyService,
+    AttachmentValidationService,
+    AttachmentProcessingService,
+    LocalAttachmentStorageService,
+  ],
+  exports: [
+    NotifyService,
+    RenderingModule,
+    AttachmentValidationService,
+    AttachmentProcessingService,
+  ],
 })
 export class NotifyModule {}
