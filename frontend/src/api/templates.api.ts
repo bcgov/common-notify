@@ -147,6 +147,49 @@ export async function previewTemplate(
   }
 }
 
+export interface CreateTemplateData {
+  name: string
+  channelCode: NotificationChannel
+  engineCode: TemplateEngine
+  subject?: string
+  body: string
+}
+
+/**
+ * Create a new template
+ *
+ * @param data Template creation data
+ * @returns Created template details
+ * @throws Error if creation fails
+ */
+export async function createTemplate(data: CreateTemplateData): Promise<TemplateResponse> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/templates')
+    return await post<TemplateResponse>({ ...params, data })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.Conflict) {
+      throw Object.assign(new Error('A template with this name already exists'), {
+        status: STATUS_CODES.Conflict,
+      })
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to create templates')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to create templates')
+    }
+
+    throw new Error(
+      `Failed to create template: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
 /**
  * Update a template
  *
@@ -165,6 +208,11 @@ export async function updateTemplate(templateId: string, updateData: Partial<Tem
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Template not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Conflict) {
+      throw Object.assign(new Error('A template with this name already exists'), {
+        status: STATUS_CODES.Conflict,
+      })
     }
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to update this template')

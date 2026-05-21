@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Inject,
+} from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -128,7 +134,7 @@ export class TemplatesService {
     // Check if template name already exists for this tenant
     const existing = await this.templatesRepository.findByName(tenantId, createDto.name)
     if (existing) {
-      throw new BadRequestException(`Template name "${createDto.name}" already exists`)
+      throw new ConflictException(`Template name "${createDto.name}" already exists`)
     }
 
     const template = await this.templatesRepository.create({
@@ -194,7 +200,7 @@ export class TemplatesService {
     if (updateDto.name && updateDto.name !== template.name) {
       const existing = await this.templatesRepository.findByName(tenantId, updateDto.name)
       if (existing) {
-        throw new BadRequestException(`Template name "${updateDto.name}" already exists`)
+        throw new ConflictException(`Template name "${updateDto.name}" already exists`)
       }
     }
 
