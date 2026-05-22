@@ -1,6 +1,7 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 import { useAppSelector } from '@/redux/hooks'
-import Card from '@/components/Card'
+import { DataTable } from '@/components/DataTable/DataTable'
+import type { TableColumn } from '@/components/DataTable/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Toggle } from '@/components/Toggle'
 import { getAllMappings, toggleMappingActiveStatus } from '@/api/admin.api'
@@ -72,57 +73,63 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
     }
   }
 
-  if (loading) {
-    return <div className="p-3">Loading mappings...</div>
-  }
+  // Define table columns
+  const columns: TableColumn<ClientTenantMapping>[] = [
+    {
+      key: 'client_id',
+      label: 'Client ID',
+      width: '140px',
+    },
+    {
+      key: 'tenant_name',
+      label: 'Tenant Name',
+      width: '200px',
+    },
+    {
+      key: 'is_active',
+      label: 'Status',
+      width: '120px',
+      render: (value) => <StatusBadge status={value as boolean} />,
+    },
+    {
+      key: 'created_by',
+      label: 'Created By',
+      width: '160px',
+      render: (value, row) => getUserUsername(value as string, row.created_by_username),
+    },
+    {
+      key: 'created_at',
+      label: 'Created At',
+      width: '140px',
+      render: (value) => new Date(value as string).toLocaleDateString(),
+    },
+    {
+      key: 'id',
+      label: 'Action',
+      width: '100px',
+      render: (_, row) => (
+        <Toggle
+          checked={row.is_active}
+          onChange={() => handleToggleStatus(row)}
+          disabled={togglingId === row.id}
+          ariaLabel={row.is_active ? 'Disable client mapping' : 'Enable client mapping'}
+          title={row.is_active ? 'Click to disable' : 'Click to enable'}
+        />
+      ),
+    },
+  ]
 
   return (
-    <Card className="mb-4">
-      {mappings.length === 0 ? (
-        <div className="p-3 text-muted">No client-tenant mappings found</div>
-      ) : (
-        <div className="table-responsive">
-          <table className="table table-sm table-hover" style={{ tableLayout: 'fixed' }}>
-            <thead>
-              <tr>
-                <th>Client ID</th>
-                <th>Tenant Name</th>
-                <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
-                <th>Created By</th>
-                <th>Created At</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.map((mapping) => (
-                <tr key={mapping.id}>
-                  <td>{mapping.client_id}</td>
-                  <td>{mapping.tenant_name}</td>
-                  <td style={{ width: '120px', textAlign: 'center' }}>
-                    <StatusBadge isActive={mapping.is_active} />
-                  </td>
-                  <td>{getUserUsername(mapping.created_by, mapping.created_by_username)}</td>
-                  <td title={new Date(mapping.created_at).toLocaleString()}>
-                    {new Date(mapping.created_at).toLocaleDateString()}
-                  </td>
-                  <td>
-                    <Toggle
-                      checked={mapping.is_active}
-                      onChange={() => handleToggleStatus(mapping)}
-                      disabled={togglingId === mapping.id}
-                      ariaLabel={
-                        mapping.is_active ? 'Disable client mapping' : 'Enable client mapping'
-                      }
-                      title={mapping.is_active ? 'Click to disable' : 'Click to enable'}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
+    <DataTable<ClientTenantMapping>
+      columns={columns}
+      data={mappings}
+      keyExtractor={(mapping) => mapping.id}
+      isLoading={loading}
+      isEmpty={mappings.length === 0}
+      emptyMessage="No client-tenant mappings found"
+      variant="bordered"
+      size="sm"
+    />
   )
 })
 

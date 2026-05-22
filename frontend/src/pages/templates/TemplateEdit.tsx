@@ -151,7 +151,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               value={formData.body}
               onChange={handleInputChange}
               rows={10}
-              style={{ fontFamily: 'monospace' }}
             />
             <small className="text-muted">
               Template uses {template.engineCode} engine for variable substitution
@@ -160,7 +159,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
 
           <div className="row">
             <div className="col">
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" isDisabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
               <Button
