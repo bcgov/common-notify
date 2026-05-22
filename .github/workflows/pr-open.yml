@@ -55,7 +55,7 @@ jobs:
             oc tag ghcr.io/${{ github.repository }}/${{ matrix.package }}:${{ github.event.number }} ${{ matrix.package }}:${{ github.event.number }} --source=docker --reference-policy=local
 
   gateway-config:
-    name: Apply API Gateway Config
+    name: Apply PR API Gateway Config
     needs: [import]
     runs-on: ubuntu-24.04
     concurrency:
@@ -64,13 +64,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config for PR + permanent services
+      - name: Fetch current production configs from main branch
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate combined config with PR + permanent services (dev+test+prod)
-          api-gateway/scripts/generate-gateway-config.sh pr-with-permanent common-notify-${{ github.event.number }}
+          # Save current PR branch configs
+          mkdir -p /tmp/pr-configs
+          cp -r api-gateway /tmp/pr-configs/
 
-      - name: Apply gateway config
+          # Fetch main branch to get production configs
+          git fetch origin main
+          git checkout origin/main -- api-gateway/
+
+          # Generate production configs (DEV+TEST+PROD) from main branch
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
+          api-gateway/scripts/generate-gateway-for-stage.sh prod
+
+          # Save production configs
+          cp api-gateway/generated/gw-active-services.yaml /tmp/prod-configs.yaml
+
+      - name: Generate PR config from PR branch
+        run: |
+          # Restore PR branch configs
+          rm -rf api-gateway
+          cp -r /tmp/pr-configs/api-gateway .
+
+          # Generate PR config only from PR branch code
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+
+          # Combine: Production configs (main) + PR config (PR branch)
+          cp /tmp/prod-configs.yaml api-gateway/generated/gw-combined-pr.yaml
+          echo "---" >> api-gateway/generated/gw-combined-pr.yaml
+          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-pr.yaml
+
+      - name: Apply PR config without touching production
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -86,8 +112,9 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply PR + permanent services (prevents deletion of dev/test/prod)
-          gwa apply -i api-gateway/generated/gw-services-pr-with-permanent.yaml
+          # Apply: Production configs (from main) + New PR config (from PR branch)
+          echo "✅ Applying PR config with CURRENT production configs (DEV/TEST/PROD unchanged)"
+          gwa apply -i api-gateway/generated/gw-combined-pr.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})

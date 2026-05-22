@@ -59,6 +59,7 @@ const TestNotificationForm: FC = () => {
             <input
               type="text"
               placeholder="Type an email address"
+              aria-label="Recipient email address"
               className="test-notification-form__recipient-input"
             />
             <button
@@ -82,6 +83,7 @@ const TestNotificationForm: FC = () => {
               <input
                 type="text"
                 placeholder="Type an email address"
+                aria-label="Cc email address"
                 className="test-notification-form__recipient-input test-notification-form__recipient-input--last"
               />
             </div>
@@ -92,6 +94,7 @@ const TestNotificationForm: FC = () => {
               <input
                 type="text"
                 placeholder="Type an email address"
+                aria-label="Bcc email address"
                 className="test-notification-form__recipient-input test-notification-form__recipient-input--last"
               />
             </div>

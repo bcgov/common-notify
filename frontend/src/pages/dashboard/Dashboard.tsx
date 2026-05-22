@@ -9,15 +9,14 @@ import { NotificationTemplatesSection } from './sections/NotificationTemplatesSe
 
 const Dashboard: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-
   return (
     <div>
       <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
 
       <Row className="mb-5">
         <Col md={7}>
-          <NotificationEventsSection />
           <NotificationTemplatesSection />
+          <NotificationEventsSection />
         </Col>
         <Col md={5}>
           <TestNotificationForm />
