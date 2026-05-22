@@ -38,7 +38,6 @@ export interface TableProps<T> {
   isLoading?: boolean
   isEmpty?: boolean
   emptyMessage?: string
-  fillToPageSize?: boolean
   // Accessibility
   label?: string
   // Styling
@@ -71,13 +70,12 @@ export function DataTable<T extends object>({
   isLoading = false,
   isEmpty,
   emptyMessage = 'No data available.',
-  fillToPageSize = true,
   currentPage,
   pageSize = 10,
   totalCount,
   onPageChange,
   label,
-  variant = 'striped',
+  variant = 'bordered',
   size = 'md',
   className = '',
   footerContent,
@@ -110,13 +108,8 @@ export function DataTable<T extends object>({
       )
     }
 
-    const rows = data.map((row) => (
-      <TableRow
-        key={keyExtractor(row)}
-        onClick={() => onRowClick?.(row)}
-        style={onRowClick ? { cursor: 'pointer' } : undefined}
-        className={onRowClick ? 'data-table__clickable-row' : undefined}
-      >
+    return data.map((row) => (
+      <TableRow key={keyExtractor(row)}>
         {columns.map((col) => {
           const rawValue = row[col.key as keyof T]
           const cell = col.render ? col.render(rawValue, row) : String(rawValue ?? '')
@@ -132,19 +125,6 @@ export function DataTable<T extends object>({
         })}
       </TableRow>
     ))
-
-    if (!fillToPageSize) return rows
-
-    const paddingCount = Math.max(0, pageSize - data.length)
-    const paddingRows = Array.from({ length: paddingCount }, (_, i) => (
-      <TableRow key={`__padding-${i}`} className="data-table__padding-row" aria-hidden="true">
-        {columns.map((col) => (
-          <TableCell key={col.key}> </TableCell>
-        ))}
-      </TableRow>
-    ))
-
-    return [...rows, ...paddingRows]
   }
 
   const statusMessage = isLoading

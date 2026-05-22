@@ -143,7 +143,6 @@ const NotificationStatusTable: FC = () => {
         isLoading={isLoading && !hasLoaded}
         emptyMessage="No notifications found"
         label="Notification Status"
-        variant="bordered"
         currentPage={page}
         pageSize={limit}
         totalCount={count}
