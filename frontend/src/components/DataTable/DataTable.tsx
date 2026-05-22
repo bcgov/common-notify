@@ -66,7 +66,6 @@ export function DataTable<T extends object>({
   sortBy,
   sortOrder,
   onSort,
-  onRowClick,
   isLoading = false,
   isEmpty,
   emptyMessage = 'No data available.',
