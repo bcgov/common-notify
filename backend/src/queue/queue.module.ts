@@ -193,19 +193,19 @@ export class QueueModule implements OnModuleInit {
       return
     }
 
-    this.logger.log('Initializing queue workers...')
-    this.logger.log(
+    this.logger.debug('Initializing queue workers...')
+    this.logger.debug(
       `Dependency check - notificationService available: ${!!this.notificationService}`,
     )
 
     // Read concurrency configuration
     const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
-    this.logger.log(`Ingestion worker concurrency: ${concurrency}`)
+    this.logger.debug(`Ingestion worker concurrency: ${concurrency}`)
 
     // Initialize workers in background - don't block app startup
     // Workers will be ready when first job is queued
     try {
-      this.logger.log('About to initialize ingestion worker...')
+      this.logger.debug('About to initialize ingestion worker...')
       // Initialize ingestion worker - orchestrates fan-out to delivery queues
       IngestionWorker.initialize(
         this.ingestionQueue,
@@ -215,9 +215,9 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         concurrency,
       )
-      this.logger.log('Ingestion worker initialization started')
+      this.logger.debug('Ingestion worker initialization started')
 
-      this.logger.log('About to initialize email delivery worker...')
+      this.logger.debug('About to initialize email delivery worker...')
       // Initialize email delivery worker - handles email sending
       // IMPORTANT: Do NOT await these - initialize() does not await process()
       // and returns immediately after setting up listeners

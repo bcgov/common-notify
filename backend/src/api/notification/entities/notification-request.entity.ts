@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { NotificationStatusCode } from './notification-status-code.entity'
+import { NotificationChannelCode } from './notification-channel-code.entity'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
 @Entity('notification_request')
@@ -28,6 +29,23 @@ export class NotificationRequest {
   @ManyToOne(() => NotificationStatusCode, { eager: true })
   @JoinColumn({ name: 'status', referencedColumnName: 'code' })
   statusCode: NotificationStatusCode
+
+  @Column({ name: 'channel_code', nullable: true, length: 20 })
+  channelCode?: string
+
+  @ManyToOne(() => NotificationChannelCode, { eager: true })
+  @JoinColumn({ name: 'channel_code', referencedColumnName: 'channelCode' })
+  channel?: NotificationChannelCode
+
+  @Column({ name: 'delayed_send_time', type: 'timestamptz', nullable: true })
+  delayedSendTime?: Date
+
+  @Column({ name: 'recipients', type: 'jsonb', nullable: true })
+  recipients?: {
+    email?: string[]
+    sms?: string[]
+    msgApp?: string[]
+  }
 
   @Column({ name: 'payload', type: 'jsonb', nullable: true })
   payload?: any

@@ -1,0 +1,141 @@
+/**
+ * TenantSwitcher Styles
+ *
+ * V3 Header dropdown tenant switcher
+ * BC Design System aligned styling
+ */
+
+.tenant-switcher {
+  position: relative;
+  display: inline-block;
+
+  .tenant-switcher-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    background-color: var(--background-light, #f9f9f9);
+    color: var(--text-dark, #222);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    &:hover {
+      background-color: var(--background-hover, #f0f0f0);
+      border-color: var(--primary-color, #003366);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    &:focus {
+      outline: 2px solid var(--primary-color, #003366);
+      outline-offset: 2px;
+    }
+
+    .tenant-switcher-label {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    i {
+      font-size: 0.75rem;
+      transition: transform 0.15s ease;
+      opacity: 0.7;
+
+      &.open {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  .tenant-switcher-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    min-width: 200px;
+    max-width: 300px;
+    background-color: white;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+    animation: slideDown 0.2s ease-out;
+
+    .tenant-switcher-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border: none;
+      border-bottom: 1px solid var(--border-color, #f0f0f0);
+      background-color: white;
+      color: var(--text-dark, #222);
+      font-size: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background-color: var(--background-hover, #f8f9fa);
+        padding-left: 1.15rem;
+      }
+
+      &:focus {
+        outline: 2px solid var(--primary-color, #003366);
+        outline-offset: -2px;
+      }
+
+      .tenant-switcher-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+
+      &.active {
+        background-color: var(--primary-light, #e6f0f7);
+        color: var(--primary-color, #003366);
+        font-weight: 600;
+
+        i {
+          color: var(--primary-color, #003366);
+          margin-left: 0.5rem;
+          opacity: 1;
+        }
+      }
+
+      i {
+        font-size: 0.8rem;
+        color: var(--primary-color, #003366);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+    }
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

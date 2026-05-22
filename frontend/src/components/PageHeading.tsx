@@ -11,7 +11,7 @@ interface PageHeadingProps {
 const PageHeading: FC<PageHeadingProps> = ({ title }) => {
   return (
     <div className="d-flex align-items-center justify-content-between mb-4">
-      <h1 className="fw-bold mb-0">{title}</h1>
+      <h1 className="fw-bold mb-4 fs-3">{title}</h1>
     </div>
   )
 }

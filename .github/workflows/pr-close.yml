@@ -48,9 +48,11 @@ jobs:
 
       - name: Generate gateway config (dev+test+prod only)
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
           # Generate combined services file with dev+test+prod (excludes PR)
-          api-gateway/scripts/generate-gateway-config.sh all
+          # Note: This restores all three environments. If main is mid-deployment,
+          # the next deployment step will correct the state.
+          api-gateway/scripts/generate-gateway-for-stage.sh prod
 
       - name: Remove PR service by applying permanent services
         env:
@@ -69,7 +71,8 @@ jobs:
           gwa config set gateway gw-fe8c5
 
           # Apply permanent services (dev+test+prod) - this will remove PR service
-          gwa apply -i api-gateway/generated/gw-services-all.yaml
+          echo "✅ Removing PR service by applying DEV+TEST+PROD config"
+          gwa apply -i api-gateway/generated/gw-active-services.yaml
 
       - name: Wait for PR service deletion
         env:

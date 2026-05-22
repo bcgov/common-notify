@@ -1,4 +1,4 @@
-import { IsString, IsOptional, Matches } from 'class-validator'
+import { IsString, IsOptional, Matches, MaxLength } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreateTenantDto {
@@ -25,6 +25,7 @@ export class CreateTenantDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(128, { message: 'Slug must not exceed 128 characters' })
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
     message: 'Slug must contain only lowercase letters, numbers, and hyphens',
   })

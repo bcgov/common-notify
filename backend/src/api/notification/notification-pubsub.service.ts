@@ -37,7 +37,7 @@ export class NotificationPubSubService implements OnModuleDestroy {
     // Subscribe to all notification:changed events
     this.subscriber.psubscribe('notification:changed:*', (err) => {
       if (err) this.logger.error('Failed to subscribe to notification changes', err)
-      else this.logger.log('Subscribed to notification:changed:* channel')
+      else this.logger.debug('Subscribed to notification:changed:* channel')
     })
 
     // Push the update to the tenant's RxJS Subject, which the SSE stream subscribes to

@@ -58,10 +58,22 @@ export class NotificationService {
       id: entity.id,
       tenantId: entity.tenantId,
       status: entity.status,
+      channelCode: entity.channelCode,
+      channel: entity.channel
+        ? {
+            channelCode: entity.channel.channelCode,
+            displayName: entity.channel.displayName,
+            description: entity.channel.description,
+          }
+        : undefined,
+      recipients: entity.recipients,
+      delayedSendTime: entity.delayedSendTime,
+      payload: entity.payload,
       createdAt: entity.createdAt,
       createdBy: entity.createdBy,
       updatedAt: entity.updatedAt,
       updatedBy: entity.updatedBy,
+      errorReason: entity.errorReason,
       tenant: entity.tenant
         ? {
             id: entity.tenant.id,
@@ -72,19 +84,94 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Extract channel code, recipients, and delayed send time from notification payload
+   */
+  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    if (!payload) {
+      return { channel: null, recipients: null, delayedSendTime: null }
+    }
+
+    const channels: string[] = []
+    const recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } = {}
+    let delayedSendTime: Date | null = null
+
+    // Extract email channel
+    if (payload.email) {
+      channels.push('EMAIL')
+      recipients.email = [
+        ...(payload.email.recipients?.to || []),
+        ...(payload.email.recipients?.cc || []),
+        ...(payload.email.recipients?.bcc || []),
+      ]
+      if (payload.email.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.email.delayedSend)
+      }
+    }
+
+    // Extract SMS channel
+    if (payload.sms) {
+      channels.push('SMS')
+      recipients.sms = payload.sms.recipients?.to || []
+      if (payload.sms.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.sms.delayedSend)
+      }
+    }
+
+    // Extract MsgApp channel
+    if (payload.msgApp) {
+      channels.push('MSGAPP')
+      recipients.msgApp = payload.msgApp.recipients?.to || []
+      if (payload.msgApp.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.msgApp.delayedSend)
+      }
+    }
+
+    // Determine primary channel code
+    let channelCode: string | null = null
+    if (channels.length === 1) {
+      channelCode = channels[0]
+    } else if (channels.length > 1) {
+      channelCode = 'MULTIPLE'
+    }
+
+    return {
+      channel: channelCode,
+      recipients: Object.keys(recipients).length > 0 ? recipients : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
+    // Extract channel, recipients, and delayed send time from payload
+    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
       status: dto.status ?? NotificationStatus.QUEUED,
       createdBy: dto.createdBy,
       payload: dto.payload,
+      channelCode: channel,
+      recipients: recipients,
+      delayedSendTime: delayedSendTime,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
-    return saved
+    // Reload with tenant relation for full data in SSE stream
+    const fullNotification = await this.notificationRepository.findOne({
+      where: { id: saved.id },
+      relations: ['tenant'],
+    })
+    return fullNotification || saved
   }
 
   async findAll(
+    tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
     status?: string,
@@ -95,8 +182,27 @@ export class NotificationService {
 
     const skip = (pageNum - 1) * limitNum
 
-    // Build where clause - include status filter if provided
+    // Build where clause - include status filter and tenantId
     const where: any = {}
+
+    // Look up tenant by external ID and get internal ID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      // Return empty result if tenant not found
+      this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
+      return {
+        data: [],
+        count: 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: 0,
+      }
+    }
+    this.logger.debug(
+      `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
+    )
+    where.tenantId = tenant.id
+
     if (status && status !== 'all') {
       where.status = status
     }
@@ -104,6 +210,7 @@ export class NotificationService {
     // Get both the data and total count
     const [notifications, total] = await this.notificationRepository.findAndCount({
       where,
+      relations: ['tenant'],
       skip,
       take: limitNum,
       order: { createdAt: 'DESC' },
@@ -121,7 +228,10 @@ export class NotificationService {
   }
 
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
-    const notification = await this.notificationRepository.findOne({ where: { id, tenantId } })
+    const notification = await this.notificationRepository.findOne({
+      where: { id, tenantId },
+      relations: ['tenant'],
+    })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }

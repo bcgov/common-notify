@@ -2,14 +2,15 @@ import type { FC } from 'react'
 import { useAppSelector } from '@/redux/hooks'
 import '@/scss/components/loading-spinner.scss'
 
-/**
- * Global loading spinner that shows when API requests exceed 0.5 seconds
- * Only displays if isLoading is true in Redux
- */
-export const LoadingSpinner: FC = () => {
-  const isLoading = useAppSelector((state) => state.loading.isLoading)
+type Props = {
+  isVisible?: boolean
+}
 
-  if (!isLoading) {
+export const LoadingSpinner: FC<Props> = ({ isVisible }) => {
+  const globalLoading = useAppSelector((state) => state.loading.isLoading)
+  const shouldRender = isVisible ?? globalLoading
+
+  if (!shouldRender) {
     return null
   }
 

@@ -198,6 +198,9 @@ dist
 # SvelteKit build / generate output
 .svelte-kit
 
+# TanStack Router generated files
+.tanstack
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

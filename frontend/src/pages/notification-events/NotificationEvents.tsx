@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { Button, TextField } from '@bcgov/design-system-react-components'
 import { Link } from '@tanstack/react-router'
 import { Col, Row, Table } from 'react-bootstrap'
+import PageHeading from '@/components/PageHeading'
 
 const mockNotificationEvents = [
   { id: 1, name: 'Graduates Outcome Survey', lastUpdated: 'Feb 1, 10:45 AM', format: 'Email' },
@@ -21,7 +22,7 @@ const NotificationEvents: FC = () => {
 
   return (
     <div>
-      <h1 className="fw-bold mb-4">Notification Events</h1>
+      <PageHeading title="Notification Events" />
 
       <Row className="align-items-center mb-4">
         <Col md="auto">

@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import {
@@ -16,6 +17,7 @@ import { QueueModule } from '../../queue/queue.module'
 @Module({
   imports: [
     TenantsModule,
+    ClientTenantMappingModule,
     ChesModule,
     NotificationModule,
     RenderingModule,

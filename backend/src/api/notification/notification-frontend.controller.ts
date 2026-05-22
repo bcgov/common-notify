@@ -1,4 +1,14 @@
-import { Controller, Get, Version, Logger, Query, Sse, Param } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Version,
+  Logger,
+  Query,
+  Sse,
+  BadRequestException,
+  UseGuards,
+  Param,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { NotificationDeliveryService } from './notification-delivery.service'
@@ -6,6 +16,9 @@ import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { TenantsService } from '../admin/tenants/tenants.service'
+import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { RoleGuard } from '../../auth/guards/role.guard'
 
 /**
  * Frontend Notification API Controller
@@ -24,6 +37,7 @@ import { NotificationPubSubService } from './notification-pubsub.service'
  */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
+@UseGuards(AuthJwtGuard, RoleGuard)
 @ApiBearerAuth()
 export class NotificationFrontendController {
   private readonly logger = new Logger(NotificationFrontendController.name)
@@ -32,11 +46,19 @@ export class NotificationFrontendController {
     private readonly notificationService: NotificationService,
     private readonly notificationDeliveryService: NotificationDeliveryService,
     private readonly notificationPubSubService: NotificationPubSubService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   @Version('1')
   @Get()
+  @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
+  @ApiQuery({
+    name: 'tenantId',
+    required: true,
+    type: String,
+    description: 'CSTAR external tenant ID to filter by',
+  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -59,25 +81,39 @@ export class NotificationFrontendController {
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
   findAll(
+    @Query('tenantId') tenantExternalId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(pageNum, limitNum, status)
+    return this.notificationService.findAll(tenantExternalId, pageNum, limitNum, status)
   }
 
   @Version('1')
   @Sse('events')
   @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
+  @ApiQuery({
+    name: 'tenantId',
+    required: true,
+    type: String,
+    description: 'CSTAR external tenant ID to filter by',
+  })
   @ApiOkResponse({
     description: 'Server-sent stream of notification_request updates for the authenticated tenant',
   })
-  streamEvents(): Observable<MessageEvent> {
-    // TODO: replace hardcoded tenantId with @GetTenant() once TenantGuard is wired in
-    const tenantId = 'bfa12621-67f2-4f77-b9be-a4168f7bd1ab'
+  async streamEvents(
+    @Query('tenantId') tenantExternalId: string,
+  ): Promise<Observable<MessageEvent>> {
+    // Convert external tenant ID to internal UUID
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
+    }
+
+    const tenantId = tenant.id
 
     // Observable stream
     const updates$ = this.notificationPubSubService
