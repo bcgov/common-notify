@@ -5,12 +5,11 @@ import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react
 import {
   getTemplateById,
   updateTemplate,
-  previewTemplate,
   NotificationChannel,
   TemplateEngine,
   TemplateBodyType,
 } from '@/api/templates.api'
-import type { TemplateResponse, PreviewTemplateResponse } from '@/api/templates.api'
+import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import '@/scss/components/templates.scss'
@@ -22,7 +21,7 @@ interface TemplateEditProps {
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
-  const [_, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
