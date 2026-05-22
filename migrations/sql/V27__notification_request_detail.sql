@@ -5,7 +5,7 @@ VALUES
   ('bounced', 'Notification bounced and was not delivered to the recipient', 'Bounced', 'system')
 ON CONFLICT (code) DO NOTHING;
 
--- Create notification delivery table
+-- Create notification request detail table
 CREATE TABLE notification_request_detail (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   notification_request_id UUID NOT NULL,
