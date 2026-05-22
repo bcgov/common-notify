@@ -19,6 +19,8 @@ import {
 import { NotifyService } from './notify.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
@@ -26,6 +28,8 @@ import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
+import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
+import { TenantsService } from '../../api/admin/tenants/tenants.service'
 
 // Mock TenantGuard to bypass authentication in tests
 const mockTenantGuard: CanActivate = {
@@ -72,6 +76,19 @@ const mockIngestionQueue = {
   process: vi.fn(),
 }
 
+const mockFeatureFlagService = {
+  getFlagsForTenant: vi.fn().mockResolvedValue({
+    sms_notifications: true,
+  }),
+}
+
+const mockTenantsService = {
+  findById: vi.fn().mockResolvedValue({
+    id: 'test-tenant-id',
+    name: 'test-tenant',
+  }),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -94,9 +111,15 @@ describe('Notify Controllers', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
+        { provide: FeatureFlagService, useValue: mockFeatureFlagService },
+        { provide: TenantsService, useValue: mockTenantsService },
       ],
     })
       .overrideGuard(TenantGuard)
+      .useValue(mockTenantGuard)
+      .overrideGuard(FeatureFlagGuard)
+      .useValue(mockTenantGuard)
+      .overrideGuard(SmsChannelFeatureFlagGuard)
       .useValue(mockTenantGuard)
       .compile()
 
@@ -118,7 +141,9 @@ describe('Notify Controllers', () => {
   })
 
   afterEach(async () => {
-    await app.close()
+    if (app) {
+      await app.close()
+    }
     vi.clearAllMocks()
     mockEmailAdapter.send.mockReset()
   })

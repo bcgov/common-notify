@@ -127,4 +127,59 @@
     padding-top: $spacing-md;
     border-top: 1px solid $border-default;
   }
+
+  &__menu-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__menu-toggle {
+    position: relative;
+
+    &.expanded {
+      .sidebar__menu-arrow {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  &__menu-arrow {
+    margin-left: auto;
+    display: flex;
+    transition: transform 0.2s ease;
+    color: $dark-text;
+  }
+
+  &__submenu {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding: $spacing-xs 0;
+  }
+
+  &__subitem {
+    display: flex;
+    align-items: center;
+    padding: $spacing-sm $spacing-md $spacing-sm calc($spacing-md + 40px); // indent under parent icon
+    border-radius: 4px;
+    text-decoration: none;
+    color: rgba($dark-text, 0.8);
+    font-size: 0.95rem;
+    cursor: pointer;
+
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+
+    &:hover {
+      background-color: rgba($primary-color, 0.08);
+      color: $dark-text;
+    }
+
+    &.active {
+      background-color: rgba($primary-color, 0.15);
+      color: $primary-color;
+      font-weight: 500;
+    }
+  }
 }

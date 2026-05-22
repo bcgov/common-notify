@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchCodeTables } from '@/redux/thunks/codeTables.thunks'
 import { fetchCstarTenants } from '@/redux/thunks/cstar.thunks'
+import { fetchAllFeatureFlags } from '@/redux/slices/featureFlags.slice'
+import { fetchAllNotifyTenants } from '@/redux/thunks/adminTenants.thunks'
 import NotFound from '@/components/NotFound'
 import Layout from '@/components/Layout'
 
@@ -22,6 +24,17 @@ function RootLayout() {
   useEffect(() => {
     // Load code tables once when app starts
     dispatch(fetchCodeTables())
+  }, [dispatch])
+
+  useEffect(() => {
+    // Load feature flags and admin tenants once when app starts
+    // The backend will return 401/403 if user isn't an admin, which is handled gracefully
+    dispatch(fetchAllFeatureFlags()).catch(() => {
+      // Silently fail if user isn't admin
+    })
+    dispatch(fetchAllNotifyTenants()).catch(() => {
+      // Silently fail if user isn't admin
+    })
   }, [dispatch])
 
   useEffect(() => {
