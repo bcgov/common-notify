@@ -151,7 +151,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               value={formData.body}
               onChange={handleInputChange}
               rows={10}
-              style={{ fontFamily: 'monospace' }}
             />
             <small className="text-muted">
               Template uses {template.engineCode} engine for variable substitution

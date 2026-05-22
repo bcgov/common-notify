@@ -32,6 +32,8 @@ export interface TableProps<T> {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (size: number) => void
   pageSizeOptions?: number[]
+  // Row interaction
+  onRowClick?: (row: T) => void
   // State
   isLoading?: boolean
   isEmpty?: boolean
@@ -65,6 +67,7 @@ export function DataTable<T extends object>({
   sortBy,
   sortOrder,
   onSort,
+  onRowClick,
   isLoading = false,
   isEmpty,
   emptyMessage = 'No data available.',
@@ -108,7 +111,12 @@ export function DataTable<T extends object>({
     }
 
     const rows = data.map((row) => (
-      <TableRow key={keyExtractor(row)}>
+      <TableRow
+        key={keyExtractor(row)}
+        onClick={() => onRowClick?.(row)}
+        style={onRowClick ? { cursor: 'pointer' } : undefined}
+        className={onRowClick ? 'data-table__clickable-row' : undefined}
+      >
         {columns.map((col) => {
           const rawValue = row[col.key as keyof T]
           const cell = col.render ? col.render(rawValue, row) : String(rawValue ?? '')

@@ -1,0 +1,36 @@
+@import '../variables';
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+
+  .status-badge__dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    // Status color variations
+    &--enabled {
+      background-color: $success-color;
+    }
+
+    &--disabled {
+      background-color: $text-disabled;
+    }
+
+    &--completed {
+      background-color: $success-color;
+    }
+
+    &--failed {
+      background-color: $danger-color;
+    }
+
+    &--pending {
+      background-color: $warning-color;
+    }
+  }
+}

@@ -5,48 +5,14 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
+import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
+import { selectFeatureFlag } from '@/features/featureFlags/featureFlagsSelectors'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
+import { StatusBadge } from '@/components/StatusBadge'
 import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
-
-/**
- * Helper to get status dot color
- */
-function getStatusColor(status?: string): string {
-  switch (status) {
-    case 'completed':
-      return '#42814A'
-    case 'failed':
-      return '#CE3E39'
-    default:
-      return '#F8BB47'
-  }
-}
-
-/**
- * Status badge component with colored dot
- */
-function StatusBadge({ status }: { status?: string }) {
-  const color = getStatusColor(status)
-  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : ''
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-      <span
-        style={{
-          display: 'inline-block',
-          width: '12px',
-          height: '12px',
-          borderRadius: '50%',
-          backgroundColor: color,
-          flexShrink: 0,
-        }}
-      />
-      {label}
-    </span>
-  )
-}
 
 /**
  * NotificationStatusTable Component
@@ -62,6 +28,9 @@ const NotificationStatusTable: FC = () => {
   const statuses = useAppSelector(selectStatuses)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
+  // Get SSE flag status from Redux (no hook, just read the state)
+  const sseEnabled = useAppSelector((state) => selectFeatureFlag(state, 'sse_notifications'))
+
   const [selectedNotification, setSelectedNotification] = useState<NotificationRequest | null>(null)
   const [showRecipientsModal, setShowRecipientsModal] = useState(false)
 
@@ -73,14 +42,22 @@ const NotificationStatusTable: FC = () => {
     }
   }, [statusFilter, page, selectedTenant, dispatch])
 
-  // Connect to SSE stream when tenant is selected
+  // Fetch feature flags for the selected tenant
+  // This ensures byCode contains flags that apply to this tenant (global + tenant-specific)
   useEffect(() => {
-    if (!selectedTenant) {
+    if (selectedTenant?.id) {
+      dispatch(fetchFeatureFlags(selectedTenant.id) as any)
+    }
+  }, [dispatch, selectedTenant?.id])
+
+  // Connect to SSE stream when tenant is selected and feature is enabled
+  useEffect(() => {
+    if (!selectedTenant || !sseEnabled) {
       return
     }
     const controller = connectNotificationSSE(dispatch, selectedTenant.id)
     return () => controller.abort()
-  }, [dispatch, selectedTenant])
+  }, [dispatch, selectedTenant, sseEnabled])
 
   // Build status filter items from Redux
   const statusFilterItems = [

@@ -18,6 +18,7 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 
 const navItems = [
   {
@@ -47,16 +48,24 @@ const navItems = [
   },
 ]
 
-const adminItems = [
-  {
-    label: 'Admin',
-    to: '/admin/clients',
-    icon: <AdminPanelSettingsOutlinedIcon />,
-  },
-] as const
+const adminItems = {
+  label: 'Admin',
+  icon: <AdminPanelSettingsOutlinedIcon />,
+  subItems: [
+    {
+      label: 'Clients',
+      to: '/admin/clients',
+    },
+    {
+      label: 'Feature Flags',
+      to: '/admin/feature-flags',
+    },
+  ],
+} as const
 
 const Sidebar: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
+  const [adminExpanded, setAdminExpanded] = useState(false)
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
@@ -100,21 +109,37 @@ const Sidebar: FC = () => {
             <span className="sidebar__label">{item.label}</span>
           </Link>
         ))}
-        {isAdmin &&
-          adminItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="sidebar__item"
-              activeProps={{ className: 'active' }}
-              title={collapsed ? item.label : ''}
+        {isAdmin && (
+          <div className="sidebar__menu-group">
+            <button
+              onClick={() => setAdminExpanded(!adminExpanded)}
+              className={`sidebar__item sidebar__menu-toggle ${adminExpanded ? 'expanded' : ''}`}
+              title={collapsed ? adminItems.label : ''}
             >
               <span className="sidebar__icon" aria-hidden="true">
-                {item.icon}
+                {adminItems.icon}
               </span>
-              <span className="sidebar__label">{item.label}</span>
-            </Link>
-          ))}
+              <span className="sidebar__label">{adminItems.label}</span>
+              <span className="sidebar__menu-arrow" aria-hidden="true">
+                <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
+              </span>
+            </button>
+            {adminExpanded && !collapsed && (
+              <div className="sidebar__submenu">
+                {adminItems.subItems.map((subItem) => (
+                  <Link
+                    key={subItem.to}
+                    to={subItem.to}
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">{subItem.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Footer */}
