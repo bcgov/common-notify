@@ -13,6 +13,8 @@ import { NotificationChannelCode } from './api/notification/entities/notificatio
 import { NotificationEventTypeCode } from './api/notification/entities/notification-event-type-code.entity'
 import { MimeTypeCode } from './api/notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from './api/notification/entities/configuration.entity'
+import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
+import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -45,6 +47,8 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         Template,
         TemplateVersion,
         TemplateEngineCode,
+        FeatureFlag,
+        FeatureFlagCode,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

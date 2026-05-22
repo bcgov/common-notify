@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { FC } from 'react'
-import { Button, Form } from '@bcgov/design-system-react-components'
 import TextField from '@/components/InputWrappers/TextField'
 import TenantCheckboxList from '@/components/TenantCheckboxList'
+import GenericModal from '@/components/GenericModal'
 import { adminApi } from '@/api/admin.api'
 import type { LinkClientToTenantsRequest } from '@/api/admin.api'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
@@ -97,68 +97,53 @@ const RegisterClientModal: FC<RegisterClientModalProps> = ({ isOpen, onClose, on
     }
   }
 
+  const handleClose = () => {
+    setFormState({
+      client_id: '',
+      client_secret: '',
+      selected_tenant_ids: selectedTenant ? [selectedTenant.id] : [],
+    })
+    onClose()
+  }
+
   return (
-    <>
-      {isOpen && <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>}
-      <div
-        className={`modal ${isOpen ? 'show' : ''}`}
-        style={{ display: isOpen ? 'block' : 'none', zIndex: 1050 }}
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">Register New Client</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={onClose}
-                aria-label="Close"
-              ></button>
-            </div>
-            <div className="modal-body">
-              <Form className="d-flex flex-column gap-3" onSubmit={handleSubmit}>
-                <TextField
-                  label="Client ID"
-                  placeholder="e.g., my-service-client"
-                  value={formState.client_id}
-                  onChange={(value) => handleInputChange('client_id')(value)}
-                  maxLength={50}
-                  required
-                  description="The client ID from your API Portal"
-                />
+    <GenericModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Register New Client"
+      onSubmit={handleSubmit}
+      submitText="Register Client"
+      isSubmitLoading={false}
+      cancelText="Cancel"
+    >
+      <TextField
+        label="Client ID"
+        placeholder="e.g., my-service-client"
+        value={formState.client_id}
+        onChange={(value) => handleInputChange('client_id')(value)}
+        maxLength={50}
+        required
+        description="The client ID from your API Portal"
+      />
 
-                <TextField
-                  label="Client Secret"
-                  placeholder="Enter your client secret"
-                  type="password"
-                  value={formState.client_secret}
-                  onChange={(value) => handleInputChange('client_secret')(value)}
-                  maxLength={100}
-                  required
-                  description="This will only be used to verify client ownership and will not be stored"
-                />
+      <TextField
+        label="Client Secret"
+        placeholder="Enter your client secret"
+        type="password"
+        value={formState.client_secret}
+        onChange={(value) => handleInputChange('client_secret')(value)}
+        maxLength={100}
+        required
+        description="This will only be used to verify client ownership and will not be stored"
+      />
 
-                <TenantCheckboxList
-                  tenants={cstarTenants}
-                  selectedTenantIds={formState.selected_tenant_ids}
-                  onChange={(value) => handleInputChange('selected_tenant_ids')(value)}
-                  required
-                />
-
-                <div className="d-flex gap-2 justify-content-end">
-                  <Button variant="secondary" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit">
-                    Register Client
-                  </Button>
-                </div>
-              </Form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+      <TenantCheckboxList
+        tenants={cstarTenants}
+        selectedTenantIds={formState.selected_tenant_ids}
+        onChange={(value) => handleInputChange('selected_tenant_ids')(value)}
+        required
+      />
+    </GenericModal>
   )
 }
 

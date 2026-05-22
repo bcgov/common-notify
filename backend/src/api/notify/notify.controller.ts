@@ -14,13 +14,17 @@ import {
 } from '@nestjs/common'
 import Bull from 'bull'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
@@ -49,6 +53,7 @@ export class NotifySimpleController {
   @Version('1')
   @Post()
   @HttpCode(202)
+  @UseGuards(SmsChannelFeatureFlagGuard)
   @Queueable(QueueName.INGESTION)
   simpleSend(
     @GetTenant() _tenant: Tenant,
@@ -75,6 +80,8 @@ export class NotifySimpleController {
   @Version('1')
   @Post('sms')
   @HttpCode(202)
+  @UseGuards(FeatureFlagGuard)
+  @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
   @Queueable(QueueName.INGESTION)
   simpleSendSms(
     @GetTenant() _tenant: Tenant,

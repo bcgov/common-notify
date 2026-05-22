@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
@@ -71,12 +72,22 @@ describe('Sidebar', () => {
   })
 
   it('renders admin link when user has the NOTIFY_ADMIN role', async () => {
+    const user = userEvent.setup()
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(true)
 
     renderSidebar()
 
-    expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
+    // Admin is a toggle button to expand/collapse the submenu
+    const adminButton = screen.getByRole('button', { name: /admin/i })
+    expect(adminButton).toBeInTheDocument()
+
+    // Click to expand the admin submenu
+    await user.click(adminButton)
+
+    // Now the admin subitem links should be present
+    expect(screen.getByRole('link', { name: /clients/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
   it('renders the logged-in user display name', () => {

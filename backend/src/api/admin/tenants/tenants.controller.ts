@@ -16,15 +16,18 @@ import {
   ApiOkResponse,
   ApiBearerAuth,
   ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
 import { TenantDto } from './schemas/tenant.dto'
-import { JwtGuard } from '../../../common/guards/jwt.guard'
+import { AuthJwtGuard } from '../../../auth/guards/auth.jwt-guard'
+import { RoleGuard } from '../../../auth/guards/role.guard'
+import { RequireRole } from '../../../auth/decorators/require-role.decorator'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
-@UseGuards(JwtGuard)
+@UseGuards(AuthJwtGuard, RoleGuard)
 @ApiBearerAuth()
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
@@ -59,14 +62,20 @@ export class TenantsController {
   }
   /**
    * List all tenants
+   * Requires NOTIFY_ADMIN role
    */
   @Get()
+  @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({
     summary: 'Get all tenants',
+    description: 'Returns all tenants in the notify database. Requires NOTIFY_ADMIN role.',
   })
   @ApiOkResponse({
     isArray: true,
     type: TenantDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'User does not have NOTIFY_ADMIN role',
   })
   async findAll() {
     return this.tenantsService.findAll()
