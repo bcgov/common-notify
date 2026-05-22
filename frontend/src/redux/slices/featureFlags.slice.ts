@@ -136,6 +136,7 @@ const featureFlagsSlice = createSlice({
       })
       .addCase(updateFeatureFlag.fulfilled, (state) => {
         // Mark as out of sync to refetch complete list
+        state.synced = false
         state.error = undefined
       })
       .addCase(updateFeatureFlag.rejected, (state, action) => {

@@ -98,7 +98,7 @@ describe('featureFlagsSlice', () => {
       const error = 'Failed to fetch feature flags'
       const state = featureFlagsReducer(
         initialState,
-        fetchFeatureFlags.rejected(new Error(), '', undefined, {}, error),
+        fetchFeatureFlags.rejected(new Error(), '', undefined, error),
       )
 
       expect(state.loading).toBe(false)
@@ -117,7 +117,7 @@ describe('featureFlagsSlice', () => {
       const error = 'Network error'
       const state = featureFlagsReducer(
         previousState,
-        fetchFeatureFlags.rejected(new Error(), '', undefined, {}, error),
+        fetchFeatureFlags.rejected(new Error(), '', undefined, error),
       )
 
       expect(state.byCode).toEqual(previousState.byCode)
@@ -137,7 +137,7 @@ describe('featureFlagsSlice', () => {
 
       const state = featureFlagsReducer(
         previousState,
-        updateFeatureFlag.fulfilled(payload, '', { id: '1', enabled: true }, {}),
+        updateFeatureFlag.fulfilled(payload, '', { id: '1', enabled: true }),
       )
 
       expect(state.synced).toBe(false)
@@ -157,7 +157,7 @@ describe('featureFlagsSlice', () => {
       const error = 'Failed to update feature flag'
       const state = featureFlagsReducer(
         initialState,
-        updateFeatureFlag.rejected(new Error(), '', { id: '1', enabled: true }, {}, error),
+        updateFeatureFlag.rejected(new Error(), '', { id: '1', enabled: true }, error),
       )
 
       expect(state.error).toBe(error)
