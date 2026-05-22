@@ -32,6 +32,8 @@ export interface TableProps<T> {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (size: number) => void
   pageSizeOptions?: number[]
+  // Row interaction
+  onRowClick?: (row: T) => void
   // State
   isLoading?: boolean
   isEmpty?: boolean
