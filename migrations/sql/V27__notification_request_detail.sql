@@ -30,7 +30,7 @@ CREATE TABLE notification_request_detail (
   CONSTRAINT uq_notification_request_detail_recipient
     UNIQUE (notification_request_id, recipient_address, channel)
 );
--- notification delivery table comments
+-- notification request detail table comments
 COMMENT ON TABLE notification_request_detail IS 'Tracks individual delivery status for each recipient in a notification request';
 COMMENT ON COLUMN notification_request_detail.id IS 'Unique identifier for this delivery attempt';
 COMMENT ON COLUMN notification_request_detail.notification_request_id IS 'Reference to the parent notification request';
