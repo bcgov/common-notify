@@ -4,7 +4,10 @@ on:
   push:
     branches: [main, crunchy-demo]
     paths-ignore:
-      - "*.md"
+      - "**.md"
+      - "docs/**"
+      - ".devcontainer/**"
+      - "LICENSE"
       - ".github/**"
       - ".github/graphics/**"
       - "!.github/workflows/**"
