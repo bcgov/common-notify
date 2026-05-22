@@ -11,6 +11,8 @@ import { NotificationRequest } from './api/notification/entities/notification-re
 import { NotificationStatusCode } from './api/notification/entities/notification-status-code.entity'
 import { NotificationChannelCode } from './api/notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from './api/notification/entities/notification-event-type-code.entity'
+import { MimeTypeCode } from './api/notification/entities/mime-type-code.entity'
+import { NotifyConfiguration } from './api/notification/entities/configuration.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -38,6 +40,8 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         NotificationStatusCode,
         NotificationChannelCode,
         NotificationEventTypeCode,
+        MimeTypeCode,
+        NotifyConfiguration,
         Template,
         TemplateVersion,
         TemplateEngineCode,
