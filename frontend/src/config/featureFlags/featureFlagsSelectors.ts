@@ -9,14 +9,20 @@ import type { RootState } from '../../redux/store'
 /**
  * Get the entire feature flags state
  */
-export const selectFeatureFlagsState = (state: RootState) => state.featureFlags
+export const selectFeatureFlagsState = (state: RootState) =>
+  state.featureFlags ?? {
+    byCode: {},
+    flagsList: [],
+    loading: false,
+    synced: false,
+  }
 
 /**
  * Get all feature flags as a record
  */
 export const selectAllFeatureFlags = createSelector(
   [selectFeatureFlagsState],
-  (state) => state.byCode,
+  (state) => state?.byCode ?? {},
 )
 
 /**
@@ -28,7 +34,7 @@ export const selectAllFeatureFlags = createSelector(
  */
 export const selectFeatureFlag = createSelector(
   [selectFeatureFlagsState, (_: RootState, code: string) => code],
-  (state, code) => state.byCode[code] ?? false,
+  (state, code) => state?.byCode?.[code] ?? false,
 )
 
 /**
@@ -36,7 +42,7 @@ export const selectFeatureFlag = createSelector(
  */
 export const selectFeatureFlagsLoading = createSelector(
   [selectFeatureFlagsState],
-  (state) => state.loading,
+  (state) => state?.loading ?? false,
 )
 
 /**
@@ -44,7 +50,7 @@ export const selectFeatureFlagsLoading = createSelector(
  */
 export const selectFeatureFlagsSynced = createSelector(
   [selectFeatureFlagsState],
-  (state) => state.synced,
+  (state) => state?.synced ?? false,
 )
 
 /**
@@ -52,7 +58,7 @@ export const selectFeatureFlagsSynced = createSelector(
  */
 export const selectFeatureFlagsError = createSelector(
   [selectFeatureFlagsState],
-  (state) => state.error,
+  (state) => state?.error,
 )
 
 /**
@@ -60,7 +66,7 @@ export const selectFeatureFlagsError = createSelector(
  */
 export const selectFeatureFlagsTenantId = createSelector(
   [selectFeatureFlagsState],
-  (state) => state.tenantId,
+  (state) => state?.tenantId,
 )
 
 /**

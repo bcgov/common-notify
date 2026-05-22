@@ -6,7 +6,7 @@ import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/no
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
-import { selectFeatureFlag } from '@/features/featureFlags/featureFlagsSelectors'
+import { selectFeatureFlag } from '@/config/featureFlags/featureFlagsSelectors'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'

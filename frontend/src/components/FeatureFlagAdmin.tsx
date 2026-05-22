@@ -10,7 +10,7 @@ import {
 import {
   selectAllFeatureFlagsList,
   selectFeatureFlagsLoading,
-} from '@/features/featureFlags/featureFlagsSelectors'
+} from '@/config/featureFlags/featureFlagsSelectors'
 import { showErrorToast, showSuccessToast } from '../redux/utils/toastUtils'
 import PageHeading from './PageHeading'
 import { DataTable } from './DataTable/DataTable'
