@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { FeatureFlagService } from './feature-flag.service'
@@ -6,6 +7,14 @@ import { FeatureFlag } from './entities/feature-flag.entity'
 describe('FeatureFlagService', () => {
   let service: FeatureFlagService
 
+  const mockQueryBuilder = {
+    leftJoinAndSelect: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    addOrderBy: vi.fn().mockReturnThis(),
+    getMany: vi.fn(),
+  }
+
   const mockFeatureFlagRepository = {
     findOne: vi.fn(),
     find: vi.fn(),
@@ -13,6 +22,7 @@ describe('FeatureFlagService', () => {
     save: vi.fn(),
     delete: vi.fn(),
     findOneOrFail: vi.fn(),
+    createQueryBuilder: vi.fn().mockReturnValue(mockQueryBuilder),
   }
 
   beforeEach(async () => {
@@ -31,6 +41,7 @@ describe('FeatureFlagService', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    mockQueryBuilder.getMany.mockReset()
   })
 
   describe('isEnabled', () => {
@@ -139,14 +150,13 @@ describe('FeatureFlagService', () => {
         },
       ]
 
-      mockFeatureFlagRepository.find.mockResolvedValue(flags)
+      mockQueryBuilder.getMany.mockResolvedValue(flags)
 
       const result = await service.getAll()
 
       expect(result).toEqual(flags)
-      expect(mockFeatureFlagRepository.find).toHaveBeenCalledWith({
-        order: { code: 'ASC', tenantId: 'ASC' },
-      })
+      expect(mockFeatureFlagRepository.createQueryBuilder).toHaveBeenCalledWith('ff')
+      expect(mockQueryBuilder.getMany).toHaveBeenCalled()
     })
   })
 
@@ -182,7 +192,7 @@ describe('FeatureFlagService', () => {
         },
       ]
 
-      mockFeatureFlagRepository.find.mockResolvedValue(flags)
+      mockQueryBuilder.getMany.mockResolvedValue(flags)
 
       const result = await service.getFlagsForTenant(tenantId)
 
@@ -190,6 +200,11 @@ describe('FeatureFlagService', () => {
         sms_notifications: true, // Tenant override
         sse_notifications: true, // Global
       })
+      expect(mockFeatureFlagRepository.createQueryBuilder).toHaveBeenCalledWith('flag')
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'flag.tenantId = :tenantId OR flag.tenantId IS NULL',
+        { tenantId },
+      )
     })
   })
 
