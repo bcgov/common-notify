@@ -945,6 +945,65 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
+    it('should log attachment counts when stored attachments are resolved and sent', async () => {
+      const debugSpy = vi.spyOn(Logger.prototype, 'debug')
+      const content = Buffer.from('hello world')
+      mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
+        {
+          filename: 'hello.txt',
+          content,
+          contentType: 'text/plain',
+          sendingMethod: 'attach',
+        },
+      ])
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-attachment-logs',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+            attachments: [
+              {
+                filename: 'hello.txt',
+                mimeType: 'text/plain',
+                storageKey: 'ab/abcdef.bin',
+                sizeBytes: 11,
+                contentSha256: 'hash',
+                storageProvider: 'local',
+              },
+            ],
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[notify-attachment-logs] Resolving stored email attachments:'),
+      )
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[notify-attachment-logs] Sending email via ches adapter:'),
+      )
+    })
+
     it('should fail delivery when a stored attachment cannot be resolved', async () => {
       mockAttachmentResolverService.resolveEmailAttachments.mockRejectedValue(
         new Error('Failed to read stored attachment'),

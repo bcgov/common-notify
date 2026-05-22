@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { StoredNotifyAttachment } from '../schemas/stored-notify-attachment'
 import { LocalAttachmentStorageService } from './local-attachment-storage.service'
 
@@ -11,6 +11,8 @@ export interface ResolvedEmailAttachment {
 
 @Injectable()
 export class AttachmentResolverService {
+  private readonly logger = new Logger(AttachmentResolverService.name)
+
   constructor(
     private readonly localAttachmentStorageService: LocalAttachmentStorageService,
   ) {}
@@ -22,7 +24,7 @@ export class AttachmentResolverService {
       return undefined
     }
 
-    return Promise.all(
+    const resolvedAttachments = await Promise.all(
       attachments.map(async (attachment) => {
         switch (attachment.storageProvider) {
           case 'local': {
@@ -51,5 +53,14 @@ export class AttachmentResolverService {
         }
       }),
     )
+
+    this.logger.debug(
+      `Resolved stored email attachments: ${JSON.stringify({
+        storedAttachmentCount: attachments.length,
+        resolvedAttachmentCount: resolvedAttachments.length,
+      })}`,
+    )
+
+    return resolvedAttachments
   }
 }

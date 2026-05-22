@@ -172,6 +172,7 @@ export class ChesEmailTransport implements IEmailTransport {
         subject: payload.subject.substring(0, 50),
         bodyType: payload.bodyType,
         bodyLength: payload.body.length,
+        attachmentCount: payload.attachments?.length ?? 0,
       })}`,
     )
 

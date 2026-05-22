@@ -11,6 +11,11 @@ import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channe
 import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
+import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
+
+type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
+  attachments?: SendEmailOptions['attachments']
+}
 
 /**
  * Email Delivery Worker
@@ -28,6 +33,21 @@ import { IEmailTransport } from '../../adapters'
  */
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
+
+  private static hasStoredAttachmentReferences(
+    attachments: unknown,
+  ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.some(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { storageKey?: unknown }).storageKey === 'string' &&
+          typeof (attachment as { storageProvider?: unknown }).storageProvider === 'string',
+      )
+    )
+  }
 
   /**
    * Initialize the email delivery worker on a queue
@@ -77,7 +97,10 @@ export class EmailDeliveryWorker {
         }
 
         // Cast payload to email channel type for type safety
-        let emailPayload = payload as NotifyEmailChannel | ProcessedNotifyEmailChannel
+        let emailPayload = payload as
+          | NotifyEmailChannel
+          | ProcessedNotifyEmailChannel
+          | ResolvedEmailDeliveryPayload
 
         // Resolve template if templateId is provided in the original request
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
@@ -163,15 +186,27 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
-        const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
-          emailPayload.attachments as ProcessedNotifyEmailChannel['attachments'],
-        )
+        if (EmailDeliveryWorker.hasStoredAttachmentReferences(emailPayload.attachments)) {
+          if (!attachmentResolverService) {
+            throw new Error(
+              'AttachmentResolverService is not available to resolve stored email attachments',
+            )
+          }
 
-        if (resolvedAttachments) {
+          logger.debug(
+            `[${notifyId}] Resolving stored email attachments: ${JSON.stringify({
+              storedAttachmentCount: emailPayload.attachments.length,
+            })}`,
+          )
+
+          const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+            emailPayload.attachments,
+          )
+
           emailPayload = {
             ...emailPayload,
-            attachments: resolvedAttachments as any,
-          }
+            attachments: resolvedAttachments as SendEmailOptions['attachments'],
+          } as ResolvedEmailDeliveryPayload
         }
 
         // Update status to SENDING (only after all validations pass)
@@ -249,12 +284,20 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel,
+    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel | ResolvedEmailDeliveryPayload,
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(`[${notifyId}] Sending email via ${emailAdapter.name} adapter`)
+    const attachmentCount = Array.isArray((payload as { attachments?: unknown[] }).attachments)
+      ? ((payload as { attachments?: unknown[] }).attachments?.length ?? 0)
+      : 0
+
+    logger.debug(
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter: ${JSON.stringify({
+        attachmentCount,
+      })}`,
+    )
 
     const result = await emailAdapter.send(payload as any)
 
