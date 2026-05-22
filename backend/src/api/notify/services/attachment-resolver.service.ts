@@ -13,9 +13,7 @@ export interface ResolvedEmailAttachment {
 export class AttachmentResolverService {
   private readonly logger = new Logger(AttachmentResolverService.name)
 
-  constructor(
-    private readonly localAttachmentStorageService: LocalAttachmentStorageService,
-  ) {}
+  constructor(private readonly localAttachmentStorageService: LocalAttachmentStorageService) {}
 
   async resolveEmailAttachments(
     attachments?: StoredNotifyAttachment[],

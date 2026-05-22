@@ -190,10 +190,7 @@ export class AttachmentValidationService {
       )
     }
 
-    if (
-      filename !== path.posix.basename(filename) ||
-      filename !== path.win32.basename(filename)
-    ) {
+    if (filename !== path.posix.basename(filename) || filename !== path.win32.basename(filename)) {
       throw new BadRequestException(
         `Attachment ${this.describeAttachment(entry)} filename is invalid`,
       )

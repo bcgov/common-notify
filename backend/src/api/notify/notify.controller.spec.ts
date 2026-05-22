@@ -248,8 +248,7 @@ describe('Notify Controllers', () => {
                 mimeType: 'text/plain',
                 storageKey: 'ab/abcdef.bin',
                 sizeBytes: 11,
-                contentSha256:
-                  'b94d27b9934d3e08a52e52d7da7dabfade4f0f1b6d8d7e8e5a7a5f6d7c8b9a0f',
+                contentSha256: 'b94d27b9934d3e08a52e52d7da7dabfade4f0f1b6d8d7e8e5a7a5f6d7c8b9a0f',
                 storageProvider: 'local',
               },
             ],

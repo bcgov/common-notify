@@ -20,13 +20,14 @@ export interface ProcessedNotifySmsChannel extends Omit<NotifySmsChannel, 'attac
   attachments?: StoredNotifyAttachment[]
 }
 
-export interface ProcessedNotifyMsgAppChannel
-  extends Omit<NotifyMsgAppChannel, 'attachments'> {
+export interface ProcessedNotifyMsgAppChannel extends Omit<NotifyMsgAppChannel, 'attachments'> {
   attachments?: StoredNotifyAttachment[]
 }
 
-export interface ProcessedNotifySimpleRequest
-  extends Omit<NotifySimpleRequest, 'email' | 'sms' | 'msgApp'> {
+export interface ProcessedNotifySimpleRequest extends Omit<
+  NotifySimpleRequest,
+  'email' | 'sms' | 'msgApp'
+> {
   email?: ProcessedNotifyEmailChannel
   sms?: ProcessedNotifySmsChannel
   msgApp?: ProcessedNotifyMsgAppChannel

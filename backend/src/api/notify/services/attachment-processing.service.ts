@@ -10,9 +10,7 @@ import { LocalAttachmentStorageService } from './local-attachment-storage.servic
 
 @Injectable()
 export class AttachmentProcessingService {
-  constructor(
-    private readonly localAttachmentStorageService: LocalAttachmentStorageService,
-  ) {}
+  constructor(private readonly localAttachmentStorageService: LocalAttachmentStorageService) {}
 
   async processAttachments(request: NotifySimpleRequest): Promise<ProcessedNotifySimpleRequest> {
     return {
@@ -31,7 +29,11 @@ export class AttachmentProcessingService {
       attachments: channel.attachments
         ? await Promise.all(
             channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(attachment.filename, attachment.mimeType, attachment.data),
+              this.storeDecodedAttachment(
+                attachment.filename,
+                attachment.mimeType,
+                attachment.data,
+              ),
             ),
           )
         : channel.attachments === undefined
@@ -48,7 +50,11 @@ export class AttachmentProcessingService {
       attachments: channel.attachments
         ? await Promise.all(
             channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(attachment.filename, attachment.mimeType, attachment.data),
+              this.storeDecodedAttachment(
+                attachment.filename,
+                attachment.mimeType,
+                attachment.data,
+              ),
             ),
           )
         : channel.attachments === undefined
@@ -65,7 +71,11 @@ export class AttachmentProcessingService {
       attachments: channel.attachments
         ? await Promise.all(
             channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(attachment.filename, attachment.mimeType, attachment.data),
+              this.storeDecodedAttachment(
+                attachment.filename,
+                attachment.mimeType,
+                attachment.data,
+              ),
             ),
           )
         : channel.attachments === undefined
@@ -74,11 +84,7 @@ export class AttachmentProcessingService {
     }
   }
 
-  private async storeDecodedAttachment(
-    filename: string,
-    mimeType: string,
-    base64Data: string,
-  ) {
+  private async storeDecodedAttachment(filename: string, mimeType: string, base64Data: string) {
     let content: Buffer
 
     try {
