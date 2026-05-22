@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
@@ -7,6 +8,8 @@ import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
 import { TenantGuard } from '../../common/guards/tenant.guard'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
 const mockNotificationService = {
   findAll: vi.fn(),
@@ -24,6 +27,12 @@ const mockTenantsService = {
 
 const mockClientTenantMappingService = {
   findTenantsByClientId: vi.fn(),
+}
+
+const mockFeatureFlagService = {
+  getFlagsForTenant: vi.fn().mockResolvedValue({
+    sms_notifications: true,
+  }),
 }
 
 describe('NotificationFrontendController', () => {
@@ -49,9 +58,16 @@ describe('NotificationFrontendController', () => {
           provide: ClientTenantMappingService,
           useValue: mockClientTenantMappingService,
         },
+        {
+          provide: FeatureFlagService,
+          useValue: mockFeatureFlagService,
+        },
         TenantGuard,
       ],
-    }).compile()
+    })
+      .overrideGuard(FeatureFlagGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
 
     controller = module.get<NotificationFrontendController>(NotificationFrontendController)
   })
