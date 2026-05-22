@@ -36,12 +36,14 @@ export class TemplatesRepository {
     offset: number = 0,
     search?: string,
   ): Promise<[Template[], number]> {
+    const sanitizedSearch = search ? search.replace(/[%_\\]/g, '\\$&') : null
     return this.templateRepository.findAndCount({
-      where: {
-        tenantId,
-        active: true,
-        ...(search ? { name: ILike(`%${search.replace(/[%_\\]/g, '\\$&')}%`) } : {}), // sanitize search input
-      },
+      where: sanitizedSearch
+        ? [
+            { tenantId, active: true, name: ILike(`%${sanitizedSearch}%`) },
+            { tenantId, active: true, body: ILike(`%${sanitizedSearch}%`) },
+          ]
+        : { tenantId, active: true },
       relations: ['channel', 'engine'],
       take: limit,
       skip: offset,
