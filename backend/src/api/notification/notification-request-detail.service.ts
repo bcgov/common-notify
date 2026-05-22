@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { NotificationDelivery } from './entities/notification-delivery.entity'
+import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
 
 @Injectable()
-export class NotificationDeliveryService {
+export class NotificationRequestDetailService {
   constructor(
-    @InjectRepository(NotificationDelivery)
-    private readonly deliveryRepository: Repository<NotificationDelivery>,
+    @InjectRepository(NotificationRequestDetail)
+    private readonly detailRepository: Repository<NotificationRequestDetail>,
   ) {}
 
   /**
-   * Create pending delivery records (one per recipient) at the start of a first attempt.
+   * Create pending request detail records (one per recipient) at the start of a first attempt.
    */
   async createPending(
     notificationRequestId: string,
@@ -22,7 +22,7 @@ export class NotificationDeliveryService {
     if (recipients.length === 0) return
     const now = new Date()
     const entities = recipients.map((address) =>
-      this.deliveryRepository.create({
+      this.detailRepository.create({
         notificationRequestId,
         recipientAddress: address,
         channel,
@@ -33,14 +33,14 @@ export class NotificationDeliveryService {
         updatedBy: createdBy,
       }),
     )
-    await this.deliveryRepository.save(entities)
+    await this.detailRepository.save(entities)
   }
 
   /**
-   * Mark all delivery records for a request as sent.
+   * Mark all request detail records for a request as sent.
    */
   async markSent(notificationRequestId: string, providerResponseId?: string): Promise<void> {
-    await this.deliveryRepository.update(
+    await this.detailRepository.update(
       { notificationRequestId },
       {
         status: 'sent',
@@ -52,10 +52,10 @@ export class NotificationDeliveryService {
   }
 
   /**
-   * Mark all delivery records for a request as failed. Only called on the final attempt.
+   * Mark all request detail records for a request as failed. Only called on the final attempt.
    */
   async markFailed(notificationRequestId: string, errorMessage: string): Promise<void> {
-    await this.deliveryRepository.update(
+    await this.detailRepository.update(
       { notificationRequestId },
       { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
     )
@@ -65,28 +65,28 @@ export class NotificationDeliveryService {
    * Increment attempt_count and reset status to pending before a retry attempt.
    */
   async resetForRetry(notificationRequestId: string): Promise<void> {
-    await this.deliveryRepository.increment({ notificationRequestId }, 'attemptCount', 1)
-    await this.deliveryRepository.update(
+    await this.detailRepository.increment({ notificationRequestId }, 'attemptCount', 1)
+    await this.detailRepository.update(
       { notificationRequestId },
       { status: 'pending', lastAttemptAt: new Date(), updatedBy: 'system' },
     )
   }
 
   /**
-   * Retrieve all delivery records for a notification request, ordered by creation time.
+   * Retrieve all request detail records for a notification request, ordered by creation time.
    */
-  async findByRequestId(notificationRequestId: string): Promise<NotificationDelivery[]> {
-    return this.deliveryRepository.find({
+  async findByRequestId(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+    return this.detailRepository.find({
       where: { notificationRequestId },
       order: { createdAt: 'ASC' },
     })
   }
 
   /**
-   * DEBUG: Retrieve all delivery records across all requests, newest first.
+   * DEBUG: Retrieve all request detail records across all requests, newest first.
    * Remove when per-request filtering is confirmed working.
    */
-  async findAllDebug(): Promise<NotificationDelivery[]> {
-    return this.deliveryRepository.find({ order: { createdAt: 'DESC' } })
+  async findAllDebug(): Promise<NotificationRequestDetail[]> {
+    return this.detailRepository.find({ order: { createdAt: 'DESC' } })
   }
 }

@@ -11,9 +11,9 @@ import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
-import { NotificationDelivery } from '../api/notification/entities/notification-delivery.entity'
+import { NotificationRequestDetail } from '../api/notification/entities/notification-request-detail.entity'
 import { NotificationService } from '../api/notification/notification.service'
-import { NotificationDeliveryService } from '../api/notification/notification-delivery.service'
+import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
@@ -38,7 +38,7 @@ import { NotifyModule } from '../api/notify/notify.module'
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotificationRequest, NotificationDelivery]),
+    TypeOrmModule.forFeature([NotificationRequest, NotificationRequestDetail]),
     TenantsModule,
     TemplatesModule,
     forwardRef(() => NotifyModule),
@@ -46,7 +46,7 @@ import { NotifyModule } from '../api/notify/notify.module'
   providers: [
     PendingNotificationRetryService,
     NotificationService,
-    NotificationDeliveryService,
+    NotificationRequestDetailService,
     NotificationPubSubService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
@@ -183,7 +183,7 @@ export class QueueModule implements OnModuleInit {
     private readonly inlineRenderingService?: InlineRenderingService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
-    private readonly notificationDeliveryService?: NotificationDeliveryService,
+    private readonly notificationRequestDetailService?: NotificationRequestDetailService,
   ) {}
 
   async onModuleInit() {
@@ -231,7 +231,7 @@ export class QueueModule implements OnModuleInit {
         this.templatesService,
         this.inlineRenderingService,
         this.emailAdapter,
-        this.notificationDeliveryService,
+        this.notificationRequestDetailService,
         emailConcurrency,
       )
       this.logger.log('Email delivery worker initialization started')
@@ -250,7 +250,7 @@ export class QueueModule implements OnModuleInit {
         this.templatesService,
         this.inlineRenderingService,
         this.smsAdapter,
-        this.notificationDeliveryService,
+        this.notificationRequestDetailService,
         smsConcurrency,
       )
       this.logger.log('SMS delivery worker initialization started')

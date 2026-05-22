@@ -1,7 +1,7 @@
 import { Controller, Get, Version, UseGuards, Logger, Query, Param } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
-import { NotificationDeliveryService } from './notification-delivery.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
@@ -18,7 +18,7 @@ export class NotificationController {
 
   constructor(
     private readonly notificationService: NotificationService,
-    private readonly notificationDeliveryService: NotificationDeliveryService,
+    private readonly notificationRequestDetailService: NotificationRequestDetailService,
   ) {}
 
   @Version('1')
@@ -60,8 +60,8 @@ export class NotificationController {
   @Version('1')
   @Get(':id/deliveries')
   @RequireRole('NOTIFY_ADMIN')
-  @ApiOperation({ summary: 'List individual delivery records for a notification request' })
+  @ApiOperation({ summary: 'List individual request detail records for a notification request' })
   findDeliveries(@Param('id') id: string) {
-    return this.notificationDeliveryService.findByRequestId(id)
+    return this.notificationRequestDetailService.findByRequestId(id)
   }
 }

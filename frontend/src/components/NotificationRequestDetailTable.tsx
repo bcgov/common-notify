@@ -2,15 +2,15 @@ import { Table } from 'react-bootstrap'
 import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { notificationApi } from '@/api'
-import type { NotificationDelivery } from '@/interfaces/NotificationRequest'
+import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 
 /**
- * NotificationDeliveryTable Component
- * DEBUG: Displays all delivery records across all notification requests.
+ * NotificationRequestDetailTable Component
+ * DEBUG: Displays all request detail records across all notification requests.
  * Swap listDeliveriesDebug() for listDeliveries(id) when per-request filtering is needed.
  */
-const NotificationDeliveryTable: FC = () => {
-  const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([])
+const NotificationRequestDetailTable: FC = () => {
+  const [deliveries, setDeliveries] = useState<NotificationRequestDetail[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,7 +21,7 @@ const NotificationDeliveryTable: FC = () => {
       .listDeliveriesDebug()
       .then(setDeliveries)
       .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : 'Failed to load delivery records'),
+        setError(err instanceof Error ? err.message : 'Failed to load request detail records'),
       )
       .finally(() => setIsLoading(false))
   }, [])
@@ -63,7 +63,7 @@ const NotificationDeliveryTable: FC = () => {
           ) : (
             <tr>
               <td colSpan={7} className="text-center">
-                No delivery records found
+                No request detail records found
               </td>
             </tr>
           )}
@@ -73,4 +73,4 @@ const NotificationDeliveryTable: FC = () => {
   )
 }
 
-export default NotificationDeliveryTable
+export default NotificationRequestDetailTable

@@ -9,8 +9,8 @@ import {
 } from 'typeorm'
 import { NotificationRequest } from './notification-request.entity'
 
-@Entity('notification_delivery')
-export class NotificationDelivery {
+@Entity('notification_request_detail')
+export class NotificationRequestDetail {
   @PrimaryGeneratedColumn('uuid')
   id: string
 

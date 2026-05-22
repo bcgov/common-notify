@@ -33,7 +33,7 @@ export interface NotificationRequest {
   errorReason?: string
 }
 
-export interface NotificationDelivery {
+export interface NotificationRequestDetail {
   id: string
   notificationRequestId: string
   recipientAddress: string

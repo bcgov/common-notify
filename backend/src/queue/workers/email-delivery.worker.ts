@@ -3,7 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
-import { NotificationDeliveryService } from '../../api/notification/notification-delivery.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
@@ -47,7 +47,7 @@ export class EmailDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
-    deliveryService: NotificationDeliveryService,
+    deliveryService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
