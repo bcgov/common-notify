@@ -159,7 +159,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
 
           <div className="row">
             <div className="col">
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" isDisabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
               <Button

@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
+import { http, HttpResponse } from 'msw'
 import React from 'react'
+import { server } from '@/test-setup'
 import featureFlagsReducer from '@/redux/slices/featureFlags.slice'
 import {
   useFeatureFlag,
@@ -12,15 +14,17 @@ import {
 } from './useFeatureFlag'
 import type { ReactNode } from 'react'
 
-// Mock fetch
-;(globalThis as any).fetch = vi.fn()
-
 describe('useFeatureFlag hooks', () => {
-  let store: any
-
   beforeEach(() => {
     vi.clearAllMocks()
-    store = configureStore({
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
+  const wrapper = ({ children }: { children: ReactNode }) => {
+    const testStore = configureStore({
       reducer: {
         featureFlags: featureFlagsReducer,
       },
@@ -34,10 +38,7 @@ describe('useFeatureFlag hooks', () => {
         },
       },
     })
-  })
-
-  const wrapper = ({ children }: { children: ReactNode }) => {
-    return <Provider store={store}>{children}</Provider>
+    return <Provider store={testStore}>{children}</Provider>
   }
 
   describe('useFeatureFlag', () => {
@@ -54,6 +55,12 @@ describe('useFeatureFlag hooks', () => {
     })
 
     it('should fetch flags if not synced', async () => {
+      server.use(
+        http.get('*/api/v1/feature-flags', () => {
+          return HttpResponse.json({ sms_notifications: true, dashboard: false })
+        }),
+      )
+
       const newStore = configureStore({
         reducer: {
           featureFlags: featureFlagsReducer,
@@ -62,25 +69,25 @@ describe('useFeatureFlag hooks', () => {
           featureFlags: {
             byCode: {},
             flagsList: [],
+            tenantId: undefined,
             loading: false,
             synced: false,
           },
         },
       })
 
-      ;(globalThis.fetch as any).mockResolvedValue({
-        ok: true,
-        json: async () => ({ sms_notifications: true, dashboard: false }),
-      })
-
       const newWrapper = ({ children }: { children: ReactNode }) => (
         <Provider store={newStore}>{children}</Provider>
       )
 
-      const { result } = renderHook(() => useFeatureFlag('sms_notifications'), {
+      const { result } = renderHook(() => useFeatureFlag('sms_notifications', 'tenant-123'), {
         wrapper: newWrapper,
       })
 
+      // Initially should be false because not synced yet
+      expect(result.current).toBe(false)
+
+      // After fetch completes, should be true
       await waitFor(() => {
         expect(result.current).toBe(true)
       })
@@ -150,7 +157,7 @@ describe('useFeatureFlag hooks', () => {
       expect(result.current.loading).toBe(true)
     })
 
-    it('should return error state', () => {
+    it('should return error state', async () => {
       const errorStore = configureStore({
         reducer: {
           featureFlags: featureFlagsReducer,
@@ -159,8 +166,9 @@ describe('useFeatureFlag hooks', () => {
           featureFlags: {
             byCode: { sms_notifications: false },
             flagsList: [],
+            tenantId: 'tenant-123',
             loading: false,
-            synced: false,
+            synced: true, // Set to true so it won't try to fetch again
             error: 'Failed to fetch flags',
           },
         },
@@ -180,10 +188,29 @@ describe('useFeatureFlag hooks', () => {
 
   describe('useFeatureFlagTenantChange', () => {
     it('should mark flags out of sync when tenant changes', async () => {
+      const tenantStore = configureStore({
+        reducer: {
+          featureFlags: featureFlagsReducer,
+        },
+        preloadedState: {
+          featureFlags: {
+            byCode: { sms_notifications: true, dashboard: false },
+            flagsList: [],
+            tenantId: 'tenant-123',
+            loading: false,
+            synced: true,
+          },
+        },
+      })
+
+      const tenantWrapper = ({ children }: { children: ReactNode }) => (
+        <Provider store={tenantStore}>{children}</Provider>
+      )
+
       const { rerender } = renderHook(
         ({ tenantId }: { tenantId: string }) => useFeatureFlagTenantChange(tenantId),
         {
-          wrapper,
+          wrapper: tenantWrapper,
           initialProps: { tenantId: 'tenant-123' },
         },
       )
@@ -192,17 +219,36 @@ describe('useFeatureFlag hooks', () => {
       rerender({ tenantId: 'tenant-456' })
 
       await waitFor(() => {
-        const state = (store.getState() as any).featureFlags
+        const state = (tenantStore.getState() as any).featureFlags
         expect(state.synced).toBe(false)
       })
     })
 
     it('should not mark out of sync when tenant stays the same', () => {
-      renderHook(() => useFeatureFlagTenantChange('tenant-123'), {
-        wrapper,
+      const tenantStore = configureStore({
+        reducer: {
+          featureFlags: featureFlagsReducer,
+        },
+        preloadedState: {
+          featureFlags: {
+            byCode: { sms_notifications: true, dashboard: false },
+            flagsList: [],
+            tenantId: 'tenant-123',
+            loading: false,
+            synced: true,
+          },
+        },
       })
 
-      expect((store.getState() as any).featureFlags.synced).toBe(true)
+      const tenantWrapper = ({ children }: { children: ReactNode }) => (
+        <Provider store={tenantStore}>{children}</Provider>
+      )
+
+      renderHook(() => useFeatureFlagTenantChange('tenant-123'), {
+        wrapper: tenantWrapper,
+      })
+
+      expect((tenantStore.getState() as any).featureFlags.synced).toBe(true)
     })
   })
 })
