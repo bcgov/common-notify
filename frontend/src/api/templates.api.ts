@@ -11,7 +11,11 @@ export enum TemplateEngine {
   HANDLEBARS = 'handlebars',
   MUSTACHE = 'mustache',
   LEGACY_GC_NOTIFY = 'legacy_gc_notify',
-  EJS = 'ejs',
+}
+
+export enum TemplateBodyType {
+  HTML = 'html',
+  MARKDOWN = 'markdown',
 }
 
 export interface TemplateResponse {
@@ -21,6 +25,7 @@ export interface TemplateResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
+  bodyType?: TemplateBodyType
   engineCode: TemplateEngine
   version: number
   active: boolean
@@ -153,6 +158,7 @@ export interface CreateTemplateData {
   engineCode: TemplateEngine
   subject?: string
   body: string
+  bodyType?: TemplateBodyType
 }
 
 /**

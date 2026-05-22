@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Button } from '@bcgov/design-system-react-components'
 import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { setPage, setLimit, setSearch } from '@/redux/slices/templates.slice'
@@ -57,6 +58,7 @@ const columns: TableColumn<TemplateResponse>[] = [
 
 const Templates: FC = () => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const {
     items: templates,
     page,
@@ -105,6 +107,9 @@ const Templates: FC = () => {
           <button className="btn btn-outline-secondary" type="button" onClick={handleSearch}>
             Search
           </button>
+        </div>
+        <div className="col-auto ms-auto">
+          <Button onPress={() => navigate({ to: '/template-create' })}>Create New Template</Button>
         </div>
       </div>
 
