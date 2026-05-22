@@ -2,6 +2,8 @@
 
 > [!INFO] version 3
 
+<!-- Test: CCP-4541 - This change should not trigger builds -->
+
 ## What it does
 
 The Notify service is a **multi-channel, multi-tenanted, notification service**. It comprises a user
