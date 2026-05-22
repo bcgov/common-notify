@@ -44,7 +44,7 @@ export class NotificationFrontendController {
 
   constructor(
     private readonly notificationService: NotificationService,
-    private readonly notificationDeliveryService: NotificationRequestDetailService,
+    private readonly notificationRequestDetailService: NotificationRequestDetailService,
     private readonly notificationPubSubService: NotificationPubSubService,
     private readonly tenantsService: TenantsService,
   ) {}
@@ -134,7 +134,7 @@ export class NotificationFrontendController {
   @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: '[DEBUG] List all delivery records across all notification requests' })
   findAllDeliveriesDebug() {
-    return this.notificationDeliveryService.findAllDebug()
+    return this.notificationRequestDetailService.findAllDebug()
   }
 
   @Version('1')
@@ -142,6 +142,6 @@ export class NotificationFrontendController {
   @RequireRole('NOTIFY_ADMIN')
   @ApiOperation({ summary: 'List individual delivery records for a notification request' })
   findDeliveries(@Param('id') id: string) {
-    return this.notificationDeliveryService.findByRequestId(id)
+    return this.notificationRequestDetailService.findByRequestId(id)
   }
 }
