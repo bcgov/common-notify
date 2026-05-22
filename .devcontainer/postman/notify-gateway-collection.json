@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "06182f39-0bcd-45d7-a6c7-3df85a76397f",
+    "_postman_id": "9c2fb158-079f-4845-9bf2-2aef932aeac2",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -656,11 +656,17 @@
                   ]
                 },
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "x-tenant-id",
+                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "type": "text"
+                  }
+                ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
+                  "raw": "{{gateway_url}}/api/v1/templates/",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates", "template-id-123"]
+                  "path": ["api", "v1", "templates", ""]
                 },
                 "description": "Get a specific notification template"
               },
@@ -688,7 +694,7 @@
                   },
                   {
                     "key": "x-tenant-id",
-                    "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
                     "type": "text"
                   }
                 ],
@@ -723,6 +729,11 @@
                   {
                     "key": "Content-Type",
                     "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
                     "type": "text"
                   }
                 ],
@@ -1164,13 +1175,52 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple"]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Multi Channel",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  },\n    \"sms\": {\n    \"recipients\": {\"to\":[\"{{recipient_phone}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1203,7 +1253,7 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "value": "20e1da22-2e44-4fbd-ab50-64f825110f56",
                 "type": "text"
               }
             ],
@@ -1242,13 +1292,13 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    },\n    \"delayedSend\": \"2026-05-12 9:10 PDT\"\n  }\n}"
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    },\n    \"delayedSend\": \"2026-05-28 9:10 PDT\"\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1281,13 +1331,13 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"templateId\": \"93ba96d1-8dfc-4db7-adbc-3f798d51d094\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
+              "raw": "{\n  \"templateId\": \"3dfe0442-1f24-4763-9885-5aa088693f33\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1670,6 +1720,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "type": "text"
               }
             ],
             "body": {
@@ -1677,9 +1732,9 @@
               "raw": "{\n  \"action\": \"cancel\"\n}"
             },
             "url": {
-              "raw": "{{gateway_url}}/api/v1/notifysimple/{{notification_id}}",
+              "raw": "{{gateway_url}}/api/v1/notifysimple/316297c7-1a55-4c0c-8a18-3281b7e16108",
               "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "{{notification_id}}"]
+              "path": ["api", "v1", "notifysimple", "316297c7-1a55-4c0c-8a18-3281b7e16108"]
             },
             "description": "Cancel a notification that hasn't been delivered yet (service-to-service endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to cancel (set {{notification_id}} variable)\n- Token must have service-to-service credentials\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Response:**\nReturns the updated notification with status changed to 'cancelled'"
           },
@@ -1704,6 +1759,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "type": "text"
               }
             ],
             "body": {
@@ -1711,9 +1771,9 @@
               "raw": "{\n  \"scheduledTime\": \"2026-05-16T14:30:00Z\"\n}"
             },
             "url": {
-              "raw": "{{gateway_url}}/api/v1/notifysimple/{{notification_id}}",
+              "raw": "{{gateway_url}}/api/v1/notifysimple/316297c7-1a55-4c0c-8a18-3281b7e16108",
               "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "{{notification_id}}"]
+              "path": ["api", "v1", "notifysimple", "316297c7-1a55-4c0c-8a18-3281b7e16108"]
             },
             "description": "Reschedule a notification to a new delivery time (service-to-service endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to reschedule (set {{notification_id}} variable)\n- Token must have service-to-service credentials\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Request Parameters:**\n- `scheduledTime`: ISO 8601 datetime (must be in the future)\n\n**Response:**\nReturns the updated notification with delayedSendTime changed to the new scheduledTime"
           },
