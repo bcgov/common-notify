@@ -15,6 +15,7 @@ import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
+import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { LocalAttachmentStorageService } from './services/local-attachment-storage.service'
 import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
@@ -41,6 +42,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
     NotifyService,
     AttachmentValidationService,
     AttachmentProcessingService,
+    AttachmentResolverService,
     LocalAttachmentStorageService,
   ],
   exports: [
@@ -48,6 +50,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
     RenderingModule,
     AttachmentValidationService,
     AttachmentProcessingService,
+    AttachmentResolverService,
   ],
 })
 export class NotifyModule {}

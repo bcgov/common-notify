@@ -20,6 +20,7 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { NotifyModule } from '../api/notify/notify.module'
+import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
 
 /**
  * Queue Module
@@ -178,6 +179,7 @@ export class QueueModule implements OnModuleInit {
     private readonly templatesRepository?: TemplatesRepository,
     private readonly templatesService?: TemplatesService,
     private readonly inlineRenderingService?: InlineRenderingService,
+    private readonly attachmentResolverService?: AttachmentResolverService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
@@ -226,6 +228,7 @@ export class QueueModule implements OnModuleInit {
         this.templatesRepository,
         this.templatesService,
         this.inlineRenderingService,
+        this.attachmentResolverService,
         this.emailAdapter,
         emailConcurrency,
       )

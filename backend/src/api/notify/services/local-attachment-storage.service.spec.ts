@@ -57,4 +57,66 @@ describe('LocalAttachmentStorageService', () => {
     expect(JSON.stringify(loggerSpy.mock.calls)).not.toContain(rawContent.toString('base64'))
     expect(JSON.stringify(loggerSpy.mock.calls)).not.toContain(rawContent.toString('utf8'))
   })
+
+  it('should read a stored attachment from local storage', async () => {
+    const storageDir = path.join(tempRootDir, 'attachments')
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        LocalAttachmentStorageService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: vi.fn((key: string) => {
+              if (key === 'attachments.storageDir') return storageDir
+              return undefined
+            }),
+          },
+        },
+      ],
+    }).compile()
+
+    service = module.get<LocalAttachmentStorageService>(LocalAttachmentStorageService)
+    const stored = await service.storeAttachment({
+      filename: 'hello.txt',
+      mimeType: 'text/plain',
+      content: Buffer.from('hello world'),
+    })
+
+    const content = await service.readAttachment(stored.storageKey, stored.contentSha256)
+
+    expect(content.toString('utf8')).toBe('hello world')
+  })
+
+  it('should throw when stored attachment hash verification fails', async () => {
+    const storageDir = path.join(tempRootDir, 'attachments')
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        LocalAttachmentStorageService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: vi.fn((key: string) => {
+              if (key === 'attachments.storageDir') return storageDir
+              return undefined
+            }),
+          },
+        },
+      ],
+    }).compile()
+
+    service = module.get<LocalAttachmentStorageService>(LocalAttachmentStorageService)
+    const stored = await service.storeAttachment({
+      filename: 'hello.txt',
+      mimeType: 'text/plain',
+      content: Buffer.from('hello world'),
+    })
+
+    await fs.writeFile(path.join(storageDir, stored.storageKey), 'tampered')
+
+    await expect(service.readAttachment(stored.storageKey, stored.contentSha256)).rejects.toThrow(
+      InternalServerErrorException,
+    )
+  })
 })

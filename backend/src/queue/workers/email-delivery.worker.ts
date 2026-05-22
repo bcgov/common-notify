@@ -8,6 +8,8 @@ import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
+import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
+import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
 
 /**
@@ -45,6 +47,7 @@ export class EmailDeliveryWorker {
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
+    attachmentResolverService: AttachmentResolverService,
     emailAdapter: IEmailTransport,
     concurrency: number = 2,
   ): Promise<void> {
@@ -74,7 +77,7 @@ export class EmailDeliveryWorker {
         }
 
         // Cast payload to email channel type for type safety
-        let emailPayload = payload as NotifyEmailChannel
+        let emailPayload = payload as NotifyEmailChannel | ProcessedNotifyEmailChannel
 
         // Resolve template if templateId is provided in the original request
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
@@ -160,6 +163,17 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
+        const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+          emailPayload.attachments as ProcessedNotifyEmailChannel['attachments'],
+        )
+
+        if (resolvedAttachments) {
+          emailPayload = {
+            ...emailPayload,
+            attachments: resolvedAttachments as any,
+          }
+        }
+
         // Update status to SENDING (only after all validations pass)
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
@@ -235,7 +249,7 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: NotifyEmailChannel,
+    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel,
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
