@@ -1,3 +1,0 @@
-notification_status_code
-notification_request
-flyway_schema_history

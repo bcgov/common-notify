@@ -1,0 +1,16 @@
+notification_channel_code
+template_engine_code
+feature_flag_code
+identity_provider
+notification_status_code
+notify_user
+tenant_status_code
+tenant
+template
+client_tenant_mapping
+feature_flag
+user_identity
+notification_request
+template_version
+flyway_schema_history
+notification_event_type_code
