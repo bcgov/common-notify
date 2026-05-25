@@ -15,11 +15,14 @@ import { NotificationService } from './notification.service'
 import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
+import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
 /**
  * Frontend Notification API Controller
@@ -94,7 +97,9 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Sse('events')
+  @UseGuards(FeatureFlagGuard)
   @RequireRole('NOTIFY_ADMIN')
+  @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
   @ApiQuery({
     name: 'tenantId',

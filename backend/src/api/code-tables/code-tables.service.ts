@@ -4,6 +4,7 @@ import { Repository } from 'typeorm'
 import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
 import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
+import { FeatureFlagCode } from '../feature-flag/entities/feature-flag-code.entity'
 
 export class CodeTableItemDto {
   id: string
@@ -15,6 +16,7 @@ export class CodeTablesResponseDto {
   statuses: CodeTableItemDto[]
   channels: CodeTableItemDto[]
   eventTypes: CodeTableItemDto[]
+  featureFlags: CodeTableItemDto[]
 }
 
 @Injectable()
@@ -28,6 +30,8 @@ export class CodeTablesService {
     private readonly channelCodeRepository: Repository<NotificationChannelCode>,
     @InjectRepository(NotificationEventTypeCode)
     private readonly eventTypeCodeRepository: Repository<NotificationEventTypeCode>,
+    @InjectRepository(FeatureFlagCode)
+    private readonly featureFlagCodeRepository: Repository<FeatureFlagCode>,
   ) {}
 
   /**
@@ -88,19 +92,40 @@ export class CodeTablesService {
   }
 
   /**
+   * Get all feature flag codes
+   */
+  async getFeatureCodes(): Promise<CodeTableItemDto[]> {
+    try {
+      const featureCodes = await this.featureFlagCodeRepository.find({
+        order: { code: 'ASC' },
+      })
+      return featureCodes.map((f) => ({
+        id: f.code,
+        label: f.displayName,
+        description: f.description,
+      }))
+    } catch (error) {
+      this.logger.error('Failed to fetch feature flag codes', error)
+      throw error
+    }
+  }
+
+  /**
    * Get all code tables
    */
   async getAllCodeTables(): Promise<CodeTablesResponseDto> {
-    const [statuses, channels, eventTypes] = await Promise.all([
+    const [statuses, channels, eventTypes, featureFlags] = await Promise.all([
       this.getStatuses(),
       this.getChannels(),
       this.getEventTypes(),
+      this.getFeatureCodes(),
     ])
 
     return {
       statuses,
       channels,
       eventTypes,
+      featureFlags,
     }
   }
 }
