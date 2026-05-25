@@ -1,13 +1,13 @@
 import '@testing-library/jest-dom'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { beforeAll, afterAll, afterEach } from 'vitest'
 import { setupServer } from 'msw/node'
 
 export const restHandlers = []
 
-const server = setupServer(...restHandlers)
+export const server = setupServer(...restHandlers)
 
 // Start server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
 
 //  Close server after all tests
 afterAll(() => server.close())

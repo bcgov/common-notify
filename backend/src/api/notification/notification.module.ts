@@ -11,6 +11,7 @@ import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { TemplatesModule } from '../templates/templates.module'
+import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TemplatesModule } from '../templates/templates.module'
     TenantsModule,
     ClientTenantMappingModule,
     TemplatesModule,
+    FeatureFlagModule,
   ],
   controllers: [NotificationController, NotificationFrontendController],
   providers: [NotificationService, NotificationPubSubService],

@@ -6,12 +6,14 @@ import { CodeTablesService } from './code-tables.service'
 import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
 import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
+import { FeatureFlagCode } from '../feature-flag/entities/feature-flag-code.entity'
 
 describe('CodeTablesService', () => {
   let service: CodeTablesService
   let statusCodeRepo: Repository<NotificationStatusCode>
   let channelCodeRepo: Repository<NotificationChannelCode>
   let eventTypeCodeRepo: Repository<NotificationEventTypeCode>
+  let featureFlagCodeRepo: Repository<FeatureFlagCode>
 
   const mockStatusCodes: NotificationStatusCode[] = [
     {
@@ -87,6 +89,27 @@ describe('CodeTablesService', () => {
     },
   ]
 
+  const mockFeatureFlagCodes: FeatureFlagCode[] = [
+    {
+      code: 'dashboard',
+      displayName: 'Dashboard',
+      description: 'Enable dashboard feature',
+      createdAt: new Date(),
+      createdBy: 'system',
+      updatedAt: new Date(),
+      updatedBy: null,
+    },
+    {
+      code: 'sms_notifications',
+      displayName: 'SMS Notifications',
+      description: 'Enable SMS notification sending',
+      createdAt: new Date(),
+      createdBy: 'system',
+      updatedAt: new Date(),
+      updatedBy: null,
+    },
+  ]
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -109,6 +132,12 @@ describe('CodeTablesService', () => {
             find: vi.fn(),
           },
         },
+        {
+          provide: getRepositoryToken(FeatureFlagCode),
+          useValue: {
+            find: vi.fn(),
+          },
+        },
       ],
     }).compile()
 
@@ -116,6 +145,7 @@ describe('CodeTablesService', () => {
     statusCodeRepo = module.get(getRepositoryToken(NotificationStatusCode))
     channelCodeRepo = module.get(getRepositoryToken(NotificationChannelCode))
     eventTypeCodeRepo = module.get(getRepositoryToken(NotificationEventTypeCode))
+    featureFlagCodeRepo = module.get(getRepositoryToken(FeatureFlagCode))
   })
 
   describe('getStatuses', () => {
@@ -222,6 +252,7 @@ describe('CodeTablesService', () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(featureFlagCodeRepo.find as any).mockResolvedValueOnce(mockFeatureFlagCodes)
 
       const result = await service.getAllCodeTables()
 
@@ -232,6 +263,7 @@ describe('CodeTablesService', () => {
         statuses: expect.any(Array),
         channels: expect.any(Array),
         eventTypes: expect.any(Array),
+        featureFlags: expect.any(Array),
       })
     })
 
@@ -239,12 +271,14 @@ describe('CodeTablesService', () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(featureFlagCodeRepo.find as any).mockResolvedValueOnce(mockFeatureFlagCodes)
 
       await service.getAllCodeTables()
 
       expect(statusCodeRepo.find).toHaveBeenCalled()
       expect(channelCodeRepo.find).toHaveBeenCalled()
       expect(eventTypeCodeRepo.find).toHaveBeenCalled()
+      expect(featureFlagCodeRepo.find).toHaveBeenCalled()
     })
 
     it('should handle partial failures', async () => {
