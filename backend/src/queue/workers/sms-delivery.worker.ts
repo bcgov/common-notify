@@ -80,7 +80,7 @@ export class SmsDeliveryWorker {
           await requestDetailService.createPending(
             notifyId,
             (payload as any).recipients?.to ?? [],
-            'sms',
+            'SMS',
             tenantId,
           )
         } else {

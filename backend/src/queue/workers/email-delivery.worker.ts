@@ -83,7 +83,7 @@ export class EmailDeliveryWorker {
           await requestDetailService.createPending(
             notifyId,
             (payload as NotifyEmailChannel).recipients.to,
-            'email',
+            'EMAIL',
             tenantId,
           )
         } else {
