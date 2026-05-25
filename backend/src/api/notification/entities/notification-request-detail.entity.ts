@@ -24,7 +24,7 @@ export class NotificationRequestDetail {
   @Column({ name: 'recipient_address', length: 255 })
   recipientAddress: string
 
-  @Column({ length: 20, default: 'email' })
+  @Column({ length: 20, default: 'EMAIL' })
   channel: string
 
   @Column({ length: 20, default: 'pending' })

@@ -51,6 +51,9 @@ export class NotificationRequestDetailService {
     )
   }
 
+  // TODO - add route to update individual notification request detail as sent
+  // need more info on what the smtp gateway returns on individual failure
+
   /**
    * Mark all request detail records for a request as failed. Only called on the final attempt.
    */
@@ -60,6 +63,9 @@ export class NotificationRequestDetailService {
       { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
     )
   }
+
+  // TODO - add route to update individual notification request detail as failed
+  // need more info on what the smtp gateway returns on individual failure
 
   /**
    * Increment attempt_count and reset status to pending before a retry attempt.
@@ -84,7 +90,7 @@ export class NotificationRequestDetailService {
 
   /**
    * DEBUG: Retrieve all request detail records across all requests, newest first.
-   * Remove when per-request filtering is confirmed working.
+   * Remove later.
    */
   async findAllDebug(): Promise<NotificationRequestDetail[]> {
     return this.detailRepository.find({ order: { createdAt: 'DESC' } })
