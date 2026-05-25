@@ -58,10 +58,20 @@ export class NotificationController {
   }
 
   @Version('1')
-  @Get(':id/deliveries')
+  @Get('request_details')
   @RequireRole('NOTIFY_ADMIN')
-  @ApiOperation({ summary: 'List individual request detail records for a notification request' })
-  findDeliveries(@Param('id') id: string) {
-    return this.notificationRequestDetailService.findByRequestId(id)
+  @ApiOperation({
+    summary: 'List all notification request detail records for the authenticated tenant',
+  })
+  findAllDeliveries(@GetTenant() tenant: Tenant) {
+    return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
+  }
+
+  @Version('1')
+  @Get(':id/request_details')
+  @RequireRole('NOTIFY_ADMIN')
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  findDeliveries(@GetTenant() tenant: Tenant, @Param('id') id: string) {
+    return this.notificationRequestDetailService.findByRequestId(id, tenant.id)
   }
 }

@@ -6,8 +6,7 @@ import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest
 
 /**
  * NotificationRequestDetailTable Component
- * DEBUG: Displays all request detail records across all notification requests.
- * Swap listDeliveriesDebug() for listDeliveries(id) when per-request filtering is needed.
+ * Displays all delivery records for the authenticated tenant.
  */
 const NotificationRequestDetailTable: FC = () => {
   const [deliveries, setDeliveries] = useState<NotificationRequestDetail[]>([])
@@ -18,7 +17,7 @@ const NotificationRequestDetailTable: FC = () => {
     setIsLoading(true)
     setError(null)
     notificationApi
-      .listDeliveriesDebug()
+      .listAllRequestDetails()
       .then(setDeliveries)
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : 'Failed to load request detail records'),

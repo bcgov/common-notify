@@ -79,20 +79,27 @@ export class NotificationRequestDetailService {
   }
 
   /**
-   * Retrieve all request detail records for a notification request, ordered by creation time.
+   * Retrieve all request detail records for a notification request belonging to a tenant.
    */
-  async findByRequestId(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+  async findByRequestId(
+    notificationRequestId: string,
+    tenantId: string,
+  ): Promise<NotificationRequestDetail[]> {
     return this.detailRepository.find({
-      where: { notificationRequestId },
-      order: { createdAt: 'ASC' },
+      where: { notificationRequestId, notificationRequest: { tenantId } },
+      relations: { notificationRequest: true },
+      order: { createdAt: 'DESC' },
     })
   }
 
   /**
-   * DEBUG: Retrieve all request detail records across all requests, newest first.
-   * Remove later.
+   * Retrieve all request detail records for a tenant, newest first.
    */
-  async findAllDebug(): Promise<NotificationRequestDetail[]> {
-    return this.detailRepository.find({ order: { createdAt: 'DESC' } })
+  async findAllByTenantId(tenantId: string): Promise<NotificationRequestDetail[]> {
+    return this.detailRepository.find({
+      where: { notificationRequest: { tenantId } },
+      relations: { notificationRequest: true },
+      order: { createdAt: 'DESC' },
+    })
   }
 }

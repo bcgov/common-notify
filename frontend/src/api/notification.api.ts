@@ -53,23 +53,22 @@ export const notificationApi = {
   },
 
   /**
-   * Fetch individual delivery records for a notification request
-   * GET /api/v1/frontend/notification_request/:id/deliveries
+   * Fetch individual delivery records for a notification request.
+   * GET /api/v1/frontend/notification_request/:id/request_details
    */
-  async listDeliveries(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+  async listRequestDetails(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
     const params = generateApiParameters(
-      `/api/v1/frontend/notification_request/${notificationRequestId}/deliveries`,
+      `/api/v1/frontend/notification_request/${notificationRequestId}/request_details`,
     )
     return get<NotificationRequestDetail[]>(params)
   },
 
   /**
-   * DEBUG: Fetch all delivery records across all notification requests.
-   * GET /api/v1/frontend/notification_request/debug/deliveries
-   * Remove when per-request filtering is confirmed working.
+   * Fetch all delivery records for the authenticated tenant.
+   * GET /api/v1/frontend/notification_request/request_details
    */
-  async listDeliveriesDebug(): Promise<NotificationRequestDetail[]> {
-    const params = generateApiParameters('/api/v1/frontend/notification_request/debug/deliveries')
+  async listAllRequestDetails(): Promise<NotificationRequestDetail[]> {
+    const params = generateApiParameters('/api/v1/frontend/notification_request/request_details')
     return get<NotificationRequestDetail[]>(params)
   },
 

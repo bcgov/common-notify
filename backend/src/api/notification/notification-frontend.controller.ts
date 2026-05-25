@@ -8,6 +8,7 @@ import {
   BadRequestException,
   UseGuards,
   Param,
+  Headers,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
@@ -130,18 +131,26 @@ export class NotificationFrontendController {
   }
 
   @Version('1')
-  @Get('debug/deliveries')
-  @RequireRole('NOTIFY_ADMIN')
-  @ApiOperation({ summary: '[DEBUG] List all delivery records across all notification requests' })
-  findAllDeliveriesDebug() {
-    return this.notificationRequestDetailService.findAllDebug()
+  @Get('request_details')
+  @ApiOperation({
+    summary: 'List all notification request detail records for the authenticated tenant',
+  })
+  async findAllDeliveries(@Headers('x-tenant-id') tenantExternalId: string) {
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
+    }
+    return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
   }
 
   @Version('1')
-  @Get(':id/deliveries')
-  @RequireRole('NOTIFY_ADMIN')
-  @ApiOperation({ summary: 'List individual delivery records for a notification request' })
-  findDeliveries(@Param('id') id: string) {
-    return this.notificationRequestDetailService.findByRequestId(id)
+  @Get(':id/request_details')
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  async findDeliveries(@Headers('x-tenant-id') tenantExternalId: string, @Param('id') id: string) {
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
+    }
+    return this.notificationRequestDetailService.findByRequestId(id, tenant.id)
   }
 }
