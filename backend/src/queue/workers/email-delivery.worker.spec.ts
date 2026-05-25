@@ -15,6 +15,7 @@ describe('EmailDeliveryWorker', () => {
   let mockTemplatesService: any
   let mockInlineRenderingService: any
   let mockEmailAdapter: IEmailTransport
+  let mockRequestDetailService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
@@ -26,6 +27,14 @@ describe('EmailDeliveryWorker', () => {
       send: vi.fn().mockResolvedValue({
         messageId: `ches-${Date.now()}`,
       }),
+    }
+
+    // Mock the request detail service
+    mockRequestDetailService = {
+      createPending: vi.fn().mockResolvedValue(undefined),
+      resetForRetry: vi.fn().mockResolvedValue(undefined),
+      markSent: vi.fn().mockResolvedValue(undefined),
+      markFailed: vi.fn().mockResolvedValue(undefined),
     }
 
     // Mock the notification service
@@ -107,6 +116,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       expect(mockEmailQueue.process).toHaveBeenCalled()
@@ -121,6 +131,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       expect(mockEmailQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -136,6 +147,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -195,6 +207,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -238,6 +251,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -275,6 +289,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -313,6 +328,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -352,6 +368,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -391,6 +408,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -430,6 +448,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -469,6 +488,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -509,6 +529,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       // Simulate final attempt
@@ -558,6 +579,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -623,6 +645,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -666,6 +689,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -707,6 +731,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -752,6 +777,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -798,6 +824,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -844,6 +871,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockEmailAdapter,
+        mockRequestDetailService,
         5, // Custom concurrency
       )
 

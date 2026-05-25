@@ -5,6 +5,7 @@ import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
 
@@ -31,6 +32,11 @@ const mockNotificationService = {
   findAll: vi.fn(),
 }
 
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
+}
+
 describe('NotificationController', () => {
   let service: NotificationService
   let app: INestApplication
@@ -38,7 +44,13 @@ describe('NotificationController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationController],
-      providers: [{ provide: NotificationService, useValue: mockNotificationService }],
+      providers: [
+        { provide: NotificationService, useValue: mockNotificationService },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
+      ],
     })
       .overrideGuard(AuthJwtGuard)
       .useValue(mockAuthGuard)

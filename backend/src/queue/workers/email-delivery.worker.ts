@@ -78,6 +78,23 @@ export class EmailDeliveryWorker {
         // Cast payload to email channel type for type safety
         let emailPayload = payload as NotifyEmailChannel
 
+        if (
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+          throw new Error('Invalid email payload: subject is missing or invalid')
+        }
+
+        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+          throw new Error('Invalid email payload: body is missing or invalid')
+        }
+
         // Track per-recipient delivery status
         if ((job.attemptsMade ?? 0) === 0) {
           await requestDetailService.createPending(
@@ -155,23 +172,6 @@ export class EmailDeliveryWorker {
             )
             throw renderError
           }
-        }
-
-        if (
-          !emailPayload.recipients ||
-          !emailPayload.recipients.to ||
-          !Array.isArray(emailPayload.recipients.to) ||
-          emailPayload.recipients.to.length === 0
-        ) {
-          throw new Error('Invalid email payload: recipient email address is missing or invalid')
-        }
-
-        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
-          throw new Error('Invalid email payload: subject is missing or invalid')
-        }
-
-        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
-          throw new Error('Invalid email payload: body is missing or invalid')
         }
 
         // Update status to SENDING (only after all validations pass)
