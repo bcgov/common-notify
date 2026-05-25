@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
@@ -13,6 +14,11 @@ import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
 const mockNotificationService = {
   findAll: vi.fn(),
+}
+
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
 }
 
 const mockNotificationPubSubService = {
@@ -45,6 +51,10 @@ describe('NotificationFrontendController', () => {
         {
           provide: NotificationService,
           useValue: mockNotificationService,
+        },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
         },
         {
           provide: NotificationPubSubService,
