@@ -114,11 +114,9 @@ export class NotificationFrontendController {
       throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
     }
 
-    const tenantId = tenant.id
-
     // Observable stream
     const updates$ = this.notificationPubSubService
-      .getObservable(tenantId)
+      .getObservable(tenant.id)
       .pipe(map((dto) => ({ data: dto }) as MessageEvent))
 
     // Emit a named keepalive event every 25s to prevent proxy/LB idle-connection timeouts.
