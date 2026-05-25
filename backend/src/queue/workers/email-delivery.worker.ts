@@ -47,7 +47,7 @@ export class EmailDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
-    deliveryService: NotificationRequestDetailService,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -80,14 +80,14 @@ export class EmailDeliveryWorker {
 
         // Track per-recipient delivery status
         if ((job.attemptsMade ?? 0) === 0) {
-          await deliveryService.createPending(
+          await requestDetailService.createPending(
             notifyId,
             (payload as NotifyEmailChannel).recipients.to,
             'email',
             tenantId,
           )
         } else {
-          await deliveryService.resetForRetry(notifyId)
+          await requestDetailService.resetForRetry(notifyId)
         }
 
         // Resolve template if templateId is provided in the original request
@@ -192,7 +192,7 @@ export class EmailDeliveryWorker {
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
         // Mark delivery records as sent (notification delivery doesn't use completed right now)
-        await deliveryService.markSent(notifyId, result.externalId)
+        await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -217,7 +217,7 @@ export class EmailDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
-          await deliveryService.markFailed(notifyId, errorMessage)
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
