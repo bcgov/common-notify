@@ -46,7 +46,7 @@ export class SmsDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     smsAdapter: ISmsTransport,
-    deliveryService: NotificationRequestDetailService,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)
@@ -77,14 +77,14 @@ export class SmsDeliveryWorker {
         // Resolve template if templateId is provided in the original request
         // Track per-recipient delivery status
         if ((job.attemptsMade ?? 0) === 0) {
-          await deliveryService.createPending(
+          await requestDetailService.createPending(
             notifyId,
             (payload as any).recipients?.to ?? [],
             'sms',
             tenantId,
           )
         } else {
-          await deliveryService.resetForRetry(notifyId)
+          await requestDetailService.resetForRetry(notifyId)
         }
 
         let resolvedPayload = payload
@@ -182,7 +182,7 @@ export class SmsDeliveryWorker {
         logger.debug(`[${notifyId}] SMS sent successfully: ${JSON.stringify(result)}`)
 
         // Mark delivery records as sent (notification delivery doesn't use completed right now)
-        await deliveryService.markSent(notifyId, result.externalId)
+        await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -207,7 +207,7 @@ export class SmsDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
-          await deliveryService.markFailed(notifyId, errorMessage)
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
