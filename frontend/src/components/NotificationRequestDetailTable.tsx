@@ -37,8 +37,6 @@ const NotificationRequestDetailTable: FC = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setIsLoading(true)
-    setError(null)
     notificationApi
       .listAllRequestDetails()
       .then(setDeliveries)
