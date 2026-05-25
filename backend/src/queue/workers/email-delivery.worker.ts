@@ -191,7 +191,7 @@ export class EmailDeliveryWorker {
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
-        // Mark delivery records as sent (notification delivery doesn't use completed right now)
+        // Request has made it to the smtp gateway, update request detail records as sent
         await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
