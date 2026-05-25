@@ -10,7 +10,7 @@ CREATE TABLE notification_request_detail (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   notification_request_id UUID NOT NULL,
   recipient_address VARCHAR(255) NOT NULL,
-  channel VARCHAR(20) NOT NULL DEFAULT 'email',
+  channel VARCHAR(20) NOT NULL DEFAULT 'EMAIL',
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   provider_response_id VARCHAR(255),
   provider_response JSONB,
@@ -27,6 +27,9 @@ CREATE TABLE notification_request_detail (
   CONSTRAINT fk_delivery_status
     FOREIGN KEY (status)
     REFERENCES notification_status_code(code),
+  CONSTRAINT fk_channel_code
+    FOREIGN KEY (channel)
+    REFERENCES notification_channel_code(channel_code),
   CONSTRAINT uq_notification_request_detail_recipient
     UNIQUE (notification_request_id, recipient_address, channel)
 );
