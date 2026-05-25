@@ -1,8 +1,31 @@
-import { Table } from 'react-bootstrap'
 import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { notificationApi } from '@/api'
 import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
+import { DataTable } from '@/components/DataTable'
+import type { TableColumn } from '@/components/DataTable'
+
+const columns: TableColumn<NotificationRequestDetail>[] = [
+  { key: 'recipientAddress', label: 'Recipient' },
+  { key: 'channel', label: 'Channel' },
+  { key: 'status', label: 'Status' },
+  { key: 'attemptCount', label: 'Attempts' },
+  {
+    key: 'providerResponseId',
+    label: 'Provider Response ID',
+    render: (value) => (value as string | undefined) ?? '—',
+  },
+  {
+    key: 'lastAttemptAt',
+    label: 'Last Attempt',
+    render: (value) => (value ? new Date(value as string).toLocaleString() : '—'),
+  },
+  {
+    key: 'errorMessage',
+    label: 'Error',
+    render: (value) => (value as string | undefined) ?? '—',
+  },
+]
 
 /**
  * NotificationRequestDetailTable Component
@@ -28,46 +51,14 @@ const NotificationRequestDetailTable: FC = () => {
   return (
     <div>
       {error && <p className="text-danger">{error}</p>}
-      <Table bordered hover responsive size="sm">
-        <thead>
-          <tr>
-            <th>Recipient</th>
-            <th>Channel</th>
-            <th>Status</th>
-            <th>Attempts</th>
-            <th>Provider Response ID</th>
-            <th>Last Attempt</th>
-            <th>Error</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <tr>
-              <td colSpan={7} className="text-center">
-                Loading...
-              </td>
-            </tr>
-          ) : deliveries.length > 0 ? (
-            deliveries.map((row) => (
-              <tr key={row.id}>
-                <td>{row.recipientAddress}</td>
-                <td>{row.channel}</td>
-                <td>{row.status}</td>
-                <td>{row.attemptCount}</td>
-                <td>{row.providerResponseId ?? '—'}</td>
-                <td>{row.lastAttemptAt ? new Date(row.lastAttemptAt).toLocaleString() : '—'}</td>
-                <td>{row.errorMessage ?? '—'}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={7} className="text-center">
-                No request detail records found
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={deliveries}
+        keyExtractor={(row) => row.id}
+        isLoading={isLoading}
+        emptyMessage="No request detail records found"
+        label="Notification Request Details"
+      />
     </div>
   )
 }
