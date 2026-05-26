@@ -1865,9 +1865,9 @@
                   "options": { "raw": { "language": "json" } }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/email",
+                  "raw": "{{gateway_url}}/ches/api/v1/email",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "email"]
+                  "path": ["ches", "api", "v1", "email"]
                 },
                 "description": "Send a single email via CHES. Returns a transaction response with txId and message IDs."
               },
@@ -1888,9 +1888,9 @@
                   "options": { "raw": { "language": "json" } }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/emailMerge",
+                  "raw": "{{gateway_url}}/ches/api/v1/emailMerge",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "emailMerge"]
+                  "path": ["ches", "api", "v1", "emailMerge"]
                 },
                 "description": "Perform a mail merge and send emails to multiple recipients. Each entry in `contexts` becomes a separate message with its own `to` and template variables."
               },
@@ -1911,9 +1911,9 @@
                   "options": { "raw": { "language": "json" } }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/emailMerge/preview",
+                  "raw": "{{gateway_url}}/ches/api/v1/emailMerge/preview",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "emailMerge", "preview"]
+                  "path": ["ches", "api", "v1", "emailMerge", "preview"]
                 },
                 "description": "Preview the resolved merge payloads without sending. Returns an array of fully-rendered message objects."
               },
@@ -1929,9 +1929,9 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/status?tag=test",
+                  "raw": "{{gateway_url}}/ches/api/v1/status?tag=test",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "status"],
+                  "path": ["ches", "api", "v1", "status"],
                   "query": [
                     { "key": "msgId", "value": "", "disabled": true },
                     { "key": "status", "value": "", "disabled": true },
@@ -1953,9 +1953,9 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/status/{{ches_msg_id}}",
+                  "raw": "{{gateway_url}}/ches/api/v1/status/{{ches_msg_id}}",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "status", "{{ches_msg_id}}"]
+                  "path": ["ches", "api", "v1", "status", "{{ches_msg_id}}"]
                 },
                 "description": "Get the full status and history for a single message by its UUID. Set `ches_msg_id` to the msgId returned from a send response."
               },
@@ -1971,9 +1971,9 @@
                 "method": "POST",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/promote?tag=test",
+                  "raw": "{{gateway_url}}/ches/api/v1/promote?tag=test",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "promote"],
+                  "path": ["ches", "api", "v1", "promote"],
                   "query": [
                     { "key": "msgId", "value": "", "disabled": true },
                     { "key": "status", "value": "", "disabled": true },
@@ -1995,9 +1995,9 @@
                 "method": "POST",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/promote/{{ches_msg_id}}",
+                  "raw": "{{gateway_url}}/ches/api/v1/promote/{{ches_msg_id}}",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "promote", "{{ches_msg_id}}"]
+                  "path": ["ches", "api", "v1", "promote", "{{ches_msg_id}}"]
                 },
                 "description": "Immediately promote and dispatch a single message by UUID. Set `ches_msg_id` to the target msgId."
               },
@@ -2013,9 +2013,9 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/cancel?tag=test",
+                  "raw": "{{gateway_url}}/ches/api/v1/cancel?tag=test",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "cancel"],
+                  "path": ["ches", "api", "v1", "cancel"],
                   "query": [
                     { "key": "msgId", "value": "", "disabled": true },
                     { "key": "status", "value": "", "disabled": true },
@@ -2037,9 +2037,9 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/cancel/{{ches_msg_id}}",
+                  "raw": "{{gateway_url}}/ches/api/v1/cancel/{{ches_msg_id}}",
                   "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "cancel", "{{ches_msg_id}}"]
+                  "path": ["ches", "api", "v1", "cancel", "{{ches_msg_id}}"]
                 },
                 "description": "Cancel a single message by UUID. Set `ches_msg_id` to the target msgId."
               },
