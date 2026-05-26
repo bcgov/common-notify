@@ -80,7 +80,15 @@ spec:
           volumeMounts:
             - name: clamav-data
               mountPath: /var/lib/clamav
+            - name: clamav-run
+              mountPath: /run/clamav
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: clamav-data
+          emptyDir: {}
+        - name: clamav-run
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 {{- end }}
