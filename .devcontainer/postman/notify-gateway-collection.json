@@ -1848,213 +1848,43 @@
           "response": []
         },
         {
-          "name": "CHES (Passthrough)",
-          "item": [
-            {
-              "name": "CHES - Send Email",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"to\": [\"{{recipient_email}}\"],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Test Email\",\n  \"body\": \"<h1>Hello</h1><p>This is a test email.</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"utf-8\",\n  \"priority\": \"normal\",\n  \"tag\": \"test\"\n}",
-                  "options": { "raw": { "language": "json" } }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/email",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "email"]
-                },
-                "description": "Send a single email via CHES. Returns a transaction response with txId and message IDs."
-              },
-              "response": []
+          "name": "CHES - Send Email (Bearer Token)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
             },
-            {
-              "name": "CHES - Email Merge",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"subject\": \"Hello {{ name }}\",\n  \"body\": \"<p>Hello {{ name }}, welcome!</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"utf-8\",\n  \"priority\": \"normal\",\n  \"contexts\": [\n    {\n      \"to\": [\"{{recipient_email}}\"],\n      \"context\": { \"name\": \"Test User\" }\n    }\n  ]\n}",
-                  "options": { "raw": { "language": "json" } }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/emailMerge",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "emailMerge"]
-                },
-                "description": "Perform a mail merge and send emails to multiple recipients. Each entry in `contexts` becomes a separate message with its own `to` and template variables."
-              },
-              "response": []
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"to\": [\n    \"{{recipient_email}}\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Test Email\",\n  \"body\": \"<h1>Hello</h1><p>This is a test email sent with Bearer token authentication.</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"UTF-8\",\n  \"priority\": \"normal\",\n  \"attachments\": [],\n  \"tag\": \"test\",\n  \"delayTs\": null,\n  \"mergeData\": {}\n}"
             },
-            {
-              "name": "CHES - Email Merge Preview",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"from\": \"noreply@gov.bc.ca\",\n  \"subject\": \"Hello {{ name }}\",\n  \"body\": \"<p>Hello {{ name }}, welcome!</p>\",\n  \"bodyType\": \"html\",\n  \"encoding\": \"utf-8\",\n  \"priority\": \"normal\",\n  \"contexts\": [\n    {\n      \"to\": [\"{{recipient_email}}\"],\n      \"context\": { \"name\": \"Test User\" }\n    }\n  ]\n}",
-                  "options": { "raw": { "language": "json" } }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/emailMerge/preview",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "emailMerge", "preview"]
-                },
-                "description": "Preview the resolved merge payloads without sending. Returns an array of fully-rendered message objects."
-              },
-              "response": []
+            "url": {
+              "raw": "{{gateway_url}}/ches/api/v1/email",
+              "host": ["{{gateway_url}}"],
+              "path": ["ches", "api", "v1", "email"]
             },
-            {
-              "name": "CHES - Get Status (Query)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/status?tag=test",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "status"],
-                  "query": [
-                    { "key": "msgId", "value": "", "disabled": true },
-                    { "key": "status", "value": "", "disabled": true },
-                    { "key": "tag", "value": "test" },
-                    { "key": "txId", "value": "", "disabled": true }
-                  ]
-                },
-                "description": "Query message statuses. At least one of `msgId`, `status`, `tag`, or `txId` should be provided."
-              },
-              "response": []
-            },
-            {
-              "name": "CHES - Get Status (Single Message)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/status/{{ches_msg_id}}",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "status", "{{ches_msg_id}}"]
-                },
-                "description": "Get the full status and history for a single message by its UUID. Set `ches_msg_id` to the msgId returned from a send response."
-              },
-              "response": []
-            },
-            {
-              "name": "CHES - Promote Messages (Query)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/promote?tag=test",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "promote"],
-                  "query": [
-                    { "key": "msgId", "value": "", "disabled": true },
-                    { "key": "status", "value": "", "disabled": true },
-                    { "key": "tag", "value": "test" },
-                    { "key": "txId", "value": "", "disabled": true }
-                  ]
-                },
-                "description": "Immediately promote and dispatch all matching messages that are still in the accepted/enqueued/delayed state."
-              },
-              "response": []
-            },
-            {
-              "name": "CHES - Promote Message (Single)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/promote/{{ches_msg_id}}",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "promote", "{{ches_msg_id}}"]
-                },
-                "description": "Immediately promote and dispatch a single message by UUID. Set `ches_msg_id` to the target msgId."
-              },
-              "response": []
-            },
-            {
-              "name": "CHES - Cancel Messages (Query)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "DELETE",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/cancel?tag=test",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "cancel"],
-                  "query": [
-                    { "key": "msgId", "value": "", "disabled": true },
-                    { "key": "status", "value": "", "disabled": true },
-                    { "key": "tag", "value": "test" },
-                    { "key": "txId", "value": "", "disabled": true }
-                  ]
-                },
-                "description": "Cancel all matching messages that are still in the enqueued/delayed state."
-              },
-              "response": []
-            },
-            {
-              "name": "CHES - Cancel Message (Single)",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
-                },
-                "method": "DELETE",
-                "header": [],
-                "url": {
-                  "raw": "{{gateway_url}}/api/v1/ches/cancel/{{ches_msg_id}}",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "ches", "cancel", "{{ches_msg_id}}"]
-                },
-                "description": "Cancel a single message by UUID. Set `ches_msg_id` to the target msgId."
-              },
-              "response": []
-            }
-          ]
+            "description": "Send an email using Bearer token authentication (OAuth2 or JWT) via CHES compatibility endpoint.\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
+          },
+          "response": []
         }
       ]
     }
   ],
   "variable": [
-    {
-      "key": "ches_msg_id",
-      "value": ""
-    },
     {
       "key": "gateway_url",
       "value": "https://gw-fe8c5-notify.dev.api.gov.bc.ca"
