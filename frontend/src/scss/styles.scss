@@ -11,6 +11,7 @@
 @import './components/sidebar.scss';
 @import './components/test-notification-form.scss';
 @import './components/data-table.scss';
+@import './components/page-limit-control.scss';
 @import './components/status-badge.scss';
 
 // Import Bootstrap and Bootstrap Icons
@@ -23,7 +24,7 @@ $bootstrap-icons-font-src:
 // Global font family (after Bootstrap so it overrides Bootstrap's reboot)
 html,
 body {
-  font-family: 'BCSans', sans-serif;
+  font-family: 'BC Sans', sans-serif;
 }
 
 // Make BCGov Select button fill its container when width is set on the wrapper

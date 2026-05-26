@@ -1,0 +1,22 @@
+.page-limit-control {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+  font-family: 'BCSans', sans-serif;
+  font-size: $font-size-base;
+  color: $dark-text;
+}
+
+.page-limit-control__select {
+  width: auto;
+  min-width: 90px;
+}
+
+.page-limit-control .bcds-react-aria-Select--Button > .bcds-react-aria-SelectValue::before {
+  content: 'Show: ';
+}
+
+.page-limit-control__result {
+  white-space: nowrap;
+}

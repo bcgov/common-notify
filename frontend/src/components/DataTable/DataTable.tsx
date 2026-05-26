@@ -79,6 +79,7 @@ export function DataTable<T extends object>({
   className = '',
   footerContent,
 }: TableProps<T>) {
+  data = data ?? []
   // Cycle through sort options null -> asc -> desc -> null for the key
   function handleSort(key: string) {
     let order: 'asc' | 'desc' | null
