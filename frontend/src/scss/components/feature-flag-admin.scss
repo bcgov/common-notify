@@ -1,0 +1,234 @@
+/* Feature Flag Admin Component Styles (SCSS) */
+
+@import '../variables';
+
+// Transitions
+$transition-all: all 0.2s;
+
+// Typography (BCSans is the official BC Government font - used for all text)
+$font-family-mono: 'BCSans', sans-serif;
+
+.feature-flag-admin {
+  margin: $spacing-xl auto;
+  padding: $spacing-xl;
+  font-family: 'BCSans', sans-serif;
+
+  &.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    color: $text-secondary;
+  }
+
+  h1 {
+    margin-top: 0;
+    margin-bottom: $spacing-xl;
+    color: $dark-text;
+  }
+}
+
+// Error Message
+.error-message {
+  background-color: rgba($danger-color, 0.1);
+  color: $danger-color;
+  padding: $spacing-md;
+  border-radius: 4px;
+  margin-bottom: $spacing-md;
+  border-left: 4px solid $danger-color;
+}
+
+// Admin Controls
+.admin-controls {
+  display: flex;
+  gap: $spacing-md;
+  margin-bottom: $spacing-xl;
+  flex-wrap: wrap;
+}
+
+.tenant-filter {
+  padding: $spacing-sm;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+// Create Flag Form
+.create-flag-form {
+  background-color: $light-bg;
+  padding: $spacing-lg;
+  border-radius: 4px;
+  margin-bottom: $spacing-xl;
+  border: 1px solid $border-default;
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: $spacing-md;
+    color: $dark-text;
+  }
+}
+
+.form-group {
+  margin-bottom: $spacing-md;
+
+  label {
+    display: block;
+    margin-bottom: $spacing-sm;
+    font-weight: 500;
+    color: $dark-text;
+  }
+
+  input[type='text'],
+  input[type='email'],
+  textarea {
+    width: 100%;
+    padding: $spacing-sm;
+    border: 1px solid $border-default;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+  }
+
+  input[type='checkbox'] {
+    margin-right: $spacing-sm;
+  }
+}
+
+.form-actions {
+  display: flex;
+  gap: $spacing-md;
+  margin-top: $spacing-lg;
+}
+
+// Flags Grid
+.flags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: $spacing-xl;
+}
+
+.flag-group {
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: $white;
+}
+
+.flag-code {
+  background-color: $light-bg;
+  margin: 0;
+  padding: $spacing-md;
+  font-size: 1rem;
+  color: $dark-text;
+  border-bottom: 1px solid $border-default;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.flag-instances {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.flag-item {
+  padding: $spacing-md;
+  border-bottom: 1px solid $border-default;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.enabled {
+    background-color: rgba($success-color, 0.1);
+  }
+
+  &.disabled {
+    background-color: rgba($danger-color, 0.1);
+  }
+
+  &.override {
+    border-left: 3px solid $warning-color;
+  }
+}
+
+.flag-info {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scope-badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  background-color: rgba($primary-color, 0.1);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $primary-color;
+  text-transform: uppercase;
+
+  .flag-item.override & {
+    background-color: rgba($warning-color, 0.2);
+    color: $dark-text;
+  }
+}
+
+.tenant-id {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  background-color: rgba($primary-color, 0.15);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: $primary-color;
+  font-family: $font-family-mono;
+}
+
+.flag-controls {
+  display: flex;
+  gap: $spacing-sm;
+}
+
+.flag-timestamps {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+
+  small {
+    font-size: 0.75rem;
+    color: $text-secondary;
+  }
+}
+
+// Responsive
+@media (max-width: $breakpoint-md) {
+  .feature-flag-admin {
+    padding: $spacing-md;
+  }
+
+  .admin-controls {
+    flex-direction: column;
+
+    button,
+    select {
+      width: 100%;
+    }
+  }
+
+  .flags-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flag-controls {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+  }
+}

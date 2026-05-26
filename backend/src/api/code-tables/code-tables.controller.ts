@@ -70,4 +70,19 @@ export class CodeTablesController {
   async getEventTypes(): Promise<CodeTableItemDto[]> {
     return this.codeTablesService.getEventTypes()
   }
+
+  /**
+   * Get feature flag codes
+   */
+  @Version('1')
+  @Get('feature-flags')
+  @ApiOperation({
+    summary: 'Get feature flag codes',
+    description:
+      'Returns all valid feature flag codes (sms_notifications, sse_notifications, etc.) for feature gating',
+  })
+  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
+  async getFeatureCodes(): Promise<CodeTableItemDto[]> {
+    return this.codeTablesService.getFeatureCodes()
+  }
 }

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotificationEventsRouteImport } from './routes/notification-events'
 import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
@@ -17,11 +18,17 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplatesTemplateIdRouteImport } from './routes/templates/$templateId'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
+import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as AdminClientsRouteImport } from './routes/admin/clients'
 
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplateCreateRoute = TemplateCreateRouteImport.update({
+  id: '/template-create',
+  path: '/template-create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -59,6 +66,11 @@ const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   path: '/template-edit/$templateId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
+  id: '/admin/feature-flags',
+  path: '/admin/feature-flags',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminClientsRoute = AdminClientsRouteImport.update({
   id: '/admin/clients',
   path: '/admin/clients',
@@ -71,8 +83,10 @@ export interface FileRoutesByFullPath {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -82,8 +96,10 @@ export interface FileRoutesByTo {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -94,8 +110,10 @@ export interface FileRoutesById {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -107,8 +125,10 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
+    | '/admin/feature-flags'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
@@ -118,8 +138,10 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
+    | '/admin/feature-flags'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   id:
@@ -129,8 +151,10 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
+    | '/admin/feature-flags'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   fileRoutesById: FileRoutesById
@@ -141,8 +165,10 @@ export interface RootRouteChildren {
   DistributionListsRoute: typeof DistributionListsRoute
   NotificationEventsRoute: typeof NotificationEventsRoute
   SettingsRoute: typeof SettingsRoute
+  TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
   AdminClientsRoute: typeof AdminClientsRoute
+  AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
 }
 
@@ -153,6 +179,13 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/template-create': {
+      id: '/template-create'
+      path: '/template-create'
+      fullPath: '/template-create'
+      preLoaderRoute: typeof TemplateCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -204,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/feature-flags': {
+      id: '/admin/feature-flags'
+      path: '/admin/feature-flags'
+      fullPath: '/admin/feature-flags'
+      preLoaderRoute: typeof AdminFeatureFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/clients': {
       id: '/admin/clients'
       path: '/admin/clients'
@@ -232,8 +272,10 @@ const rootRouteChildren: RootRouteChildren = {
   DistributionListsRoute: DistributionListsRoute,
   NotificationEventsRoute: NotificationEventsRoute,
   SettingsRoute: SettingsRoute,
+  TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
   AdminClientsRoute: AdminClientsRoute,
+  AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
 }
 export const routeTree = rootRouteImport

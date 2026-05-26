@@ -18,6 +18,7 @@ import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
 import { GcNotifyModule } from './api/gc-notify/gc-notify.module'
 import { ClamavService } from './services/clamav.service'
+import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ClamavService } from './services/clamav.service'
     AuthModule,
     ChesModule,
     NotificationModule,
+    FeatureFlagModule,
     AdaptersModule.forRoot(),
     GcNotifyModule.forRoot(),
   ],

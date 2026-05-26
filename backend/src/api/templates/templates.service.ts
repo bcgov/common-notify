@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Inject,
+} from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -8,6 +14,7 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
@@ -45,7 +52,8 @@ export class TemplatesService {
     tenantId: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
+    search?: string,
+  ): Promise<PaginatedTemplateResponse> {
     // Validate pagination limits
     if (limit > 100) {
       throw new BadRequestException('Limit must not exceed 100 items per page')
@@ -59,8 +67,19 @@ export class TemplatesService {
 
     // Convert page number to offset (1-indexed to 0-indexed)
     const offset = (page - 1) * limit
-    const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
-    return templates.map((t) => this.toResponseDto(t))
+    const [templates, total] = await this.templatesRepository.findByTenantId(
+      tenantId,
+      limit,
+      offset,
+      search,
+    )
+    return {
+      data: templates.map((t) => this.toResponseDto(t)),
+      count: total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   /**
@@ -73,7 +92,8 @@ export class TemplatesService {
     tenantExternalId: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
+    search?: string,
+  ): Promise<PaginatedTemplateResponse> {
     // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {
@@ -81,7 +101,7 @@ export class TemplatesService {
     }
 
     // Use the internal tenant ID to list templates
-    return this.listTemplates(tenant.id, page, limit)
+    return this.listTemplates(tenant.id, page, limit, search)
   }
 
   /**
@@ -114,7 +134,7 @@ export class TemplatesService {
     // Check if template name already exists for this tenant
     const existing = await this.templatesRepository.findByName(tenantId, createDto.name)
     if (existing) {
-      throw new BadRequestException(`Template name "${createDto.name}" already exists`)
+      throw new ConflictException(`Template name "${createDto.name}" already exists`)
     }
 
     const template = await this.templatesRepository.create({
@@ -180,7 +200,7 @@ export class TemplatesService {
     if (updateDto.name && updateDto.name !== template.name) {
       const existing = await this.templatesRepository.findByName(tenantId, updateDto.name)
       if (existing) {
-        throw new BadRequestException(`Template name "${updateDto.name}" already exists`)
+        throw new ConflictException(`Template name "${updateDto.name}" already exists`)
       }
     }
 
