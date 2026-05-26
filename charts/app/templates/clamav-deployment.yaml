@@ -27,8 +27,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 100
-        fsGroup: 101
       containers:
         - name: clamav
           image: clamav/clamav:latest
