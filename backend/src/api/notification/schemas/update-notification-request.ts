@@ -23,7 +23,6 @@ export class UpdateNotificationRequestDto {
   errorReason?: string
 
   @ApiPropertyOptional({
-    type: 'object',
     description: 'Quarantine details when notification is flagged as malware',
   })
   @IsOptional()

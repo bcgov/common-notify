@@ -1,0 +1,88 @@
+{{- if .Values.backend.clamav.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-clamav
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: clamav
+      app.kubernetes.io/name: clamav
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: clamav
+        app.kubernetes.io/name: clamav
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        fsGroup: 101
+      containers:
+        - name: clamav
+          image: clamav/clamav:latest
+          imagePullPolicy: Always
+          ports:
+            - name: clamd
+              containerPort: 3310
+              protocol: TCP
+          env:
+            - name: CLAMD_STARTUP_TIMEOUT
+              value: "600"
+            # Point to BC Gov's ClamAV Mirror Service for definition updates
+            - name: CVD_UPDATE_HOSTNAME
+              value: "clamav-mirror.apps.silver.devops.gov.bc.ca"
+            - name: CVD_UPDATE_SCHEME
+              value: "https"
+          startupProbe:
+            exec:
+              command:
+                - /usr/local/bin/clamdcheck.sh
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/clamdcheck.sh
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/clamdcheck.sh
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          volumeMounts:
+            - name: clamav-data
+              mountPath: /var/lib/clamav
+      volumes:
+        - name: clamav-data
+          emptyDir: {}
+{{- end }}

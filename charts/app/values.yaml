@@ -77,6 +77,16 @@ backend:
     # 3. Monitoring namespace (monitoring policy-group)
     # 4. Any namespace on port 3000 (for Kong API Gateway)
     # NOTE: More restrictive namespace selector needed from platform team
+  #-- ClamAV antivirus scanning configuration
+  clamav:
+    #-- enable or disable ClamAV scanning
+    enabled: true
+    #-- hostname of the ClamAV service (clamd daemon)
+    host: clamav
+    #-- port of the ClamAV service
+    port: 3310
+    #-- connection timeout in milliseconds
+    timeout: 30000
 
 frontend:
   # -- enable or disable a component deployment.
