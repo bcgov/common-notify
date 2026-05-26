@@ -12,5 +12,5 @@ export class NotifyAttachment {
 
   @ApiProperty()
   @IsString()
-  data: string
+  content: string
 }

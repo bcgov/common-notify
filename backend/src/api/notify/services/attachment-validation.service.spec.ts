@@ -83,7 +83,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       } as any,
@@ -99,7 +99,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'note.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('sms attachment').toString('base64'),
+            content: Buffer.from('sms attachment').toString('base64'),
           },
         ],
       } as any,
@@ -115,7 +115,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'image.png',
             mimeType: 'image/png',
-            data: Buffer.from('pngdata').toString('base64'),
+            content: Buffer.from('pngdata').toString('base64'),
           },
         ],
       } as any,
@@ -131,7 +131,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'application/x-msdownload',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       } as any,
@@ -147,7 +147,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: '../secret.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       } as any,
@@ -163,7 +163,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'folder\\hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       } as any,
@@ -179,7 +179,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: 'not-base64!!!',
+            content: 'not-base64!!!',
           },
         ],
       } as any,
@@ -196,7 +196,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'large.txt',
             mimeType: 'text/plain',
-            data: oversizedBuffer.toString('base64'),
+            content: oversizedBuffer.toString('base64'),
           },
         ],
       } as any,
@@ -213,7 +213,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'large-one.txt',
             mimeType: 'text/plain',
-            data: largeBuffer.toString('base64'),
+            content: largeBuffer.toString('base64'),
           },
         ],
       } as any,
@@ -222,7 +222,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: 'large-two.txt',
             mimeType: 'text/plain',
-            data: largeBuffer.toString('base64'),
+            content: largeBuffer.toString('base64'),
           },
         ],
       } as any,
@@ -238,7 +238,7 @@ describe('AttachmentValidationService', () => {
           {
             filename: `${'a'.repeat(256)}.txt`,
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       } as any,

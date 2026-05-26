@@ -57,7 +57,7 @@ export class AttachmentValidationService {
       this.validateMimeType(entry, attachment.mimeType, allowedMimeTypes)
       this.validateFilename(entry, attachment.filename, config.maxFilenameLength)
 
-      const decoded = this.decodeBase64(entry, attachment.data)
+      const decoded = this.decodeBase64(entry, attachment.content)
       const decodedBytes = decoded.byteLength
 
       if (decodedBytes > config.maxAttachmentSizeBytes) {

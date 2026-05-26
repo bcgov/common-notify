@@ -294,7 +294,7 @@ describe('Notify Controllers', () => {
                 {
                   filename: 'hello.txt',
                   mimeType: 'text/plain',
-                  data: 'SGVsbG8gd29ybGQ=',
+                  content: 'SGVsbG8gd29ybGQ=',
                 },
               ],
             },

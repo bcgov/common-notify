@@ -61,7 +61,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       },
@@ -88,7 +88,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'sms.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('sms body').toString('base64'),
+            content: Buffer.from('sms body').toString('base64'),
           },
         ],
       },
@@ -108,7 +108,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'msg.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('msg body').toString('base64'),
+            content: Buffer.from('msg body').toString('base64'),
           },
         ],
       },
@@ -127,7 +127,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       },
@@ -148,7 +148,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'secret-name.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       },
@@ -168,7 +168,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('hello world').toString('base64'),
+            content: Buffer.from('hello world').toString('base64'),
           },
         ],
       },
@@ -188,7 +188,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'hash.txt',
             mimeType: 'text/plain',
-            data: Buffer.from(data).toString('base64'),
+            content: Buffer.from(data).toString('base64'),
           },
         ],
       },
@@ -209,7 +209,7 @@ describe('AttachmentProcessingService', () => {
           {
             filename: 'hello.txt',
             mimeType: 'text/plain',
-            data: Buffer.from('secret payload').toString('base64'),
+            content: Buffer.from('secret payload').toString('base64'),
           },
         ],
       },

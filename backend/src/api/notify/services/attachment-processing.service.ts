@@ -32,7 +32,7 @@ export class AttachmentProcessingService {
               this.storeDecodedAttachment(
                 attachment.filename,
                 attachment.mimeType,
-                attachment.data,
+                attachment.content,
               ),
             ),
           )
@@ -53,7 +53,7 @@ export class AttachmentProcessingService {
               this.storeDecodedAttachment(
                 attachment.filename,
                 attachment.mimeType,
-                attachment.data,
+                attachment.content,
               ),
             ),
           )
@@ -74,7 +74,7 @@ export class AttachmentProcessingService {
               this.storeDecodedAttachment(
                 attachment.filename,
                 attachment.mimeType,
-                attachment.data,
+                attachment.content,
               ),
             ),
           )
