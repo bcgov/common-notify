@@ -426,4 +426,88 @@ export class NotificationService {
 
     return errors
   }
+
+  /**
+   * Cancels or reschedules a notification.
+   *
+   * Cancellation is allowed for notifications in pending, accepted, or scheduled status.
+   * The status is changed to 'cancelled' and the audit fields are updated.
+   *
+   * Rescheduling updates the delayedSendTime field for notifications in pending, accepted,
+   * or scheduled status. The scheduledTime must be in the future.
+   *
+   * @param notificationId UUID of the notification to cancel or reschedule
+   * @param tenantId UUID of the tenant that owns the notification
+   * @param updatedBy User ID making the change (for audit trail)
+   * @param action Action to perform ('cancel') - optional, if not present then scheduledTime must be provided
+   * @param scheduledTime New scheduled time (ISO8601 format) - optional, if not present then action must be 'cancel'
+   * @returns Updated NotificationRequest entity
+   * @throws NotFoundException if notification not found
+   * @throws BadRequestException if notification status doesn't allow modification or scheduledTime is invalid
+   */
+  async cancelOrRescheduleNotification(
+    notificationId: string,
+    tenantId: string,
+    updatedBy: string,
+    action?: 'cancel',
+    scheduledTime?: string,
+  ): Promise<NotificationRequest> {
+    // Fetch the notification
+    const notification = await this.findOne(notificationId, tenantId)
+
+    // Only allow cancellation/rescheduling for notifications in these statuses
+    const allowedStatuses = ['pending', 'accepted', 'scheduled']
+    if (!allowedStatuses.includes(notification.status)) {
+      throw new Error(
+        `Cannot modify notification with status '${notification.status}'. Allowed statuses: ${allowedStatuses.join(', ')}`,
+      )
+    }
+
+    // Perform action
+    if (action === 'cancel') {
+      // Update status to cancelled
+      await this.notificationRepository.update(
+        { id: notificationId, tenantId },
+        {
+          status: 'cancelled',
+          updatedBy,
+          // updatedAt is automatically set by @UpdateDateColumn
+        },
+      )
+      this.logger.log(`Cancelled notification request: ${notificationId}`, { tenantId })
+    } else if (scheduledTime) {
+      // Validate and reschedule
+      const newScheduledTime = new Date(scheduledTime)
+      if (isNaN(newScheduledTime.getTime())) {
+        throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
+      }
+
+      if (newScheduledTime <= new Date()) {
+        throw new Error(`scheduledTime must be in the future`)
+      }
+
+      await this.notificationRepository.update(
+        { id: notificationId, tenantId },
+        {
+          delayedSendTime: newScheduledTime,
+          updatedBy,
+          // updatedAt is automatically set by @UpdateDateColumn
+        },
+      )
+      this.logger.log(`Rescheduled notification request: ${notificationId}`, {
+        tenantId,
+        newScheduledTime,
+      })
+    } else {
+      throw new Error(`Either 'action' or 'scheduledTime' must be provided`)
+    }
+
+    // Fetch and return updated record
+    const updated = await this.findOne(notificationId, tenantId)
+
+    // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
+    await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
+
+    return updated
+  }
 }

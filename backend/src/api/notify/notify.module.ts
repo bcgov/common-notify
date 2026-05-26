@@ -7,6 +7,7 @@ import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import {
   NotifyController,
   NotifySimpleController,
+  NotifySimpleFrontendController,
   NotifyEventController,
   ChesEmailController,
 } from './notify.controller'
@@ -28,6 +29,7 @@ import { QueueModule } from '../../queue/queue.module'
   ],
   controllers: [
     NotifySimpleController,
+    NotifySimpleFrontendController,
     NotifyEventController,
     NotifyController,
     ChesEmailController,
