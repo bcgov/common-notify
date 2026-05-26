@@ -27,6 +27,24 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      initContainers:
+        - name: init-clamav-dirs
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              # Create necessary directories
+              mkdir -p /var/lib/clamav /run/clamav /tmp/clamav
+              # Make them writable
+              chmod 777 /var/lib/clamav /run/clamav /tmp/clamav
+          volumeMounts:
+            - name: clamav-data
+              mountPath: /var/lib/clamav
+            - name: clamav-run
+              mountPath: /run/clamav
+            - name: tmp
+              mountPath: /tmp/clamav
       containers:
         - name: clamav
           image: clamav/clamav:latest
