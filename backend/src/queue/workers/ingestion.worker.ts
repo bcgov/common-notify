@@ -92,7 +92,7 @@ export class IngestionWorker {
               let buffer: Buffer
               try {
                 buffer = Buffer.from(attachment.content, 'base64')
-              } catch (e) {
+              } catch {
                 // If base64 decode fails, treat as raw content
                 buffer = Buffer.from(attachment.content, 'utf-8')
               }
