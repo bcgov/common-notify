@@ -45,7 +45,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/email
+      - /ches/api/v1/email
     methods:
       - POST
     strip_path: false
@@ -58,7 +58,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/emailMerge
+      - /ches/api/v1/emailMerge
     methods:
       - POST
     strip_path: false
@@ -71,7 +71,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/emailMerge/preview
+      - /ches/api/v1/emailMerge/preview
     methods:
       - POST
     strip_path: false
@@ -84,7 +84,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/status
+      - /ches/api/v1/status
     methods:
       - GET
     strip_path: false
@@ -97,7 +97,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/ches/status/[^/]+
+      - ~/ches/api/v1/status/[^/]+
     methods:
       - GET
     strip_path: false
@@ -110,7 +110,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/promote
+      - /ches/api/v1/promote
     methods:
       - POST
     strip_path: false
@@ -123,7 +123,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/ches/promote/[^/]+
+      - ~/ches/api/v1/promote/[^/]+
     methods:
       - POST
     strip_path: false
@@ -136,7 +136,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/ches/cancel
+      - /ches/api/v1/cancel
     methods:
       - DELETE
     strip_path: false
@@ -149,7 +149,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/ches/cancel/[^/]+
+      - ~/ches/api/v1/cancel/[^/]+
     methods:
       - DELETE
     strip_path: false
