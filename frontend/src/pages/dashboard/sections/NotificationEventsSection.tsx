@@ -18,7 +18,7 @@ export const NotificationEventsSection: FC = () => {
       <PageSubHeading title="Notification Events"></PageSubHeading>
       <Button variant="primary">Create New Notification Event</Button>
       <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
-        {mockNotificationEvents.map((event) => (
+        {mockNotificationEvents.slice(0, 2).map((event) => (
           <li key={event.id}>
             <Link to="/notification-events" style={{ color: 'black' }}>
               {event.name}

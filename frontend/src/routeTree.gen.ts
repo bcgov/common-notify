@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotificationEventsRouteImport } from './routes/notification-events'
 import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
@@ -23,6 +24,11 @@ import { Route as AdminClientsRouteImport } from './routes/admin/clients'
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplateCreateRoute = TemplateCreateRouteImport.update({
+  id: '/template-create',
+  path: '/template-create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/distribution-lists': typeof DistributionListsRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
+  '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
     | '/admin/feature-flags'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
     | '/admin/feature-flags'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/distribution-lists'
     | '/notification-events'
     | '/settings'
+    | '/template-create'
     | '/templates'
     | '/admin/clients'
     | '/admin/feature-flags'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   DistributionListsRoute: typeof DistributionListsRoute
   NotificationEventsRoute: typeof NotificationEventsRoute
   SettingsRoute: typeof SettingsRoute
+  TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
   AdminClientsRoute: typeof AdminClientsRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
@@ -166,6 +179,13 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/template-create': {
+      id: '/template-create'
+      path: '/template-create'
+      fullPath: '/template-create'
+      preLoaderRoute: typeof TemplateCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -252,6 +272,7 @@ const rootRouteChildren: RootRouteChildren = {
   DistributionListsRoute: DistributionListsRoute,
   NotificationEventsRoute: NotificationEventsRoute,
   SettingsRoute: SettingsRoute,
+  TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
   AdminClientsRoute: AdminClientsRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,

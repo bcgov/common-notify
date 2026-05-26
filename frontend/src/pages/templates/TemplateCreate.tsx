@@ -1,67 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react-components'
 import {
-  getTemplateById,
-  updateTemplate,
+  createTemplate,
   NotificationChannel,
   TemplateEngine,
   TemplateBodyType,
 } from '@/api/templates.api'
-import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import '@/scss/components/templates.scss'
 
-interface TemplateEditProps {
-  templateId: string
-}
-
-const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
+const TemplateCreate: FC = () => {
   const navigate = useNavigate()
-  const [template, setTemplate] = useState<TemplateResponse | null>(null)
-  const [, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
-    channelCode: NotificationChannel.EMAIL as string,
-    engineCode: TemplateEngine.HANDLEBARS as string,
+    channelCode: '' as string,
+    engineCode: '' as string,
     bodyType: '' as string,
     subject: '',
     body: '',
   })
   const [formErrors, setFormErrors] = useState({
     name: '',
+    channelCode: '',
     engineCode: '',
     bodyType: '',
     subject: '',
     body: '',
   })
 
-  useEffect(() => {
-    const fetchTemplate = async () => {
-      setLoading(true)
-      try {
-        const data = await getTemplateById(templateId)
-        setTemplate(data)
-        setFormData({
-          name: data.name,
-          channelCode: data.channelCode,
-          engineCode: data.engineCode,
-          bodyType: data.bodyType || '',
-          subject: data.subject || '',
-          body: data.body || '',
-        })
-      } catch (error) {
-        showErrorToast(error instanceof Error ? error.message : 'Failed to load template')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTemplate()
-  }, [templateId])
+  const isSaveDisabled = saving || !formData.name.trim()
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -69,9 +40,19 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   }
 
   const validate = (): boolean => {
-    const errors = { name: '', engineCode: '', bodyType: '', subject: '', body: '' }
+    const errors = {
+      name: '',
+      channelCode: '',
+      engineCode: '',
+      bodyType: '',
+      subject: '',
+      body: '',
+    }
     if (!formData.name.trim()) {
       errors.name = ' '
+    }
+    if (!formData.channelCode) {
+      errors.channelCode = 'Please select an option to continue.'
     }
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
@@ -94,20 +75,21 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     if (!validate()) return
     setSaving(true)
     try {
-      await updateTemplate(templateId, {
+      await createTemplate({
         name: formData.name,
+        channelCode: formData.channelCode as NotificationChannel,
         engineCode: formData.engineCode as TemplateEngine,
         bodyType: formData.bodyType as TemplateBodyType,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
       })
-      showSuccessToast('Template saved successfully')
+      showSuccessToast('Template created successfully')
       navigate({ to: '/templates' })
     } catch (error) {
       if ((error as any).status === 409) {
         setFormErrors((prev) => ({ ...prev, name: (error as Error).message }))
       } else {
-        showErrorToast(error instanceof Error ? error.message : 'Failed to save template')
+        showErrorToast(error instanceof Error ? error.message : 'Failed to create template')
       }
     } finally {
       setSaving(false)
@@ -118,19 +100,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     navigate({ to: '/templates' })
   }
 
-  if (!template) {
-    return (
-      <div>
-        <div className="alert alert-danger">Template not found</div>
-        <Button onClick={handleCancel}>Back to Templates</Button>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <PageHeading title="Edit reusable template" />
+        <PageHeading title="Create reusable template" />
         <form onSubmit={handleSave}>
           <div className="mb-4 desc-above">
             <TextField
@@ -160,8 +133,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 ) as any
               }
               value={formData.channelCode}
-              onChange={(value) => setFormData((prev) => ({ ...prev, channelCode: value }))}
-              isDisabled
+              onChange={(value) => {
+                setFormData((prev) => ({ ...prev, channelCode: value }))
+                setFormErrors((prev) => ({ ...prev, channelCode: '' }))
+              }}
+              isInvalid={!!formErrors.channelCode}
+              errorMessage={formErrors.channelCode}
             >
               <Radio value={NotificationChannel.EMAIL}>Email</Radio>
               <Radio value={NotificationChannel.SMS}>SMS</Radio>
@@ -256,7 +233,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
               Preview
             </Button>
-            <Button type="submit" isDisabled={saving}>
+            <Button type="submit" isDisabled={isSaveDisabled}>
               {saving ? 'Saving...' : 'Save'}
             </Button>
           </div>
@@ -266,4 +243,4 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   )
 }
 
-export default TemplateEdit
+export default TemplateCreate
