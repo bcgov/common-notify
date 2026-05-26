@@ -23,7 +23,7 @@ export const NotificationTemplatesSection: FC = () => {
       <PageSubHeading title="Notification Templates" />
       <Button variant="primary">Create New Template</Button>
       <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
-        {templates.map((template) => (
+        {templates.slice(0, 2).map((template) => (
           <li key={template.id}>
             <Link
               to="/template-edit/$templateId"
