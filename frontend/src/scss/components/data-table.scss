@@ -163,4 +163,72 @@
       padding: $spacing-xl $spacing-md;
     }
   }
+
+  /* Pagination footer row */
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: $font-size-sm;
+    color: $dark-text;
+    font-family: 'BC Sans', sans-serif;
+
+    &-left,
+    &-right {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+    }
+
+    &-label {
+      white-space: nowrap;
+      color: $text-secondary;
+    }
+
+    &-range {
+      white-space: nowrap;
+    }
+
+    &-select {
+      border: 1px solid $border-default;
+      border-radius: 4px;
+      padding: 2px $spacing-xs;
+      font-size: $font-size-sm;
+      background-color: $white;
+      color: $dark-text;
+      height: 28px;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    &-nav-btn {
+      @include button-reset;
+
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid $border-default;
+      border-radius: 4px;
+      background-color: $white;
+      color: $dark-text;
+      font-size: 14px;
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      &:hover:not(:disabled) {
+        background-color: $light-bg;
+        border-color: $border-medium;
+      }
+    }
+  }
 }

@@ -9,7 +9,6 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
-import PageLimitControl from '@/components/PageLimitControl'
 
 const columns: TableColumn<TemplateResponse>[] = [
   {
@@ -113,7 +112,6 @@ const Templates: FC = () => {
         </div>
       </div>
 
-      <PageLimitControl limit={limit} page={page} count={count} onLimitChange={handleLimitChange} />
       <DataTable
         columns={columns}
         data={templates}
@@ -124,6 +122,8 @@ const Templates: FC = () => {
         totalCount={count}
         isLoading={isLoading}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+        onPageSizeChange={handleLimitChange}
+        pageSizeOptions={[15, 30]}
         label="Notification Templates"
       />
     </div>
