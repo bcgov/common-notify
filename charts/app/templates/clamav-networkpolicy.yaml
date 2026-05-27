@@ -43,16 +43,12 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # Allow HTTPS for virus definition updates from BC Gov ClamAV Mirror
-    - to:
-        - namespaceSelector: {}
-      ports:
+    # Allow HTTPS for virus definition updates from BC Gov ClamAV Mirror (external traffic)
+    - ports:
         - protocol: TCP
           port: 443
     # Allow HTTP for virus definition updates (fallback)
-    - to:
-        - namespaceSelector: {}
-      ports:
+    - ports:
         - protocol: TCP
           port: 80
 {{- end }}

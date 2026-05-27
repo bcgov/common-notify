@@ -26,72 +26,98 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       securityContext:
-        runAsNonRoot: true
-      initContainers:
-        - name: init-clamav-dirs
-          image: busybox:latest
+        fsGroup: 1018590000
+      containers:
+        - name: clamav
+          # Using official ClamAV image with custom command to bypass chown operations
+          image: clamav/clamav:stable-debian
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - sh
             - -c
             - |
-              # Create necessary directories
-              mkdir -p /var/lib/clamav /run/clamav /tmp/clamav
-              # Make them writable
-              chmod 777 /var/lib/clamav /run/clamav /tmp/clamav
-          volumeMounts:
-            - name: clamav-data
-              mountPath: /var/lib/clamav
-            - name: clamav-run
-              mountPath: /run/clamav
-            - name: tmp
-              mountPath: /tmp/clamav
-      containers:
-        - name: clamav
-          image: clamav/clamav:latest
-          imagePullPolicy: Always
+              # Create freshclam config with default mirrors (BC Gov mirror timing out)
+              cat > /tmp/freshclam.conf <<EOF
+              DatabaseMirror database.clamav.net
+              DatabaseDirectory /var/lib/clamav
+              LogVerbose yes
+              LogTime yes
+              Foreground yes
+              EOF
+
+              # Download virus databases in background
+              /usr/bin/freshclam --config-file=/tmp/freshclam.conf &
+
+              # Wait for databases to download (check for daily.cvd/cld)
+              while [ ! -f /var/lib/clamav/daily.cvd ] && [ ! -f /var/lib/clamav/daily.cld ]; do
+                echo "Waiting for virus databases to download..."
+                sleep 10
+              done
+
+              echo "Virus databases downloaded, starting clamd..."
+
+              # Create clamd config - log to file in /tmp and tail to stdout
+              cat > /tmp/clamd.conf <<CLAMDEOF
+              LogFile /tmp/clamd.log
+              LogFileMaxSize 10M
+              LogTime yes
+              LogVerbose yes
+              DatabaseDirectory /var/lib/clamav
+              LocalSocket /tmp/clamd.sock
+              TCPSocket 3310
+              TCPAddr 0.0.0.0
+              MaxThreads 12
+              MaxConnectionQueueLength 30
+              StreamMaxLength 100M
+              CLAMDEOF
+
+              # Start clamd with custom config and tail logs to stdout
+              /usr/sbin/clamd --foreground=yes --config-file=/tmp/clamd.conf &
+              CLAMD_PID=$!
+
+              # Tail logs to stdout
+              tail -f /tmp/clamd.log &
+
+              # Wait for clamd process
+              wait $CLAMD_PID
           ports:
             - name: clamd
               containerPort: 3310
               protocol: TCP
-          env:
-            - name: CLAMD_STARTUP_TIMEOUT
-              value: "600"
-            # Point to BC Gov's ClamAV Mirror Service for definition updates
-            - name: CVD_UPDATE_HOSTNAME
-              value: "clamav-mirror.apps.silver.devops.gov.bc.ca"
-            - name: CVD_UPDATE_SCHEME
-              value: "https"
           startupProbe:
-            exec:
-              command:
-                - /usr/local/bin/clamdcheck.sh
+            tcpSocket:
+              port: 3310
             initialDelaySeconds: 60
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             successThreshold: 1
-            failureThreshold: 30
+            failureThreshold: 60
           readinessProbe:
-            exec:
-              command:
-                - /usr/local/bin/clamdcheck.sh
+            tcpSocket:
+              port: 3310
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 3
           livenessProbe:
-            exec:
-              command:
-                - /usr/local/bin/clamdcheck.sh
+            tcpSocket:
+              port: 3310
             initialDelaySeconds: 90
             periodSeconds: 30
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 3
           resources:
             requests:
               cpu: 200m
-              memory: 1Gi
+              memory: 768Mi
             limits:
               cpu: 2
               memory: 2Gi

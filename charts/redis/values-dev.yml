@@ -1,0 +1,14 @@
+1# Dev environment overrides for Redis
+# - Reduced replicas due to storage constraints (40Gi quota)
+# - Disabled PodDisruptionBudget (not needed in dev)
+# - Disabled Sentinel (not needed with only 1 replica)
+redis:
+  replica:
+    replicaCount: 1
+    podDisruptionBudget:
+      enabled: false
+  sentinel:
+    enabled: false
+  master:
+    podDisruptionBudget:
+      enabled: false
