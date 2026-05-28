@@ -80,7 +80,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Add a trigger that uses the new function to generate a history table entry before every INSERT and UPDATE
+-- Add a trigger that uses the new function to generate a history table entry whenever an INSERT or UPDATE occurs
 CREATE TRIGGER notification_request_audit
 BEFORE INSERT OR UPDATE ON notify.notification_request
 FOR EACH ROW
