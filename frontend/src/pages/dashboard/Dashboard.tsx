@@ -13,7 +13,7 @@ const Dashboard: FC = () => {
     <div>
       <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
 
-      {/* <Row className="mb-5">
+      <Row className="mb-5">
         <Col md={7}>
           <NotificationTemplatesSection />
           <NotificationEventsSection />
@@ -21,7 +21,7 @@ const Dashboard: FC = () => {
         <Col md={5}>
           <TestNotificationForm />
         </Col>
-      </Row> */}
+      </Row>
 
       <Row>
         <Col md={12}>
