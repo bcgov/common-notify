@@ -1,5 +1,7 @@
 @import '../variables.scss';
 
+$table-header-bg: #f1f8fe; // Table header / footer color
+
 // Base table wrapper and element
 .data-table-wrapper {
   width: 100%;
@@ -213,7 +215,7 @@
       border: none;
       padding: 2px $spacing-xs;
       font-size: $font-size-sm;
-      background-color: #f1f8fe;
+      background-color: $table-header-bg;
       color: $dark-text;
       height: 28px;
       cursor: pointer;
