@@ -18,7 +18,12 @@
     border: 1px solid $border-default;
 
     thead {
+      background-color: $table-header-bg;
       border-bottom: 1px solid $border-default;
+    }
+
+    tfoot {
+      background-color: $table-header-bg;
     }
 
     tbody tr:nth-child(odd) {
@@ -111,7 +116,7 @@
   tfoot {
     td {
       color: $text-secondary;
-      border-top: 2px solid $border-default;
+      border-top: 1px solid $border-default;
       font-size: $font-size-sm;
     }
   }
@@ -168,17 +173,31 @@
 
   &__footer {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    align-items: stretch;
     font-size: $font-size-sm;
     color: $dark-text;
     font-family: 'BC Sans', sans-serif;
+    background-color: $table-header-bg;
 
-    &-left,
-    &-right {
+    &-cell {
       display: flex;
       align-items: center;
       gap: $spacing-sm;
+      padding: $spacing-xs $spacing-sm;
+      border-right: 1px solid $border-default;
+
+      &:first-child {
+        padding-left: $spacing-md;
+      }
+
+      &--grow {
+        flex: 1;
+      }
+
+      &--last {
+        border-right: none;
+        padding-right: $spacing-sm;
+      }
     }
 
     &-label {
@@ -191,14 +210,19 @@
     }
 
     &-select {
-      border: 1px solid $border-default;
-      border-radius: 4px;
+      border: none;
       padding: 2px $spacing-xs;
       font-size: $font-size-sm;
-      background-color: $white;
+      background-color: #f1f8fe;
       color: $dark-text;
       height: 28px;
       cursor: pointer;
+      outline: none;
+
+      &:focus-visible {
+        outline: 2px solid $border-active;
+        outline-offset: 1px;
+      }
 
       &:disabled {
         opacity: 0.5;
@@ -214,9 +238,7 @@
       justify-content: center;
       width: 28px;
       height: 28px;
-      border: 1px solid $border-default;
-      border-radius: 4px;
-      background-color: $white;
+      background-color: transparent;
       color: $dark-text;
       font-size: 14px;
 
@@ -226,8 +248,7 @@
       }
 
       &:hover:not(:disabled) {
-        background-color: $light-bg;
-        border-color: $border-medium;
+        background-color: rgba($primary-color, 0.05);
       }
     }
   }

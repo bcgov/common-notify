@@ -76,7 +76,7 @@ export function DataTable<T extends object>({
   onPageSizeChange,
   pageSizeOptions,
   label,
-  variant = 'bordered',
+  variant = 'striped',
   size = 'md',
   className = '',
   footerContent,
@@ -168,7 +168,7 @@ export function DataTable<T extends object>({
             )}
             {onPageChange != null && totalCount != null && currentPage != null && (
               <TableRow>
-                <TableCell colSpan={columns.length}>
+                <TableCell colSpan={columns.length} style={{ padding: 0 }}>
                   <TablePaginationFooter
                     page={currentPage}
                     totalPages={Math.ceil(totalCount / pageSize)}

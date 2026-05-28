@@ -33,31 +33,32 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
       data-page={currentPage}
       data-total-pages={safeTotalPages}
     >
-      <div className="data-table__footer-left">
-        {pageSizeOptions && onPageSizeChange && (
-          <>
-            <span className="data-table__footer-label">Items per page:</span>
-            <select
-              className="data-table__footer-select"
-              value={limit}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              disabled={isLoading}
-              aria-label="Items per page"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-      </div>
+      {pageSizeOptions && onPageSizeChange && (
+        <div className="data-table__footer-cell">
+          <span className="data-table__footer-label">Items per page:</span>
+          <select
+            className="data-table__footer-select"
+            value={limit}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            disabled={isLoading}
+            aria-label="Items per page"
+          >
+            {pageSizeOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      <div className="data-table__footer-right">
+      <div className="data-table__footer-cell data-table__footer-cell--grow">
         <span className="data-table__footer-range">
           {start} - {end} of {count} items
         </span>
+      </div>
+
+      <div className="data-table__footer-cell">
         <select
           className="data-table__footer-select"
           value={currentPage}
@@ -72,6 +73,9 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
           ))}
         </select>
         <span className="data-table__footer-label">of {safeTotalPages} page(s)</span>
+      </div>
+
+      <div className="data-table__footer-cell">
         <button
           className="data-table__footer-nav-btn"
           type="button"
@@ -81,6 +85,9 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
         >
           <i className="bi bi-chevron-left" aria-hidden="true" />
         </button>
+      </div>
+
+      <div className="data-table__footer-cell data-table__footer-cell--last">
         <button
           className="data-table__footer-nav-btn"
           type="button"
