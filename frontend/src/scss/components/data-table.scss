@@ -110,6 +110,7 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     td {
       vertical-align: middle;
       color: $dark-text;
+      white-space: nowrap;
     }
   }
 
