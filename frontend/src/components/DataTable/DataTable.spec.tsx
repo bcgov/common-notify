@@ -309,7 +309,7 @@ describe('DataTable', () => {
         />,
       )
 
-      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
 
       expect(onPageChange).toHaveBeenCalledWith(2)
     })
