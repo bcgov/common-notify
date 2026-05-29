@@ -110,7 +110,7 @@ describe('TemplatesRepository', () => {
         relations: ['channel', 'engine'],
         take: 20,
         skip: 0,
-        order: { createdAt: 'DESC' },
+        order: { updatedAt: 'DESC' },
       })
     })
 
@@ -127,7 +127,7 @@ describe('TemplatesRepository', () => {
         relations: ['channel', 'engine'],
         take: 10,
         skip: 20,
-        order: { createdAt: 'DESC' },
+        order: { updatedAt: 'DESC' },
       })
     })
 
