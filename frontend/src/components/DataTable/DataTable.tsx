@@ -12,6 +12,7 @@ export interface TableColumn<T> {
   key: keyof T & string
   label: string
   sortable?: boolean
+  sortLabel?: string
   width?: string
   render?: (value: unknown, row: T) => ReactNode
   className?: string
@@ -133,7 +134,14 @@ export function DataTable<T extends object>({
     ? 'Loading'
     : showEmpty
       ? emptyMessage
-      : `${data.length} row${data.length === 1 ? '' : 's'}`
+      : currentPage != null && totalCount != null
+        ? (() => {
+            const totalPages = Math.ceil(totalCount / pageSize)
+            const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1
+            const end = Math.min(currentPage * pageSize, totalCount)
+            return `Page ${currentPage} of ${totalPages}, showing ${start}\u2013${end} of ${totalCount} items`
+          })()
+        : `${data.length} row${data.length === 1 ? '' : 's'}`
 
   return (
     <>
@@ -149,6 +157,7 @@ export function DataTable<T extends object>({
                 className={col.className}
                 style={col.width ? { width: col.width } : undefined}
                 sortable={col.sortable}
+                sortLabel={col.sortLabel}
                 sortOrder={sortBy === col.key ? sortOrder : null}
                 onSort={col.sortable ? () => handleSort(col.key) : undefined}
               >

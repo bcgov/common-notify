@@ -59,20 +59,9 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
       </div>
 
       <div className="data-table__footer-cell">
-        <select
-          className="data-table__footer-select"
-          value={currentPage}
-          onChange={(e) => onPageChange(Number(e.target.value))}
-          disabled={isLoading || safeTotalPages <= 1}
-          aria-label="Page number"
-        >
-          {Array.from({ length: safeTotalPages }, (_, i) => i + 1).map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <span className="data-table__footer-label">of {safeTotalPages} page(s)</span>
+        <span className="data-table__footer-range" aria-live="polite" aria-atomic="true">
+          Page {currentPage} of {safeTotalPages}
+        </span>
       </div>
 
       <div className="data-table__footer-cell">
@@ -81,7 +70,7 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1 || isLoading}
-          aria-label="Prev"
+          aria-label="Previous page"
         >
           <i className="bi bi-chevron-left" aria-hidden="true" />
         </button>
@@ -93,7 +82,7 @@ const TablePaginationFooter: FC<TablePaginationFooterProps> = ({
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages || isLoading}
-          aria-label="Next"
+          aria-label="Next page"
         >
           <i className="bi bi-chevron-right" aria-hidden="true" />
         </button>
