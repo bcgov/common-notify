@@ -17,11 +17,8 @@ $table-header-bg: #f1f8fe; // Table header / footer color
   /* Variants */
 
   &--striped {
-    border: 1px solid $border-default;
-
     thead {
       background-color: $table-header-bg;
-      border-bottom: 1px solid $border-default;
     }
 
     tfoot {
@@ -119,7 +116,6 @@ $table-header-bg: #f1f8fe; // Table header / footer color
   tfoot {
     td {
       color: $text-secondary;
-      border-top: 1px solid $border-default;
       font-size: $font-size-sm;
     }
   }
