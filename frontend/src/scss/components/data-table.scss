@@ -90,6 +90,14 @@
         outline: 1px solid $border-active;
         outline-offset: -2px;
       }
+
+      &.data-table__clickable-row {
+        cursor: pointer;
+
+        &:hover {
+          background-color: rgba($primary-color, 0.1);
+        }
+      }
     }
 
     td {

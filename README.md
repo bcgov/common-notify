@@ -1,6 +1,8 @@
 # Notify Service — Overview
 
-> [!INFO] version 3
+**version 4**
+
+***[ Swagger API Spec](https://citz-do.atlassian.net/wiki/spaces/CCP/pages/657719331/Notification+API+definition)***
 
 <!-- Test: CCP-4541 - This change should not trigger builds -->
 
@@ -214,8 +216,14 @@ transition to the universal API.
 Send a single email through the tenant default email channel using NO defaults NO templates NO
 parameters 
 
-**Admin UI** No setup except tenant sender email address. 
-**API** POST to /notifysimple/email 
+**Admin UI** 
+
+No setup except tenant sender email address. 
+
+**API** 
+
+POST to /notifysimple/email 
+
 **Payload**
 
 ```json
@@ -234,7 +242,9 @@ parameters
 ```
 
 alternatively - 
+
 POST to /notifysimple 
+
 **Payload**
 
 ```json
@@ -256,8 +266,14 @@ POST to /notifysimple
 
 #### 1.2 Same as 1.1 except add SMS
 
-**Admin UI** No setup except tenant sender email address. 
-**API** POST to /notifysimple 
+**Admin UI** 
+
+No setup except tenant sender email address. 
+
+**API** 
+
+POST to /notifysimple 
+
 **Payload**
 
 ```json
@@ -292,8 +308,13 @@ POST to /notifysimple
 Add templated content and email addresses using the "handlebars" templating engine (double curly braces) , add parameter substitution
 
 **Admin UI** 
+
 No setup except tenant sender email address. 
-**API** POST to /notifysimple/email
+
+**API** 
+
+POST to /notifysimple/email
+
 **Payload**
 
 ```json
@@ -322,10 +343,14 @@ Preview the output of the previous example, no actual sending
 
 
 **Admin UI**
+ 
  No setup except tenant sender email address. 
  > [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
 
- **API** POST to /notifysimple/email/preview 
+ **API** 
+ 
+ POST to /notifysimple/email?preview=true
+
 **Payload**
 
 As per 2.1
@@ -360,6 +385,7 @@ As per 2.1
 Pass a templateId into the API, with parameter substitution
 
 **Admin UI**
+
 Create a template using the template UI - say "Sample template". The template might look like the
   following
 
@@ -407,9 +433,13 @@ Create a template using the template UI - say "Sample template". The template mi
 Extend 2.3 with inline base64 encoded attachments and delayed send
 
 **Admin UI**
+
 As per 2.3
+
 **API**
+
  POST to /notifysimple/email
+
  **Payload**
 
 ```json
@@ -489,10 +519,12 @@ parameter substitution
   - Add recipient "**{{phonenumber}}**" to the "**to**" field.
 > [!NOTE]
    Variable substitution can occur in "to" and other recipient fields
-    >
+
   **API** 
+
   POST to /notifyevent
-     **Payload**
+
+ **Payload**
 
 ```json
 {
@@ -518,15 +550,19 @@ parameter substitution
 As per 3.1 , but don't actually send the notification, just preview exactly what would be sent
 
 **API** 
-POST to /notifyevent/preview 
+
+POST to /notifyevent?preview=true
+
 **Payload**
+
 As per 3.1
+
 **Return**
- **API**
 
 ```json
 {
-  "email": {
+  "email": [
+    {
       "recipients": {
         "to": ["lucky@me.com"],
         "cc": ["fred@gov.bc.ca", "joan@gov.bc.ca"]
@@ -536,31 +572,41 @@ As per 3.1
         "body": "Dear Lucky Applicant \n
            Your funding to the amount of $1000 for program Small Business Development fund has been approved",
         "bodyType": "text",
-      },
-  "sms": {
-    "recipients" :{
-      "to": ["7787001234"]
+        "encoding": "utf-8"
+
+      }
     }
-    "content" : {
-      "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund"
+  ],
+  "sms": [
+    {
+      "recipients" :{
+        "to": ["7787001234"]
+      }
+      "content" : {
+        "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund"
+      }
     }
-  }
+  ]
 }
 ```
 
-> [!NOTE]
->
-> - CSTAR group email addresses are resolved
-> - Variable substitutions are performed on templates
-> - Variable substititions are performed on recipient fields
-> - The result is exactly what would be sent to the SMTP email gateway or SMS API
-> - This result can be viewed directly in the preview capability of the admin UI - it is required to provide the substitutable params
+  > [!NOTE]
+  >
+  > - CSTAR group email addresses are resolved
+  > - Variable substitutions are performed on templates
+  > - Variable substititions are performed on recipient fields
+  > - The result is exactly what would be sent to the SMTP email gateway or SMS API
+  > - The email and SMS results are array elements - this is because it is possible to send multiple emails and / or SMS messages as a mail-merge - see sect 4.
+  > - This result can be viewed directly in the preview capability of the admin UI - it is required to provide the substitutable params
 
 ##### 3.3 SMS Overrides
 
 As per 3.1 but overrride so that no SMS is sent 
+
 **API** 
+
 POST to /notifyevent 
+
 **Payload**
 
 ```json
@@ -583,8 +629,11 @@ POST to /notifyevent
 ##### 3.4 Template Overrides
 
 As per 3.3 but overrride the email template with one on the server (given by \<guid\> )
+
 **API**
- POST to /notifyevent 
+
+ POST to /notifyevent
+
 **Payload**
 
 ```json
@@ -614,9 +663,13 @@ As per 3.3 but overrride the email template with one on the server (given by \<g
 ##### 3.5 Augment recipients
 
 As per 3.4 but add an additional recipient to the CC list.
+
 **API**
+
  POST to /notifyevent 
+
 **Payload**
+
 ```json
 {
 "notificationEventType": "funding-approval",
@@ -647,10 +700,125 @@ As per 3.4 but add an additional recipient to the CC list.
   }
 }
 
-````
+```
 > [!NOTE]
 >
 > - A combination of augments and overrides can replace or supplement almost any part of the notification 
 > -  This is not expected to be the normal use of Notification Event Types, but it does provide flexibility where needed or for testing purposes
+
+## 4. Mail merge (Bulk Send)
+
+Notify provides Mail Merge (sometimes called "Bulk Send") capabilities. This is when customised emails or SMS's are individually sent separately based on a list of recipients and metadata. Invariably the content is templated and modified for each recipient, based on the metadata passed in the payload. It is important to understand that there is typically one and only one recipient, although exceptions do occur ( perhaps a customised email is sent to all partners of a joint venture, or perhaps a default bcc to a records-management system which records all correspondence ).
+
+For this reason, the system distinguishes between the recipients as they exist in a "**single notification with multiple recipients**" - as has been the case in all examples till now  - and the recipients as they exist in a "**multiple custom notifications to specified recipient(s)**" by means of a mutually-exclusive "**mergeArray**" field. To clarify - recipients can be sepcified in the payload as a combination of "to", "cc", "bcc" and subscription service **OR**  
+"mergeArray" , but not both.  
+
+This means that the presence of values in the **mergeArray** field for recipients unambiguously signals that the email or sms is to be of the mail-merge form
+
+> [!NOTE]
+> - Astute observers will note that recipients can exist separately for email and SMS in the payload. This means that it is possible to have a mail-merge for email but not SMS or vice versa. 
+> - There is no mail-merge capability for 3rd party message channels 
+
+#### 4.1 Send a simple mail-merge email
+
+Send a series of mailmerge emails through the tenant default email channel using NO defaults NO templates NO parameters 
+
+**Admin UI** 
+
+No setup except tenant sender email address. 
+
+**API** 
+
+POST to /notifysimple/email 
+
+**Payload**
+
+```json
+{ 
+  "recipients" : {
+    "mergeArray": [ ["to", "firstname", "lastname"],
+                    ["fred@example.com", "Frederic", "Chopin" ].
+                    ["franz@me.com", "Franz", "Liszt"]
+    ] 
+  },
+  "content" : {
+    "subject": "Induction into composer hall of fame",
+    "body": "Dear {{firstname}} {{lastname))\n Congratulations on being inducted into the composer hall of fame !",
+    "bodyType": "text"
+  }
+}
+```
+
+**Result**
+
+2 emails are sent, one to fred@example.com with content "Dear Frederic Chopin \n Congratulations on being inducted to the composer hall of fame" , and one to franz@me.com with content ""Dear Franz Liszt \n Congratulations on being inducted to the composer hall of fame"
+> [!NOTE]
+> - The mergeArray is a 2 dimensional array (an array of rows) .  The first row is the header and MUST include en element "**to**" for the email address(es) (if you're sending an email)  or phone number(s) if you're sending a text message. 
+>  - Multiple email addresses or phone numbers can be defined, separated by commas within the string
+> - "**cc**" and "**bcc**" are both valid header elements, corresponding to the email "cc" and "bcc" recipients respectively. 
+>  - The other column headers should match the replaceable parameter names or KEYS used in your template or content.
+> - The following rows should be your recipients' details and the VALUES of the replaceable parameters. These values must match the order of column headers. You can have between 1 and 50,000 recipients.
+
+#### 4.2 Preview a simple mail-merge email
+
+The setup and payload are identical to 4.1, but now the endpoint uses the preview query parameter. 
+
+> [!NOTE]
+> No emails are sent
+
+**API** 
+
+POST to /notifysimple/email?preview=true 
+
+**Response**
+
+```json
+{
+  [
+    {
+      "recipients" : {
+        "to": ["fred@example.com"]
+      }
+      "content": {
+        "subject": "Induction into composer hall of fame",
+        "body": "Dear Frederic Chopin \n Congratulations on being inducted to the composer hall of fame",
+        "bodyType": "text",
+        "encoding": "utf-8"
+      }
+    },
+    {
+      "recipients" : {
+        "to": ["franz@me.com"]
+      }
+      "content": {
+        "subject": "Induction into composer hall of fame",
+        "body": "Dear Franz Liszt \n Congratulations on being inducted to the composer hall of fame",
+        "bodyType": "text",
+        "encoding": "utf-8"
+      }
+    }    
+  ]
+}
+```
+
+
+
+
+
+## Services 
+
+Services are call-outs to external systems for things like templates, recipients or documents - performed at run-time while processing a notification. Like notification event types and other defaults they are configured in the admin UI once, then activated by notification requests. 
+
+A notification service component is usually configured with the URL of the service, the authentication key or token for the service, any service-specific parameters and any mapping between service parameters and notification parameters (both inbound and outbound). Then at runtime, when the service is called, the list of cascading notification params is mapped to service parameters and the service is called with these parameters in the payload. On return, the return payload is mapped to notification variables (things like "to", "cc", "bcc", attachments, "content" ) which get passed onto the next stage of notification.
+
+### Subscriptions ###
+### Templates ###
+### Attachments ###
+### Webhooks ###
+
+
+
+
+
 
 <!-- Testing API gateway automation -->

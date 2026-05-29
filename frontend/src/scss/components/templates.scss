@@ -1,0 +1,19 @@
+.desc-above {
+  .bcds-react-aria-TextField--container {
+    order: 1;
+  }
+
+  .bcds-react-aria-TextField--Description {
+    white-space: nowrap;
+  }
+}
+
+.error-after-label {
+  .bcds-react-aria-RadioGroup--options {
+    order: 2;
+  }
+
+  .bcds-react-aria-RadioGroup--error {
+    order: 1;
+  }
+}

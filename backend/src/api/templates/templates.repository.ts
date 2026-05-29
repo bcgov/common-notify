@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, ILike } from 'typeorm'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 
@@ -34,9 +34,16 @@ export class TemplatesRepository {
     tenantId: string,
     limit: number = 20,
     offset: number = 0,
+    search?: string,
   ): Promise<[Template[], number]> {
+    const sanitizedSearch = search ? search.replace(/[%_\\]/g, '\\$&') : null
     return this.templateRepository.findAndCount({
-      where: { tenantId, active: true },
+      where: sanitizedSearch
+        ? [
+            { tenantId, active: true, name: ILike(`%${sanitizedSearch}%`) },
+            { tenantId, active: true, body: ILike(`%${sanitizedSearch}%`) },
+          ]
+        : { tenantId, active: true },
       relations: ['channel', 'engine'],
       take: limit,
       skip: offset,

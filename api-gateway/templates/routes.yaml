@@ -66,6 +66,32 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/frontend/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
@@ -158,6 +184,19 @@ routes:
       - POST
       - PATCH
       - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}feature-flags
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/feature-flags
+    methods:
+      - GET
     strip_path: false
     https_redirect_status_code: 426
     path_handling: v0
@@ -378,6 +417,36 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/code-tables/feature-flags (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/feature-flags (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/notification_request (service variant)
   - name: ${ROUTE_PREFIX}notification-request-service
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
@@ -466,6 +535,21 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
+  - name: ${ROUTE_PREFIX}admin-tenants-list
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/admin/tenants
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/users/me (upsert current user)
   - name: ${ROUTE_PREFIX}admin-users-upsert
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
@@ -490,6 +574,69 @@ routes:
       - /api/v1/frontend/users
     methods:
       - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # FEATURE FLAG ADMIN ROUTES (admin only)
+  # ============================================================================
+  # /api/v1/frontend/admin/feature-flags (list all)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-list
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags (create)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-create
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags/:id (update)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-update
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags/
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags/:id (delete)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-delete
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags/
+    methods:
+      - DELETE
     strip_path: false
     https_redirect_status_code: 426
     path_handling: v0
@@ -1140,6 +1287,34 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
 
+  # Admin Tenants List - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-tenants-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
   # Admin Users Upsert (me) - Frontend Token
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
@@ -1173,6 +1348,208 @@ plugins:
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # ============================================================================
+  # FEATURE FLAG ADMIN ROUTES PLUGINS
+  # ============================================================================
+  # Admin Feature Flags List - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Create - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-create
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Update - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-update
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Delete - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-delete
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # ============================================================================
+  # FEATURE FLAG CLIENT & CODE-TABLES PLUGINS
+  # ============================================================================
+  # Feature Flags - Frontend Token (authenticated users)
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Feature Flags - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Feature Flags - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}

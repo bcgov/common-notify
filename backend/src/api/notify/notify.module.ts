@@ -3,9 +3,11 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
+import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import {
   NotifyController,
   NotifySimpleController,
+  NotifySimpleFrontendController,
   NotifyEventController,
   ChesEmailController,
 } from './notify.controller'
@@ -21,11 +23,13 @@ import { QueueModule } from '../../queue/queue.module'
     ChesModule,
     NotificationModule,
     RenderingModule,
+    FeatureFlagModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],
   controllers: [
     NotifySimpleController,
+    NotifySimpleFrontendController,
     NotifyEventController,
     NotifyController,
     ChesEmailController,

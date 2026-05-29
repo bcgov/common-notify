@@ -61,6 +61,9 @@ jobs:
       contents: write
       pages: write
     uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@ca6579bdadf383a2513397081f963889b92823a4 # v1.1.0
+    with:
+      flyway_schema: notify
+      schemaspy_schema: notify
 
   # Run sequentially to reduce chances of rate limiting
   zap:
