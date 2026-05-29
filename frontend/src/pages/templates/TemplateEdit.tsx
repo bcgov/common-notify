@@ -21,7 +21,7 @@ interface TemplateEditProps {
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
-  const [, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -116,6 +116,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
 
   const handleCancel = () => {
     navigate({ to: '/templates' })
+  }
+
+  if (loading) {
+    return null
   }
 
   if (!template) {

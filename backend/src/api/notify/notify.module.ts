@@ -8,6 +8,7 @@ import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import {
   NotifyController,
   NotifySimpleController,
+  NotifySimpleFrontendController,
   NotifyEventController,
   ChesEmailController,
 } from './notify.controller'
@@ -36,6 +37,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
   ],
   controllers: [
     NotifySimpleController,
+    NotifySimpleFrontendController,
     NotifyEventController,
     NotifyController,
     ChesEmailController,
