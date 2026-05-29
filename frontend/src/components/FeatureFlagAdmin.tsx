@@ -140,7 +140,6 @@ const FeatureFlagAdmin: FC = () => {
         isLoading={loading}
         isEmpty={flags.length === 0}
         emptyMessage="No feature flags found"
-        variant="bordered"
         size="sm"
       />
     </div>
