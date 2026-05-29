@@ -114,8 +114,12 @@ const columns: TableColumn<DistributionList>[] = [
   {
     key: 'id',
     label: 'Actions',
-    render: (_, row) => (
-      <Link to="/" className="btn btn-sm btn-outline-primary" title="Edit distribution list">
+    render: () => (
+      <Link
+        to="/distribution-lists"
+        className="btn btn-sm btn-outline-primary"
+        title="Edit distribution list"
+      >
         Edit
       </Link>
     ),
