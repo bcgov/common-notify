@@ -9,7 +9,7 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { vi } from 'vitest'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantContextGuard } from '../../common/guards/auth.guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('TemplatesController', () => {
@@ -53,8 +53,8 @@ describe('TemplatesController', () => {
     previewTemplate: vi.fn(),
   }
 
-  // Mock TenantGuard to bypass authentication
-  const mockTenantGuard: CanActivate = {
+  // Mock AuthGuard to bypass authentication
+  const mockAuthGuard: CanActivate = {
     canActivate: (_context: ExecutionContext) => true,
   }
 
@@ -68,8 +68,8 @@ describe('TemplatesController', () => {
         },
       ],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(AuthGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     controller = module.get<TemplatesController>(TemplatesController)
@@ -470,15 +470,15 @@ describe('TemplatesController', () => {
   })
 
   describe('Controller Guards and Decorators', () => {
-    it('should require TenantGuard for accessing templates', () => {
-      // TenantGuard is applied at class level via @UseGuards(TenantGuard)
+    it('should require AuthGuard for accessing templates', () => {
+      // AuthGuard is applied at class level via @UseGuards(AuthGuard)
       // The @GetTenant() decorator provides the tenant from the request
       expect(controller).toBeDefined()
     })
 
     it('should require authorization via ApiBearerAuth', () => {
       // ApiBearerAuth is for Swagger documentation
-      // The actual auth is handled by TenantGuard
+      // The actual auth is handled by AuthGuard with X-Tenant-ID header validation
       expect(controller).toBeDefined()
     })
   })

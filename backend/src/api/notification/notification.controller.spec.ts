@@ -5,8 +5,7 @@ import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
+import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
 
 // Mock AuthJwtGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {

@@ -63,7 +63,7 @@ const NotificationStatusTable: FC = () => {
   const statusFilterItems = [
     { id: 'all', label: 'All' },
     ...statuses.map((s) => ({
-      id: s.id,
+      id: String(s.id),
       label: s.label,
     })),
   ]
@@ -127,14 +127,19 @@ const NotificationStatusTable: FC = () => {
 
   return (
     <div>
-      <div className="mb-3" style={{ maxWidth: '220px' }}>
-        <Select
-          label="Filter by status"
-          items={statusFilterItems}
-          selectedKey={statusFilter}
-          onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
-        />
-      </div>
+      {statuses.length > 0 && (
+        <div className="mb-3" style={{ maxWidth: '220px' }}>
+          <Select
+            key={`status-filter-${statuses.length}`}
+            label="Filter by status"
+            items={statusFilterItems}
+            selectedKey={statusFilter}
+            onSelectionChange={(key) =>
+              dispatch(setStatusFilter(key as NotificationStatus | 'all'))
+            }
+          />
+        </div>
+      )}
 
       <DataTable
         columns={columns}

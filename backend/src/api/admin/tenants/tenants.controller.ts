@@ -21,13 +21,13 @@ import {
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
 import { TenantDto } from './schemas/tenant.dto'
-import { AuthJwtGuard } from '../../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../../auth/guards/role.guard'
-import { RequireRole } from '../../../auth/decorators/require-role.decorator'
+import { SSORoleGuard } from '../../../common/guards/sso-role.guard'
+import { Roles } from '../../../common/decorators/roles.decorator'
+import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(SSORoleGuard)
 @ApiBearerAuth()
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
@@ -43,6 +43,7 @@ export class TenantsController {
    * The API key is returned ONCE and must be stored by the caller.
    */
   @Post()
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Create a new tenant',
     description: 'Creates a new tenant. Requires JWT authentication.',
@@ -65,7 +66,7 @@ export class TenantsController {
    * Requires NOTIFY_ADMIN role
    */
   @Get()
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get all tenants',
     description: 'Returns all tenants in the notify database. Requires NOTIFY_ADMIN role.',
@@ -85,6 +86,7 @@ export class TenantsController {
    * Get a specific tenant
    */
   @Get(':id')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get a tenant by ID',
   })
@@ -103,6 +105,7 @@ export class TenantsController {
    * Delete a tenant
    */
   @Delete(':id')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @HttpCode(204)
   @ApiOperation({
     summary: 'Delete a tenant',

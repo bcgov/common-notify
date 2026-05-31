@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { vi } from 'vitest'
-import { AuthJwtGuard } from './auth.jwt-guard'
+import { JwtGuard } from './auth.jwt-guard'
 
-describe('AuthJwtGuard', () => {
-  let guard: AuthJwtGuard
+describe('JwtGuard', () => {
+  let guard: JwtGuard
   let configService: ConfigService
 
   const mockConfigService = {
@@ -22,7 +22,7 @@ describe('AuthJwtGuard', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AuthJwtGuard,
+        JwtGuard,
         {
           provide: ConfigService,
           useValue: mockConfigService,
@@ -30,7 +30,7 @@ describe('AuthJwtGuard', () => {
       ],
     }).compile()
 
-    guard = module.get<AuthJwtGuard>(AuthJwtGuard)
+    guard = module.get<JwtGuard>(JwtGuard)
     configService = module.get<ConfigService>(ConfigService)
     vi.clearAllMocks()
   })
@@ -184,9 +184,9 @@ describe('AuthJwtGuard', () => {
     })
 
     it('should call super() with jwt strategy', () => {
-      // AuthJwtGuard extends AuthGuard('jwt')
+      // JwtGuard extends AuthGuard('jwt')
       // We can verify it's properly initialized by checking the class name
-      expect(guard.constructor.name).toBe('AuthJwtGuard')
+      expect(guard.constructor.name).toBe('JwtGuard')
     })
   })
 })

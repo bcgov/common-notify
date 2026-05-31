@@ -17,7 +17,9 @@ import {
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
 import { TenantGuard } from '../../common/guards/tenant.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
@@ -41,7 +43,7 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
  */
 @ApiTags('templates')
 @Controller('templates')
-@UseGuards(TenantGuard)
+@UseGuards(TenantGuard, CstarRoleGuard)
 @ApiBearerAuth()
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name)
@@ -76,10 +78,11 @@ export class TemplatesController {
   })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ): Promise<PaginatedTemplateResponse> {
+    const tenant = (req as any).tenant as Tenant
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
     return this.templatesService.listTemplates(tenant.id, pageNum, limitNum)
@@ -96,9 +99,10 @@ export class TemplatesController {
   @Get(':templateId')
   @HttpCode(200)
   async getTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
@@ -112,11 +116,12 @@ export class TemplatesController {
   @Version('1')
   @Post()
   @HttpCode(201)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async createTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
@@ -133,12 +138,13 @@ export class TemplatesController {
   @Version('1')
   @Patch(':templateId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async updateTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
@@ -153,10 +159,12 @@ export class TemplatesController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async deleteTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
+    const tenant = (req as any).tenant as Tenant
     await this.templatesService.deleteTemplate(tenant.id, templateId)
   }
 
@@ -173,10 +181,11 @@ export class TemplatesController {
   @Post(':templateId/preview')
   @HttpCode(200)
   async previewTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
   }
 }

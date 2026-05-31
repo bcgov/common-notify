@@ -14,12 +14,14 @@ import {
   BadRequestException,
   Logger,
   Request,
+  Req,
 } from '@nestjs/common'
 import Bull from 'bull'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { TenantGuard } from '../../common/guards/tenant.guard'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
@@ -34,9 +36,9 @@ import { QueueName } from '../../enum/queue-name.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
-import { RequireRole } from '../../auth/decorators/require-role.decorator'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -44,8 +46,12 @@ import { RoleGuard } from '../../auth/guards/role.guard'
 //
 // Anything requiring queueing should use the @Queueable decorator and implement the method with an
 // empty body (the decorator will handle the logic).
+//
+// Uses TenantGuard (not JwtGuard) to support Kong service-to-service calls that send HS256-signed JWTs.
+// TenantGuard manually decodes the JWT without signature validation, allowing both Kong (HS256) and
+// Keycloak (RS256) JWTs to work.
 @Controller('notifysimple')
-@UseGuards(TenantGuard)
+@UseGuards(TenantGuard, CstarRoleGuard)
 export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -61,9 +67,10 @@ export class NotifySimpleController {
   @Post()
   @HttpCode(202)
   @UseGuards(SmsChannelFeatureFlagGuard)
+  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSend(
-    @GetTenant() _tenant: Tenant,
+    @Req() req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -74,9 +81,10 @@ export class NotifySimpleController {
   @Version('1')
   @Post('email')
   @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSendEmail(
-    @GetTenant() _tenant: Tenant,
+    @Req() req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -89,9 +97,10 @@ export class NotifySimpleController {
   @HttpCode(202)
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
+  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSendSms(
-    @GetTenant() _tenant: Tenant,
+    @Req() req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -102,11 +111,13 @@ export class NotifySimpleController {
   @Version('1')
   @Patch(':notificationId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async cancelOrRescheduleNotification(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('notificationId') notificationId: string,
     @Body() body: CancelNotificationDto | RescheduleNotificationDto,
   ): Promise<NotificationRequestDto> {
+    const tenant = (req as any).tenant as Tenant
     return this.doCancelOrReschedule(
       tenant.id,
       tenant.id, // For service-to-service, use tenantId as updatedBy
@@ -251,7 +262,7 @@ export class NotifySimpleController {
  * Both controllers delegate to the same service for consistency.
  */
 @Controller('frontend/notifysimple')
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(CstarRoleGuard)
 export class NotifySimpleFrontendController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -266,7 +277,7 @@ export class NotifySimpleFrontendController {
   @Version('1')
   @Patch(':notificationId')
   @HttpCode(200)
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async cancelOrRescheduleNotification(
     @Request() req: any,
     @Param('notificationId') notificationId: string,
@@ -295,7 +306,7 @@ export class NotifySimpleFrontendController {
 }
 
 @Controller('notifyevent')
-@UseGuards(TenantGuard)
+@UseGuards(JwtGuard)
 export class NotifyEventController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -329,7 +340,7 @@ export class NotifyEventController {
 }
 
 @Controller('notify')
-@UseGuards(TenantGuard)
+@UseGuards(JwtGuard)
 export class NotifyController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -383,7 +394,7 @@ export class NotifyController {
 }
 
 @Controller('ches/api/v1/email')
-@UseGuards(TenantGuard)
+@UseGuards(JwtGuard)
 export class ChesEmailController {
   constructor(private readonly notifyService: NotifyService) {}
 

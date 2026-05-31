@@ -58,6 +58,12 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
+    // Used to fetch user roles for role-based access control
+    cstar: {
+      baseUrl: process.env.CSTAR_BASE_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+    },
+
     // Twilio SMS Service
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,
@@ -69,6 +75,11 @@ export default () => {
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+    },
+
+    // Attachment Storage
+    attachments: {
+      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
     },
 
     // Job Queue Worker Configuration

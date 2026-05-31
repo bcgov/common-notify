@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import { useState, useRef, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
+import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
 
@@ -17,6 +18,7 @@ import '@/scss/components/tenant-switcher.scss'
  * 2. Dropdown opens with list of available tenants
  * 3. Click a tenant to switch context
  * 4. App re-renders with new tenant context
+ * 5. User's roles for that tenant are fetched
  *
  * If user has only 1 tenant, switcher is hidden (no need to switch).
  */
@@ -32,6 +34,7 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const authUser = useAppSelector((state) => state.auth.user)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,6 +60,10 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
+    // Fetch user's roles in the selected tenant
+    if (authUser?.id) {
+      dispatch(fetchCstarRoles({ tenantId: tenant.id, ssoUserId: authUser.id }))
+    }
     setIsOpen(false)
   }
 

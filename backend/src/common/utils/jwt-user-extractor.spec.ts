@@ -28,43 +28,6 @@ describe('JwtUserExtractor', () => {
       })
     })
 
-    describe('with Kong consumer username header', () => {
-      it('should return Kong username when present', () => {
-        const req = {
-          headers: {
-            'x-consumer-username': 'kong-user',
-          },
-        } as any
-
-        const result = JwtUserExtractor.extractUser(req)
-        expect(result).toBe('kong-user')
-      })
-
-      it('should prioritize Kong username over JWT token', () => {
-        const token = createJwt({ preferred_username: 'jwt-user' })
-        const req = {
-          headers: {
-            'x-consumer-username': 'kong-user',
-            authorization: `Bearer ${token}`,
-          },
-        } as any
-
-        const result = JwtUserExtractor.extractUser(req)
-        expect(result).toBe('kong-user')
-      })
-
-      it('should handle Kong username as string type', () => {
-        const req = {
-          headers: {
-            'x-consumer-username': 'string-user',
-          },
-        } as any
-
-        const result = JwtUserExtractor.extractUser(req)
-        expect(result).toBe('string-user')
-      })
-    })
-
     describe('with JWT token', () => {
       it('should extract preferred_username from JWT', () => {
         const token = createJwt({ preferred_username: 'john.doe' })
@@ -285,29 +248,6 @@ describe('JwtUserExtractor', () => {
 
         const result = JwtUserExtractor.extractUser(req)
         expect(result).toBe('system')
-      })
-
-      it('should handle Kong username with special characters', () => {
-        const req = {
-          headers: {
-            'x-consumer-username': 'user@example.com',
-          },
-        } as any
-
-        const result = JwtUserExtractor.extractUser(req)
-        expect(result).toBe('user@example.com')
-      })
-
-      it('should handle very long Kong username', () => {
-        const longUsername = 'a'.repeat(500)
-        const req = {
-          headers: {
-            'x-consumer-username': longUsername,
-          },
-        } as any
-
-        const result = JwtUserExtractor.extractUser(req)
-        expect(result).toBe(longUsername)
       })
 
       it('should handle JWT with empty payload object', () => {

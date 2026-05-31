@@ -8,14 +8,10 @@ import {
 } from '@nestjs/common'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappings/client-tenant-mapping.service'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 
 /**
- * Guard that extracts tenant information from JWT or Kong headers
- *
- * Kong adds these headers after successful authentication:
- * - X-Consumer-Username: The authenticated consumer's username
- * - X-Consumer-ID: Kong's internal UUID for the consumer
- * - X-Credential-ID: The specific API key credential ID
+ * Guard that extracts tenant information from JWT
  *
  * JWT authentication via Keycloak includes:
  * - Authorization: Bearer <JWT token>
@@ -34,92 +30,13 @@ export class TenantGuard implements CanActivate {
   constructor(
     private tenantsService: TenantsService,
     private clientTenantMappingService: ClientTenantMappingService,
+    private cstarApiClient: CstarApiClient,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    // First, try to get tenant from Kong headers (if Kong is in use)
-    const kongUsername = request.headers['x-consumer-username']
-    const kongConsumerId = request.headers['x-consumer-id']
-
-    this.logger.debug(
-      `Incoming request: method=${request.method}, url=${request.url}, KongUsername=${kongUsername}, KongConsumerId=${kongConsumerId}`,
-    )
-
-    if (kongUsername) {
-      this.logger.debug(
-        `Kong authentication detected: username="${kongUsername}", consumerId="${kongConsumerId}"`,
-      )
-
-      // Kong X-Consumer-Username is the OAuth2 client ID (from API Gateway)
-      // Look up which tenant(s) this client is mapped to
-      if (!kongUsername) {
-        this.logger.error('Kong authentication present but missing X-Consumer-Username header')
-        throw new UnauthorizedException('Missing client ID in Kong headers')
-      }
-
-      const clientId = kongUsername as string
-      const tenantIds = await this.clientTenantMappingService
-        .findTenantsByClientId(clientId)
-        .catch((error) => {
-          this.logger.warn(
-            `Error looking up ClientTenantMapping for Kong client ${clientId}: ${error.message}`,
-          )
-          return []
-        })
-
-      if (tenantIds.length === 0) {
-        this.logger.error(
-          `Kong client ${clientId} (${kongUsername}) has no mapped tenants in ClientTenantMapping table. Register via link-client-to-tenants endpoint.`,
-        )
-        throw new UnauthorizedException(
-          `Client is not authorized to access any tenants. Please register this client via the admin API.`,
-        )
-      }
-
-      this.logger.debug(
-        `Kong client ${clientId} is authorized for ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}`,
-      )
-
-      // Fetch the tenant objects
-      const tenants = await Promise.all(
-        tenantIds.map((id) => this.tenantsService.findOne(id)),
-      ).catch((error) => {
-        this.logger.error(`Failed to fetch tenant details: ${error.message}`)
-        throw new UnauthorizedException('Failed to resolve authorized tenants')
-      })
-
-      // Require explicit tenant selection via X-Tenant-ID header
-      const xTenantId = request.headers['x-tenant-id'] as string
-      if (!xTenantId) {
-        this.logger.error(
-          `Kong client ${clientId} attempted request without X-Tenant-ID header. Must explicitly specify which tenant.`,
-        )
-        throw new BadRequestException(
-          'X-Tenant-ID header is required. Please specify which tenant you want to access.',
-        )
-      }
-
-      const selectedTenant = tenants.find((t) => t.externalId === xTenantId)
-      if (!selectedTenant) {
-        this.logger.error(`Kong client ${clientId} requested unauthorized tenant ${xTenantId}`)
-        throw new UnauthorizedException(`You are not authorized to access tenant ${xTenantId}`)
-      }
-
-      request.tenant = selectedTenant
-      request.accessibleTenants = tenants
-      request.clientId = clientId
-      request.kongUsername = kongUsername
-
-      this.logger.debug(
-        `Tenant authenticated via Kong client: ${selectedTenant.name} (DB ID: ${selectedTenant.id}, Kong Client ID: ${clientId})`,
-      )
-
-      return true
-    }
-
-    // If no Kong headers, try JWT from Authorization header
+    // Try to get tenant from JWT in Authorization header
     const authHeader = request.headers.authorization
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7)
@@ -193,6 +110,42 @@ export class TenantGuard implements CanActivate {
             this.logger.debug(
               `Service client ${azp} mapping verified as active for tenant ${tenant.id}`,
             )
+          } else {
+            // REGULAR FRONTEND USER: Validate user has access to tenant via CSTAR
+            // This prevents users from spoofing X-Tenant-ID to access tenants they don't belong to
+            this.logger.debug(
+              `Regular frontend user detected. Validating CSTAR access: user=${sub}, tenant=${xTenantId}`,
+            )
+
+            try {
+              // Extract user ID from JWT idir_user_guid claim and normalize for CSTAR API
+              const normalizedUserId = ((payload.idir_user_guid as string) || '').toUpperCase()
+              const userTenantIds = await this.cstarApiClient.getUserTenants(
+                normalizedUserId,
+                authHeader,
+              )
+              const hasAccess = userTenantIds.includes(xTenantId)
+
+              if (!hasAccess) {
+                this.logger.warn(
+                  `User ${sub} requested tenant ${xTenantId} but does not have access. User has access to: [${userTenantIds.join(', ')}]`,
+                )
+                throw new UnauthorizedException(
+                  `You do not have access to tenant ${xTenantId}. Verify the tenant ID and try again.`,
+                )
+              }
+
+              this.logger.debug(`User ${sub} verified as having access to tenant ${xTenantId}`)
+            } catch (error) {
+              if (error instanceof UnauthorizedException) {
+                throw error
+              }
+
+              this.logger.error(
+                `Error validating user tenant access: ${error instanceof Error ? error.message : String(error)}`,
+              )
+              throw new UnauthorizedException(`Failed to verify tenant access. Please try again.`)
+            }
           }
 
           this.logger.debug(
@@ -200,7 +153,18 @@ export class TenantGuard implements CanActivate {
           )
 
           request.tenant = tenant
+          request.user = payload
           request.userGuid = sub
+
+          this.logger.debug(
+            `TenantGuard: Set request.tenant for frontend user ${sub} with X-Tenant-ID: ${JSON.stringify(
+              {
+                tenantId: request.tenant?.id,
+                tenantName: request.tenant?.name,
+              },
+            )}`,
+          )
+
           return true
         }
 
@@ -228,17 +192,37 @@ export class TenantGuard implements CanActivate {
           )
 
           // Fetch the tenant objects
-          const tenants = await Promise.all(
-            tenantIds.map((id) => this.tenantsService.findOne(id)),
-          ).catch((error) => {
-            this.logger.error(`Failed to fetch tenant details: ${error.message}`)
-            throw new UnauthorizedException('Failed to resolve authorized tenants')
-          })
+          const tenants = (
+            await Promise.all(tenantIds.map((id) => this.tenantsService.findOne(id))).catch(
+              (error) => {
+                this.logger.error(`Failed to fetch tenant details: ${error.message}`)
+                throw new UnauthorizedException('Failed to resolve authorized tenants')
+              },
+            )
+          ).filter((t) => t !== null)
+
+          if (tenants.length === 0) {
+            this.logger.error(
+              `Client ${azp} has tenant mappings but none of the mapped tenants exist in the database. Mapped IDs: ${tenantIds.join(', ')}`,
+            )
+            throw new UnauthorizedException(
+              'Tenant records not found. Please contact an administrator.',
+            )
+          }
 
           // Use first tenant as primary (can be overridden by route-specific logic)
           request.tenant = tenants[0]
+          request.user = payload
           request.accessibleTenants = tenants
           request.clientId = azp
+
+          this.logger.debug(
+            `TenantGuard: Set request.tenant for service client ${azp}: ${JSON.stringify({
+              tenantId: request.tenant?.id,
+              tenantName: request.tenant?.name,
+            })}`,
+          )
+
           return true
         }
 
@@ -267,7 +251,16 @@ export class TenantGuard implements CanActivate {
         )
 
         request.tenant = tenant
+        request.user = payload
         request.userGuid = sub
+
+        this.logger.debug(
+          `TenantGuard: Set request.tenant for regular user ${sub}: ${JSON.stringify({
+            tenantId: request.tenant?.id,
+            tenantName: request.tenant?.name,
+          })}`,
+        )
+
         return true
       } catch (error) {
         this.logger.error(`Failed to process JWT: ${error.message}`)

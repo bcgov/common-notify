@@ -4,6 +4,7 @@ import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/clien
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { CstarModule } from '../../services/cstar/cstar.module'
 import {
   NotifyController,
   NotifySimpleController,
@@ -24,6 +25,7 @@ import { QueueModule } from '../../queue/queue.module'
     NotificationModule,
     RenderingModule,
     FeatureFlagModule,
+    CstarModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],

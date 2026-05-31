@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { AlertDialog, Button, Modal, Select } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
+import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import UserService from '@/service/user-service'
 import '@/scss/components/tenant-selection-modal.scss'
@@ -17,6 +18,7 @@ import '@/scss/components/tenant-selection-modal.scss'
  * 1. Modal appears on app load if multiple tenants exist
  * 2. User selects a tenant from the list
  * 3. Modal closes and app loads with selected tenant context
+ * 4. Fetch user's CSTAR roles for that tenant
  */
 
 const CSTAR_TENANT_SETUP_URL =
@@ -26,12 +28,13 @@ const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
   const showModal = useAppSelector((state) => state.tenant.showTenantModal)
   const tenants = useAppSelector((state) => state.cstar.tenants)
+  const authUser = useAppSelector((state) => state.auth.user)
   const [pendingTenantId, setPendingTenantId] = useState<string | undefined>(undefined)
 
   const tenantItems = useMemo(
     () =>
       tenants.map((tenant) => ({
-        id: tenant.id,
+        id: String(tenant.id),
         label: tenant.name,
       })),
     [tenants],
@@ -39,6 +42,10 @@ const TenantSelectionModal: FC = () => {
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
+    // Fetch user's roles in the selected tenant
+    if (authUser?.id) {
+      dispatch(fetchCstarRoles({ tenantId: tenant.id, ssoUserId: authUser.id }))
+    }
   }
 
   const handleCancelSelection = () => {

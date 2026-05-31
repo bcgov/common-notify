@@ -4,7 +4,7 @@ import { ChesController } from './ches.controller'
 import { ChesApiClient } from './ches-api.client'
 import { ChesMessageObject } from './schemas/ches-message-object'
 import { ChesMergeRequest } from './schemas/ches-merge-request'
-import { TenantGuard } from '../common/guards/tenant.guard'
+import { TenantContextGuard } from '../common/guards/auth.guard'
 
 describe('ChesController', () => {
   let controller: ChesController
@@ -21,10 +21,6 @@ describe('ChesController', () => {
     getStatusCallbackUrls: vi.fn(),
   }
 
-  const mockTenantGuard = {
-    canActivate: vi.fn().mockReturnValue(true),
-  }
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ChesController],
@@ -35,8 +31,8 @@ describe('ChesController', () => {
         },
       ],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(AuthGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     controller = module.get<ChesController>(ChesController)

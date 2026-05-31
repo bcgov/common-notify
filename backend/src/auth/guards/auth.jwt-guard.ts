@@ -4,12 +4,17 @@ import { AuthGuard } from '@nestjs/passport'
 
 @Injectable()
 /**
- * Guard that validates JWT tokens issued by Keycloak.
+ * JWT Validation Guard
+ *
+ * Validates JWT tokens issued by Keycloak using JWKS.
  * Apply to controllers or routes that require JWT authentication.
  * If the JWT is invalid or missing, an UnauthorizedException is thrown.
+ *
+ * Attaches to request:
+ * - request.user: The decoded JWT payload
  */
-export class AuthJwtGuard extends AuthGuard('jwt') {
-  private readonly logger = new Logger(AuthJwtGuard.name)
+export class JwtGuard extends AuthGuard('jwt') {
+  protected readonly logger = new Logger(JwtGuard.name)
 
   constructor(private readonly config: ConfigService) {
     super()

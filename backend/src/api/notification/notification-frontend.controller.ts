@@ -11,13 +11,14 @@ import {
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
-import { RequireRole } from '../../auth/decorators/require-role.decorator'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
+import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
@@ -38,7 +39,7 @@ import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
  */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(TenantContextGuard, CstarRoleGuard)
 @ApiBearerAuth()
 export class NotificationFrontendController {
   private readonly logger = new Logger(NotificationFrontendController.name)
@@ -51,7 +52,7 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Get()
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -93,8 +94,8 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Sse('events')
-  @UseGuards(FeatureFlagGuard)
-  @RequireRole('NOTIFY_ADMIN')
+  @UseGuards(TenantContextGuard, CstarRoleGuard, FeatureFlagGuard)
+  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
   @ApiQuery({

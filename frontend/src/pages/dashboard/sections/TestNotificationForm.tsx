@@ -6,8 +6,8 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import '@/scss/components/test-notification-form.scss'
 
 const mockNotificationEventItems = [
-  { id: 1, label: 'New Order Ready' },
-  { id: 2, label: 'Extra Cheese Requested' },
+  { id: '1', label: 'New Order Ready' },
+  { id: '2', label: 'Extra Cheese Requested' },
 ]
 
 /**
@@ -28,12 +28,11 @@ const TestNotificationForm: FC = () => {
     }
   }, [dispatch, selectedTenant])
 
-  const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
+  const templateItems = templates.map((t, index) => ({ id: String(t.id ?? index), label: t.name }))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // TODO: Implement test notification send logic
-    console.log('Send test notification clicked')
   }
 
   return (
@@ -41,12 +40,14 @@ const TestNotificationForm: FC = () => {
       <h3 className="test-notification-form__title">Test Notification Event Setting</h3>
       <Form className="test-notification-form__fields" onSubmit={handleSubmit}>
         <Select
+          key="notification-events-select"
           label="Notification Events"
           placeholder="select..."
           items={mockNotificationEventItems}
           style={{ width: '100%' }}
         />
         <Select
+          key="template-select"
           label="Notification Template"
           placeholder="select..."
           items={templateItems}

@@ -24,9 +24,9 @@ import { ConfigService } from '@nestjs/config'
 import { ClientTenantMappingService } from './client-tenant-mapping.service'
 import { LinkClientToTenantsDto } from './schemas/link-client-to-tenants.dto'
 import { LinkClientToTenantsResponseDto } from './schemas/link-client-to-tenants-response.dto'
-import { AuthJwtGuard } from '../../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../../auth/guards/role.guard'
-import { RequireRole } from '../../../auth/decorators/require-role.decorator'
+import { SSORoleGuard } from '../../../common/guards/sso-role.guard'
+import { Roles } from '../../../common/decorators/roles.decorator'
+import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 import type Express from 'express'
 
 /**
@@ -43,7 +43,7 @@ import type Express from 'express'
  */
 @ApiTags('admin')
 @Controller({ path: 'frontend/admin/clients', version: '1' })
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(SSORoleGuard)
 @ApiBearerAuth()
 export class ClientTenantMappingController {
   private readonly logger = new Logger(ClientTenantMappingController.name)
@@ -68,7 +68,7 @@ export class ClientTenantMappingController {
    * @returns Confirmation with created mappings
    */
   @Post('link-to-tenants')
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Link an API Gateway client to CSTAR tenants',
     description:
@@ -163,6 +163,7 @@ export class ClientTenantMappingController {
    * @returns List of all mappings
    */
   @Get('mappings')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get all client-tenant mappings',
     description: 'List all active and inactive client-tenant mappings',
@@ -196,7 +197,7 @@ export class ClientTenantMappingController {
    * @returns Updated mapping
    */
   @Patch('mappings')
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Toggle client-tenant mapping active status',
     description: 'Enable or disable a client-tenant mapping without deleting it',

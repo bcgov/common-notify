@@ -1,6 +1,8 @@
-import { Controller, Get, Version, Logger } from '@nestjs/common'
+import { Controller, Get, Version, Logger, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
-import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './code-tables.service'
+import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { CodeTablesService } from './code-tables.service'
+import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 
 /**
  * Frontend Code Tables API Controller
@@ -16,9 +18,16 @@ import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './co
  *
  * If the gateway configuration changes to support a single route with conditional auth,
  * these controllers can be consolidated.
+ *
+ * SECURITY NOTE: Code tables are public reference data (dropdowns, status codes, channels).
+ * They require JWT authentication for usage tracking and CSTAR role validation,
+ * but NOT tenant-specific validation since they're not tenant-specific data.
+ * We only use CstarRoleGuard (JWT + role validation) without AuthGuard
+ * to avoid unnecessary CSTAR API calls that require backend service credentials.
  */
 @ApiTags('code-tables')
 @Controller('frontend/code-tables')
+@UseGuards(JwtGuard)
 @ApiBearerAuth()
 export class CodeTablesFrontendController {
   private readonly logger = new Logger(CodeTablesFrontendController.name)
@@ -50,8 +59,8 @@ export class CodeTablesFrontendController {
     summary: 'Get notification status codes',
     description: 'Returns all valid notification status codes (sent, failed, pending, etc.)',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getStatuses(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getStatuses(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getStatuses()
   }
 
@@ -64,8 +73,8 @@ export class CodeTablesFrontendController {
     summary: 'Get notification channel codes',
     description: 'Returns all valid notification channels (EMAIL, SMS, etc.)',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getChannels(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getChannels(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getChannels()
   }
 
@@ -79,8 +88,8 @@ export class CodeTablesFrontendController {
     description:
       'Returns all valid event types (PASSWORD_RESET, INVOICE_SENT, etc.) that can trigger notifications',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getEventTypes(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getEventTypes(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getEventTypes()
   }
 }

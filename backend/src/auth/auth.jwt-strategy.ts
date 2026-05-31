@@ -13,6 +13,8 @@ export class AuthJwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(AuthJwtStrategy.name)
 
   constructor(config: ConfigService) {
+    const keycloakClientId = config.get<string>('auth.keycloakClientId')
+
     super({
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
@@ -21,7 +23,8 @@ export class AuthJwtStrategy extends PassportStrategy(Strategy) {
         jwksUri: config.get<string>('auth.jwksUri'),
       }),
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience: config.get<string>('auth.keycloakClientId'),
+      // Only validate audience if KEYCLOAK_CLIENT_ID is configured
+      ...(keycloakClientId ? { audience: keycloakClientId } : {}),
       issuer: config.get<string>('auth.jwtIssuer'),
       algorithms: ['RS256'],
     })

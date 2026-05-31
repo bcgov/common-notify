@@ -71,7 +71,11 @@ export const notificationApi = {
       const token = await UserService.getToken()
       return fetch(input, {
         ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+        headers: {
+          ...(init?.headers ?? {}),
+          Authorization: `Bearer ${token}`,
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
       })
     }
 

@@ -1,13 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BadRequestException, NotFoundException, HttpException } from '@nestjs/common'
+import { TenantContextGuard } from '../../common/guards/auth.guard'
 import { FeatureFlagController, FeatureFlagClientController } from './feature-flag.controller'
 import { FeatureFlagService } from './feature-flag.service'
 import { FeatureFlag } from './entities/feature-flag.entity'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { TenantGuard } from '../../common/guards/tenant.guard'
 
 describe('FeatureFlagController', () => {
   let controller: FeatureFlagController
@@ -238,9 +237,7 @@ describe('FeatureFlagController', () => {
           },
         ],
       })
-        .overrideGuard(AuthJwtGuard)
-        .useValue({ canActivate: () => true })
-        .overrideGuard(TenantGuard)
+        .overrideGuard(AuthGuard)
         .useValue({ canActivate: () => true })
         .compile()
 

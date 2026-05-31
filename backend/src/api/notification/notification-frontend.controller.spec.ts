@@ -7,7 +7,7 @@ import { NotificationPubSubService } from './notification-pubsub.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { TenantContextGuard } from '../../common/guards/auth.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
@@ -62,7 +62,7 @@ describe('NotificationFrontendController', () => {
           provide: FeatureFlagService,
           useValue: mockFeatureFlagService,
         },
-        TenantGuard,
+        AuthGuard,
       ],
     })
       .overrideGuard(FeatureFlagGuard)

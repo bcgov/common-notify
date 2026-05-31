@@ -7,12 +7,14 @@ import { FeatureFlagController } from './feature-flag.controller'
 import { FeatureFlagClientController } from './feature-flag.controller'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
+import { CstarModule } from '../../services/cstar/cstar.module'
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([FeatureFlag, FeatureFlagCode]),
     TenantsModule,
     ClientTenantMappingModule,
+    CstarModule,
   ],
   providers: [FeatureFlagService],
   controllers: [FeatureFlagController, FeatureFlagClientController],
