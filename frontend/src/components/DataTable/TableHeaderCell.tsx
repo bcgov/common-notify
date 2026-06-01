@@ -5,6 +5,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 export interface TableHeaderCellProps extends ComponentPropsWithoutRef<'th'> {
   sortable?: boolean
+  sortLabel?: string
   sortOrder?: 'asc' | 'desc' | null
   onSort?: () => void
   children?: ReactNode
@@ -30,6 +31,7 @@ function SortIcon({ sortOrder }: { sortOrder?: 'asc' | 'desc' | null }) {
 
 export function TableHeaderCell({
   sortable,
+  sortLabel,
   sortOrder,
   onSort,
   children,
@@ -43,6 +45,8 @@ export function TableHeaderCell({
         : 'none'
     : undefined
 
+  const sortName = sortLabel ?? (typeof children === 'string' ? children : undefined)
+
   return (
     <th scope="col" aria-sort={ariaSort} {...props}>
       {sortable ? (
@@ -50,12 +54,12 @@ export function TableHeaderCell({
           type="button"
           className="data-table__sort-btn"
           aria-label={
-            typeof children === 'string'
+            sortName != null
               ? sortOrder === 'asc'
-                ? `Sort by ${children}, currently ascending`
+                ? `Sort by ${sortName}, currently ascending`
                 : sortOrder === 'desc'
-                  ? `Sort by ${children}, currently descending`
-                  : `Sort by ${children}`
+                  ? `Sort by ${sortName}, currently descending`
+                  : `Sort by ${sortName}`
               : undefined
           }
           onClick={onSort}
