@@ -246,9 +246,9 @@ $table-header-bg: #f1f8fe; // Table header / footer color
         cursor: not-allowed;
       }
 
-      &:hover:not(:disabled) {
-        background-color: rgba($primary-color, 0.05);
-      }
+      // &:hover:not(:disabled) {
+      //   background-color: rgba($primary-color, 0.05);
+      // }
     }
   }
 }
