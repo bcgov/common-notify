@@ -1,0 +1,23 @@
+{{- if .Values.backend.clamav.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-clamav
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: clamd
+      port: 3310
+      targetPort: 3310
+      protocol: TCP
+  selector:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
