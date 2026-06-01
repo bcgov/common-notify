@@ -105,6 +105,21 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: TWILIO_FROM_NUMBER
+            - name: FRONTEND_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: FRONTEND_KEYCLOAK_ISSUER
+            - name: API_GATEWAY_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: API_GATEWAY_KEYCLOAK_ISSUER
+            - name: NOTIFY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: NOTIFY_CLIENT_ID
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}

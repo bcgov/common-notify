@@ -9,7 +9,7 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { vi } from 'vitest'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('TemplatesController', () => {

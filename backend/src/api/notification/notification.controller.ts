@@ -2,14 +2,14 @@ import { Controller, Get, Version, UseGuards, Logger, Query, Req, Request } from
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
-import { SSORoleGuard } from '../../common/guards/sso-role.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 
 @ApiTags('notification_request')
 @Controller('notification_request')
-@UseGuards(SSORoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)

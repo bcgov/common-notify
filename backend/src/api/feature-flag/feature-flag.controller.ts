@@ -20,8 +20,8 @@ import { FeatureFlagService } from './feature-flag.service'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
 import { FeatureFlag } from './entities/feature-flag.entity'
-import { SSORoleGuard } from '../../common/guards/sso-role.guard'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
 
@@ -41,7 +41,7 @@ import { SsoRole } from '../../enum/sso-role.enum'
  * - GET    /api/v1/feature-flags                          Get feature flags for user's tenant
  */
 @Controller('frontend/admin/feature-flags')
-@UseGuards(SSORoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 export class FeatureFlagController {
   private readonly logger = new Logger(FeatureFlagController.name)
 
@@ -164,7 +164,7 @@ export class FeatureFlagController {
  * Available to any authenticated user
  */
 @Controller('feature-flags')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 export class FeatureFlagClientController {
   private readonly logger = new Logger(FeatureFlagClientController.name)
 
@@ -172,12 +172,12 @@ export class FeatureFlagClientController {
 
   /**
    * Get feature flags for the current user's tenant
-   * ANY AUTHENTICATED USER - Uses tenant context from AuthGuard
+   * ANY AUTHENTICATED USER - Uses tenant context from NotifyServiceGuard
    *
    * Tenant validation:
    * 1. Client sends X-Tenant-ID header
-   * 2. AuthGuard validates tenant via CSTAR API
-   * 3. AuthGuard sets request.tenant with validated tenant info
+   * 2. NotifyServiceGuard validates tenant and client mapping
+   * 3. NotifyServiceGuard sets request.tenant with validated tenant info
    * 4. This endpoint uses request.tenant.id
    *
    * Returns a map of feature codes to enabled status
@@ -195,14 +195,14 @@ export class FeatureFlagClientController {
   async getForTenant(@Req() req: Request): Promise<Record<string, boolean>> {
     try {
       // Extract internal tenant ID from request context
-      // TenantGuard has already converted the external tenant ID (X-Tenant-ID header)
+      // NotifyServiceGuard has already converted the external tenant ID (X-Tenant-ID header)
       // to the internal tenant object with UUID, stored in request.tenant
       const tenant = (req as any).tenant
 
       if (!tenant?.id) {
         this.logger.error(`Tenant not found. request.tenant: ${JSON.stringify(tenant)}`)
         throw new BadRequestException(
-          'Tenant not found in request context. Ensure X-Tenant-ID header is provided and validated by AuthGuard.',
+          'Tenant not found in request context. Ensure X-Tenant-ID header is provided and validated by NotifyServiceGuard.',
         )
       }
 

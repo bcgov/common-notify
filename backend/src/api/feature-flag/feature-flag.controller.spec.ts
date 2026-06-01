@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BadRequestException, NotFoundException, HttpException } from '@nestjs/common'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagController, FeatureFlagClientController } from './feature-flag.controller'
 import { FeatureFlagService } from './feature-flag.service'
 import { FeatureFlag } from './entities/feature-flag.entity'

@@ -12,7 +12,7 @@ import {
 } from './notify.controller'
 import { NotifyService } from './notify.service'
 import { NotificationService } from '../../api/notification/notification.service'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'

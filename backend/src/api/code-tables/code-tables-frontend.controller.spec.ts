@@ -3,7 +3,7 @@ import { CodeTablesFrontendController } from './code-tables-frontend.controller'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { vi } from 'vitest'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('CodeTablesFrontendController', () => {
@@ -132,7 +132,7 @@ describe('CodeTablesFrontendController', () => {
         },
       ],
     })
-      .overrideGuard(AuthGuard)
+      .overrideGuard(NotifyFrontendRoleGuard)
       .useValue(mockAuthGuard)
       .compile()
 

@@ -17,11 +17,10 @@ import {
   Req,
 } from '@nestjs/common'
 import Bull from 'bull'
-import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
@@ -37,7 +36,6 @@ import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
-import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
@@ -47,11 +45,10 @@ import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 // Anything requiring queueing should use the @Queueable decorator and implement the method with an
 // empty body (the decorator will handle the logic).
 //
-// Uses TenantGuard (not JwtGuard) to support Kong service-to-service calls that send HS256-signed JWTs.
-// TenantGuard manually decodes the JWT without signature validation, allowing both Kong (HS256) and
-// Keycloak (RS256) JWTs to work.
+// Uses NotifyServiceGuard for service-to-service calls that require x-tenant-id header
+// and valid client_id + tenant_id mapping in the database.
 @Controller('notifysimple')
-@UseGuards(TenantGuard, CstarRoleGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -67,10 +64,9 @@ export class NotifySimpleController {
   @Post()
   @HttpCode(202)
   @UseGuards(SmsChannelFeatureFlagGuard)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSend(
-    @Req() req: any,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -81,10 +77,9 @@ export class NotifySimpleController {
   @Version('1')
   @Post('email')
   @HttpCode(202)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSendEmail(
-    @Req() req: any,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -97,10 +92,9 @@ export class NotifySimpleController {
   @HttpCode(202)
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @Queueable(QueueName.INGESTION)
   simpleSendSms(
-    @Req() req: any,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -262,7 +256,7 @@ export class NotifySimpleController {
  * Both controllers delegate to the same service for consistency.
  */
 @Controller('frontend/notifysimple')
-@UseGuards(CstarRoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 export class NotifySimpleFrontendController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -306,7 +300,7 @@ export class NotifySimpleFrontendController {
 }
 
 @Controller('notifyevent')
-@UseGuards(JwtGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifyEventController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -340,7 +334,7 @@ export class NotifyEventController {
 }
 
 @Controller('notify')
-@UseGuards(JwtGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifyController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -394,7 +388,7 @@ export class NotifyController {
 }
 
 @Controller('ches/api/v1/email')
-@UseGuards(JwtGuard)
+@UseGuards(NotifyServiceGuard)
 export class ChesEmailController {
   constructor(private readonly notifyService: NotifyService) {}
 

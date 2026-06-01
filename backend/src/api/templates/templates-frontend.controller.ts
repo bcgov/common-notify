@@ -15,8 +15,7 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
-import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
@@ -45,7 +44,7 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
  */
 @ApiTags('templates')
 @Controller('frontend/templates')
-@UseGuards(TenantContextGuard, CstarRoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class TemplatesFrontendController {
   private readonly logger = new Logger(TemplatesFrontendController.name)

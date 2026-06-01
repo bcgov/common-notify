@@ -13,6 +13,7 @@ import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/clien
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { CstarModule } from '../../services/cstar/cstar.module'
     CstarModule,
   ],
   controllers: [NotificationController, NotificationFrontendController],
-  providers: [NotificationService, NotificationPubSubService],
+  providers: [NotificationService, NotificationPubSubService, NotifyFrontendRoleGuard],
   exports: [NotificationService, NotificationPubSubService],
 })
 export class NotificationModule {}

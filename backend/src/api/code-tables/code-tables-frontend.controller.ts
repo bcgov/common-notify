@@ -1,6 +1,6 @@
 import { Controller, Get, Version, Logger, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
-import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 
@@ -27,7 +27,7 @@ import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
  */
 @ApiTags('code-tables')
 @Controller('frontend/code-tables')
-@UseGuards(JwtGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class CodeTablesFrontendController {
   private readonly logger = new Logger(CodeTablesFrontendController.name)

@@ -10,6 +10,7 @@ import { CodeTablesFrontendController } from './code-tables-frontend.controller'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { CstarModule } from '../../services/cstar/cstar.module'
     CstarModule,
   ],
   controllers: [CodeTablesController, CodeTablesFrontendController],
-  providers: [CodeTablesService],
+  providers: [CodeTablesService, NotifyFrontendRoleGuard],
   exports: [CodeTablesService],
 })
 export class CodeTablesModule {}

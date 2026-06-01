@@ -16,6 +16,8 @@ import { NotifyService } from './notify.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 
 @Module({
   imports: [
@@ -36,7 +38,7 @@ import { QueueModule } from '../../queue/queue.module'
     NotifyController,
     ChesEmailController,
   ],
-  providers: [NotifyService],
+  providers: [NotifyService, NotifyFrontendRoleGuard, NotifyServiceGuard],
   exports: [NotifyService, RenderingModule],
 })
 export class NotifyModule {}

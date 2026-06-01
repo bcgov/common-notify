@@ -24,7 +24,7 @@ import { ConfigService } from '@nestjs/config'
 import { ClientTenantMappingService } from './client-tenant-mapping.service'
 import { LinkClientToTenantsDto } from './schemas/link-client-to-tenants.dto'
 import { LinkClientToTenantsResponseDto } from './schemas/link-client-to-tenants-response.dto'
-import { SSORoleGuard } from '../../../common/guards/sso-role.guard'
+import { NotifyFrontendRoleGuard } from '../../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 import type Express from 'express'
@@ -43,7 +43,7 @@ import type Express from 'express'
  */
 @ApiTags('admin')
 @Controller({ path: 'frontend/admin/clients', version: '1' })
-@UseGuards(SSORoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class ClientTenantMappingController {
   private readonly logger = new Logger(ClientTenantMappingController.name)

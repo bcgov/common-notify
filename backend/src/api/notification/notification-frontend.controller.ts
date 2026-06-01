@@ -17,8 +17,7 @@ import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
-import { TenantContextGuard } from '../../common/guards/auth.guard'
-import { CstarRoleGuard } from '../../common/guards/cstar-role.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
@@ -39,7 +38,7 @@ import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
  */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
-@UseGuards(TenantContextGuard, CstarRoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class NotificationFrontendController {
   private readonly logger = new Logger(NotificationFrontendController.name)
@@ -94,7 +93,7 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Sse('events')
-  @UseGuards(TenantContextGuard, CstarRoleGuard, FeatureFlagGuard)
+  @UseGuards(NotifyFrontendRoleGuard, FeatureFlagGuard)
   @Roles(CstarRoleEnum.NOTIFY_VIEWER)
   @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
