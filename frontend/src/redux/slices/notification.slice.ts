@@ -1,10 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { fetchNotifications } from '../thunks/notification.thunks'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import { MAX_NOTIFICATION_RESULTS_PER_PAGE } from '@/config/notification'
 import type { RootState } from '../store'
+import { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 interface NotificationState {
   items: NotificationRequest[]
@@ -41,14 +41,6 @@ export const notificationSlice = createSlice({
     setPage(state, action: PayloadAction<number>) {
       state.page = Math.max(1, action.payload)
     },
-    upsertNotification(state, action: PayloadAction<NotificationRequest>) {
-      const idx = state.items.findIndex((item) => item.id === action.payload.id)
-      if (idx !== -1) {
-        state.items[idx] = action.payload
-      } else if (state.statusFilter === 'all' || state.statusFilter === action.payload.status) {
-        state.items.unshift(action.payload)
-      }
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -72,7 +64,7 @@ export const notificationSlice = createSlice({
   },
 })
 
-export const { setStatusFilter, setPage, upsertNotification } = notificationSlice.actions
+export const { setStatusFilter, setPage } = notificationSlice.actions
 
 export const selectNotifications = (state: RootState) => state.notification.items
 
