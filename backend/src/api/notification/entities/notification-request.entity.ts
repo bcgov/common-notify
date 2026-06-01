@@ -11,6 +11,16 @@ import { NotificationStatusCode } from './notification-status-code.entity'
 import { NotificationChannelCode } from './notification-channel-code.entity'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
+/**
+ * Quarantine details when a notification is flagged by antivirus scanning
+ */
+export interface QuarantineDetails {
+  viruses: string[] // List of detected virus names (e.g., ['Win.Test.EICAR_HDB-1'])
+  filename?: string // Name of the file that was infected
+  scannedAt: string // ISO timestamp of when the scan occurred
+  reason: string // Human-readable reason (e.g., 'Malware detected during attachment scanning')
+}
+
 @Entity('notification_request')
 export class NotificationRequest {
   @PrimaryGeneratedColumn('uuid')
@@ -64,4 +74,7 @@ export class NotificationRequest {
 
   @Column({ type: 'text', nullable: true, name: 'error_reason' })
   errorReason?: string
+
+  @Column({ type: 'jsonb', nullable: true, name: 'quarantine_details' })
+  quarantineDetails?: QuarantineDetails
 }

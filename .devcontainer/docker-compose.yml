@@ -53,6 +53,25 @@ services:
       timeout: 3s
       retries: 5
 
+  clamav:
+    image: clamav/clamav:latest
+    platform: linux/amd64
+    container_name: clamav
+    ports: ["3310:3310"]
+    environment:
+      CLAMD_STARTUP_TIMEOUT: 600
+      # Point to BC Gov's ClamAV Mirror Service for definition updates
+      CVD_UPDATE_HOSTNAME: clamav-mirror.apps.silver.devops.gov.bc.ca
+      CVD_UPDATE_SCHEME: https
+    healthcheck:
+      test: ["CMD", "clamdscan", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Increase memory limit for virus definition updates
+    mem_limit: 2g
+
   schemaspy:
     image: schemaspy/schemaspy:7.0.2
     profiles: ["schemaspy"]
@@ -71,6 +90,8 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      clamav:
+        condition: service_healthy
       kong:
         condition: service_healthy
     env_file:
@@ -84,6 +105,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
       GATEWAY_OAUTH2_TOKEN_URL: http://kong:8000/oauth2/token
     image: *node-image
     ports: ["3001:3000"]
