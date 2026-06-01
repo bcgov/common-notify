@@ -5,4 +5,5 @@ export enum NotificationStatus {
   SENDING = 'sending',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  QUARANTINED = 'quarantined',
 }
