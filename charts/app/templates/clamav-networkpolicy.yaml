@@ -1,0 +1,54 @@
+{{- if .Values.backend.clamav.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-clamav-netpol
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  podSelector:
+    matchLabels:
+      app: clamav
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from backend pods in the same release
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: backend
+      ports:
+        - protocol: TCP
+          port: 3310
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow HTTPS for virus definition updates from BC Gov ClamAV Mirror (external traffic)
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Allow HTTP for virus definition updates (fallback)
+    - ports:
+        - protocol: TCP
+          port: 80
+{{- end }}
