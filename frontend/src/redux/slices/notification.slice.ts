@@ -4,7 +4,7 @@ import { fetchNotifications } from '../thunks/notification.thunks'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import { MAX_NOTIFICATION_RESULTS_PER_PAGE } from '@/config/notification'
 import type { RootState } from '../store'
-import { NotificationRequest } from '@/interfaces/NotificationRequest'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 interface NotificationState {
   items: NotificationRequest[]
