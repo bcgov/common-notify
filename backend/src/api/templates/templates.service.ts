@@ -332,6 +332,8 @@ export class TemplatesService {
         return 'handlebars'
       case TemplateEngine.MUSTACHE:
         return 'mustache'
+      case TemplateEngine.MJML:
+        return 'mjml'
       default:
         return 'handlebars' // default fallback
     }
