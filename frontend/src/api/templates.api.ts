@@ -11,6 +11,7 @@ export enum TemplateEngine {
   HANDLEBARS = 'handlebars',
   MUSTACHE = 'mustache',
   LEGACY_GC_NOTIFY = 'legacy_gc_notify',
+  MJML = 'mjml',
 }
 
 export enum TemplateBodyType {

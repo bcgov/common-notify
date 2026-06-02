@@ -192,6 +192,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               <Radio value={TemplateEngine.HANDLEBARS}>Handlebars</Radio>
               <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
               <Radio value={TemplateEngine.LEGACY_GC_NOTIFY}>Legacy GC Notify</Radio>
+              <Radio value={TemplateEngine.MJML}>MJML</Radio>
             </RadioGroup>
           </div>
 
