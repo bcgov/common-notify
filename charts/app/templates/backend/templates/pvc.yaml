@@ -1,0 +1,20 @@
+{{- if .Values.backend.enabled }}
+{{- if .Values.backend.attachments.pvc.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "backend.fullname" . }}-attachments
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.backend.attachments.pvc.size }}
+  {{- if .Values.backend.attachments.pvc.storageClassName }}
+  storageClassName: {{ .Values.backend.attachments.pvc.storageClassName }}
+  {{- end }}
+{{- end }}
+{{- end }}
