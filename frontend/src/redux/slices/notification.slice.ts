@@ -41,6 +41,18 @@ export const notificationSlice = createSlice({
     setPage(state, action: PayloadAction<number>) {
       state.page = Math.max(1, action.payload)
     },
+    setLimit(state, action: PayloadAction<number>) {
+      state.limit = action.payload
+      state.page = 1
+    },
+    upsertNotification(state, action: PayloadAction<NotificationRequest>) {
+      const idx = state.items.findIndex((item) => item.id === action.payload.id)
+      if (idx !== -1) {
+        state.items[idx] = action.payload
+      } else if (state.statusFilter === 'all' || state.statusFilter === action.payload.status) {
+        state.items.unshift(action.payload)
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -64,7 +76,7 @@ export const notificationSlice = createSlice({
   },
 })
 
-export const { setStatusFilter, setPage } = notificationSlice.actions
+export const { setStatusFilter, setPage, setLimit, upsertNotification } = notificationSlice.actions
 
 export const selectNotifications = (state: RootState) => state.notification.items
 
