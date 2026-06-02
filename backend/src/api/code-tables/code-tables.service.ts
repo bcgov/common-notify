@@ -28,7 +28,7 @@ export class CodeTablesService {
   async getStatuses(): Promise<CodeTableDto[]> {
     try {
       const statuses = await this.statusCodeRepository.find({
-        order: { code: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
       return statuses.map((s) => ({
         code: s.code,
@@ -51,7 +51,7 @@ export class CodeTablesService {
   async getChannels(): Promise<CodeTableDto[]> {
     try {
       const channels = await this.channelCodeRepository.find({
-        order: { channelCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
       return channels.map((c) => ({
         code: c.channelCode,
@@ -74,7 +74,7 @@ export class CodeTablesService {
   async getEventTypes(): Promise<CodeTableDto[]> {
     try {
       const eventTypes = await this.eventTypeCodeRepository.find({
-        order: { eventTypeCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
       return eventTypes.map((e) => ({
         code: e.eventTypeCode,
@@ -97,7 +97,7 @@ export class CodeTablesService {
   async getFeatureCodes(): Promise<CodeTableDto[]> {
     try {
       const featureCodes = await this.featureFlagCodeRepository.find({
-        order: { code: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
       return featureCodes.map((f) => ({
         code: f.code,

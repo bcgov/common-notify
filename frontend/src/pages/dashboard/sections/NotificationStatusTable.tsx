@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
+import { setLimit } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
@@ -34,13 +35,13 @@ const NotificationStatusTable: FC = () => {
   const [selectedNotification, setSelectedNotification] = useState<NotificationRequest | null>(null)
   const [showRecipientsModal, setShowRecipientsModal] = useState(false)
 
-  // Fetch notifications when status filter, page, or selected tenant changes
+  // Fetch notifications when status filter, page, limit, or selected tenant changes
   // Only fetch if a tenant is selected
   useEffect(() => {
     if (selectedTenant) {
       dispatch(fetchNotifications())
     }
-  }, [statusFilter, page, selectedTenant, dispatch])
+  }, [statusFilter, page, limit, selectedTenant, dispatch])
 
   // Fetch feature flags for the selected tenant
   // This ensures byCode contains flags that apply to this tenant (global + tenant-specific)
@@ -152,6 +153,8 @@ const NotificationStatusTable: FC = () => {
         pageSize={limit}
         totalCount={count}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+        onPageSizeChange={(newLimit) => dispatch(setLimit(newLimit))}
+        pageSizeOptions={[15, 30]}
       />
 
       <RecipientsModal

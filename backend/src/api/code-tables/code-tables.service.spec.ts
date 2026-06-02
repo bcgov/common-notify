@@ -24,6 +24,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       code: 'failed',
@@ -33,6 +34,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
     },
     {
       code: 'pending',
@@ -42,6 +44,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 30,
     },
   ]
 
@@ -54,6 +57,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       channelCode: 'SMS',
@@ -63,6 +67,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
     },
   ]
 
@@ -76,6 +81,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       eventTypeCode: 'INVOICE_SENT',
@@ -86,6 +92,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
     },
   ]
 
@@ -98,6 +105,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 999,
     },
     {
       code: 'sms_notifications',
@@ -107,6 +115,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
   ]
 
@@ -165,7 +174,7 @@ describe('CodeTablesService', () => {
         updatedBy: null,
       })
       expect(statusCodeRepo.find).toHaveBeenCalledWith({
-        order: { code: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 
@@ -202,7 +211,7 @@ describe('CodeTablesService', () => {
         updatedBy: null,
       })
       expect(channelCodeRepo.find).toHaveBeenCalledWith({
-        order: { channelCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 
@@ -239,7 +248,7 @@ describe('CodeTablesService', () => {
         updatedBy: null,
       })
       expect(eventTypeCodeRepo.find).toHaveBeenCalledWith({
-        order: { eventTypeCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 

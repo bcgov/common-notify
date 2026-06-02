@@ -1,0 +1,139 @@
+{{- if .Values.backend.clamav.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-clamav
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: clamav
+      app.kubernetes.io/name: clamav
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: clamav
+        app.kubernetes.io/name: clamav
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1018590000
+      containers:
+        - name: clamav
+          # Using official ClamAV image with custom command to bypass chown operations
+          image: clamav/clamav:stable-debian
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - sh
+            - -c
+            - |
+              # Create freshclam config with default mirrors (BC Gov mirror timing out)
+              cat > /tmp/freshclam.conf <<EOF
+              DatabaseMirror database.clamav.net
+              DatabaseDirectory /var/lib/clamav
+              LogVerbose yes
+              LogTime yes
+              Foreground yes
+              EOF
+
+              # Download virus databases in background
+              /usr/bin/freshclam --config-file=/tmp/freshclam.conf &
+
+              # Wait for databases to download (check for daily.cvd/cld)
+              while [ ! -f /var/lib/clamav/daily.cvd ] && [ ! -f /var/lib/clamav/daily.cld ]; do
+                echo "Waiting for virus databases to download..."
+                sleep 10
+              done
+
+              echo "Virus databases downloaded, starting clamd..."
+
+              # Create clamd config - log to file in /tmp and tail to stdout
+              cat > /tmp/clamd.conf <<CLAMDEOF
+              LogFile /tmp/clamd.log
+              LogFileMaxSize 10M
+              LogTime yes
+              LogVerbose yes
+              DatabaseDirectory /var/lib/clamav
+              LocalSocket /tmp/clamd.sock
+              TCPSocket 3310
+              TCPAddr 0.0.0.0
+              MaxThreads 12
+              MaxConnectionQueueLength 30
+              StreamMaxLength 100M
+              CLAMDEOF
+
+              # Start clamd with custom config and tail logs to stdout
+              /usr/sbin/clamd --foreground=yes --config-file=/tmp/clamd.conf &
+              CLAMD_PID=$!
+
+              # Tail logs to stdout
+              tail -f /tmp/clamd.log &
+
+              # Wait for clamd process
+              wait $CLAMD_PID
+          ports:
+            - name: clamd
+              containerPort: 3310
+              protocol: TCP
+          startupProbe:
+            tcpSocket:
+              port: 3310
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 3310
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 3310
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          volumeMounts:
+            - name: clamav-data
+              mountPath: /var/lib/clamav
+            - name: clamav-run
+              mountPath: /run/clamav
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: clamav-data
+          emptyDir: {}
+        - name: clamav-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

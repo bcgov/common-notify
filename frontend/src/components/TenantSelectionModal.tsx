@@ -22,7 +22,7 @@ import '@/scss/components/tenant-selection-modal.scss'
  */
 
 const CSTAR_TENANT_SETUP_URL =
-  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || 'https://cstar-dev.apps.silver.devops.gov.bc.ca'
+  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca'
 
 const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
