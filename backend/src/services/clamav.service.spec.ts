@@ -1,7 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as net from 'net'
 import { ClamavService } from './clamav.service'
+
+// Mock the net module
+vi.mock('net', () => ({
+  createConnection: vi.fn(),
+}))
 
 describe('ClamavService', () => {
   let service: ClamavService
@@ -16,9 +22,9 @@ describe('ClamavService', () => {
             get: vi.fn((key: string, defaultValue?: any) => {
               const config = {
                 CLAMAV_HOST: 'localhost',
-                CLAMAV_PORT: 3310,
-                CLAMAV_TIMEOUT: 5000,
-                CLAMAV_ENABLED: 'true',
+                CLAMAV_PORT: '3310',
+                CLAMAV_TIMEOUT: '5000',
+                CLAMAV_ENABLED: 'false', // Disable ClamAV in tests
               }
               return config[key] || defaultValue
             }),
