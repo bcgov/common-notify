@@ -42,6 +42,12 @@ export class TemplateResponseDto {
   body: string
 
   /**
+   * Body content type
+   * @example "html"
+   */
+  bodyType?: 'text' | 'markdown' | 'html'
+
+  /**
    * Template rendering engine
    * @example "handlebars"
    */
