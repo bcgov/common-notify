@@ -55,6 +55,7 @@ UPDATE notify.notification_status_code SET sort_order = 60 WHERE code='sending';
 UPDATE notify.notification_status_code SET sort_order = 70 WHERE code='completed';
 UPDATE notify.notification_status_code SET sort_order = 80 WHERE code='failed';
 UPDATE notify.notification_status_code SET sort_order = 90 WHERE code='cancelled';
+UPDATE notify.notification_status_code SET sort_order = 100 WHERE code='quarantined';
 -- Make the column non-optional
 ALTER TABLE notify.notification_status_code 
 ALTER COLUMN sort_order SET NOT NULL,
