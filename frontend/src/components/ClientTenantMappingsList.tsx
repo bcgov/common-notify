@@ -127,7 +127,6 @@ const ClientTenantMappingsList = forwardRef<{ refetch?: () => void }>((_props, r
       isLoading={loading}
       isEmpty={mappings.length === 0}
       emptyMessage="No client-tenant mappings found"
-      variant="bordered"
       size="sm"
     />
   )

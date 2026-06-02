@@ -9,12 +9,11 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
-import PageLimitControl from '@/components/PageLimitControl'
 
 const columns: TableColumn<TemplateResponse>[] = [
   {
     key: 'name',
-    label: 'Name',
+    label: 'Template Title',
     render: (_, row) => (
       <Link
         to={`/template-edit/$templateId`}
@@ -27,7 +26,7 @@ const columns: TableColumn<TemplateResponse>[] = [
   },
   {
     key: 'channelCode',
-    label: 'Channel',
+    label: 'Template Type',
     render: (_, row) => {
       const channelCode =
         row.channelCode.charAt(0).toUpperCase() + row.channelCode.slice(1).toLowerCase()
@@ -36,12 +35,27 @@ const columns: TableColumn<TemplateResponse>[] = [
   },
   {
     key: 'active',
-    label: 'Status',
+    label: 'Template Status',
     render: (_, row) => <span>{row.active ? 'Active' : 'Inactive'}</span>,
   },
   {
+    key: 'createdAt',
+    label: 'Initiated Date',
+    render: (_, row) => {
+      const formatted = new Date(row.createdAt).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+      return <span>{formatted}</span>
+    },
+  },
+  {
     key: 'updatedAt',
-    label: 'Updated At',
+    label: 'Last Updated Date',
     render: (_, row) => {
       const formatted = new Date(row.updatedAt).toLocaleString(undefined, {
         month: 'short',
@@ -113,7 +127,6 @@ const Templates: FC = () => {
         </div>
       </div>
 
-      <PageLimitControl limit={limit} page={page} count={count} onLimitChange={handleLimitChange} />
       <DataTable
         columns={columns}
         data={templates}
@@ -124,6 +137,8 @@ const Templates: FC = () => {
         totalCount={count}
         isLoading={isLoading}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+        onPageSizeChange={handleLimitChange}
+        pageSizeOptions={[15, 30]}
         label="Notification Templates"
       />
     </div>
