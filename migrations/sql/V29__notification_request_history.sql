@@ -1,7 +1,7 @@
 -- Add history table for notification_request
-CREATE TABLE 
+CREATE TABLE
   notify.notification_request_history (
-    h_id uuid DEFAULT notify.uuid_generate_v4() NOT NULL PRIMARY KEY,
+    h_id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     target_row_id uuid NOT NULL,
     operation_type char(1) NOT NULL,
     operation_user varchar(200) DEFAULT CURRENT_USER NOT NULL,
@@ -9,44 +9,44 @@ CREATE TABLE
     data_after_operation jsonb NOT NULL
   );
 
-CREATE INDEX idx_nr_history_target_row 
+CREATE INDEX idx_nr_history_target_row
   ON notify.notification_request_history(target_row_id);
 
-CREATE INDEX idx_nr_history_timestamp 
+CREATE INDEX idx_nr_history_timestamp
   ON notify.notification_request_history(operation_executed_at DESC);
 
-CREATE INDEX idx_nr_history_user 
+CREATE INDEX idx_nr_history_user
   ON notify.notification_request_history(operation_user);
 
-CREATE INDEX idx_nr_history_operation 
+CREATE INDEX idx_nr_history_operation
   ON notify.notification_request_history(operation_type);
 
-CREATE INDEX idx_nr_history_data 
+CREATE INDEX idx_nr_history_data
   ON notify.notification_request_history USING GIN (data_after_operation);
 
-COMMENT ON TABLE notify.notification_request_history IS 
+COMMENT ON TABLE notify.notification_request_history IS
   'Immutable audit log of all changes to notification_request. Each row captures a complete snapshot after INSERT/UPDATE/DELETE. Populated automatically by audit_history() trigger.';
 
-COMMENT ON COLUMN notify.notification_request_history.h_id IS 
+COMMENT ON COLUMN notify.notification_request_history.h_id IS
   'Unique identifier for this history record';
 
-COMMENT ON COLUMN notify.notification_request_history.target_row_id IS 
+COMMENT ON COLUMN notify.notification_request_history.target_row_id IS
   'Foreign key to notification_request.id that was changed';
 
-COMMENT ON COLUMN notify.notification_request_history.operation_type IS 
+COMMENT ON COLUMN notify.notification_request_history.operation_type IS
   'Type of operation: I=INSERT, U=UPDATE, D=DELETE';
 
-COMMENT ON COLUMN notify.notification_request_history.operation_user IS 
+COMMENT ON COLUMN notify.notification_request_history.operation_user IS
   'User who performed the operation (from app.current_user or database user)';
 
-COMMENT ON COLUMN notify.notification_request_history.operation_executed_at IS 
+COMMENT ON COLUMN notify.notification_request_history.operation_executed_at IS
   'Server timestamp when operation occurred (always NOW() at trigger time)';
 
-COMMENT ON COLUMN notify.notification_request_history.data_after_operation IS 
+COMMENT ON COLUMN notify.notification_request_history.data_after_operation IS
   'Complete JSON snapshot of the row after the operation. For UPDATE/INSERT: NEW row. For DELETE: OLD row.';
 
 -- Create function used to populate history tables
-CREATE OR REPLACE FUNCTION notify.audit_history() 
+CREATE OR REPLACE FUNCTION notify.audit_history()
 RETURNS TRIGGER AS $$
 DECLARE
   v_history_table TEXT;
@@ -70,9 +70,9 @@ BEGIN
 
   -- Capture to history (AFTER trigger instead)
   EXECUTE format(
-    'INSERT INTO notify.%I (target_row_id, operation_type, operation_user, 
+    'INSERT INTO notify.%I (target_row_id, operation_type, operation_user,
      operation_executed_at, data_after_operation) VALUES ($1.%I, %L, %L, now(), to_jsonb($1))',
-    v_history_table, v_pk_column, SUBSTRING(TG_OP, 1, 1), 
+    v_history_table, v_pk_column, SUBSTRING(TG_OP, 1, 1),
     COALESCE(current_setting('app.current_user', true), current_user)
   ) USING NEW;
 
