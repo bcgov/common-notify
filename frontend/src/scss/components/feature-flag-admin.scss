@@ -5,13 +5,9 @@
 // Transitions
 $transition-all: all 0.2s;
 
-// Typography (BCSans is the official BC Government font - used for all text)
-$font-family-mono: 'BCSans', sans-serif;
-
 .feature-flag-admin {
   margin: $spacing-xl auto;
   padding: $spacing-xl;
-  font-family: 'BCSans', sans-serif;
 
   &.loading {
     display: flex;
