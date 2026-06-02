@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import * as net from 'net'
 import { ClamavService } from './clamav.service'
 
 // Mock the net module
