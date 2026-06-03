@@ -1,5 +1,31 @@
 {{- if .Values.backend.enabled }}
 {{- if .Values.backend.attachments.pvc.enabled }}
+{{- if .Values.backend.attachments.pvc.shared }}
+{{- /* Only create shared PVC once - check if this is the main release or if forced */ -}}
+{{- if or (eq .Release.Name "common-notify") (.Values.backend.attachments.pvc.createShared) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nr-notify-attachments-shared
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: nr-notify-attachments
+    app.kubernetes.io/component: shared-storage
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.backend.attachments.pvc.size }}
+  {{- if .Values.backend.attachments.pvc.storageClassName }}
+  storageClassName: {{ .Values.backend.attachments.pvc.storageClassName }}
+  {{- end }}
+{{- end }}
+{{- else }}
+{{- /* Legacy: Per-PR PVC (wasteful, but kept for backward compatibility) */ -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -16,5 +42,6 @@ spec:
   {{- if .Values.backend.attachments.pvc.storageClassName }}
   storageClassName: {{ .Values.backend.attachments.pvc.storageClassName }}
   {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

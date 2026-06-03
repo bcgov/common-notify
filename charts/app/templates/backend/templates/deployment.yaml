@@ -95,6 +95,8 @@ spec:
               value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
             - name: ATTACHMENT_STORAGE_DIR
               value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
+            - name: RELEASE_NAME
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:
@@ -165,7 +167,7 @@ spec:
       volumes:
         - name: attachments
           persistentVolumeClaim:
-            claimName: {{ include "backend.fullname" . }}-attachments
+            claimName: {{ if .Values.backend.attachments.pvc.shared }}nr-notify-attachments-shared{{ else }}{{ include "backend.fullname" . }}-attachments{{ end }}
       {{- end }}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
