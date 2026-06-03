@@ -104,8 +104,8 @@ describe('Dashboard with CodeTables', () => {
 
     // Status filter items should be rendered from Redux code tables
     // which are loaded at root level, not by Dashboard itself
-    const selectElement = screen.getByRole('combobox', { hidden: true })
-    expect(selectElement).toBeTruthy()
+    const selectElements = screen.getAllByRole('combobox', { hidden: true })
+    expect(selectElements.length).toBeGreaterThan(0)
   })
 
   it('should render status filter with code table items from Redux', async () => {

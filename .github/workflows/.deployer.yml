@@ -129,6 +129,8 @@ jobs:
             VALUES_FILE="charts/redis/values.yml"
             if [ "${{ inputs.environment }}" == "PROD" ]; then
               VALUES_OVERRIDE="-f charts/redis/values-prod.yml"
+            elif [ "${{ inputs.environment }}" == "DEV" ]; then
+              VALUES_OVERRIDE="-f charts/redis/values-dev.yml"
             else
               VALUES_OVERRIDE=""
             fi
@@ -236,6 +238,7 @@ jobs:
               --set-string global.tag="${{ steps.vars.outputs.tag }}" \
               --set-string global.config.databaseUser="${{ inputs.db_user }}" \
               --set-string global.databaseAlias="${{ steps.deploy_crunchy.outputs.release }}-crunchy" \
+              --set-string global.config.redisSecret="${{ github.event.repository.name }}-redis" \
               ${{ inputs.params }} \
               --install --wait ${{ inputs.atomic && '--atomic' || '' }} ${{ steps.vars.outputs.release }} \
               --timeout ${{ inputs.timeout-minutes }}m \

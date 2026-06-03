@@ -75,7 +75,7 @@ export class FeatureFlagService {
     return this.featureFlagRepository
       .createQueryBuilder('ff')
       .leftJoinAndSelect('ff.flagCode', 'flagCode')
-      .orderBy('ff.code', 'ASC')
+      .orderBy('flagCode.sort_order', 'ASC')
       .addOrderBy('ff.tenantId', 'ASC')
       .getMany()
   }
@@ -90,8 +90,9 @@ export class FeatureFlagService {
     // This ensures global flags (tenantId IS NULL) are included
     const flags = await this.featureFlagRepository
       .createQueryBuilder('flag')
+      .leftJoin('flag.flagCode', 'flagCode')
       .where('flag.tenantId = :tenantId OR flag.tenantId IS NULL', { tenantId })
-      .orderBy('flag.code', 'ASC')
+      .orderBy('flagCode.sort_order', 'ASC')
       .getMany()
 
     // Build map with tenant overrides taking precedence over global

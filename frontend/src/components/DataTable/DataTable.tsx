@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import PaginationControls from '../PaginationControls'
+import TablePaginationFooter from './pagination/TablePaginationFooter'
 import { Table } from './Table'
 import { TableBody } from './TableBody'
 import { TableCell } from './TableCell'
@@ -12,6 +12,7 @@ export interface TableColumn<T> {
   key: keyof T & string
   label: string
   sortable?: boolean
+  sortLabel?: string
   width?: string
   render?: (value: unknown, row: T) => ReactNode
   className?: string
@@ -70,11 +71,13 @@ export function DataTable<T extends object>({
   isEmpty,
   emptyMessage = 'No data available.',
   currentPage,
-  pageSize = 10,
+  pageSize = 15,
   totalCount,
   onPageChange,
+  onPageSizeChange,
+  pageSizeOptions,
   label,
-  variant = 'bordered',
+  variant = 'striped',
   size = 'md',
   className = '',
   footerContent,
@@ -131,7 +134,14 @@ export function DataTable<T extends object>({
     ? 'Loading'
     : showEmpty
       ? emptyMessage
-      : `${data.length} row${data.length === 1 ? '' : 's'}`
+      : currentPage != null && totalCount != null
+        ? (() => {
+            const totalPages = Math.ceil(totalCount / pageSize)
+            const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1
+            const end = Math.min(currentPage * pageSize, totalCount)
+            return `Page ${currentPage} of ${totalPages}, showing ${start}\u2013${end} of ${totalCount} items`
+          })()
+        : `${data.length} row${data.length === 1 ? '' : 's'}`
 
   return (
     <>
@@ -147,6 +157,7 @@ export function DataTable<T extends object>({
                 className={col.className}
                 style={col.width ? { width: col.width } : undefined}
                 sortable={col.sortable}
+                sortLabel={col.sortLabel}
                 sortOrder={sortBy === col.key ? sortOrder : null}
                 onSort={col.sortable ? () => handleSort(col.key) : undefined}
               >
@@ -156,24 +167,33 @@ export function DataTable<T extends object>({
           </TableRow>
         </TableHeader>
         <TableBody>{renderBodyContent()}</TableBody>
-        {footerContent != null && (
+        {(footerContent != null ||
+          (onPageChange != null && totalCount != null && currentPage != null)) && (
           <TableFooter>
-            <TableRow>
-              <TableCell colSpan={columns.length}>{footerContent}</TableCell>
-            </TableRow>
+            {footerContent != null && (
+              <TableRow>
+                <TableCell colSpan={columns.length}>{footerContent}</TableCell>
+              </TableRow>
+            )}
+            {onPageChange != null && totalCount != null && currentPage != null && (
+              <TableRow>
+                <TableCell colSpan={columns.length} style={{ padding: 0 }}>
+                  <TablePaginationFooter
+                    page={currentPage}
+                    totalPages={Math.ceil(totalCount / pageSize)}
+                    count={totalCount}
+                    limit={pageSize}
+                    isLoading={isLoading}
+                    onPageChange={onPageChange}
+                    onPageSizeChange={onPageSizeChange}
+                    pageSizeOptions={pageSizeOptions}
+                  />
+                </TableCell>
+              </TableRow>
+            )}
           </TableFooter>
         )}
       </Table>
-      {onPageChange != null && totalCount != null && currentPage != null && (
-        <PaginationControls
-          page={currentPage}
-          totalPages={Math.ceil(totalCount / pageSize)}
-          count={totalCount}
-          limit={pageSize}
-          isLoading={isLoading}
-          onPageChange={onPageChange}
-        />
-      )}
     </>
   )
 }

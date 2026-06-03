@@ -73,18 +73,30 @@ spec:
             - name: GC_NOTIFY_BASE_URL
               value: https://api.notification.canada.ca
             - name: REDIS_HOST
-              value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Chart.Name) }}
+              value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Release.Name) }}
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.config.redisSecret | default (printf "%s-redis" .Chart.Name) }}
+                  name: {{ .Values.global.config.redisSecret | default (printf "%s-redis" .Release.Name) }}
                   key: redis-password
             - name: REDIS_DB
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            - name: CLAMAV_HOST
+              value: {{ .Values.backend.clamav.host | default (printf "%s-clamav" .Release.Name) | quote }}
+            - name: CLAMAV_PORT
+              value: {{ .Values.backend.clamav.port | default "3310" | quote }}
+            - name: CLAMAV_TIMEOUT
+              value: {{ .Values.backend.clamav.timeout | default "30000" | quote }}
+            - name: CLAMAV_ENABLED
+              value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
+            - name: ATTACHMENT_STORAGE_DIR
+              value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
+            - name: RELEASE_NAME
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:
@@ -146,6 +158,17 @@ spec:
             limits:
               cpu: 4
               memory: 8Gi
+          {{- if .Values.backend.attachments.pvc.enabled }}
+          volumeMounts:
+            - name: attachments
+              mountPath: {{ .Values.backend.attachments.storageDir | default "/app/attachments" }}
+          {{- end }}
+      {{- if .Values.backend.attachments.pvc.enabled }}
+      volumes:
+        - name: attachments
+          persistentVolumeClaim:
+            claimName: {{ if .Values.backend.attachments.pvc.shared }}nr-notify-attachments-shared{{ else }}{{ include "backend.fullname" . }}-attachments{{ end }}
+      {{- end }}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
