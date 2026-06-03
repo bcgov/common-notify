@@ -1,6 +1,7 @@
 import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
+import { useLocation } from '@tanstack/react-router'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchCstarTenants } from '@/redux/thunks/cstar.thunks'
 import LoadingSpinner from './LoadingSpinner'
@@ -16,6 +17,7 @@ type Props = {
 
 const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
+  const location = useLocation()
 
   const user = useAppSelector((state) => state.auth.user)
   const isInitializing = useAppSelector((state) => state.auth.isInitializing)
@@ -38,6 +40,8 @@ const Layout: FC<Props> = ({ children }) => {
   if (!selectedTenant && !showTenantModal && tenants.length > 0) {
     return <LoadingSpinner isVisible />
   }
+
+  const showSidebar = location.pathname !== '/not-authorized'
 
   return (
     <>
@@ -67,7 +71,7 @@ const Layout: FC<Props> = ({ children }) => {
         </div>
         <div className="layout-body">
           <div className="layout-body-inner">
-            <Sidebar />
+            {showSidebar && <Sidebar />}
             <div className="layout-content">{children}</div>
           </div>
         </div>

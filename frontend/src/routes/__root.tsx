@@ -1,4 +1,4 @@
-import { createRootRoute, ErrorComponent, Outlet } from '@tanstack/react-router'
+import { createRootRoute, ErrorComponent, Outlet, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchCodeTables } from '@/redux/thunks/codeTables.thunks'
@@ -16,10 +16,14 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const user = useAppSelector((state) => state.auth.user)
+  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const cstarIsLoading = useAppSelector((state) => state.cstar.isLoading)
 
   // Track which user we've already fetched tenants for to avoid duplicate fetches
   const fetchedUserIdRef = useRef<string | null>(null)
+  const checkAuthorizationRef = useRef<boolean>(false)
 
   useEffect(() => {
     // Load code tables once when app starts
@@ -52,6 +56,32 @@ function RootLayout() {
     fetchedUserIdRef.current = user.id
     dispatch(fetchCstarTenants(user.id))
   }, [dispatch, user?.id]) // Only depend on user?.id, not Redux state
+
+  useEffect(() => {
+    // Check authorization status after tenants have been loaded
+    // If user is authenticated but has no tenants, show NotAuthorized page
+    if (!user?.id) {
+      checkAuthorizationRef.current = false
+      return
+    }
+
+    // Only check once CSTAR has finished loading
+    if (cstarIsLoading) {
+      return
+    }
+
+    // Only check once per session
+    if (checkAuthorizationRef.current) {
+      return
+    }
+
+    checkAuthorizationRef.current = true
+
+    // If user is authenticated but has no accessible tenants/roles, redirect to NotAuthorized
+    if (cstarTenants.length === 0) {
+      navigate({ to: '/not-authorized' })
+    }
+  }, [user?.id, cstarTenants, cstarIsLoading, navigate])
 
   return (
     <Layout>

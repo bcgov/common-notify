@@ -62,7 +62,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get()
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List all templates for the specified tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -119,7 +123,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get(':templateId')
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   async getTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
@@ -138,7 +146,7 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post()
   @HttpCode(201)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async createTemplate(
     @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
@@ -160,7 +168,7 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId')
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async updateTemplate(
     @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
@@ -181,7 +189,7 @@ export class TemplatesFrontendController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async deleteTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
@@ -202,7 +210,7 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async previewTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,

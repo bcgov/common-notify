@@ -5,10 +5,12 @@ export interface CstarRole {
   id: string
   name: string
   description: string
-  createdDateTime: string
-  updatedDateTime: string
-  createdBy: string | null
-  updatedBy: string | null
+  allowedIdentityProviders?: string[]
+  groups?: Array<{ id: string; name: string }>
+  createdDateTime?: string
+  updatedDateTime?: string
+  createdBy?: string | null
+  updatedBy?: string | null
 }
 
 /**
@@ -16,6 +18,6 @@ export interface CstarRole {
  */
 export interface CstarRolesResponse {
   data: {
-    roles: CstarRole[]
+    sharedServiceRoles: CstarRole[]
   }
 }

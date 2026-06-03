@@ -51,7 +51,11 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Get()
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -94,7 +98,11 @@ export class NotificationFrontendController {
   @Version('1')
   @Sse('events')
   @UseGuards(NotifyFrontendRoleGuard, FeatureFlagGuard)
-  @Roles(CstarRoleEnum.NOTIFY_VIEWER)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
   @ApiQuery({
