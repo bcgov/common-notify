@@ -10,7 +10,7 @@ import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
-import { JwtGuard } from './auth/guards/auth.jwt-guard'
+import { JwtGuard } from './common/guards/auth.jwt-guard'
 
 /**
  *

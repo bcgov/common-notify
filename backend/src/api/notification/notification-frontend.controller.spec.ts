@@ -8,7 +8,6 @@ import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
-import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
 const mockNotificationService = {
@@ -62,11 +61,10 @@ describe('NotificationFrontendController', () => {
           provide: FeatureFlagService,
           useValue: mockFeatureFlagService,
         },
-        AuthGuard,
       ],
     })
-      .overrideGuard(FeatureFlagGuard)
-      .useValue({ canActivate: () => true })
+      .overrideGuard(NotifyFrontendRoleGuard)
+      .useValue({})
       .compile()
 
     controller = module.get<NotificationFrontendController>(NotificationFrontendController)

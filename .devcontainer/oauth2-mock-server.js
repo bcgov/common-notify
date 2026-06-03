@@ -20,6 +20,10 @@ const jwtSecrets = {
   'LOCAL003-GHI789': 'jwt-secret-local003',
 }
 
+// Issuer (should match API_GATEWAY_KEYCLOAK_ISSUER in backend)
+const keycloakIssuer =
+  process.env.API_GATEWAY_KEYCLOAK_ISSUER || 'https://dev.loginproxy.gov.bc.ca/auth/realms/apigw'
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
@@ -59,6 +63,7 @@ app.post('/', (req, res) => {
   const payload = {
     sub: client_id,
     azp: client_id, // Authorized Party - the client ID authorized to use this token
+    iss: keycloakIssuer, // Issuer (service realm)
     scope: scope || 'notify',
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor((Date.now() + 3600000) / 1000),

@@ -1,6 +1,6 @@
 import { Controller, Get, Version, Logger, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
-import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 
@@ -20,14 +20,13 @@ import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
  * these controllers can be consolidated.
  *
  * SECURITY NOTE: Code tables are public reference data (dropdowns, status codes, channels).
- * They require JWT authentication for usage tracking and CSTAR role validation,
- * but NOT tenant-specific validation since they're not tenant-specific data.
- * We only use CstarRoleGuard (JWT + role validation) without AuthGuard
- * to avoid unnecessary CSTAR API calls that require backend service credentials.
+ * They require JWT authentication for usage tracking, but NOT tenant-specific validation
+ * since they're reference data available to all authenticated users.
+ * Using JwtGuard (not NotifyFrontendRoleGuard) to avoid x-tenant-id dependency.
  */
 @ApiTags('code-tables')
 @Controller('frontend/code-tables')
-@UseGuards(NotifyFrontendRoleGuard)
+@UseGuards(JwtGuard)
 @ApiBearerAuth()
 export class CodeTablesFrontendController {
   private readonly logger = new Logger(CodeTablesFrontendController.name)

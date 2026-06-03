@@ -30,10 +30,6 @@ import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappin
  * 6. Looks up tenant by external ID
  * 7. Verifies client_id + tenant_id mapping exists in database
  *
- * Attaches to request:
- * - request.tenant: The tenant entity
- * - request.clientId: The service client ID (azp claim)
- *
  * Error responses:
  * - 400: Missing x-tenant-id header
  * - 401: Missing/invalid authorization header, invalid issuer, or missing client ID
@@ -60,13 +56,13 @@ export class NotifyServiceGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    // 1. Validate x-tenant-id header is present
+    // Validate x-tenant-id header is present
     const xTenantId = request.headers['x-tenant-id'] as string
     if (!xTenantId) {
       throw new BadRequestException('x-tenant-id header is required for service-to-service calls')
     }
 
-    // 2. Extract JWT from Authorization header
+    // Extract JWT from Authorization header.  This is the jwt we get by exchanging the client credentials
     const authHeader = request.headers.authorization as string
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid authorization header')
@@ -74,7 +70,7 @@ export class NotifyServiceGuard implements CanActivate {
 
     const token = authHeader.substring(7)
 
-    // 3. Decode JWT manually (no signature validation - Kong gateway already validated)
+    // Decode JWT manually (no signature validation - Kong gateway already validated)
     let payload: any
     try {
       payload = this.decodeJwt(token)
@@ -89,14 +85,20 @@ export class NotifyServiceGuard implements CanActivate {
       throw new UnauthorizedException('Client ID not found in JWT')
     }
 
-    // 3b. Validate issuer (service requests must come from apigw realm)
+    // Validate issuer (service requests must come from apigw realm)
     const issuer = payload.iss as string
+    this.logger.debug(
+      `[NotifyServiceGuard] JWT issuer: ${issuer}, Expected: ${this.keycloakIssuer}`,
+    )
     if (issuer !== this.keycloakIssuer) {
-      this.logger.warn(`Issuer mismatch. Expected: ${this.keycloakIssuer}, Got: ${issuer}`)
+      this.logger.warn(
+        `[NotifyServiceGuard] Issuer mismatch. Expected: ${this.keycloakIssuer}, Got: ${issuer}`,
+      )
       throw new UnauthorizedException('Invalid token issuer')
     }
+    this.logger.debug(`[NotifyServiceGuard] ✓ Issuer validated`)
 
-    // 4. Look up tenant by external ID
+    // Look up tenant by external ID
     let tenant
     try {
       tenant = await this.tenantsService.findByExternalId(xTenantId)
@@ -110,7 +112,7 @@ export class NotifyServiceGuard implements CanActivate {
       throw new NotFoundException('Tenant not found')
     }
 
-    // 5. Verify client_id + tenant_id mapping exists
+    // Verify client_id + tenant_id mapping exists
     try {
       const mappedTenantIds = await this.clientTenantMappingService.findTenantsByClientId(clientId)
       if (!mappedTenantIds.includes(tenant.id)) {

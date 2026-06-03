@@ -3,7 +3,7 @@ import { CodeTablesFrontendController } from './code-tables-frontend.controller'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { vi } from 'vitest'
-import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('CodeTablesFrontendController', () => {
@@ -132,7 +132,7 @@ describe('CodeTablesFrontendController', () => {
         },
       ],
     })
-      .overrideGuard(NotifyFrontendRoleGuard)
+      .overrideGuard(JwtGuard)
       .useValue(mockAuthGuard)
       .compile()
 
@@ -273,9 +273,8 @@ describe('CodeTablesFrontendController', () => {
 
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toHaveProperty('code')
-      expect(result[0]).toHaveProperty('name')
+      expect(result[0]).toHaveProperty('displayName')
       expect(result[0]).toHaveProperty('description')
-      expect(result[0]).toHaveProperty('displayOrder')
     })
 
     it('should return empty array when no statuses', async () => {

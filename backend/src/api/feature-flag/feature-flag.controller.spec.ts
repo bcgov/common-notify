@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { BadRequestException, NotFoundException, HttpException } from '@nestjs/common'
-import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { FeatureFlagController, FeatureFlagClientController } from './feature-flag.controller'
 import { FeatureFlagService } from './feature-flag.service'
 import { FeatureFlag } from './entities/feature-flag.entity'
@@ -30,7 +31,10 @@ describe('FeatureFlagController', () => {
           useValue: mockFeatureFlagService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(NotifyAdminGuard)
+      .useValue({})
+      .compile()
 
     controller = module.get<FeatureFlagController>(FeatureFlagController)
   })
@@ -237,8 +241,8 @@ describe('FeatureFlagController', () => {
           },
         ],
       })
-        .overrideGuard(AuthGuard)
-        .useValue({ canActivate: () => true })
+        .overrideGuard(NotifyServiceGuard)
+        .useValue({})
         .compile()
 
       clientController = module.get<FeatureFlagClientController>(FeatureFlagClientController)

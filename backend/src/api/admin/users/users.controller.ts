@@ -9,7 +9,7 @@ import {
 import { UsersService } from './users.service'
 import { UpsertUserDto } from './schemas/upsert-user.dto'
 import { UpsertUserResponseDto, UserResponseDto } from './schemas/user-response.dto'
-import { JwtGuard } from '../../../auth/guards/auth.jwt-guard'
+import { JwtGuard } from '../../../common/guards/auth.jwt-guard'
 import type Express from 'express'
 
 /**

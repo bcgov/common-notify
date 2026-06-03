@@ -21,13 +21,13 @@ import {
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
 import { TenantDto } from './schemas/tenant.dto'
-import { NotifyFrontendRoleGuard } from '../../../common/guards/notify-frontend-role.guard'
+import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
-@UseGuards(NotifyFrontendRoleGuard)
+@UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}

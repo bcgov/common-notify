@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import type { FC } from 'react'
 import { Button, Form, Select, TextField } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -6,8 +6,8 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import '@/scss/components/test-notification-form.scss'
 
 const mockNotificationEventItems = [
-  { id: '1', label: 'New Order Ready' },
-  { id: '2', label: 'Extra Cheese Requested' },
+  { id: '1', label: 'New Order Ready', key: 'event-1' },
+  { id: '2', label: 'Extra Cheese Requested', key: 'event-2' },
 ]
 
 /**
@@ -28,7 +28,15 @@ const TestNotificationForm: FC = () => {
     }
   }, [dispatch, selectedTenant])
 
-  const templateItems = templates.map((t, index) => ({ id: String(t.id ?? index), label: t.name }))
+  const templateItems = useMemo(
+    () =>
+      templates.map((t, index) => ({
+        id: String(t.id ?? index),
+        label: t.name,
+        key: `template-${index}-${t.id}`,
+      })),
+    [templates],
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,7 +55,7 @@ const TestNotificationForm: FC = () => {
           style={{ width: '100%' }}
         />
         <Select
-          key="template-select"
+          key={`template-select-${templateItems.map((t) => t.id).join('-')}`}
           label="Notification Template"
           placeholder="select..."
           items={templateItems}

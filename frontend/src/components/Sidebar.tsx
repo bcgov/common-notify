@@ -126,16 +126,17 @@ const Sidebar: FC = () => {
             </button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
-                {adminItems.subItems.map((subItem) => (
-                  <Link
-                    key={subItem.to}
-                    to={subItem.to}
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">{subItem.label}</span>
-                  </Link>
-                ))}
+                {adminItems.subItems &&
+                  adminItems.subItems.map((subItem) => (
+                    <Link
+                      key={`admin-${subItem.to}`}
+                      to={subItem.to}
+                      className="sidebar__subitem"
+                      activeProps={{ className: 'active' }}
+                    >
+                      <span className="sidebar__label">{subItem.label}</span>
+                    </Link>
+                  ))}
               </div>
             )}
           </div>

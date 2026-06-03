@@ -2,7 +2,7 @@ import { Controller, Get, Version, UseGuards, Logger } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
-import { JwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 
 @ApiTags('code-tables')
 @Controller('code-tables')

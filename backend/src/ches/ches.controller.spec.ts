@@ -4,7 +4,7 @@ import { ChesController } from './ches.controller'
 import { ChesApiClient } from './ches-api.client'
 import { ChesMessageObject } from './schemas/ches-message-object'
 import { ChesMergeRequest } from './schemas/ches-merge-request'
-import { NotifyFrontendRoleGuard } from '../common/guards/notify-frontend-role.guard'
+import { NotifyServiceGuard } from '../common/guards/notify-service.guard'
 
 describe('ChesController', () => {
   let controller: ChesController
@@ -31,8 +31,8 @@ describe('ChesController', () => {
         },
       ],
     })
-      .overrideGuard(AuthGuard)
-      .useValue(mockAuthGuard)
+      .overrideGuard(NotifyServiceGuard)
+      .useValue({})
       .compile()
 
     controller = module.get<ChesController>(ChesController)

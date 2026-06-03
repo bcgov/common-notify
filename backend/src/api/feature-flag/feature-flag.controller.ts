@@ -20,6 +20,7 @@ import { FeatureFlagService } from './feature-flag.service'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
 import { FeatureFlag } from './entities/feature-flag.entity'
+import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -41,7 +42,7 @@ import { SsoRole } from '../../enum/sso-role.enum'
  * - GET    /api/v1/feature-flags                          Get feature flags for user's tenant
  */
 @Controller('frontend/admin/feature-flags')
-@UseGuards(NotifyFrontendRoleGuard)
+@UseGuards(NotifyAdminGuard)
 export class FeatureFlagController {
   private readonly logger = new Logger(FeatureFlagController.name)
 
@@ -203,6 +204,80 @@ export class FeatureFlagClientController {
         this.logger.error(`Tenant not found. request.tenant: ${JSON.stringify(tenant)}`)
         throw new BadRequestException(
           'Tenant not found in request context. Ensure X-Tenant-ID header is provided and validated by NotifyServiceGuard.',
+        )
+      }
+
+      this.logger.debug(`Fetching feature flags for tenant: ${tenant.name} (ID: ${tenant.id})`)
+      const flags = await this.featureFlagService.getFlagsForTenant(tenant.id)
+      this.logger.debug(`Flags for tenant ${tenant.id}: ${JSON.stringify(flags)}`)
+      return flags
+    } catch (error) {
+      this.logger.error(
+        `Error fetching feature flags for tenant: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      // Safe default: return empty flags object
+      return {}
+    }
+  }
+}
+
+/**
+ * Client Feature Flags Controller (Frontend)
+ * Routes for getting feature flags for the current user's tenant (frontend users)
+ * Available to any authenticated frontend user
+ *
+ * This controller mirrors FeatureFlagClientController but for frontend users.
+ * Frontend users authenticate via the standard Keycloak realm (FRONTEND_KEYCLOAK_ISSUER)
+ * whereas service-to-service requests use the apigw realm (API_GATEWAY_KEYCLOAK_ISSUER).
+ *
+ * ARCHITECTURAL NOTE: This controller intentionally duplicates the GET method from FeatureFlagClientController
+ * because the API Gateway requires separate routing:
+ * - FeatureFlagClientController: /api/v1/feature-flags (service-to-service auth)
+ * - FeatureFlagClientFrontendController: /api/v1/frontend/feature-flags (frontend auth)
+ */
+@Controller('frontend/feature-flags')
+@UseGuards(NotifyFrontendRoleGuard)
+export class FeatureFlagClientFrontendController {
+  private readonly logger = new Logger(FeatureFlagClientFrontendController.name)
+
+  constructor(private readonly featureFlagService: FeatureFlagService) {}
+
+  /**
+   * Get feature flags for the current user's tenant
+   *
+   * Tenant validation:
+   * 1. User sends X-Tenant-ID header
+   * 2. NotifyFrontendRoleGuard validates JWT and tenant access
+   * 3. NotifyFrontendRoleGuard sets request.tenant with validated tenant info
+   * 4. This endpoint uses request.tenant.id
+   *
+   * Returns feature flags for:
+   * - Tenant-specific flags (where tenant_id matches user's selected tenant)
+   * - Global flags (where tenant_id is NULL)
+   *
+   * Returns a map of feature codes to enabled status
+   * Takes into account tenant-specific overrides and global flags
+   *
+   * Example response:
+   * {
+   *   "sms_notifications": true,
+   *   "sse_notifications": true,
+   *   "dashboard": false
+   * }
+   */
+  @Version('1')
+  @Get()
+  async getForTenant(@Req() req: Request): Promise<Record<string, boolean>> {
+    try {
+      // Extract internal tenant ID from request context
+      // NotifyFrontendRoleGuard has already validated the JWT and tenant access,
+      // and set request.tenant with the validated tenant object
+      const tenant = (req as any).tenant
+
+      if (!tenant?.id) {
+        this.logger.error(`Tenant not found. request.tenant: ${JSON.stringify(tenant)}`)
+        throw new BadRequestException(
+          'Tenant not found in request context. Ensure X-Tenant-ID header is provided and validated by NotifyFrontendRoleGuard.',
         )
       }
 

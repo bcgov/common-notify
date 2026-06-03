@@ -21,14 +21,16 @@ describe('TemplatesController', () => {
     slug: 'test-tenant',
     externalId: 'ext-123',
     status: 'active',
+    statusCode: { code: 'active', name: 'Active' } as any,
     createdAt: new Date(),
+    createdBy: 'admin',
     updatedAt: new Date(),
+    updatedBy: 'admin',
     isDeleted: false,
   }
 
   const mockTemplate: TemplateResponseDto = {
     id: 'template-123',
-    tenantId: 'tenant-123',
     name: 'Welcome Email',
     description: 'Welcome template',
     channelCode: NotificationChannel.EMAIL,
@@ -55,8 +57,18 @@ describe('TemplatesController', () => {
 
   // Mock AuthGuard to bypass authentication
   const mockAuthGuard: CanActivate = {
-    canActivate: (_context: ExecutionContext) => true,
+    canActivate: (context: ExecutionContext) => {
+      const request = context.switchToHttp().getRequest()
+      request.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
+      return true
+    },
   }
+
+  // Helper to create a mock request with tenant
+  const createMockRequest = () =>
+    ({
+      tenant: mockTenant,
+    }) as any
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -68,7 +80,7 @@ describe('TemplatesController', () => {
         },
       ],
     })
-      .overrideGuard(AuthGuard)
+      .overrideGuard(NotifyServiceGuard)
       .useValue(mockAuthGuard)
       .compile()
 
@@ -82,7 +94,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      const result = await controller.listTemplates(mockTenant)
+      const result = await controller.listTemplates(createMockRequest())
 
       expect(result).toEqual(templates)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 1, 10)
@@ -92,7 +104,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      const result = await controller.listTemplates(mockTenant, '2', '20')
+      const result = await controller.listTemplates(createMockRequest(), '2', '20')
 
       expect(result).toEqual(templates)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 2, 20)
@@ -102,7 +114,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      await controller.listTemplates(mockTenant, 'invalid', '10')
+      await controller.listTemplates(createMockRequest(), 'invalid', '10')
 
       // parseInt will return NaN for 'invalid', which should default to 1
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
@@ -116,7 +128,7 @@ describe('TemplatesController', () => {
       const templates = [mockTemplate]
       mockTemplatesService.listTemplates.mockResolvedValue(templates)
 
-      await controller.listTemplates(mockTenant, '1', 'invalid')
+      await controller.listTemplates(createMockRequest(), '1', 'invalid')
 
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',
@@ -128,7 +140,7 @@ describe('TemplatesController', () => {
     it('should return empty array when no templates exist', async () => {
       mockTemplatesService.listTemplates.mockResolvedValue([])
 
-      const result = await controller.listTemplates(mockTenant)
+      const result = await controller.listTemplates(createMockRequest())
 
       expect(result).toEqual([])
     })
@@ -136,7 +148,7 @@ describe('TemplatesController', () => {
     it('should pass tenant ID to service', async () => {
       mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
 
-      await controller.listTemplates(mockTenant)
+      await controller.listTemplates(createMockRequest())
 
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         mockTenant.id,
@@ -150,7 +162,7 @@ describe('TemplatesController', () => {
     it('should return a specific template by ID', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.getTemplate(mockTenant, 'template-123')
+      const result = await controller.getTemplate(createMockRequest(), 'template-123')
 
       expect(result).toEqual(mockTemplate)
       expect(mockTemplatesService.getTemplate).toHaveBeenCalledWith('tenant-123', 'template-123')
@@ -159,7 +171,7 @@ describe('TemplatesController', () => {
     it('should call service with tenant ID and template ID', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.getTemplate(mockTenant, 'template-456')
+      await controller.getTemplate(createMockRequest(), 'template-456')
 
       expect(mockTemplatesService.getTemplate).toHaveBeenCalledWith('tenant-123', 'template-456')
     })
@@ -167,7 +179,7 @@ describe('TemplatesController', () => {
     it('should throw error when template not found', async () => {
       mockTemplatesService.getTemplate.mockRejectedValue(new Error('Template not found'))
 
-      await expect(controller.getTemplate(mockTenant, 'non-existent')).rejects.toThrow(
+      await expect(controller.getTemplate(createMockRequest(), 'non-existent')).rejects.toThrow(
         'Template not found',
       )
     })
@@ -187,7 +199,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, createDto)
+      const result = await controller.createTemplate(createMockRequest(), createDto)
 
       expect(result).toEqual(mockTemplate)
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
@@ -208,7 +220,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.createTemplate(mockTenant, createDto)
+      await controller.createTemplate(createMockRequest(), createDto)
 
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
       expect(mockTemplatesService.createTemplate).toHaveBeenCalledWith(
@@ -226,13 +238,9 @@ describe('TemplatesController', () => {
         engineCode: TemplateEngine.HANDLEBARS,
       }
 
-      const mockRequest = {
-        user: { sub: 'user-123', email: 'user@example.com' },
-      } as any
-
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.createTemplate(mockTenant, createDto, mockRequest)
+      await controller.createTemplate(createMockRequest(), createDto)
 
       expect(mockTemplatesService.createTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -251,7 +259,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, createDto)
+      const result = await controller.createTemplate(createMockRequest(), createDto)
 
       expect(result.id).toBe('template-123')
       expect(result.name).toBe('Welcome Email')
@@ -267,7 +275,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.updateTemplate(mockTenant, 'template-123', updateDto)
+      const result = await controller.updateTemplate(createMockRequest(), 'template-123', updateDto)
 
       expect(result).toEqual(mockTemplate)
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
@@ -286,7 +294,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.updateTemplate(mockTenant, 'template-456', updateDto)
+      await controller.updateTemplate(createMockRequest(), 'template-456', updateDto)
 
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
       expect(mockTemplatesService.updateTemplate).toHaveBeenCalledWith(
@@ -302,13 +310,9 @@ describe('TemplatesController', () => {
         body: 'New body',
       }
 
-      const mockRequest = {
-        user: { sub: 'user-456' },
-      } as any
-
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.updateTemplate(mockTenant, 'template-123', updateDto, mockRequest)
+      await controller.updateTemplate(createMockRequest(), 'template-123', updateDto)
 
       expect(mockTemplatesService.updateTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -326,7 +330,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.updateTemplate.mockRejectedValue(new Error('Template not found'))
 
       await expect(
-        controller.updateTemplate(mockTenant, 'non-existent', updateDto),
+        controller.updateTemplate(createMockRequest(), 'non-existent', updateDto),
       ).rejects.toThrow('Template not found')
     })
   })
@@ -335,7 +339,7 @@ describe('TemplatesController', () => {
     it('should delete a template by ID', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
       expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-123')
@@ -344,7 +348,7 @@ describe('TemplatesController', () => {
     it('should call service with correct tenant and template IDs', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      await controller.deleteTemplate(mockTenant, 'template-456')
+      await controller.deleteTemplate(createMockRequest(), 'template-456')
 
       expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-456')
     })
@@ -352,7 +356,7 @@ describe('TemplatesController', () => {
     it('should return 204 No Content status', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
     })
@@ -360,7 +364,7 @@ describe('TemplatesController', () => {
     it('should throw error when template not found', async () => {
       mockTemplatesService.deleteTemplate.mockRejectedValue(new Error('Template not found'))
 
-      await expect(controller.deleteTemplate(mockTenant, 'non-existent')).rejects.toThrow(
+      await expect(controller.deleteTemplate(createMockRequest(), 'non-existent')).rejects.toThrow(
         'Template not found',
       )
     })
@@ -382,7 +386,11 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.previewTemplate.mockResolvedValue(previewResult)
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result).toEqual(previewResult)
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
@@ -404,7 +412,7 @@ describe('TemplatesController', () => {
         body: 'Test body',
       })
 
-      await controller.previewTemplate(mockTenant, 'template-456', previewDto)
+      await controller.previewTemplate(createMockRequest(), 'template-456', previewDto)
 
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -413,9 +421,9 @@ describe('TemplatesController', () => {
       )
     })
 
-    it('should handle preview with empty personalisation', async () => {
+    it('should handle preview with empty params', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {},
+        params: {},
       }
 
       mockTemplatesService.previewTemplate.mockResolvedValue({
@@ -423,7 +431,11 @@ describe('TemplatesController', () => {
         body: 'Static body',
       })
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result).toBeDefined()
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
@@ -435,7 +447,7 @@ describe('TemplatesController', () => {
 
     it('should return rendered email with subject and body', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {
+        params: {
           firstName: 'Jane',
           lastName: 'Doe',
         },
@@ -449,7 +461,11 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.previewTemplate.mockResolvedValue(previewResult)
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result.subject).toBe('Welcome Jane')
       expect(result.body).toBe('Hello Jane Doe!')
@@ -458,13 +474,13 @@ describe('TemplatesController', () => {
 
     it('should throw error when template not found', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {},
+        params: {},
       }
 
       mockTemplatesService.previewTemplate.mockRejectedValue(new Error('Template not found'))
 
       await expect(
-        controller.previewTemplate(mockTenant, 'non-existent', previewDto),
+        controller.previewTemplate(createMockRequest(), 'non-existent', previewDto),
       ).rejects.toThrow('Template not found')
     })
   })
@@ -487,7 +503,7 @@ describe('TemplatesController', () => {
     it('should return 200 for listTemplates', async () => {
       mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
 
-      const result = await controller.listTemplates(mockTenant)
+      const result = await controller.listTemplates(createMockRequest())
 
       expect(result).toBeDefined()
       // Status code 200 is implicit for @Get() without @HttpCode override
@@ -496,7 +512,7 @@ describe('TemplatesController', () => {
     it('should return 200 for getTemplate', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.getTemplate(mockTenant, 'template-123')
+      const result = await controller.getTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeDefined()
     })
@@ -504,7 +520,7 @@ describe('TemplatesController', () => {
     it('should return 201 for createTemplate', async () => {
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, {} as CreateTemplateDto)
+      const result = await controller.createTemplate(createMockRequest(), {} as CreateTemplateDto)
 
       expect(result).toBeDefined()
       // Status code 201 is set via @HttpCode(201) decorator
@@ -514,7 +530,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
       const result = await controller.updateTemplate(
-        mockTenant,
+        createMockRequest(),
         'template-123',
         {} as UpdateTemplateDto,
       )
@@ -526,7 +542,7 @@ describe('TemplatesController', () => {
     it('should return 204 for deleteTemplate', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
       // Status code 204 is set via @HttpCode(204) decorator
@@ -536,7 +552,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.previewTemplate.mockResolvedValue({ body: 'rendered' })
 
       const result = await controller.previewTemplate(
-        mockTenant,
+        createMockRequest(),
         'template-123',
         {} as PreviewTemplateDto,
       )

@@ -12,6 +12,7 @@ import {
 } from './notify.controller'
 import { NotifyService } from './notify.service'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
@@ -96,7 +97,9 @@ describe('Notify Controllers', () => {
         { provide: TenantsService, useValue: mockTenantsService },
       ],
     })
-      .overrideGuard(AuthGuard)
+      .overrideGuard(NotifyServiceGuard)
+      .useValue(mockAuthGuard)
+      .overrideGuard(NotifyFrontendRoleGuard)
       .useValue(mockAuthGuard)
       .overrideGuard(FeatureFlagGuard)
       .useValue(mockAuthGuard)
