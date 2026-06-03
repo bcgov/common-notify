@@ -89,6 +89,22 @@ backend:
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
+  #-- File attachments storage configuration
+  attachments:
+    #-- directory where attachments will be stored
+    storageDir: /app/attachments
+    #-- PersistentVolumeClaim configuration for attachment storage
+    pvc:
+      #-- enable or disable PVC for attachment storage
+      enabled: true
+      #-- use shared PVC across all PRs (recommended to save storage)
+      shared: true
+      #-- force creation of shared PVC (only needed once per namespace)
+      createShared: false
+      #-- size of the PVC (storage capacity) - only used when creating new PVC
+      size: 3Gi
+      #-- storage class name (leave empty for default)
+      storageClassName: netapp-file-standard
 
 frontend:
   # -- enable or disable a component deployment.
