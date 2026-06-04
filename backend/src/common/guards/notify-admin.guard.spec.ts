@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ForbiddenException } from '@nestjs/common'
+import { ExecutionContext, ForbiddenException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyAdminGuard } from './notify-admin.guard'
@@ -19,6 +19,21 @@ vi.mock('@nestjs/passport', () => {
     }),
   }
 })
+
+// Helper to create mock ExecutionContext with getResponse
+function createMockContext(userPayload: any, headers: Record<string, string> = {}) {
+  return {
+    switchToHttp: () => ({
+      getRequest: () => ({
+        user: userPayload,
+        headers,
+      }),
+      getResponse: () => ({}),
+    }),
+    getHandler: () => ({}),
+    getClass: () => ({}),
+  } as unknown as ExecutionContext
+}
 
 describe('NotifyAdminGuard', () => {
   let guard: NotifyAdminGuard
