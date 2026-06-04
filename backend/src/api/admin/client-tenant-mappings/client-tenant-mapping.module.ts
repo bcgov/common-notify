@@ -4,7 +4,7 @@ import { ClientTenantMappingController } from './client-tenant-mapping.controlle
 import { ClientTenantMappingService } from './client-tenant-mapping.service'
 import { ClientTenantMapping } from './entities/client-tenant-mapping.entity'
 import { Tenant } from '../tenants/entities/tenant.entity'
-import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
+import { NotifyFrontendRoleGuard } from '../../../common/guards/notify-frontend-role.guard'
 import { TenantsModule } from '../tenants/tenants.module'
 import { CstarModule } from '../../../services/cstar/cstar.module'
 
@@ -15,7 +15,7 @@ import { CstarModule } from '../../../services/cstar/cstar.module'
     CstarModule,
   ],
   controllers: [ClientTenantMappingController],
-  providers: [ClientTenantMappingService, NotifyAdminGuard],
+  providers: [ClientTenantMappingService, NotifyFrontendRoleGuard],
   exports: [ClientTenantMappingService],
 })
 export class ClientTenantMappingModule {}
