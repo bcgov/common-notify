@@ -21,6 +21,7 @@ import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { NotifyModule } from '../api/notify/notify.module'
 import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
+import { ClamavService } from '../services/clamav.service'
 
 /**
  * Queue Module
@@ -46,6 +47,7 @@ import { AttachmentResolverService } from '../api/notify/services/attachment-res
     PendingNotificationRetryService,
     NotificationService,
     NotificationPubSubService,
+    ClamavService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -182,6 +184,7 @@ export class QueueModule implements OnModuleInit {
     private readonly attachmentResolverService?: AttachmentResolverService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
+    private readonly clamavService?: ClamavService,
   ) {}
 
   async onModuleInit() {
@@ -211,6 +214,7 @@ export class QueueModule implements OnModuleInit {
         this.smsQueue,
         this.notificationService,
         this.configService,
+        this.clamavService,
         concurrency,
       )
       this.logger.debug('Ingestion worker initialization started')

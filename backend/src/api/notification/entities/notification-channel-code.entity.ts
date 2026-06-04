@@ -22,4 +22,7 @@ export class NotificationChannelCode {
 
   @Column({ nullable: true, name: 'updated_by' })
   updatedBy: string
+
+  @Column({ type: 'int', default: 999 })
+  sort_order: number
 }

@@ -1,8 +1,9 @@
 import type { FC } from 'react'
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import Card from '@/components/Card'
 import PageHeading from '@/components/PageHeading'
+import { DataTable } from '@/components/DataTable'
+import type { TableColumn } from '@/components/DataTable'
 
 export interface DistributionList {
   id: string
@@ -63,97 +64,88 @@ const mockDistributionLists: DistributionList[] = [
   },
 ]
 
+const columns: TableColumn<DistributionList>[] = [
+  {
+    key: 'name',
+    label: 'Name',
+    render: (_, row) => <span className="fw-bold">{row.name}</span>,
+  },
+  {
+    key: 'description',
+    label: 'Description',
+    render: (_, row) => (
+      <span className="text-muted text-truncate" title={row.description}>
+        {row.description}
+      </span>
+    ),
+  },
+  {
+    key: 'memberCount',
+    label: 'Members',
+    render: (_, row) => <span className="badge bg-secondary">{row.memberCount}</span>,
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    render: (_, row) => (
+      <span className={`badge ${row.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
+        {row.status === 'active' ? 'Active' : 'Inactive'}
+      </span>
+    ),
+  },
+  {
+    key: 'createdBy',
+    label: 'Created By',
+    render: (_, row) => (
+      <span title={row.createdBy} className="text-truncate">
+        {row.createdBy}
+      </span>
+    ),
+  },
+  {
+    key: 'createdAt',
+    label: 'Created',
+    render: (_, row) => (
+      <span title={new Date(row.createdAt).toLocaleString()}>
+        {new Date(row.createdAt).toLocaleDateString()}
+      </span>
+    ),
+  },
+  {
+    key: 'id',
+    label: 'Actions',
+    render: () => (
+      <Link
+        to="/distribution-lists"
+        className="btn btn-sm btn-outline-primary"
+        title="Edit distribution list"
+      >
+        Edit
+      </Link>
+    ),
+  },
+]
+
 const DistributionLists: FC = () => {
   const [distributionLists] = useState<DistributionList[]>(mockDistributionLists)
-  const [page] = useState(1)
+  const [page, setPage] = useState(1)
   const limit = 10
 
   return (
     <div>
       <PageHeading title="Distribution Lists" />
 
-      <Card className="mb-4">
-        {distributionLists.length === 0 ? (
-          <div className="text-center py-4 text-muted">
-            <p>No distribution lists found</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-hover mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Members</th>
-                  <th>Status</th>
-                  <th>Created By</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {distributionLists.map((list) => (
-                  <tr key={list.id}>
-                    <td className="fw-bold">{list.name}</td>
-                    <td className="text-muted text-truncate" title={list.description}>
-                      {list.description}
-                    </td>
-                    <td>
-                      <span className="badge bg-secondary">{list.memberCount}</span>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${list.status === 'active' ? 'bg-success' : 'bg-danger'}`}
-                      >
-                        {list.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td title={list.createdBy} className="text-truncate">
-                      {list.createdBy}
-                    </td>
-                    <td title={new Date(list.createdAt).toLocaleString()}>
-                      {new Date(list.createdAt).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <Link
-                        to="/"
-                        className="btn btn-sm btn-outline-primary"
-                        title="Edit distribution list"
-                      >
-                        Edit
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {distributionLists.length > 0 && (
-        <nav aria-label="Distribution lists pagination" className="mt-4">
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-              <button className="page-link" disabled={page === 1}>
-                Previous
-              </button>
-            </li>
-            <li className="page-item active">
-              <span className="page-link">
-                Page {page} of {Math.ceil(distributionLists.length / limit)}
-              </span>
-            </li>
-            <li
-              className={`page-item ${page * limit >= distributionLists.length ? 'disabled' : ''}`}
-            >
-              <button className="page-link" disabled={page * limit >= distributionLists.length}>
-                Next
-              </button>
-            </li>
-          </ul>
-        </nav>
-      )}
+      <DataTable
+        columns={columns}
+        data={distributionLists}
+        keyExtractor={(row) => row.id}
+        label="Distribution Lists"
+        emptyMessage="No distribution lists found"
+        currentPage={page}
+        pageSize={limit}
+        totalCount={distributionLists.length}
+        onPageChange={setPage}
+      />
     </div>
   )
 }

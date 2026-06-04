@@ -1,5 +1,7 @@
 @import '../variables.scss';
 
+$table-header-bg: #f1f8fe; // Table header / footer color
+
 // Base table wrapper and element
 .data-table-wrapper {
   width: 100%;
@@ -15,10 +17,12 @@
   /* Variants */
 
   &--striped {
-    border: 1px solid $border-default;
-
     thead {
-      border-bottom: 1px solid $border-default;
+      background-color: $table-header-bg;
+    }
+
+    tfoot {
+      background-color: $table-header-bg;
     }
 
     tbody tr:nth-child(odd) {
@@ -103,6 +107,7 @@
     td {
       vertical-align: middle;
       color: $dark-text;
+      white-space: nowrap;
     }
   }
 
@@ -111,7 +116,6 @@
   tfoot {
     td {
       color: $text-secondary;
-      border-top: 2px solid $border-default;
       font-size: $font-size-sm;
     }
   }
@@ -161,6 +165,90 @@
       text-align: center;
       color: $text-secondary;
       padding: $spacing-xl $spacing-md;
+    }
+  }
+
+  /* Pagination footer row */
+
+  &__footer {
+    display: flex;
+    align-items: stretch;
+    font-size: $font-size-sm;
+    color: $dark-text;
+    font-family: 'BC Sans', sans-serif;
+    background-color: $table-header-bg;
+
+    &-cell {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      padding: $spacing-xs $spacing-sm;
+      border-right: 1px solid $border-default;
+
+      &:first-child {
+        padding-left: $spacing-md;
+      }
+
+      &--grow {
+        flex: 1;
+      }
+
+      &--last {
+        border-right: none;
+        padding-right: $spacing-sm;
+      }
+    }
+
+    &-label {
+      white-space: nowrap;
+      color: $text-secondary;
+    }
+
+    &-range {
+      white-space: nowrap;
+    }
+
+    &-select {
+      border: none;
+      padding: 2px $spacing-xs;
+      font-size: $font-size-sm;
+      background-color: $table-header-bg;
+      color: $dark-text;
+      height: 28px;
+      cursor: pointer;
+      outline: none;
+
+      &:focus-visible {
+        outline: 2px solid $border-active;
+        outline-offset: 1px;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    &-nav-btn {
+      @include button-reset;
+
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background-color: transparent;
+      color: $dark-text;
+      font-size: 14px;
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      // &:hover:not(:disabled) {
+      //   background-color: rgba($primary-color, 0.05);
+      // }
     }
   }
 }
