@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common'
+import {
+  ExecutionContext,
+  UnauthorizedException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { NotifyFrontendRoleGuard } from './notify-frontend-role.guard'
@@ -13,9 +18,12 @@ vi.mock('@nestjs/passport', () => {
     AuthGuard: vi.fn((_strategy: string) => {
       return class {
         async canActivate(context: any) {
-          // Return false if user is not authenticated
+          // Throw UnauthorizedException if user is not authenticated (like real Passport guard)
           const request = context.switchToHttp().getRequest()
-          return !!request.user
+          if (!request.user) {
+            throw new UnauthorizedException('Invalid or missing JWT')
+          }
+          return true
         }
       }
     }),
@@ -32,7 +40,10 @@ describe('NotifyFrontendRoleGuard', () => {
 
   beforeEach(async () => {
     mockTenantsService = { findByExternalId: vi.fn().mockResolvedValue(null) }
-    mockCstarApiClient = { getUserTenants: vi.fn().mockResolvedValue([]) }
+    mockCstarApiClient = {
+      getUserTenants: vi.fn().mockResolvedValue(['bc-health']),
+      getUserRoles: vi.fn().mockResolvedValue(['NOTIFY_VIEWER']),
+    }
 
     const mockConfigService = {
       getOrThrow: vi.fn((key: string) => {
@@ -86,7 +97,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -146,7 +157,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -171,7 +182,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject request with missing azp claim', async () => {
@@ -189,7 +200,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -214,7 +225,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -239,7 +250,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject request with missing issuer claim', async () => {
@@ -257,7 +268,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -282,7 +293,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -370,7 +381,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -445,7 +456,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123', 'BC456'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health', 'bc-other'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -472,7 +483,11 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123', 'BC456', 'BC789'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([
+        'bc-education',
+        'bc-other',
+        'bc-third',
+      ])
 
       const result = await guard.canActivate(mockContext)
 
@@ -501,7 +516,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC456', 'BC789'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-other', 'bc-third'])
 
       expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
@@ -580,7 +595,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['NOTIFY_VIEWER'])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 
@@ -609,7 +624,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(null)
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['BC123'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
 
       const result = await guard.canActivate(mockContext)
 

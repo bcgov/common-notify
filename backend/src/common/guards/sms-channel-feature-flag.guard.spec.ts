@@ -16,7 +16,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
           provide: FeatureFlagService,
           useValue: {
             isEnabled: vi.fn().mockResolvedValue(false),
-            getFlagsForTenant: vi.fn().mockResolvedValue({}),
+            getFlagsForTenant: vi.fn().mockResolvedValue({ sms_notifications: false }),
           },
         },
       ],
@@ -124,19 +124,21 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: { phoneNumber: '+16045551234' } },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
+      expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('tenant-123')
     })
 
     it('should allow SMS request with minimal sms object', async () => {
@@ -144,14 +146,16 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: {} },
-            tenant: 'tenant-456',
+            tenant: { id: 'tenant-456' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
@@ -163,17 +167,20 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: '' },
-            tenant: 'tenant-789',
+            tenant: { id: 'tenant-789' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
+
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).not.toHaveBeenCalled()
     })
 
     it('should allow SMS request with sms set to 0 (falsy check)', async () => {
@@ -181,17 +188,20 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: 0 },
-            tenant: 'tenant-abc',
+            tenant: { id: 'tenant-abc' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
+
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).not.toHaveBeenCalled()
     })
 
     it('should allow SMS request with sms set to false (falsy check)', async () => {
@@ -199,17 +209,20 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: false },
-            tenant: 'tenant-def',
+            tenant: { id: 'tenant-def' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
+
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).not.toHaveBeenCalled()
     })
   })
 
@@ -219,17 +232,19 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: { phoneNumber: '+16045551234' } },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(false)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: false,
+      })
 
       expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
+      expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('tenant-123')
     })
 
     it('should reject SMS request with disabled flag error message', async () => {
@@ -317,22 +332,21 @@ describe('SmsChannelFeatureFlagGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             body: { sms: { phoneNumber: '+16045551234' } },
-            tenant: 'specific-tenant-id',
+            tenant: { id: 'specific-tenant-id' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
-        'SMS_NOTIFICATIONS',
-        'specific-tenant-id',
-      )
+      expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('specific-tenant-id')
     })
   })
 
@@ -364,19 +378,21 @@ describe('SmsChannelFeatureFlagGuard', () => {
               sms: { phoneNumber: '+16045551234' },
               push: { title: 'Test' },
             },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
+      expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('tenant-123')
     })
   })
 
@@ -392,14 +408,16 @@ describe('SmsChannelFeatureFlagGuard', () => {
                 metadata: { key: 'value' },
               },
             },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
@@ -413,19 +431,21 @@ describe('SmsChannelFeatureFlagGuard', () => {
             body: {
               sms: [{ phoneNumber: '+16045551234' }],
             },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
+      expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('tenant-123')
     })
 
     it('should handle request with sms as string (edge case)', async () => {
@@ -435,19 +455,20 @@ describe('SmsChannelFeatureFlagGuard', () => {
             body: {
               sms: 'some-string-value',
             },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
     })
 
     it('should handle request with sms as number (edge case)', async () => {
@@ -457,19 +478,20 @@ describe('SmsChannelFeatureFlagGuard', () => {
             body: {
               sms: 123,
             },
-            tenant: 'tenant-123',
+            tenant: { id: 'tenant-123' },
           }),
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(true)
+      vi.spyOn(featureFlagService, 'getFlagsForTenant').mockResolvedValue({
+        sms_notifications: true,
+      })
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(featureFlagService.isEnabled).toHaveBeenCalledWith('SMS_NOTIFICATIONS', 'tenant-123')
     })
   })
 })

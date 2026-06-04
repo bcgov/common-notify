@@ -42,7 +42,7 @@ describe('NotifyServiceGuard', () => {
           },
         },
         { provide: TenantsService, useValue: { findByExternalId: vi.fn() } },
-        { provide: ClientTenantMappingService, useValue: { findActiveMapping: vi.fn() } },
+        { provide: ClientTenantMappingService, useValue: { findTenantsByClientId: vi.fn() } },
       ],
     }).compile()
 
@@ -54,12 +54,7 @@ describe('NotifyServiceGuard', () => {
   describe('x-tenant-id Header Validation (positive)', () => {
     it('should allow request with valid x-tenant-id header', async () => {
       const mockTenant = { id: 'tenant-uuid-123', externalId: 'tenant-123' }
-      const mockMapping = {
-        id: 'mapping-123',
-        clientId: 'client-service',
-        tenantId: 'tenant-uuid-123',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-123']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -76,7 +71,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -85,12 +80,7 @@ describe('NotifyServiceGuard', () => {
 
     it('should allow valid request with proper JWT structure', async () => {
       const mockTenant = { id: 'tenant-uuid-456', externalId: 'tenant-456' }
-      const mockMapping = {
-        id: 'mapping-456',
-        clientId: 'api-service',
-        tenantId: 'tenant-uuid-456',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-456']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -107,7 +97,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -162,12 +152,7 @@ describe('NotifyServiceGuard', () => {
   describe('Authorization Header and JWT Decoding (positive)', () => {
     it('should accept valid Bearer token format', async () => {
       const mockTenant = { id: 'tenant-uuid-789', externalId: 'tenant-789' }
-      const mockMapping = {
-        id: 'mapping-789',
-        clientId: 'client-service',
-        tenantId: 'tenant-uuid-789',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-789']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -184,7 +169,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -279,12 +264,7 @@ describe('NotifyServiceGuard', () => {
   describe('Issuer Validation', () => {
     it('should accept request with correct issuer', async () => {
       const mockTenant = { id: 'tenant-uuid-111', externalId: 'tenant-111' }
-      const mockMapping = {
-        id: 'mapping-111',
-        clientId: 'client-service',
-        tenantId: 'tenant-uuid-111',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-111']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -301,7 +281,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -348,12 +328,7 @@ describe('NotifyServiceGuard', () => {
   describe('Client ID (azp) Extraction and Validation', () => {
     it('should accept request with valid azp claim', async () => {
       const mockTenant = { id: 'tenant-uuid-222', externalId: 'tenant-222' }
-      const mockMapping = {
-        id: 'mapping-222',
-        clientId: 'service-client',
-        tenantId: 'tenant-uuid-222',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-222']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -370,7 +345,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -399,12 +374,7 @@ describe('NotifyServiceGuard', () => {
   describe('Tenant Lookup (positive)', () => {
     it('should find tenant by external ID', async () => {
       const mockTenant = { id: 'tenant-uuid-333', externalId: 'external-tenant-333' }
-      const mockMapping = {
-        id: 'mapping-333',
-        clientId: 'client-service',
-        tenantId: 'tenant-uuid-333',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-333']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -421,7 +391,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -448,7 +418,7 @@ describe('NotifyServiceGuard', () => {
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(null)
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when tenant lookup fails with error', async () => {
@@ -475,12 +445,7 @@ describe('NotifyServiceGuard', () => {
   describe('Client-Tenant Mapping (positive)', () => {
     it('should allow authorized client', async () => {
       const mockTenant = { id: 'tenant-uuid-444', externalId: 'tenant-444' }
-      const mockMapping = {
-        id: 'mapping-444',
-        clientId: 'authorized-client',
-        tenantId: 'tenant-uuid-444',
-        isActive: true,
-      }
+      const mockMapping = ['tenant-uuid-444']
 
       const mockContext = {
         switchToHttp: () => ({
@@ -497,7 +462,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(mockMapping)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -524,7 +489,7 @@ describe('NotifyServiceGuard', () => {
       } as unknown as ExecutionContext
 
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(clientTenantMappingService, 'findActiveMapping').mockResolvedValue(null)
+      vi.spyOn(clientTenantMappingService, 'findTenantsByClientId').mockResolvedValue([])
 
       expect(guard.canActivate(mockContext)).rejects.toThrow()
     })

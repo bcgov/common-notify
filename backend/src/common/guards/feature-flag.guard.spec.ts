@@ -74,7 +74,7 @@ describe('FeatureFlagGuard', () => {
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
-            tenant: 'tenant-456',
+            tenant: { id: 'tenant-456' },
             headers: {},
           }),
         }),
