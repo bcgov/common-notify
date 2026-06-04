@@ -67,7 +67,6 @@ describe('NotifyFrontendRoleGuard', () => {
 
     guard = module.get<NotifyFrontendRoleGuard>(NotifyFrontendRoleGuard)
     reflector = module.get<Reflector>(Reflector)
-    configService = module.get<ConfigService>(ConfigService)
     tenantsService = module.get<TenantsService>(TenantsService)
     cstarApiClient = module.get<CstarApiClient>(CstarApiClient)
   })

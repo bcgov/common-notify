@@ -36,6 +36,5 @@ export function createMockExecutionContext(
     }),
     getArgs: () => [],
     getArgByIndex: () => ({}),
-    switchToHttp: undefined, // Will be defined above
   } as unknown as ExecutionContext
 }
