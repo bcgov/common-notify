@@ -8,6 +8,7 @@ describe('FeatureFlagService', () => {
   let service: FeatureFlagService
 
   const mockQueryBuilder = {
+    leftJoin: vi.fn().mockReturnThis(),
     leftJoinAndSelect: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
