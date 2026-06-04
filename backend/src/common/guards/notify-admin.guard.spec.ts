@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ExecutionContext, ForbiddenException } from '@nestjs/common'
+import { ExecutionContext } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyAdminGuard } from './notify-admin.guard'

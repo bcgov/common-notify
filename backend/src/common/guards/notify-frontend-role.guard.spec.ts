@@ -1,20 +1,31 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { NotifyFrontendRoleGuard } from './notify-frontend-role.guard'
 import { ConfigService } from '@nestjs/config'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 
+// Mock the parent AuthGuard class
+vi.mock('@nestjs/passport', () => ({
+  AuthGuard: vi.fn().mockImplementation(() => ({
+    canActivate: vi.fn().mockResolvedValue(true),
+  })),
+}))
+
 describe('NotifyFrontendRoleGuard', () => {
   let guard: NotifyFrontendRoleGuard
   let reflector: Reflector
-  let configService: ConfigService
   let tenantsService: TenantsService
   let cstarApiClient: CstarApiClient
+  let mockTenantsService: any
+  let mockCstarApiClient: any
 
   beforeEach(async () => {
+    mockTenantsService = { findByExternalId: vi.fn().mockResolvedValue(null) }
+    mockCstarApiClient = { getUserTenants: vi.fn().mockResolvedValue([]) }
+
     const mockConfigService = {
       getOrThrow: vi.fn((key: string) => {
         const config: Record<string, string> = {
@@ -30,8 +41,8 @@ describe('NotifyFrontendRoleGuard', () => {
         NotifyFrontendRoleGuard,
         { provide: Reflector, useValue: { getAllAndOverride: vi.fn() } },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: TenantsService, useValue: { findByExternalId: vi.fn() } },
-        { provide: CstarApiClient, useValue: { getUserTenants: vi.fn() } },
+        { provide: TenantsService, useValue: mockTenantsService },
+        { provide: CstarApiClient, useValue: mockCstarApiClient },
       ],
     }).compile()
 
@@ -40,6 +51,10 @@ describe('NotifyFrontendRoleGuard', () => {
     configService = module.get<ConfigService>(ConfigService)
     tenantsService = module.get<TenantsService>(TenantsService)
     cstarApiClient = module.get<CstarApiClient>(CstarApiClient)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
   })
 
   describe('JWT Signature Validation (positive)', () => {

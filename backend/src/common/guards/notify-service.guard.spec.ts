@@ -8,7 +8,6 @@ import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappin
 
 describe('NotifyServiceGuard', () => {
   let guard: NotifyServiceGuard
-  let configService: ConfigService
   let tenantsService: TenantsService
   let clientTenantMappingService: ClientTenantMappingService
 
@@ -33,7 +32,6 @@ describe('NotifyServiceGuard', () => {
     }).compile()
 
     guard = module.get<NotifyServiceGuard>(NotifyServiceGuard)
-    configService = module.get<ConfigService>(ConfigService)
     tenantsService = module.get<TenantsService>(TenantsService)
     clientTenantMappingService = module.get<ClientTenantMappingService>(ClientTenantMappingService)
   })
