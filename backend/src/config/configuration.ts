@@ -58,6 +58,14 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
     // Twilio SMS Service
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,

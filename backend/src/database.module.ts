@@ -4,6 +4,7 @@ import { Tenant } from './api/admin/tenants/entities/tenant.entity'
 import { TenantStatusCode } from './api/admin/tenants/entities/tenant-status-code.entity'
 import { ClientTenantMapping } from './api/admin/client-tenant-mappings/entities/client-tenant-mapping.entity'
 import { NotifyUser } from './api/admin/users/entities/notify-user.entity'
+import { ApiKey } from './api/admin/api-keys/entities/api-key.entity'
 import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
 import { TemplateEngineCode } from './api/templates/entities/template-engine-code.entity'
@@ -36,6 +37,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TenantStatusCode,
         ClientTenantMapping,
         NotifyUser,
+        ApiKey,
         NotificationRequest,
         NotificationStatusCode,
         NotificationChannelCode,
