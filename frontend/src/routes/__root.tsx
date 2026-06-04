@@ -7,6 +7,7 @@ import { fetchAllFeatureFlags } from '@/redux/slices/featureFlags.slice'
 import { fetchAllNotifyTenants } from '@/redux/thunks/adminTenants.thunks'
 import NotFound from '@/components/NotFound'
 import Layout from '@/components/Layout'
+import UserService from '@/service/user-service'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -78,7 +79,9 @@ function RootLayout() {
     checkAuthorizationRef.current = true
 
     // If user is authenticated but has no accessible tenants/roles, redirect to NotAuthorized
-    if (cstarTenants.length === 0) {
+    // UNLESS they are a NOTIFY_ADMIN (admins don't need CSTAR tenants for bootstrap)
+    const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+    if (cstarTenants.length === 0 && !isAdmin) {
       navigate({ to: '/not-authorized' })
     }
   }, [user?.id, cstarTenants, cstarIsLoading, navigate])
