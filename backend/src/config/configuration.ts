@@ -86,5 +86,10 @@ export default () => {
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
       pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
+
+    // Encryption
+    encryption: {
+      key: process.env.ENCRYPTION_KEY,
+    },
   }
 }

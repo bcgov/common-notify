@@ -15,6 +15,7 @@ import { NotifyService } from './notify.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
+import { WebhookModule } from '../webhook/webhook.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { QueueModule } from '../../queue/queue.module'
     NotificationModule,
     RenderingModule,
     FeatureFlagModule,
+    WebhookModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],

@@ -37,6 +37,11 @@ import { NotificationRequestDto } from '../notification/schemas/notification-req
 import { RequireRole } from '../../auth/decorators/require-role.decorator'
 import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
 import { RoleGuard } from '../../auth/guards/role.guard'
+import { WebhookService } from '../webhook/webhook.service'
+import {
+  CallbackRegistrationRequest,
+  CallbackRegistrationResponse,
+} from '../webhook/schemas/callback-registration.dto'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -331,7 +336,10 @@ export class NotifyEventController {
 @Controller('notify')
 @UseGuards(TenantGuard)
 export class NotifyController {
-  constructor(private readonly notifyService: NotifyService) {}
+  constructor(
+    private readonly notifyService: NotifyService,
+    private readonly webhookService: WebhookService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -362,23 +370,33 @@ export class NotifyController {
 
   @Version('1')
   @Post('registerCallback')
-  @HttpCode(501)
-  registerCallback(@Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(201)
+  registerCallback(
+    @GetTenant() tenant: Tenant,
+    @Body() body: CallbackRegistrationRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    return this.webhookService.create(tenant.id, body, tenant.id)
   }
 
   @Version('1')
   @Patch('registerCallback/:callbackId')
-  @HttpCode(501)
-  updateCallback(@Param('callbackId') _callbackId: string, @Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(200)
+  updateCallback(
+    @GetTenant() tenant: Tenant,
+    @Param('callbackId') callbackId: string,
+    @Body() body: CallbackRegistrationRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    return this.webhookService.update(tenant.id, callbackId, body)
   }
 
   @Version('1')
   @Delete('registerCallback/:callbackId')
-  @HttpCode(501)
-  deleteCallback(@Param('callbackId') _callbackId: string) {
-    return this.notifyService.notImplemented()
+  @HttpCode(204)
+  deleteCallback(
+    @GetTenant() tenant: Tenant,
+    @Param('callbackId') callbackId: string,
+  ): Promise<void> {
+    return this.webhookService.delete(tenant.id, callbackId)
   }
 }
 
