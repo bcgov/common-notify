@@ -132,6 +132,11 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: NOTIFY_CLIENT_ID
+            - name: CSTAR_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: CSTAR_BASE_URL
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}

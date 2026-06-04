@@ -97,6 +97,118 @@ app.post('/', (req, res) => {
   })
 })
 
+// CSTAR API Mock Endpoints
+// These endpoints simulate the CSTAR API for role and tenant lookups
+
+/**
+ * GET /api/v1/users/:ssoUserId/tenants
+ * Returns list of tenants accessible to the user
+ *
+ * Used by: Frontend (fetchCstarTenants) and Backend (NotifyFrontendRoleGuard)
+ * Returns: Array of tenant objects with id, name
+ */
+app.get('/api/v1/users/:ssoUserId/tenants', (req, res) => {
+  const { ssoUserId } = req.params
+
+  // Mock data: Different users have access to different tenants
+  const userTenants = {
+    'user-001': [
+      {
+        id: 'tenant-001',
+        name: 'Ministry of Health',
+        ministryName: 'Ministry of Health',
+        description: 'MOH Tenant',
+      },
+      {
+        id: 'tenant-002',
+        name: 'Ministry of Education',
+        ministryName: 'Ministry of Education',
+        description: 'MOE Tenant',
+      },
+    ],
+    'user-002': [
+      {
+        id: 'tenant-002',
+        name: 'Ministry of Education',
+        ministryName: 'Ministry of Education',
+        description: 'MOE Tenant',
+      },
+    ],
+    'user-003': [
+      {
+        id: 'tenant-001',
+        name: 'Ministry of Health',
+        ministryName: 'Ministry of Health',
+        description: 'MOH Tenant',
+      },
+    ],
+  }
+
+  const tenants = userTenants[ssoUserId] || []
+
+  res.json({
+    data: tenants,
+  })
+})
+
+/**
+ * GET /api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles
+ * Returns list of roles a user has in a specific tenant for Notify service
+ *
+ * Used by: Backend (NotifyFrontendRoleGuard) and Frontend (fetchCstarRoles)
+ * Returns: Object with sharedServiceRoles array containing role names
+ */
+app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (req, res) => {
+  const { tenantId, ssoUserId } = req.params
+
+  // Mock data: Different users have different roles in different tenants
+  const userRoles = {
+    'user-001': {
+      'tenant-001': [
+        {
+          id: 'role-1',
+          name: 'NOTIFY_OPERATIONS_ADMIN',
+          description: 'Full admin access',
+        },
+      ],
+      'tenant-002': [
+        {
+          id: 'role-2',
+          name: 'NOTIFY_TEMPLATE_EDITOR',
+          description: 'Can create and edit templates',
+        },
+      ],
+    },
+    'user-002': {
+      'tenant-002': [
+        {
+          id: 'role-3',
+          name: 'NOTIFY_VIEWER',
+          description: 'Read-only access',
+        },
+      ],
+    },
+    'user-003': {
+      'tenant-001': [
+        {
+          id: 'role-4',
+          name: 'NOTIFY_TEMPLATE_EDITOR',
+          description: 'Can create and edit templates',
+        },
+      ],
+    },
+  }
+
+  // Get roles for this user in this tenant
+  const roles = userRoles[ssoUserId]?.[tenantId] || []
+
+  res.json({
+    data: {
+      sharedServiceRoles: roles,
+    },
+  })
+})
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err)
@@ -109,11 +221,26 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3002
 app.listen(PORT, () => {
   console.log(` Mock OAuth2 Token Server listening on port ${PORT}`)
+  console.log('')
+  console.log('OAuth2 Endpoints:')
   console.log(`   POST http://localhost:${PORT}/ - OAuth2 token endpoint`)
   console.log(`   GET  http://localhost:${PORT}/health - Health check`)
+  console.log('')
+  console.log('CSTAR Mock Endpoints:')
+  console.log(`   GET  http://localhost:${PORT}/api/v1/users/:ssoUserId/tenants`)
+  console.log(
+    `   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles`,
+  )
   console.log('')
   console.log('Test credentials (from kong-seed.sh):')
   console.log('  - LOCAL001-ABC123: LOCAL001-SECRET-ABC123XYZ789')
   console.log('  - LOCAL002-DEF456: LOCAL002-SECRET-DEF456XYZ789')
   console.log('  - LOCAL003-GHI789: LOCAL003-SECRET-GHI789XYZ789')
+  console.log('')
+  console.log('Mock Users for CSTAR API:')
+  console.log(
+    '  - user-001: Has access to tenant-001 (NOTIFY_OPERATIONS_ADMIN) and tenant-002 (NOTIFY_TEMPLATE_EDITOR)',
+  )
+  console.log('  - user-002: Has access to tenant-002 (NOTIFY_VIEWER)')
+  console.log('  - user-003: Has access to tenant-001 (NOTIFY_TEMPLATE_EDITOR)')
 })
