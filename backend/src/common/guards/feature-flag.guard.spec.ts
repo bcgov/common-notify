@@ -5,6 +5,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { FeatureFlagGuard } from './feature-flag.guard'
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
 
 describe('FeatureFlagGuard', () => {
   let guard: FeatureFlagGuard
@@ -231,7 +232,19 @@ describe('FeatureFlagGuard', () => {
 
   describe('Tenant Resolution from External ID', () => {
     it('should resolve external tenant ID to internal UUID', async () => {
-      const mockTenant = { id: 'internal-uuid', externalId: 'external-123' }
+      const mockTenant = {
+        id: 'internal-uuid',
+        externalId: 'external-123',
+        name: 'Test Tenant',
+        slug: 'test-tenant',
+        statusCode: { code: 'ACTIVE' },
+        status: 'ACTIVE',
+        createdAt: new Date(),
+        createdBy: 'system',
+        updatedAt: new Date(),
+        updatedBy: 'system',
+        isDeleted: false,
+      } as unknown as Tenant
 
       const mockContext = {
         switchToHttp: () => ({

@@ -8,11 +8,19 @@ import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 
 // Mock the parent AuthGuard class
-vi.mock('@nestjs/passport', () => ({
-  AuthGuard: vi.fn().mockImplementation(() => ({
-    canActivate: vi.fn().mockResolvedValue(true),
-  })),
-}))
+vi.mock('@nestjs/passport', () => {
+  return {
+    AuthGuard: vi.fn((_strategy: string) => {
+      return class {
+        async canActivate(context: any) {
+          // Return false if user is not authenticated
+          const request = context.switchToHttp().getRequest()
+          return !!request.user
+        }
+      }
+    }),
+  }
+})
 
 describe('NotifyFrontendRoleGuard', () => {
   let guard: NotifyFrontendRoleGuard

@@ -1,10 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common'
+import { UnauthorizedException, BadRequestException } from '@nestjs/common'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyServiceGuard } from './notify-service.guard'
 import { ConfigService } from '@nestjs/config'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../../api/admin/client-tenant-mappings/client-tenant-mapping.service'
+
+// Mock the parent AuthGuard class
+vi.mock('@nestjs/passport', () => {
+  return {
+    AuthGuard: vi.fn((_strategy: string) => {
+      return class {
+        async canActivate(context: any) {
+          // Return false if user is not authenticated
+          const request = context.switchToHttp().getRequest()
+          return !!request.user
+        }
+      }
+    }),
+  }
+})
 
 describe('NotifyServiceGuard', () => {
   let guard: NotifyServiceGuard

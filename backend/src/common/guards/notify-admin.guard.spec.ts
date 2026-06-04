@@ -1,9 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ExecutionContext } from '@nestjs/common'
+import { ForbiddenException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyAdminGuard } from './notify-admin.guard'
 import { SsoRole } from '../../enum/sso-role.enum'
+
+// Mock the parent AuthGuard class
+vi.mock('@nestjs/passport', () => {
+  return {
+    AuthGuard: vi.fn((_strategy: string) => {
+      return class {
+        async canActivate(context: any) {
+          // Return false if user is not authenticated
+          const request = context.switchToHttp().getRequest()
+          return !!request.user
+        }
+      }
+    }),
+  }
+})
 
 describe('NotifyAdminGuard', () => {
   let guard: NotifyAdminGuard
@@ -20,18 +35,10 @@ describe('NotifyAdminGuard', () => {
 
   describe('JWT Validation (positive)', () => {
     it('should allow request with valid JWT and no role requirement', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-123',
-              client_roles: ['some-role'],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-123',
+        client_roles: ['some-role'],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
 
@@ -41,18 +48,10 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should allow admin user with required NOTIFY_ADMIN role', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'admin-user-123',
-              client_roles: [SsoRole.NOTIFY_ADMIN],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'admin-user-123',
+        client_roles: [SsoRole.NOTIFY_ADMIN],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -62,18 +61,10 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should allow user with multiple roles including NOTIFY_ADMIN', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'multi-role-user',
-              client_roles: ['role1', SsoRole.NOTIFY_ADMIN, 'role3'],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'multi-role-user',
+        client_roles: ['role1', SsoRole.NOTIFY_ADMIN, 'role3'],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -85,15 +76,7 @@ describe('NotifyAdminGuard', () => {
 
   describe('JWT Validation (negative)', () => {
     it('should reject request with invalid JWT', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: null,
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext(null)
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -103,13 +86,7 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should reject request with missing user payload', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({}),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext(undefined)
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -121,18 +98,10 @@ describe('NotifyAdminGuard', () => {
 
   describe('Role Validation (positive)', () => {
     it('should allow user with exact required role', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-123',
-              client_roles: [SsoRole.NOTIFY_ADMIN],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-123',
+        client_roles: [SsoRole.NOTIFY_ADMIN],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -142,18 +111,10 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should allow user with one of multiple required roles', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-456',
-              client_roles: ['role1', SsoRole.NOTIFY_ADMIN],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-456',
+        client_roles: ['role1', SsoRole.NOTIFY_ADMIN],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN, 'role1'])
 
@@ -165,125 +126,67 @@ describe('NotifyAdminGuard', () => {
 
   describe('Role Validation (negative)', () => {
     it('should reject user without required role', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-789',
-              client_roles: ['wrong-role'],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-789',
+        client_roles: ['wrong-role'],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject user with empty client_roles array', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-empty',
-              client_roles: [],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-empty',
+        client_roles: [],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject user with null client_roles', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-null',
-              client_roles: null,
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-null',
+        client_roles: null,
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject user with undefined client_roles', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-undefined',
-              client_roles: undefined,
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-undefined',
+        client_roles: undefined,
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject user with completely different role', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-different',
-              client_roles: ['role-x', 'role-y', 'role-z'],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-different',
+        client_roles: ['role-x', 'role-y', 'role-z'],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
   describe('Decorator Handling', () => {
     it('should skip role validation when no @Roles() decorator is present', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-any',
-              client_roles: ['any-role'],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-any',
+        client_roles: ['any-role'],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(null)
 
@@ -293,18 +196,10 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should skip role validation when @Roles() decorator is empty array', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-empty-decorator',
-              client_roles: [],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'user-empty-decorator',
+        client_roles: [],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
 
@@ -316,18 +211,10 @@ describe('NotifyAdminGuard', () => {
 
   describe('Guard Scope', () => {
     it('should only validate SSO roles, not CSTAR roles', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'sso-user',
-              client_roles: [SsoRole.NOTIFY_ADMIN],
-            },
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext({
+        sub: 'sso-user',
+        client_roles: [SsoRole.NOTIFY_ADMIN],
+      })
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 
@@ -337,19 +224,13 @@ describe('NotifyAdminGuard', () => {
     })
 
     it('should not require x-tenant-id header', async () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            user: {
-              sub: 'user-no-tenant',
-              client_roles: [SsoRole.NOTIFY_ADMIN],
-            },
-            headers: {},
-          }),
-        }),
-        getHandler: () => ({}),
-        getClass: () => ({}),
-      } as unknown as ExecutionContext
+      const mockContext = createMockContext(
+        {
+          sub: 'user-no-tenant',
+          client_roles: [SsoRole.NOTIFY_ADMIN],
+        },
+        {},
+      )
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
 

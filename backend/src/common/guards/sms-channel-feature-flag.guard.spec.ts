@@ -12,7 +12,13 @@ describe('SmsChannelFeatureFlagGuard', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SmsChannelFeatureFlagGuard,
-        { provide: FeatureFlagService, useValue: { isEnabled: vi.fn() } },
+        {
+          provide: FeatureFlagService,
+          useValue: {
+            isEnabled: vi.fn().mockResolvedValue(false),
+            getFlagsForTenant: vi.fn().mockResolvedValue({}),
+          },
+        },
       ],
     }).compile()
 
