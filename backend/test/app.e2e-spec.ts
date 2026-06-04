@@ -15,7 +15,9 @@ describe('AppController (e2e)', () => {
         const config: Record<string, string> = {
           'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
           'auth.keycloakClientId': 'test-client',
+          'auth.notifyClientId': 'notify-test-client',
           'auth.jwtIssuer': 'https://example.com/realms/test',
+          'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
           'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
         }
         return config[key]
@@ -24,7 +26,9 @@ describe('AppController (e2e)', () => {
         const config: Record<string, string> = {
           'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
           'auth.keycloakClientId': 'test-client',
+          'auth.notifyClientId': 'notify-test-client',
           'auth.jwtIssuer': 'https://example.com/realms/test',
+          'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
           'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
         }
         const value = config[key]
