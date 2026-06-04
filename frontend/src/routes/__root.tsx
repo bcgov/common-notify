@@ -55,7 +55,7 @@ function RootLayout() {
     }
 
     fetchedUserIdRef.current = user.id
-    dispatch(fetchCstarTenants(user.id))
+    dispatch(fetchCstarTenants())
   }, [dispatch, user?.id]) // Only depend on user?.id, not Redux state
 
   useEffect(() => {
@@ -78,11 +78,18 @@ function RootLayout() {
 
     checkAuthorizationRef.current = true
 
-    // If user is authenticated but has no accessible tenants/roles, redirect to NotAuthorized
-    // UNLESS they are a NOTIFY_ADMIN (admins don't need CSTAR tenants for bootstrap)
+    // Check user's authorization status
     const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
-    if (cstarTenants.length === 0 && !isAdmin) {
-      navigate({ to: '/not-authorized' })
+
+    // If user has no CSTAR tenants:
+    // - If they are NOTIFY_ADMIN: redirect to feature flags (bootstrap/admin access)
+    // - If they are not NOTIFY_ADMIN: redirect to not-authorized (no access)
+    if (cstarTenants.length === 0) {
+      if (isAdmin) {
+        navigate({ to: '/admin/feature-flags' })
+      } else {
+        navigate({ to: '/not-authorized' })
+      }
     }
   }, [user?.id, cstarTenants, cstarIsLoading, navigate])
 

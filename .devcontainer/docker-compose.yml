@@ -118,6 +118,8 @@ services:
   frontend:
     container_name: frontend
     entrypoint: sh -c "npm ci --ignore-scripts && npm run dev"
+    env_file:
+      - "../.env"
     environment:
       BACKEND_URL: http://backend:3000
       PORT: 3000

@@ -13,6 +13,7 @@ import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { ROLES_KEY } from '../decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
+import { CstarRole } from '../../enum/cstar-role.enum'
 
 /**
  * NotifyFrontendRoleGuard
@@ -83,7 +84,22 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
     const jwtRoles = (payload.client_roles as string[]) || []
     const hasNotifyAdminRole = jwtRoles.includes(SsoRole.NOTIFY_ADMIN)
 
-    // Validate x-tenant-id header is present (required for both admins and regular users)
+    // Check if endpoint requires NOTIFY_OPERATIONS_ADMIN (global admin operation)
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
+    const isGlobalAdminOp = requiredRoles?.includes(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+
+    // For global admin operations, skip tenant context checks - no x-tenant-id needed
+    if (isGlobalAdminOp) {
+      request.userGuid = idirUserGuid
+      request.clientId = azp
+      request.isGlobalAdmin = true
+      return true
+    }
+
+    // Validate x-tenant-id header is present (required for tenant-scoped operations)
     const xTenantId = request.headers['x-tenant-id'] as string
     if (!xTenantId) {
       this.logger.warn(`[NotifyFrontendRoleGuard] x-tenant-id header is missing`)
@@ -137,10 +153,7 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
     }
 
     // Check if @Roles() decorator is present (only then validate with CSTAR)
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
+    // requiredRoles already retrieved above for global admin check
 
     if (requiredRoles && requiredRoles.length > 0) {
       // Validate CSTAR role (fetch fresh roles from CSTAR)

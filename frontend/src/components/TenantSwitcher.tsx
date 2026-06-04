@@ -4,7 +4,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
-import UserService from '@/service/user-service'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
 
@@ -37,7 +36,6 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const authUser = useAppSelector((state) => state.auth.user)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -63,29 +61,21 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
-    const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
     // Fetch user's roles in the selected tenant
-    if (authUser?.id) {
-      dispatch(fetchCstarRoles({ tenantId: tenant.id, ssoUserId: authUser.id })).then((result) => {
-        // Check if the action was rejected (error fetching roles) or returned empty roles
-        if (
-          result.type === 'cstar/fetchRoles/rejected' ||
-          (result.payload && Array.isArray(result.payload) && result.payload.length === 0)
-        ) {
-          // User has no roles in this tenant
-          // Allow NOTIFY_ADMIN users through anyway (they can access admin features)
-          // Deny regular users
-          if (isAdmin) {
-            navigate({ to: '/dashboard' })
-          } else {
-            navigate({ to: '/not-authorized' })
-          }
-        } else if (result.payload && Array.isArray(result.payload) && result.payload.length > 0) {
-          // User has roles in this tenant, navigate to dashboard
-          navigate({ to: '/dashboard' })
-        }
-      })
-    }
+    dispatch(fetchCstarRoles({ tenantId: tenant.id })).then((result) => {
+      // Check if the action was rejected (error fetching roles) or returned empty roles
+      if (
+        result.type === 'cstar/fetchRoles/rejected' ||
+        (result.payload && Array.isArray(result.payload) && result.payload.length === 0)
+      ) {
+        // User has no roles in this tenant, redirect to not-authorized
+        // (even if they're NOTIFY_ADMIN - admin role doesn't grant tenant access)
+        navigate({ to: '/not-authorized' })
+      } else if (result.payload && Array.isArray(result.payload) && result.payload.length > 0) {
+        // User has roles in this tenant, navigate to dashboard
+        navigate({ to: '/dashboard' })
+      }
+    })
     setIsOpen(false)
   }
 

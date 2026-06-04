@@ -53,7 +53,7 @@ export class CstarApiClient {
    */
   async getUserRoles(tenantId: string, ssoUserId: string, authHeader?: string): Promise<string[]> {
     if (!this.baseUrl) {
-      this.logger.error('CSTAR_BASE_URL is not configured')
+      this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')
     }
 
@@ -153,9 +153,9 @@ export class CstarApiClient {
    * @throws UnauthorizedException if user not found or credentials invalid
    * @throws InternalServerErrorException if CSTAR API error
    */
-  async getUserTenants(ssoUserId: string, authHeader?: string): Promise<string[]> {
+  async getUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
     if (!this.baseUrl) {
-      this.logger.error('CSTAR_BASE_URL is not configured')
+      this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')
     }
 
@@ -212,12 +212,15 @@ export class CstarApiClient {
       }
 
       const data = (await response.json()) as CstarTenantsResponseDto
-      const tenantIds = data.data.tenants.map((tenant) => tenant.id)
-      this.logger.debug(`Successfully fetched ${tenantIds.length} tenants for user ${ssoUserId}`, {
-        tenantIds,
-      })
+      this.logger.debug(
+        `Successfully fetched ${data.data.tenants.length} tenants for user ${ssoUserId}`,
+        {
+          tenantCount: data.data.tenants.length,
+        },
+      )
 
-      return tenantIds
+      // Return full tenant objects, not just IDs
+      return data.data.tenants
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error

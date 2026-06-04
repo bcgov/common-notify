@@ -28,7 +28,6 @@ const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
   const showModal = useAppSelector((state) => state.tenant.showTenantModal)
   const tenants = useAppSelector((state) => state.cstar.tenants)
-  const authUser = useAppSelector((state) => state.auth.user)
   const [pendingTenantId, setPendingTenantId] = useState<string | undefined>(undefined)
 
   const tenantItems = useMemo(
@@ -40,12 +39,16 @@ const TenantSelectionModal: FC = () => {
     [tenants],
   )
 
+  // Don't show modal for NOTIFY_ADMIN users without tenants - they go directly to feature flags
+  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+  if (tenants.length === 0 && isAdmin) {
+    return null
+  }
+
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
     // Fetch user's roles in the selected tenant
-    if (authUser?.id) {
-      dispatch(fetchCstarRoles({ tenantId: tenant.id, ssoUserId: authUser.id }))
-    }
+    dispatch(fetchCstarRoles({ tenantId: tenant.id }))
   }
 
   const handleCancelSelection = () => {

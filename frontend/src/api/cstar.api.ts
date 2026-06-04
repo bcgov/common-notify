@@ -2,53 +2,56 @@ import { generateApiParameters, get } from '@/common/api'
 import type { CstarTenantsResponse } from '@/interfaces/CstarTenant'
 import type { CstarRolesResponse } from '@/interfaces/CstarRoles'
 
-declare global {
-  interface Window {
-    VITE_CSTAR_API_URL?: string
-  }
-}
-
-const baseUrl = window.VITE_CSTAR_API_URL || import.meta.env.VITE_CSTAR_API_URL
-
 /**
- * CSTAR API Client
+ * CSTAR API Client (Frontend Proxy)
  *
- * Provides methods for calling CSTAR APIs.
- * URL construction and business logic is handled in thunks.
+ * Provides methods for calling CSTAR APIs through the backend.
+ * Backend makes server-to-server calls to CSTAR to avoid CORS issues.
+ *
+ * API Routes:
+ * - GET /api/v1/frontend/auth/tenants - Get user's CSTAR tenants
+ * - GET /api/v1/frontend/auth/tenants/:tenantId/roles - Get user's roles in tenant
  */
 export const cstarApi = {
-  async fetchUserTenants(ssoUserId: string): Promise<CstarTenantsResponse> {
-    if (!baseUrl) {
-      throw new Error('CSTAR API URL is not configured')
-    }
-
+  /**
+   * Fetch user's tenants through backend proxy
+   * Calls: GET /api/v1/frontend/auth/tenants
+   *
+   * @returns Promise with tenants array
+   */
+  async fetchUserTenants(): Promise<CstarTenantsResponse> {
     const parameters = generateApiParameters<never>(
-      `${baseUrl}/api/v1/users/${ssoUserId}/tenants`,
+      '/api/v1/frontend/auth/tenants',
       undefined,
       false,
-      true, // CSTAR API requires JWT auth
+      true, // Requires JWT auth
     )
 
-    return get(parameters)
+    const response = await get(parameters)
+    return {
+      data: response.tenants || [],
+    }
   },
 
-  async fetchUserRoles(url: string): Promise<CstarRolesResponse> {
-    if (!baseUrl) {
-      throw new Error('CSTAR API URL is not configured')
-    }
-
+  /**
+   * Fetch user's roles in a specific tenant through backend proxy
+   * Calls: GET /api/v1/frontend/auth/tenants/:tenantId/roles
+   *
+   * @param tenantId The tenant ID to fetch roles for
+   * @returns Promise with roles array
+   */
+  async fetchUserRoles(tenantId: string): Promise<CstarRolesResponse> {
     const parameters = generateApiParameters<never>(
-      url,
+      `/api/v1/frontend/auth/tenants/${tenantId}/roles`,
       undefined,
       false,
-      true, // CSTAR API requires JWT auth
+      true, // Requires JWT auth
     )
 
-    return get(parameters)
-  },
-
-  getBaseUrl(): string {
-    return baseUrl || ''
+    const response = await get(parameters)
+    return {
+      data: response.roles || [],
+    }
   },
 }
 

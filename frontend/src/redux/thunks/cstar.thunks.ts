@@ -2,35 +2,49 @@ import { createAsyncThunk } from '@reduxjs/toolkit'
 import cstarApi from '@/api/cstar.api'
 import type { Tenant } from '@/interfaces/CstarTenant'
 
+/**
+ * Fetch current user's CSTAR tenants
+ *
+ * Backend endpoint: GET /api/v1/frontend/auth/tenants
+ * Backend extracts user ID from JWT, so no parameters needed
+ *
+ * @returns Array of tenants the user has access to
+ */
 export const fetchCstarTenants = createAsyncThunk<
   Tenant[],
-  string,
+  void,
   {
     rejectValue: string
   }
->('cstar/fetchTenants', async (ssoUserId, { rejectWithValue }) => {
+>('cstar/fetchTenants', async (_, { rejectWithValue }) => {
   try {
-    const response = await cstarApi.fetchUserTenants(ssoUserId)
-    return response.data.tenants
+    const response = await cstarApi.fetchUserTenants()
+    return response.data
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch tenants')
   }
 })
 
+/**
+ * Fetch current user's CSTAR roles in a specific tenant
+ *
+ * Backend endpoint: GET /api/v1/frontend/auth/tenants/:tenantId/roles
+ * Backend extracts user ID from JWT, so only tenantId is needed
+ *
+ * @param tenantId The tenant ID to fetch roles for
+ * @returns Array of role names for the user in that tenant
+ */
 export const fetchCstarRoles = createAsyncThunk<
   string[],
-  { tenantId: string; ssoUserId: string },
+  { tenantId: string },
   {
     rejectValue: string
   }
->('cstar/fetchRoles', async ({ tenantId, ssoUserId }, { rejectWithValue }) => {
+>('cstar/fetchRoles', async ({ tenantId }, { rejectWithValue }) => {
   try {
-    const baseUrl = cstarApi.getBaseUrl()
-    const url = `${baseUrl}/api/v1/tenants/${tenantId}/ssousers/${ssoUserId}/shared-service-roles`
-    const response = await cstarApi.fetchUserRoles(url)
-    // Extract role names from role objects
-    const roleNames = response.data.sharedServiceRoles.map((role) => role.name)
-    return roleNames
+    const response = await cstarApi.fetchUserRoles(tenantId)
+    // Response.data is already an array of role strings
+    return response.data
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch roles')
   }

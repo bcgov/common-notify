@@ -62,7 +62,7 @@ export default () => {
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
     // Used to fetch user roles for role-based access control
     cstar: {
-      baseUrl: process.env.CSTAR_BASE_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+      baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
     },
 
     // Twilio SMS Service
