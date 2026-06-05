@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { CstarRolesResponseDto, CstarTenantsResponseDto } from './schemas/cstar.schema'
@@ -35,9 +36,17 @@ interface CstarErrorResponse {
 export class CstarApiClient {
   private readonly logger = new Logger(CstarApiClient.name)
   private readonly baseUrl: string
+  private static readonly SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]{1,128}$/
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>('cstar.baseUrl') || ''
+  }
+
+  private validatePathSegment(value: string, fieldName: string): string {
+    if (!CstarApiClient.SAFE_PATH_SEGMENT.test(value)) {
+      throw new BadRequestException(`Invalid ${fieldName}`)
+    }
+    return value
   }
 
   /**
@@ -57,7 +66,12 @@ export class CstarApiClient {
       throw new InternalServerErrorException('CSTAR API is not configured')
     }
 
-    const url = `${this.baseUrl}/api/v1/tenants/${tenantId}/ssousers/${ssoUserId}/shared-service-roles`
+    const safeTenantId = encodeURIComponent(this.validatePathSegment(tenantId, 'tenantId'))
+    const safeSsoUserId = encodeURIComponent(this.validatePathSegment(ssoUserId, 'ssoUserId'))
+    const url = new URL(
+      `/api/v1/tenants/${safeTenantId}/ssousers/${safeSsoUserId}/shared-service-roles`,
+      this.baseUrl,
+    ).toString()
 
     try {
       this.logger.debug(`Fetching shared service roles from CSTAR: ${url}`)
