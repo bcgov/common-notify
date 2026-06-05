@@ -81,9 +81,14 @@ backend:
     # NOTE: More restrictive namespace selector needed from platform team
   #-- ClamAV antivirus scanning configuration
   clamav:
-    #-- enable or disable ClamAV scanning
+    #-- enable or disable ClamAV deployment
+    #-- Default: true for DEV/TEST/PROD environments (one per namespace)
+    #-- Disabled for PR environments (set in pr-open.yml) - PRs share the namespace's ClamAV instance
+    #-- Similar to shared PVC approach: one ClamAV per namespace, shared by all PRs
+    #-- Each ClamAV instance uses: 200m CPU + 768Mi memory (limits: 2 CPU + 2Gi memory)
     enabled: true
     #-- hostname of the ClamAV service (clamd daemon)
+    #-- PRs override this to 'common-notify-dev-clamav' to use shared instance
     host: clamav
     #-- port of the ClamAV service
     port: 3310
