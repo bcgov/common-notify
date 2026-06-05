@@ -95,7 +95,7 @@ services:
       kong:
         condition: service_healthy
     env_file:
-      - "../.env"
+      - "./.env"
     entrypoint: sh -c "npm i && npm run start:dev"
     environment:
       <<: *postgres-vars
@@ -119,7 +119,7 @@ services:
     container_name: frontend
     entrypoint: sh -c "npm ci --ignore-scripts && npm run dev"
     env_file:
-      - "../.env"
+      - "./.env"
     environment:
       BACKEND_URL: http://backend:3000
       PORT: 3000
@@ -219,7 +219,7 @@ services:
     working_dir: /app
     entrypoint: sh -c "npm install && npm start"
     env_file:
-      - "../.env"
+      - "./.env"
     environment:
       NODE_ENV: development
       PORT: 3002
