@@ -27,7 +27,7 @@ export const cstarApi = {
       true, // Requires JWT auth
     )
 
-    const response = await get(parameters)
+    const response = (await get(parameters)) as { tenants?: any[] }
     return {
       data: response.tenants || [],
     }
@@ -48,7 +48,7 @@ export const cstarApi = {
       true, // Requires JWT auth
     )
 
-    const response = await get(parameters)
+    const response = (await get(parameters)) as { roles?: string[] }
     return {
       data: response.roles || [],
     }
