@@ -7,8 +7,7 @@ import { NotificationPubSubService } from './notification-pubsub.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
-import { TenantGuard } from '../../common/guards/tenant.guard'
-import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
 const mockNotificationService = {
@@ -62,11 +61,10 @@ describe('NotificationFrontendController', () => {
           provide: FeatureFlagService,
           useValue: mockFeatureFlagService,
         },
-        TenantGuard,
       ],
     })
-      .overrideGuard(FeatureFlagGuard)
-      .useValue({ canActivate: () => true })
+      .overrideGuard(NotifyFrontendRoleGuard)
+      .useValue({})
       .compile()
 
     controller = module.get<NotificationFrontendController>(NotificationFrontendController)

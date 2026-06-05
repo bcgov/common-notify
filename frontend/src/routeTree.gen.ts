@@ -13,6 +13,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotificationEventsRouteImport } from './routes/notification-events'
+import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -39,6 +40,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const NotificationEventsRoute = NotificationEventsRouteImport.update({
   id: '/notification-events',
   path: '/notification-events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
+  id: '/not-authorized',
+  path: '/not-authorized',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DistributionListsRoute = DistributionListsRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/not-authorized': typeof NotAuthorizedRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/not-authorized': typeof NotAuthorizedRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/distribution-lists': typeof DistributionListsRoute
+  '/not-authorized': typeof NotAuthorizedRoute
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/not-authorized'
     | '/notification-events'
     | '/settings'
     | '/template-create'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/not-authorized'
     | '/notification-events'
     | '/settings'
     | '/template-create'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/distribution-lists'
+    | '/not-authorized'
     | '/notification-events'
     | '/settings'
     | '/template-create'
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DistributionListsRoute: typeof DistributionListsRoute
+  NotAuthorizedRoute: typeof NotAuthorizedRoute
   NotificationEventsRoute: typeof NotificationEventsRoute
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/notification-events'
       fullPath: '/notification-events'
       preLoaderRoute: typeof NotificationEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/not-authorized': {
+      id: '/not-authorized'
+      path: '/not-authorized'
+      fullPath: '/not-authorized'
+      preLoaderRoute: typeof NotAuthorizedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/distribution-lists': {
@@ -270,6 +290,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DistributionListsRoute: DistributionListsRoute,
+  NotAuthorizedRoute: NotAuthorizedRoute,
   NotificationEventsRoute: NotificationEventsRoute,
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,

@@ -1,26 +1,83 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
 import { CodeTablesController } from './code-tables.controller'
-import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './code-tables.service'
+import { CodeTablesService, CodeTablesResponseDto } from './code-tables.service'
+import { CodeTableDto } from './schemas/code-table.dto'
 
 describe('CodeTablesController', () => {
   let controller: CodeTablesController
   let service: CodeTablesService
 
-  const mockStatuses: CodeTableItemDto[] = [
-    { id: 'sent', label: 'Sent', description: 'sent' },
-    { id: 'failed', label: 'Failed', description: 'failed' },
-    { id: 'pending', label: 'Pending', description: 'pending' },
+  const mockStatuses: CodeTableDto[] = [
+    {
+      code: 'SENT',
+      displayName: 'Sent',
+      description: 'sent',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
+    {
+      code: 'FAILED',
+      displayName: 'Failed',
+      description: 'failed',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
+    {
+      code: 'PENDING',
+      displayName: 'Pending',
+      description: 'pending',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
   ]
 
-  const mockChannels: CodeTableItemDto[] = [
-    { id: 'EMAIL', label: 'Email', description: 'EMAIL' },
-    { id: 'SMS', label: 'SMS', description: 'SMS' },
+  const mockChannels: CodeTableDto[] = [
+    {
+      code: 'EMAIL',
+      displayName: 'Email',
+      description: 'EMAIL',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
+    {
+      code: 'SMS',
+      displayName: 'SMS',
+      description: 'SMS',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
   ]
 
-  const mockEventTypes: CodeTableItemDto[] = [
-    { id: 'PASSWORD_RESET', label: 'Password Reset', description: 'PASSWORD_RESET' },
-    { id: 'INVOICE_SENT', label: 'Invoice Sent', description: 'INVOICE_SENT' },
+  const mockEventTypes: CodeTableDto[] = [
+    {
+      code: 'PASSWORD_RESET',
+      displayName: 'Password Reset',
+      description: 'PASSWORD_RESET',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
+    {
+      code: 'INVOICE_SENT',
+      displayName: 'Invoice Sent',
+      description: 'INVOICE_SENT',
+      createdAt: new Date('2024-01-01'),
+      createdBy: 'system',
+      updatedAt: new Date('2024-01-01'),
+      updatedBy: 'system',
+    },
   ]
 
   const mockCodeTablesResponse: CodeTablesResponseDto = {
