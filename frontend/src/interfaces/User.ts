@@ -15,6 +15,8 @@ export interface UserResponse {
   updatedAt: string
   updatedBy: string
   isDeleted: boolean
+  /** User's roles in the selected tenant from CSTAR */
+  cstarRoles?: string[]
 }
 
 /**

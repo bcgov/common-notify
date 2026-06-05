@@ -1,51 +1,113 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { CodeTablesFrontendController } from './code-tables-frontend.controller'
-import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './code-tables.service'
+import { CodeTablesService } from './code-tables.service'
+import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { vi } from 'vitest'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
 
 describe('CodeTablesFrontendController', () => {
   let controller: CodeTablesFrontendController
 
-  const mockCodeTableItem: CodeTableItemDto = {
+  const mockCodeTableItem: CodeTableDto = {
     code: 'SENT',
-    name: 'Sent',
+    displayName: 'Sent',
     description: 'Notification has been sent',
-    displayOrder: 1,
+    createdAt: new Date('2024-01-01'),
+    createdBy: 'system',
+    updatedAt: new Date('2024-01-01'),
+    updatedBy: 'system',
   }
 
   const mockCodeTablesResponse: CodeTablesResponseDto = {
     statuses: [
-      { code: 'SENT', name: 'Sent', description: 'Sent', displayOrder: 1 },
-      { code: 'FAILED', name: 'Failed', description: 'Failed', displayOrder: 2 },
-      { code: 'PENDING', name: 'Pending', description: 'Pending', displayOrder: 3 },
+      {
+        code: 'SENT',
+        displayName: 'Sent',
+        description: 'Sent',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
+      {
+        code: 'FAILED',
+        displayName: 'Failed',
+        description: 'Failed',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
+      {
+        code: 'PENDING',
+        displayName: 'Pending',
+        description: 'Pending',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
     ],
     channels: [
-      { code: 'EMAIL', name: 'Email', description: 'Email channel', displayOrder: 1 },
-      { code: 'SMS', name: 'SMS', description: 'SMS channel', displayOrder: 2 },
-      { code: 'MSGAPP', name: 'Message App', description: 'Message App channel', displayOrder: 3 },
+      {
+        code: 'EMAIL',
+        displayName: 'Email',
+        description: 'Email channel',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
+      {
+        code: 'SMS',
+        displayName: 'SMS',
+        description: 'SMS channel',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
+      {
+        code: 'MSGAPP',
+        displayName: 'Message App',
+        description: 'Message App channel',
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
+      },
     ],
     eventTypes: [
       {
         code: 'PASSWORD_RESET',
-        name: 'Password Reset',
+        displayName: 'Password Reset',
         description: 'Password reset event',
-        displayOrder: 1,
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
       },
       {
         code: 'INVOICE_SENT',
-        name: 'Invoice Sent',
+        displayName: 'Invoice Sent',
         description: 'Invoice sent event',
-        displayOrder: 2,
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
       },
       {
         code: 'USER_SIGNUP',
-        name: 'User Signup',
+        displayName: 'User Signup',
         description: 'User signup event',
-        displayOrder: 3,
+        createdAt: new Date('2024-01-01'),
+        createdBy: 'system',
+        updatedAt: new Date('2024-01-01'),
+        updatedBy: 'system',
       },
     ],
+    featureFlags: [],
   }
 
   const mockCodeTablesService = {
@@ -55,8 +117,8 @@ describe('CodeTablesFrontendController', () => {
     getEventTypes: vi.fn(),
   }
 
-  // Mock TenantGuard to bypass authentication
-  const mockTenantGuard: CanActivate = {
+  // Mock AuthGuard to bypass authentication
+  const mockAuthGuard: CanActivate = {
     canActivate: (_context: ExecutionContext) => true,
   }
 
@@ -70,8 +132,8 @@ describe('CodeTablesFrontendController', () => {
         },
       ],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(JwtGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     controller = module.get<CodeTablesFrontendController>(CodeTablesFrontendController)
@@ -136,6 +198,7 @@ describe('CodeTablesFrontendController', () => {
         statuses: [],
         channels: [],
         eventTypes: [],
+        featureFlags: [],
       }
       mockCodeTablesService.getAllCodeTables.mockResolvedValue(emptyResponse)
 
@@ -149,12 +212,37 @@ describe('CodeTablesFrontendController', () => {
     it('should preserve order from service response', async () => {
       const orderedResponse: CodeTablesResponseDto = {
         statuses: [
-          { code: 'A', name: 'First', displayOrder: 1 },
-          { code: 'B', name: 'Second', displayOrder: 2 },
-          { code: 'C', name: 'Third', displayOrder: 3 },
+          {
+            code: 'A',
+            displayName: 'First',
+            description: 'First status',
+            createdAt: new Date('2024-01-01'),
+            createdBy: 'system',
+            updatedAt: new Date('2024-01-01'),
+            updatedBy: 'system',
+          },
+          {
+            code: 'B',
+            displayName: 'Second',
+            description: 'Second status',
+            createdAt: new Date('2024-01-01'),
+            createdBy: 'system',
+            updatedAt: new Date('2024-01-01'),
+            updatedBy: 'system',
+          },
+          {
+            code: 'C',
+            displayName: 'Third',
+            description: 'Third status',
+            createdAt: new Date('2024-01-01'),
+            createdBy: 'system',
+            updatedAt: new Date('2024-01-01'),
+            updatedBy: 'system',
+          },
         ],
         channels: [],
         eventTypes: [],
+        featureFlags: [],
       }
       mockCodeTablesService.getAllCodeTables.mockResolvedValue(orderedResponse)
 
@@ -185,9 +273,8 @@ describe('CodeTablesFrontendController', () => {
 
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toHaveProperty('code')
-      expect(result[0]).toHaveProperty('name')
+      expect(result[0]).toHaveProperty('displayName')
       expect(result[0]).toHaveProperty('description')
-      expect(result[0]).toHaveProperty('displayOrder')
     })
 
     it('should return empty array when no statuses', async () => {
@@ -199,11 +286,43 @@ describe('CodeTablesFrontendController', () => {
     })
 
     it('should include common status codes', async () => {
-      const statuses: CodeTableItemDto[] = [
-        { code: 'QUEUED', name: 'Queued', displayOrder: 1 },
-        { code: 'PROCESSING', name: 'Processing', displayOrder: 2 },
-        { code: 'SENT', name: 'Sent', displayOrder: 3 },
-        { code: 'FAILED', name: 'Failed', displayOrder: 4 },
+      const statuses: CodeTableDto[] = [
+        {
+          code: 'QUEUED',
+          displayName: 'Queued',
+          description: 'Queued',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'PROCESSING',
+          displayName: 'Processing',
+          description: 'Processing',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'SENT',
+          displayName: 'Sent',
+          description: 'Sent',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'FAILED',
+          displayName: 'Failed',
+          description: 'Failed',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getStatuses.mockResolvedValue(statuses)
 
@@ -214,19 +333,43 @@ describe('CodeTablesFrontendController', () => {
       expect(result.map((s) => s.code)).toContain('FAILED')
     })
 
-    it('should preserve displayOrder', async () => {
-      const statuses: CodeTableItemDto[] = [
-        { code: 'FIRST', name: 'First', displayOrder: 1 },
-        { code: 'SECOND', name: 'Second', displayOrder: 2 },
-        { code: 'THIRD', name: 'Third', displayOrder: 3 },
+    it('should preserve status information', async () => {
+      const statuses: CodeTableDto[] = [
+        {
+          code: 'FIRST',
+          displayName: 'First',
+          description: 'First status',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'SECOND',
+          displayName: 'Second',
+          description: 'Second status',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'THIRD',
+          displayName: 'Third',
+          description: 'Third status',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getStatuses.mockResolvedValue(statuses)
 
       const result = await controller.getStatuses()
 
-      expect(result[0].displayOrder).toBe(1)
-      expect(result[1].displayOrder).toBe(2)
-      expect(result[2].displayOrder).toBe(3)
+      expect(result[0].displayName).toBe('First')
+      expect(result[1].displayName).toBe('Second')
+      expect(result[2].displayName).toBe('Third')
     })
 
     it('should delegate to service', async () => {
@@ -249,7 +392,7 @@ describe('CodeTablesFrontendController', () => {
       expect(mockCodeTablesService.getChannels).toHaveBeenCalledTimes(1)
     })
 
-    it('should return array of CodeTableItemDto', async () => {
+    it('should return array of CodeTableDto', async () => {
       const channels = [mockCodeTableItem]
       mockCodeTablesService.getChannels.mockResolvedValue(channels)
 
@@ -257,8 +400,8 @@ describe('CodeTablesFrontendController', () => {
 
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toHaveProperty('code')
-      expect(result[0]).toHaveProperty('name')
-      expect(result[0]).toHaveProperty('displayOrder')
+      expect(result[0]).toHaveProperty('displayName')
+      expect(result[0]).toHaveProperty('description')
     })
 
     it('should return empty array when no channels', async () => {
@@ -270,10 +413,34 @@ describe('CodeTablesFrontendController', () => {
     })
 
     it('should include standard channels', async () => {
-      const channels: CodeTableItemDto[] = [
-        { code: 'EMAIL', name: 'Email', displayOrder: 1 },
-        { code: 'SMS', name: 'SMS', displayOrder: 2 },
-        { code: 'MSGAPP', name: 'Message App', displayOrder: 3 },
+      const channels: CodeTableDto[] = [
+        {
+          code: 'EMAIL',
+          displayName: 'Email',
+          description: 'Email channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'SMS',
+          displayName: 'SMS',
+          description: 'SMS channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'MSGAPP',
+          displayName: 'Message App',
+          description: 'Message App channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getChannels.mockResolvedValue(channels)
 
@@ -284,11 +451,35 @@ describe('CodeTablesFrontendController', () => {
       expect(result.map((c) => c.code)).toContain('MSGAPP')
     })
 
-    it('should preserve channel order', async () => {
-      const channels: CodeTableItemDto[] = [
-        { code: 'EMAIL', name: 'Email', displayOrder: 1 },
-        { code: 'SMS', name: 'SMS', displayOrder: 2 },
-        { code: 'MSGAPP', name: 'Message App', displayOrder: 3 },
+    it('should preserve channel information', async () => {
+      const channels: CodeTableDto[] = [
+        {
+          code: 'EMAIL',
+          displayName: 'Email',
+          description: 'Email channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'SMS',
+          displayName: 'SMS',
+          description: 'SMS channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'MSGAPP',
+          displayName: 'Message App',
+          description: 'Message App channel',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getChannels.mockResolvedValue(channels)
 
@@ -319,7 +510,7 @@ describe('CodeTablesFrontendController', () => {
       expect(mockCodeTablesService.getEventTypes).toHaveBeenCalledTimes(1)
     })
 
-    it('should return array of CodeTableItemDto', async () => {
+    it('should return array of CodeTableDto', async () => {
       const eventTypes = [mockCodeTableItem]
       mockCodeTablesService.getEventTypes.mockResolvedValue(eventTypes)
 
@@ -327,8 +518,8 @@ describe('CodeTablesFrontendController', () => {
 
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toHaveProperty('code')
-      expect(result[0]).toHaveProperty('name')
-      expect(result[0]).toHaveProperty('displayOrder')
+      expect(result[0]).toHaveProperty('displayName')
+      expect(result[0]).toHaveProperty('description')
     })
 
     it('should return empty array when no event types', async () => {
@@ -340,10 +531,34 @@ describe('CodeTablesFrontendController', () => {
     })
 
     it('should include common event types', async () => {
-      const eventTypes: CodeTableItemDto[] = [
-        { code: 'PASSWORD_RESET', name: 'Password Reset', displayOrder: 1 },
-        { code: 'INVOICE_SENT', name: 'Invoice Sent', displayOrder: 2 },
-        { code: 'USER_SIGNUP', name: 'User Signup', displayOrder: 3 },
+      const eventTypes: CodeTableDto[] = [
+        {
+          code: 'PASSWORD_RESET',
+          displayName: 'Password Reset',
+          description: 'Password reset event',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'INVOICE_SENT',
+          displayName: 'Invoice Sent',
+          description: 'Invoice sent event',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'USER_SIGNUP',
+          displayName: 'User Signup',
+          description: 'User signup event',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getEventTypes.mockResolvedValue(eventTypes)
 
@@ -354,11 +569,35 @@ describe('CodeTablesFrontendController', () => {
       expect(result.map((e) => e.code)).toContain('USER_SIGNUP')
     })
 
-    it('should preserve event type order', async () => {
-      const eventTypes: CodeTableItemDto[] = [
-        { code: 'EVENT_A', name: 'Event A', displayOrder: 1 },
-        { code: 'EVENT_B', name: 'Event B', displayOrder: 2 },
-        { code: 'EVENT_C', name: 'Event C', displayOrder: 3 },
+    it('should preserve event type information', async () => {
+      const eventTypes: CodeTableDto[] = [
+        {
+          code: 'EVENT_A',
+          displayName: 'Event A',
+          description: 'Event A description',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'EVENT_B',
+          displayName: 'Event B',
+          description: 'Event B description',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
+        {
+          code: 'EVENT_C',
+          displayName: 'Event C',
+          description: 'Event C description',
+          createdAt: new Date('2024-01-01'),
+          createdBy: 'system',
+          updatedAt: new Date('2024-01-01'),
+          updatedBy: 'system',
+        },
       ]
       mockCodeTablesService.getEventTypes.mockResolvedValue(eventTypes)
 

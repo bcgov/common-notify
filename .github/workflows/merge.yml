@@ -214,3 +214,100 @@ jobs:
       redis_triggers: ('charts/redis/')
       tag: prod
       timeout-minutes: 15
+
+  create-release:
+    name: Create Git Tag and GitHub Release
+    needs: [deploy-prod]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Fetch all history for proper version bumping
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get Previous Tag
+        id: previous_tag
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          echo "Previous tag: $PREVIOUS_TAG"
+
+      - name: Bump Version
+        id: bump_version
+        run: |
+          chmod +x .github/scripts/bump-version.sh
+          .github/scripts/bump-version.sh auto
+          NEW_VERSION=$(node -p "require('./frontend/package.json').version")
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Check if Tag Exists
+        id: check_tag
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.version }}"
+          if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️  Tag v$NEW_VERSION already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ Tag v$NEW_VERSION does not exist"
+          fi
+
+      - name: Commit Version Bump
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git add frontend/package.json
+          git commit -m "chore(release): bump version to ${{ steps.bump_version.outputs.version }} [skip ci]"
+          git push origin main
+
+      - name: Create Git Tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.version }}"
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          echo "✓ Created and pushed tag v$NEW_VERSION"
+
+      - name: Generate Release Notes
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          chmod +x .github/scripts/generate-release-notes.sh
+          .github/scripts/generate-release-notes.sh "${{ steps.previous_tag.outputs.previous_tag }}" "${{ steps.bump_version.outputs.version }}"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump_version.outputs.version }}
+          name: Release v${{ steps.bump_version.outputs.version }}
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "## 🎉 Release Created!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ steps.bump_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version:** ${{ steps.previous_tag.outputs.previous_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Production deployment completed and tagged successfully!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Skip Release (Tag Exists)
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "## ⚠️ Release Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tag v${{ steps.bump_version.outputs.version }} already exists." >> $GITHUB_STEP_SUMMARY
+          echo "No new release created." >> $GITHUB_STEP_SUMMARY

@@ -40,8 +40,9 @@ export default () => {
     // Keycloak / JWT authentication
     auth: {
       jwksUri: process.env.JWKS_URI,
-      jwtIssuer: process.env.JWT_ISSUER,
-      keycloakClientId: process.env.KEYCLOAK_CLIENT_ID,
+      frontendKeycloakIssuer: process.env.FRONTEND_KEYCLOAK_ISSUER,
+      apiGatewayKeycloakIssuer: process.env.API_GATEWAY_KEYCLOAK_ISSUER,
+      notifyClientId: process.env.NOTIFY_CLIENT_ID,
     },
 
     // CHES (Common Hosted Email Service)
@@ -66,6 +67,12 @@ export default () => {
       adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
     },
 
+    // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
+    // Used to fetch user roles for role-based access control
+    cstar: {
+      baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+    },
+
     // Twilio SMS Service
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,
@@ -77,6 +84,11 @@ export default () => {
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+    },
+
+    // Attachment Storage
+    attachments: {
+      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
     },
 
     // Job Queue Worker Configuration

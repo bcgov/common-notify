@@ -4,6 +4,7 @@ import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/clien
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { CstarModule } from '../../services/cstar/cstar.module'
 import {
   NotifyController,
   NotifySimpleController,
@@ -15,6 +16,8 @@ import { NotifyService } from './notify.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 
 @Module({
   imports: [
@@ -24,6 +27,7 @@ import { QueueModule } from '../../queue/queue.module'
     NotificationModule,
     RenderingModule,
     FeatureFlagModule,
+    CstarModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],
@@ -34,7 +38,7 @@ import { QueueModule } from '../../queue/queue.module'
     NotifyController,
     ChesEmailController,
   ],
-  providers: [NotifyService],
+  providers: [NotifyService, NotifyFrontendRoleGuard, NotifyServiceGuard],
   exports: [NotifyService, RenderingModule],
 })
 export class NotifyModule {}

@@ -10,20 +10,40 @@ describe('AppController (e2e)', () => {
   let app: INestApplication
 
   beforeAll(async () => {
+    const configMock = {
+      get: (key: string) => {
+        const config: Record<string, string> = {
+          'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
+          'auth.keycloakClientId': 'test-client',
+          'auth.notifyClientId': 'notify-test-client',
+          'auth.jwtIssuer': 'https://example.com/realms/test',
+          'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
+          'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
+        }
+        return config[key]
+      },
+      getOrThrow: (key: string) => {
+        const config: Record<string, string> = {
+          'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
+          'auth.keycloakClientId': 'test-client',
+          'auth.notifyClientId': 'notify-test-client',
+          'auth.jwtIssuer': 'https://example.com/realms/test',
+          'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
+          'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
+        }
+        const value = config[key]
+        if (!value) {
+          throw new Error(`Config key "${key}" not found`)
+        }
+        return value
+      },
+    }
+
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(ConfigService)
-      .useValue({
-        get: (key: string) => {
-          const config: Record<string, string> = {
-            'auth.jwksUri': 'https://example.com/.well-known/jwks.json',
-            'auth.keycloakClientId': 'test-client',
-            'auth.jwtIssuer': 'https://example.com/realms/test',
-          }
-          return config[key]
-        },
-      })
+      .useValue(configMock)
       .overrideProvider(PendingNotificationRetryService)
       .useValue({
         onModuleInit: () => Promise.resolve(),

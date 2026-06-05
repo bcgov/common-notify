@@ -3,12 +3,12 @@ import { ChesController } from './ches.controller'
 import { ChesOAuthService } from './ches-oauth.service'
 import { ChesApiClient } from './ches-api.client'
 import { AdminModule } from '../api/admin/admin.module'
-import { TenantGuard } from '../common/guards/tenant.guard'
+import { CstarModule } from '../services/cstar/cstar.module'
 
 @Module({
-  imports: [AdminModule],
+  imports: [AdminModule, CstarModule],
   controllers: [ChesController],
-  providers: [ChesOAuthService, ChesApiClient, TenantGuard],
+  providers: [ChesOAuthService, ChesApiClient],
   exports: [ChesApiClient],
 })
 export class ChesModule {}
