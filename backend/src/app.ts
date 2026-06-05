@@ -10,6 +10,7 @@ import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
+import { JwtGuard } from './common/guards/auth.jwt-guard'
 
 /**
  *
@@ -35,6 +36,10 @@ export async function bootstrap() {
   )
 
   app.useGlobalFilters(new ValidationExceptionFilter())
+
+  // Apply JwtGuard globally - all routes require JWT unless marked with @Public()
+  const jwtGuard = app.get(JwtGuard)
+  app.useGlobalGuards(jwtGuard)
 
   app.use(helmet())
   app.enableCors()

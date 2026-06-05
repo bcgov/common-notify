@@ -6,6 +6,10 @@ import type { FeatureFlag } from '@/interfaces/feature-flag.interface'
 /**
  * Fetch feature flags for the user's tenant
  * Called on app load or when tenant changes
+ *
+ * Returns feature flags for:
+ * - The user's selected tenant
+ * - Global flags (tenant_id = null)
  */
 export const fetchFeatureFlags = createAsyncThunk(
   'featureFlags/fetch',
@@ -18,12 +22,12 @@ export const fetchFeatureFlags = createAsyncThunk(
 
       const response = await get(
         {
-          url: '/api/v1/feature-flags',
+          url: '/api/v1/frontend/feature-flags',
         },
         headers,
       )
 
-      const data: Record<string, boolean> = response
+      const data: Record<string, boolean> = response as Record<string, boolean>
       return { flags: data, tenantId }
     } catch (error) {
       return rejectWithValue(
@@ -44,7 +48,7 @@ export const fetchAllFeatureFlags = createAsyncThunk(
         url: '/api/v1/frontend/admin/feature-flags',
       })
 
-      const data: FeatureFlag[] = response
+      const data: FeatureFlag[] = response as FeatureFlag[]
       return data
     } catch (error) {
       return rejectWithValue(

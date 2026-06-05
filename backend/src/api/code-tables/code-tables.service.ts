@@ -5,19 +5,7 @@ import { NotificationStatusCode } from '../notification/entities/notification-st
 import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
 import { FeatureFlagCode } from '../feature-flag/entities/feature-flag-code.entity'
-
-export class CodeTableItemDto {
-  id: string
-  label: string
-  description: string
-}
-
-export class CodeTablesResponseDto {
-  statuses: CodeTableItemDto[]
-  channels: CodeTableItemDto[]
-  eventTypes: CodeTableItemDto[]
-  featureFlags: CodeTableItemDto[]
-}
+import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 
 @Injectable()
 export class CodeTablesService {
@@ -37,15 +25,19 @@ export class CodeTablesService {
   /**
    * Get all notification status codes
    */
-  async getStatuses(): Promise<CodeTableItemDto[]> {
+  async getStatuses(): Promise<CodeTableDto[]> {
     try {
       const statuses = await this.statusCodeRepository.find({
         order: { sort_order: 'ASC' },
       })
       return statuses.map((s) => ({
-        id: s.code,
-        label: s.displayName || s.description,
+        code: s.code,
+        displayName: s.displayName,
         description: s.description,
+        createdAt: s.createdAt,
+        createdBy: s.createdBy,
+        updatedAt: s.updatedAt,
+        updatedBy: s.updatedBy,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch status codes', error)
@@ -56,15 +48,19 @@ export class CodeTablesService {
   /**
    * Get all notification channel codes
    */
-  async getChannels(): Promise<CodeTableItemDto[]> {
+  async getChannels(): Promise<CodeTableDto[]> {
     try {
       const channels = await this.channelCodeRepository.find({
         order: { sort_order: 'ASC' },
       })
       return channels.map((c) => ({
-        id: c.channelCode,
-        label: c.displayName || c.description,
+        code: c.channelCode,
+        displayName: c.displayName,
         description: c.description,
+        createdAt: c.createdAt,
+        createdBy: c.createdBy,
+        updatedAt: c.updatedAt,
+        updatedBy: c.updatedBy,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch channel codes', error)
@@ -75,15 +71,19 @@ export class CodeTablesService {
   /**
    * Get all notification event type codes
    */
-  async getEventTypes(): Promise<CodeTableItemDto[]> {
+  async getEventTypes(): Promise<CodeTableDto[]> {
     try {
       const eventTypes = await this.eventTypeCodeRepository.find({
         order: { sort_order: 'ASC' },
       })
       return eventTypes.map((e) => ({
-        id: e.eventTypeCode,
-        label: e.displayName || e.description,
+        code: e.eventTypeCode,
+        displayName: e.displayName,
         description: e.description,
+        createdAt: e.createdAt,
+        createdBy: e.createdBy,
+        updatedAt: e.updatedAt,
+        updatedBy: e.updatedBy,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch event type codes', error)
@@ -94,15 +94,19 @@ export class CodeTablesService {
   /**
    * Get all feature flag codes
    */
-  async getFeatureCodes(): Promise<CodeTableItemDto[]> {
+  async getFeatureCodes(): Promise<CodeTableDto[]> {
     try {
       const featureCodes = await this.featureFlagCodeRepository.find({
         order: { sort_order: 'ASC' },
       })
       return featureCodes.map((f) => ({
-        id: f.code,
-        label: f.displayName,
+        code: f.code,
+        displayName: f.displayName,
         description: f.description,
+        createdAt: f.createdAt,
+        createdBy: f.createdBy,
+        updatedAt: f.updatedAt,
+        updatedBy: f.updatedBy,
       }))
     } catch (error) {
       this.logger.error('Failed to fetch feature flag codes', error)
