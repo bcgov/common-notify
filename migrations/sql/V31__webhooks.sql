@@ -7,6 +7,7 @@ CREATE TABLE webhook_config (
   headers JSONB,
   channel_type VARCHAR(20),
   trigger_on JSONB,
+  webhook_type VARCHAR(20) NOT NULL DEFAULT 'generic',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by VARCHAR(255),

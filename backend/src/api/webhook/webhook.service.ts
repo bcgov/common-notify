@@ -7,6 +7,7 @@ import {
   CallbackRegistrationRequest,
   CallbackRegistrationResponse,
 } from './schemas/callback-registration.dto'
+import { WebhookType } from '../../enum/webhook-type.enum'
 
 @Injectable()
 export class WebhookService {
@@ -26,6 +27,7 @@ export class WebhookService {
       secret: dto.secret ? this.encryptionService.encrypt(dto.secret) : undefined,
       headers: dto.headers,
       active: dto.active ?? true,
+      webhookType: dto.webhookType ?? WebhookType.GENERIC,
       triggerOn: {
         channelType: dto.channelType ?? [],
         trigger: dto.trigger ?? [],
@@ -58,6 +60,7 @@ export class WebhookService {
       ...(dto.secret !== undefined && { secret: this.encryptionService.encrypt(dto.secret) }),
       ...(dto.headers !== undefined && { headers: dto.headers }),
       ...(dto.active !== undefined && { active: dto.active }),
+      ...(dto.webhookType !== undefined && { webhookType: dto.webhookType }),
       triggerOn: updatedTriggerOn,
     })
     return this.toResponse(this.decryptConfig(updated!))
@@ -90,15 +93,16 @@ export class WebhookService {
   }
 
   private toResponse(config: WebhookConfig): CallbackRegistrationResponse {
-    const triggerOn = (config.triggerOn ?? {}) as Record<string, unknown>
+    const triggerOn = (config.triggerOn ?? {}) as any
     return {
       callbackId: config.id,
       url: config.url,
       secret: config.secret,
       headers: config.headers,
-      channelType: (triggerOn.channelType as string[]) ?? [],
-      trigger: (triggerOn.trigger as string[]) ?? [],
+      channelType: triggerOn.channelType as string[],
+      trigger: triggerOn.trigger as string[],
       active: config.active,
+      webhookType: config.webhookType ?? WebhookType.GENERIC,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     }

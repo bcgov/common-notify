@@ -4,6 +4,7 @@ import Bull from 'bull'
 import axios from 'axios'
 import { WebhookJobPayload } from '../queue.types'
 import { WebhookService } from '../../api/webhook/webhook.service'
+import { WebhookType } from '../../enum/webhook-type.enum'
 import { WebhookDeliveryLogRepository } from '../../api/webhook/webhook-delivery-log.repository'
 
 /**
@@ -58,13 +59,19 @@ export class WebhookDeliveryWorker {
       }
 
       // Build the POST body
-      const postBody = {
+      const genericPostBody = {
         event,
         notificationId,
         tenantId,
         data: payload,
         deliveredAt: new Date().toISOString(),
       }
+
+      // Teams expects a payload formatted in a certain way
+      const postBody =
+        webhookConfig.webhookType === WebhookType.TEAMS
+          ? buildTeamsPayload(notificationId, payload)
+          : genericPostBody
       const bodyString = JSON.stringify(postBody)
 
       // Build headers
@@ -175,5 +182,35 @@ export class WebhookDeliveryWorker {
     })
 
     logger.log('Webhook delivery worker initialized')
+  }
+}
+
+function buildTeamsPayload(notificationId: string, payload: any): any {
+  const status = String(payload.status)
+  const channel = String(payload.channel)
+  const deliveredAt = String(payload.updatedAt)
+  const themeColor =
+    status.toLowerCase() === 'failed'
+      ? 'FF0000'
+      : status.toLowerCase() === 'completed'
+        ? '42814a'
+        : 'FFA500'
+
+  return {
+    '@type': 'MessageCard',
+    '@context': 'https://schema.org/extensions',
+    themeColor,
+    summary: `Notification ${status}`,
+    sections: [
+      {
+        activityTitle: 'Notification Status Changed',
+        facts: [
+          { name: 'Notification ID', value: notificationId },
+          { name: 'Status', value: status },
+          { name: 'Channel', value: channel },
+          { name: 'Delivered At', value: deliveredAt },
+        ],
+      },
+    ],
   }
 }

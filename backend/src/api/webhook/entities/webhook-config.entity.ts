@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
+import { WebhookType } from '../../../enum/webhook-type.enum'
 
 @Entity('webhook_config')
 export class WebhookConfig {
@@ -33,13 +34,18 @@ export class WebhookConfig {
   active: boolean
 
   @Column({ type: 'jsonb', nullable: true })
-  headers?: Record<string, string>
+  headers?: any
 
   @Column({ name: 'channel_type', length: 20, nullable: true })
   channelType?: string
 
+  /** Status to strigger on */
   @Column({ name: 'trigger_on', type: 'jsonb', nullable: true })
-  triggerOn?: Record<string, unknown>
+  triggerOn?: any
+
+  /** Webhook type: 'teams' sends a Teams MessageCard payload; 'generic' sends raw JSON */
+  @Column({ name: 'webhook_type', type: 'varchar', length: 20, default: WebhookType.GENERIC })
+  webhookType: WebhookType
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date

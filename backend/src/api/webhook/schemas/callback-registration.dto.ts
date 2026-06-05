@@ -1,5 +1,6 @@
-import { IsOptional, IsUrl, IsString, IsArray, IsBoolean, IsObject } from 'class-validator'
+import { IsOptional, IsUrl, IsString, IsArray, IsBoolean, IsObject, IsEnum } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+import { WebhookType } from '../../../enum/webhook-type.enum'
 
 export class CallbackRegistrationRequest {
   @ApiPropertyOptional({
@@ -44,6 +45,15 @@ export class CallbackRegistrationRequest {
   @IsOptional()
   @IsBoolean()
   active?: boolean
+
+  @ApiPropertyOptional({
+    description:
+      'Webhook type. "teams" sends a Teams MessageCard payload; "generic" sends raw JSON. Defaults to "generic".',
+    enum: WebhookType,
+  })
+  @IsOptional()
+  @IsEnum(WebhookType)
+  webhookType?: WebhookType
 }
 
 export class CallbackRegistrationResponse {
@@ -54,6 +64,7 @@ export class CallbackRegistrationResponse {
   channelType: string[]
   trigger: string[]
   active: boolean
+  webhookType: WebhookType
   createdAt: Date
   updatedAt: Date
 }
