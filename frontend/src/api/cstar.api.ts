@@ -1,6 +1,6 @@
 import { generateApiParameters, get } from '@/common/api'
 import type { CstarTenantsResponse } from '@/interfaces/CstarTenant'
-import type { CstarRolesResponse } from '@/interfaces/CstarRoles'
+import type { BackendRolesResponse } from '@/interfaces/CstarRoles'
 
 /**
  * CSTAR API Client (Frontend Proxy)
@@ -29,7 +29,9 @@ export const cstarApi = {
 
     const response = (await get(parameters)) as { tenants?: any[] }
     return {
-      data: response.tenants || [],
+      data: {
+        tenants: response.tenants || [],
+      },
     }
   },
 
@@ -40,7 +42,7 @@ export const cstarApi = {
    * @param tenantId The tenant ID to fetch roles for
    * @returns Promise with roles array
    */
-  async fetchUserRoles(tenantId: string): Promise<CstarRolesResponse> {
+  async fetchUserRoles(tenantId: string): Promise<BackendRolesResponse> {
     const parameters = generateApiParameters<never>(
       `/api/v1/frontend/auth/tenants/${tenantId}/roles`,
       undefined,
@@ -50,7 +52,9 @@ export const cstarApi = {
 
     const response = (await get(parameters)) as { roles?: string[] }
     return {
-      data: response.roles || [],
+      data: {
+        roles: response.roles || [],
+      },
     }
   },
 }

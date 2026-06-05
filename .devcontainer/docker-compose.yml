@@ -218,6 +218,8 @@ services:
     container_name: oauth2-mock
     working_dir: /app
     entrypoint: sh -c "npm install && npm start"
+    env_file:
+      - "../.env"
     environment:
       NODE_ENV: development
       PORT: 3002

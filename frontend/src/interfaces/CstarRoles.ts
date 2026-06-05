@@ -21,3 +21,13 @@ export interface CstarRolesResponse {
     sharedServiceRoles: CstarRole[]
   }
 }
+
+/**
+ * Response from backend proxy endpoint for user roles
+ * Backend returns simple array of role name strings
+ */
+export interface BackendRolesResponse {
+  data: {
+    roles: string[]
+  }
+}

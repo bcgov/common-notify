@@ -22,7 +22,7 @@ const jwtSecrets = {
 
 // Issuer (should match API_GATEWAY_KEYCLOAK_ISSUER in backend)
 const keycloakIssuer =
-  process.env.API_GATEWAY_KEYCLOAK_ISSUER || 'https://dev.loginproxy.gov.bc.ca/auth/realms/apigw'
+  process.env.API_GATEWAY_KEYCLOAK_ISSUER || 'https://test.loginproxy.gov.bc.ca/auth/realms/apigw'
 
 // Health check endpoint
 app.get('/health', (req, res) => {

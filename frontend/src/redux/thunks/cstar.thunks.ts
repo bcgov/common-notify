@@ -19,7 +19,7 @@ export const fetchCstarTenants = createAsyncThunk<
 >('cstar/fetchTenants', async (_, { rejectWithValue }) => {
   try {
     const response = await cstarApi.fetchUserTenants()
-    return response.data
+    return response.data.tenants
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch tenants')
   }
@@ -43,8 +43,7 @@ export const fetchCstarRoles = createAsyncThunk<
 >('cstar/fetchRoles', async ({ tenantId }, { rejectWithValue }) => {
   try {
     const response = await cstarApi.fetchUserRoles(tenantId)
-    // Response.data is already an array of role strings
-    return response.data
+    return response.data.roles
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch roles')
   }
