@@ -9,7 +9,7 @@ import {
 import { UsersService } from './users.service'
 import { UpsertUserDto } from './schemas/upsert-user.dto'
 import { UpsertUserResponseDto, UserResponseDto } from './schemas/user-response.dto'
-import { AuthJwtGuard } from '../../../auth/guards/auth.jwt-guard'
+import { JwtGuard } from '../../../common/guards/auth.jwt-guard'
 import type Express from 'express'
 
 /**
@@ -20,7 +20,7 @@ import type Express from 'express'
  */
 @ApiTags('users')
 @Controller({ path: 'frontend/users', version: '1' })
-@UseGuards(AuthJwtGuard)
+@UseGuards(JwtGuard)
 @ApiBearerAuth()
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)

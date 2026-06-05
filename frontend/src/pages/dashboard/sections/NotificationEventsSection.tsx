@@ -5,8 +5,8 @@ import PageSubHeading from '../../../components/PageSubHeading'
 
 // Mocked notification events data for now
 const mockNotificationEvents = [
-  { id: 1, name: 'New Order Ready' },
-  { id: 2, name: 'Extra Cheese Requested' },
+  { id: '1', name: 'New Order Ready' },
+  { id: '2', name: 'Extra Cheese Requested' },
 ]
 
 /**
