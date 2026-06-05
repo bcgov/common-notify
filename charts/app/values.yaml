@@ -18,8 +18,8 @@ global:
     persist: true
   config:
     databaseUser: ~
-    redisHost: ~ # Redis host, defaults to <release-name>-redis-master if not set
-    redisSecret: ~ # Redis secret name, defaults to <release-name>-redis if not set
+    redisHost: ~ # Redis host, should be set to common-notify-redis-master. Defaults to <release-name>-redis-master if not set
+    redisSecret: ~ # Redis secret name, should be set to common-notify-redis. Defaults to <release-name>-redis if not set
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
   domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
