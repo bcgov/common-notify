@@ -27,9 +27,8 @@ export class WebhookConfigRepository {
     return this.findById(tenantId, id)
   }
 
-  async delete(tenantId: string, id: string): Promise<boolean> {
-    const result = await this.repo.delete({ id, tenantId })
-    return (result.affected ?? 0) > 0
+  async delete(tenantId: string, id: string): Promise<void> {
+    await this.repo.delete({ id, tenantId })
   }
 
   findActiveByTenant(tenantId: string): Promise<WebhookConfig[]> {

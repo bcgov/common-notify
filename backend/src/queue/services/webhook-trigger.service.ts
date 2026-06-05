@@ -98,21 +98,16 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     const notificationChannel = notification.channelCode?.toLowerCase()
 
     for (const webhook of activeWebhooks) {
-      const triggerOn = (webhook.triggerOn ?? {}) as Record<string, unknown>
-      const triggerTypes = (triggerOn.trigger as string[]) ?? []
-      const channelTypes = (triggerOn.channelType as string[]) ?? []
+      const triggerTypes = webhook.triggerOn ?? []
 
-      // Determine if this status change matches the configured trigger
+      // Empty triggerOn = fire for any status; otherwise check for match
       const statusMatches =
-        triggerTypes.length === 0 ||
-        (triggerTypes.includes('completed') && notificationStatus === 'completed') ||
-        (triggerTypes.includes('failed') && notificationStatus === 'failed')
+        triggerTypes.length === 0 || triggerTypes.includes(notificationStatus ?? '')
 
       if (!statusMatches) continue
 
-      // Determine if this channel matches the configured channel filter
-      // Use case-insensitive comparison since channelCode is uppercase (EMAIL, SMS)
-      // and trigger channelType is lowercase (email, sms, msgApp)
+      // Empty channelType = fire for any channel; otherwise check for match
+      const channelTypes = webhook.channelType ?? []
       const channelMatches =
         channelTypes.length === 0 ||
         (notificationChannel !== undefined &&

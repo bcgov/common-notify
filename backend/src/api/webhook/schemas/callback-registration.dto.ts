@@ -22,9 +22,9 @@ export class CallbackRegistrationRequest {
   headers?: Record<string, string>
 
   @ApiPropertyOptional({
-    description: 'Channel types to filter on. Empty or omitted means all channels.',
+    description: 'Channel types to filter on. Omit or leave empty to fire for all channels.',
     type: [String],
-    enum: ['email', 'sms', 'msgApp'],
+    example: ['email', 'sms'],
   })
   @IsOptional()
   @IsArray()
@@ -32,9 +32,10 @@ export class CallbackRegistrationRequest {
   channelType?: string[]
 
   @ApiPropertyOptional({
-    description: 'Status triggers. "success" fires on COMPLETED, "failure" on FAILED.',
+    description:
+      'Status transitions that trigger delivery. Omit or leave empty to fire for all statuses.',
     type: [String],
-    enum: ['success', 'failure'],
+    example: ['cancelled', 'failed'],
   })
   @IsOptional()
   @IsArray()

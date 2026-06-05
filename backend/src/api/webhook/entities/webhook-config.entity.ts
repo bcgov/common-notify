@@ -36,12 +36,13 @@ export class WebhookConfig {
   @Column({ type: 'jsonb', nullable: true })
   headers?: any
 
-  @Column({ name: 'channel_type', length: 20, nullable: true })
-  channelType?: string
+  /** Channel types to filter on: e.g. ['email', 'sms']. Empty = all channels. */
+  @Column({ name: 'channel_type', type: 'jsonb', nullable: true })
+  channelType?: string[]
 
-  /** Status to strigger on */
+  /** Status transitions that trigger delivery: e.g. ['completed', 'failed']. Empty = all statuses. */
   @Column({ name: 'trigger_on', type: 'jsonb', nullable: true })
-  triggerOn?: any
+  triggerOn?: string[]
 
   /** Webhook type: 'teams' sends a Teams MessageCard payload; 'generic' sends raw JSON */
   @Column({ name: 'webhook_type', type: 'varchar', length: 20, default: WebhookType.GENERIC })

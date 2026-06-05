@@ -28,10 +28,8 @@ export class WebhookService {
       headers: dto.headers,
       active: dto.active ?? true,
       webhookType: dto.webhookType ?? WebhookType.GENERIC,
-      triggerOn: {
-        channelType: dto.channelType ?? [],
-        trigger: dto.trigger ?? [],
-      },
+      channelType: dto.channelType ?? [],
+      triggerOn: dto.trigger ?? [],
       createdBy: tenantId,
       updatedBy: tenantId,
     })
@@ -48,29 +46,20 @@ export class WebhookService {
       throw new NotFoundException(`Callback '${id}' not found`)
     }
 
-    const currentTriggerOn = (existing.triggerOn ?? {}) as Record<string, unknown>
-    const updatedTriggerOn: Record<string, unknown> = {
-      ...currentTriggerOn,
-      ...(dto.channelType !== undefined && { channelType: dto.channelType }),
-      ...(dto.trigger !== undefined && { trigger: dto.trigger }),
-    }
-
     const updated = await this.webhookConfigRepository.update(tenantId, id, {
       ...(dto.url !== undefined && { url: dto.url }),
       ...(dto.secret !== undefined && { secret: this.encryptionService.encrypt(dto.secret) }),
       ...(dto.headers !== undefined && { headers: dto.headers }),
       ...(dto.active !== undefined && { active: dto.active }),
       ...(dto.webhookType !== undefined && { webhookType: dto.webhookType }),
-      triggerOn: updatedTriggerOn,
+      ...(dto.channelType !== undefined && { channelType: dto.channelType }),
+      ...(dto.trigger !== undefined && { triggerOn: dto.trigger }),
     })
     return this.toResponse(this.decryptConfig(updated!))
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    const deleted = await this.webhookConfigRepository.delete(tenantId, id)
-    if (!deleted) {
-      throw new NotFoundException(`Callback '${id}' not found`)
-    }
+    await this.webhookConfigRepository.delete(tenantId, id)
   }
 
   async findById(tenantId: string, id: string): Promise<WebhookConfig | null> {
@@ -93,14 +82,13 @@ export class WebhookService {
   }
 
   private toResponse(config: WebhookConfig): CallbackRegistrationResponse {
-    const triggerOn = (config.triggerOn ?? {}) as any
     return {
       callbackId: config.id,
       url: config.url,
       secret: config.secret,
       headers: config.headers,
-      channelType: triggerOn.channelType as string[],
-      trigger: triggerOn.trigger as string[],
+      channelType: config.channelType,
+      trigger: config.triggerOn ?? [],
       active: config.active,
       webhookType: config.webhookType ?? WebhookType.GENERIC,
       createdAt: config.createdAt,

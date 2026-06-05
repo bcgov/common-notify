@@ -5,7 +5,7 @@ CREATE TABLE webhook_config (
   secret VARCHAR(512),
   active BOOLEAN DEFAULT true,
   headers JSONB,
-  channel_type VARCHAR(20),
+  channel_type JSONB,
   trigger_on JSONB,
   webhook_type VARCHAR(20) NOT NULL DEFAULT 'generic',
   created_at TIMESTAMPTZ DEFAULT NOW(),
