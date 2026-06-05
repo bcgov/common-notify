@@ -37,7 +37,9 @@ export class KongAdminApiClient {
       throw new Error('Kong Admin token endpoint not configured (KONG_ADMIN_TOKEN_ENDPOINT)')
     }
     if (!this.clientId || !this.clientSecret) {
-      throw new Error('Kong service account not configured (KONG_ADMIN_CLIENT_ID, KONG_ADMIN_CLIENT_SECRET)')
+      throw new Error(
+        'Kong service account not configured (KONG_ADMIN_CLIENT_ID, KONG_ADMIN_CLIENT_SECRET)',
+      )
     }
 
     this.client = axios.create({
@@ -255,158 +257,6 @@ export class KongAdminApiClient {
         id: response.id,
         created_at: response.created_at,
         tags: response.tags || [],
-      }
-    } catch (error) {
-      throw this.handleKongError(error, `Failed to get key details for ${keyId}`)
-    }
-  }
-
-  /**
-   * Handle Kong API errors with consistent logging and user-friendly messages.
-   *
-   * @param error - The error object
-   * @param context - Context for logging
-   * @throws InternalServerErrorException
-   */
-  private handleKongError(error: any, context: string): never {
-    this.logger.error(`Kong API Error: ${context}`, {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-    })
-
-    // Don't expose Kong internals to client
-    throw new InternalServerErrorException(
-      'Failed to manage API keys. Please contact support if the problem persists.',
-    )
-  }
-}
-
-
-  /**
-   * Get or create a Kong consumer for a tenant.
-   * Uses tenant ID as the consumer username for consistency.
-   *
-   * @param tenantId - Tenant UUID to use as consumer identifier
-   * @returns Kong consumer ID
-   */
-  async ensureConsumer(tenantId: string): Promise<string> {
-    try {
-      // Try to get existing consumer
-      const response = await this.client.get(`/consumers/${tenantId}`)
-      this.logger.debug(`Consumer already exists for tenant ${tenantId}: ${response.data.id}`)
-      return response.data.id
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Consumer doesn't exist, create it
-        return this.createConsumer(tenantId)
-      }
-      throw this.handleKongError(error, `Failed to get consumer for tenant ${tenantId}`)
-    }
-  }
-
-  /**
-   * Create a new Kong consumer for a tenant.
-   *
-   * @param tenantId - Tenant UUID to use as consumer identifier
-   * @returns Kong consumer ID
-   */
-  private async createConsumer(tenantId: string): Promise<string> {
-    try {
-      const response = await this.client.post('/consumers', {
-        username: tenantId,
-        tags: [`tenant:${tenantId}`],
-      })
-      this.logger.debug(`Created Kong consumer for tenant ${tenantId}: ${response.data.id}`)
-      return response.data.id
-    } catch (error) {
-      throw this.handleKongError(error, `Failed to create consumer for tenant ${tenantId}`)
-    }
-  }
-
-  /**
-   * Generate a new API key for a tenant's consumer.
-   *
-   * @param tenantId - Tenant UUID
-   * @returns Object containing Kong key ID and the actual API key value
-   *          (key value should only be shown to user once, then discarded)
-   */
-  async generateKeyForTenant(tenantId: string): Promise<{ keyId: string; keyValue: string }> {
-    try {
-      const consumerId = await this.ensureConsumer(tenantId)
-      const response = await this.client.post(`/consumers/${consumerId}/key-auth`, {
-        tags: [`tenant:${tenantId}`],
-      })
-
-      this.logger.debug(`Generated API key for tenant ${tenantId}, key ID: ${response.data.id}`)
-
-      return {
-        keyId: response.data.id,
-        keyValue: response.data.key,
-      }
-    } catch (error) {
-      throw this.handleKongError(error, `Failed to generate key for tenant ${tenantId}`)
-    }
-  }
-
-  /**
-   * Revoke (delete) an API key from Kong.
-   *
-   * @param tenantId - Tenant UUID
-   * @param keyId - Kong key ID (not the key value itself)
-   */
-  async revokeKey(tenantId: string, keyId: string): Promise<void> {
-    try {
-      const consumerId = await this.ensureConsumer(tenantId)
-      await this.client.delete(`/consumers/${consumerId}/key-auth/${keyId}`)
-      this.logger.debug(`Revoked key ${keyId} for tenant ${tenantId}`)
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Key already deleted or doesn't exist
-        this.logger.warn(`Key ${keyId} not found in Kong for tenant ${tenantId}`)
-        return
-      }
-      throw this.handleKongError(error, `Failed to revoke key ${keyId} for tenant ${tenantId}`)
-    }
-  }
-
-  /**
-   * List all API keys for a tenant's consumer.
-   *
-   * @param tenantId - Tenant UUID
-   * @returns Array of key objects from Kong
-   */
-  async listKeysForTenant(
-    tenantId: string,
-  ): Promise<Array<{ id: string; key: string; tags: string[] }>> {
-    try {
-      const consumerId = await this.ensureConsumer(tenantId)
-      const response = await this.client.get(`/consumers/${consumerId}/key-auth`)
-      return response.data.data || []
-    } catch (error) {
-      throw this.handleKongError(error, `Failed to list keys for tenant ${tenantId}`)
-    }
-  }
-
-  /**
-   * Get details of a specific key from Kong.
-   *
-   * @param tenantId - Tenant UUID
-   * @param keyId - Kong key ID
-   * @returns Key details from Kong (without the actual key value for security)
-   */
-  async getKeyDetails(
-    tenantId: string,
-    keyId: string,
-  ): Promise<{ id: string; created_at: number; tags: string[] }> {
-    try {
-      const consumerId = await this.ensureConsumer(tenantId)
-      const response = await this.client.get(`/consumers/${consumerId}/key-auth/${keyId}`)
-      return {
-        id: response.data.id,
-        created_at: response.data.created_at,
-        tags: response.data.tags || [],
       }
     } catch (error) {
       throw this.handleKongError(error, `Failed to get key details for ${keyId}`)

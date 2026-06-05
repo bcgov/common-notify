@@ -6,7 +6,19 @@ import { ApiKeyModule } from './api-keys/api-key.module'
 import { AuthModule as FrontendAuthModule } from '../auth/auth.module'
 
 @Module({
-  imports: [TenantsModule, ClientTenantMappingModule, UsersModule, ApiKeyModule, FrontendAuthModule],
-  exports: [TenantsModule, ClientTenantMappingModule, UsersModule, ApiKeyModule, FrontendAuthModule],
+  imports: [
+    TenantsModule,
+    ClientTenantMappingModule,
+    UsersModule,
+    ApiKeyModule,
+    FrontendAuthModule,
+  ],
+  exports: [
+    TenantsModule,
+    ClientTenantMappingModule,
+    UsersModule,
+    ApiKeyModule,
+    FrontendAuthModule,
+  ],
 })
 export class AdminModule {}
