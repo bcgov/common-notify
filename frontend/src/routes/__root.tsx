@@ -21,10 +21,12 @@ function RootLayout() {
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const cstarIsLoading = useAppSelector((state) => state.cstar.isLoading)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
   // Track which user we've already fetched tenants for to avoid duplicate fetches
   const fetchedUserIdRef = useRef<string | null>(null)
   const checkAuthorizationRef = useRef<boolean>(false)
+  const adminDataFetchedRef = useRef<boolean>(false)
 
   useEffect(() => {
     // Load code tables once when app starts
@@ -32,8 +34,18 @@ function RootLayout() {
   }, [dispatch])
 
   useEffect(() => {
-    // Load feature flags and admin tenants once when app starts
-    // The backend will return 401/403 if user isn't an admin, which is handled gracefully
+    // Load feature flags and admin tenants only if user is NOTIFY_ADMIN
+    // The backend will return 401/403 if user isn't an admin, so skip the fetch entirely
+    if (!UserService.hasRole('NOTIFY_ADMIN')) {
+      adminDataFetchedRef.current = true
+      return
+    }
+
+    if (adminDataFetchedRef.current) {
+      return
+    }
+
+    adminDataFetchedRef.current = true
     dispatch(fetchAllFeatureFlags()).catch(() => {
       // Silently fail if user isn't admin
     })
@@ -81,17 +93,19 @@ function RootLayout() {
     // Check user's authorization status
     const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
 
-    // If user has no CSTAR tenants:
+    // If user has no CSTAR tenants AND no tenant is selected:
     // - If they are NOTIFY_ADMIN: redirect to feature flags (bootstrap/admin access)
     // - If they are not NOTIFY_ADMIN: redirect to not-authorized (no access)
-    if (cstarTenants.length === 0) {
+    // NOTE: Only show not-authorized if tenant is not set. A tenant may be set from
+    // localStorage even if CSTAR failed/returned no tenants during this session.
+    if (cstarTenants.length === 0 && !selectedTenant) {
       if (isAdmin) {
         navigate({ to: '/admin/feature-flags' })
       } else {
         navigate({ to: '/not-authorized' })
       }
     }
-  }, [user?.id, cstarTenants, cstarIsLoading, navigate])
+  }, [user?.id, cstarTenants, cstarIsLoading, selectedTenant, navigate])
 
   return (
     <Layout>

@@ -47,7 +47,7 @@ const TenantSelectionModal: FC = () => {
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
-    // Fetch user's roles in the selected tenant
+    // Fetch user's roles in the selected tenant and wait for it to complete
     dispatch(fetchCstarRoles({ tenantId: tenant.id }))
   }
 

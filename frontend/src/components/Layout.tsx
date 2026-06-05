@@ -2,8 +2,9 @@ import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
 import { useLocation } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { fetchCstarTenants } from '@/redux/thunks/cstar.thunks'
+import { fetchCstarTenants, fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import LoadingSpinner from './LoadingSpinner'
 import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
@@ -19,22 +20,40 @@ const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
   const location = useLocation()
 
-  const user = useAppSelector((state) => state.auth.user)
-  const isInitializing = useAppSelector((state) => state.auth.isInitializing)
   const tenants = useAppSelector((state) => state.cstar.tenants)
-  const tenantLoading = useAppSelector((state) => state.cstar.isLoading)
   const tenantError = useAppSelector((state) => state.cstar.error)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const showTenantModal = useAppSelector((state) => state.tenant.showTenantModal)
+  const rolesLoading = useAppSelector((state) => state.user.rolesLoading)
 
-  if (isInitializing || !user || tenantLoading) {
+  // Track which tenants we've already fetched roles for in this session
+  const rolesFetchedRef = useRef<Set<string>>(new Set())
+
+  // When tenant selection changes, fetch roles for that tenant (once per session)
+  useEffect(() => {
+    if (!selectedTenant?.id) {
+      return
+    }
+
+    // Only fetch if we haven't already fetched roles for this tenant in this session
+    if (rolesFetchedRef.current.has(selectedTenant.id)) {
+      return
+    }
+
+    rolesFetchedRef.current.add(selectedTenant.id)
+    dispatch(fetchCstarRoles({ tenantId: selectedTenant.id }))
+  }, [selectedTenant?.id, dispatch])
+
+  // Block rendering while we're fetching roles for the selected tenant
+  // This ensures authorization checks have the correct roles loaded
+  if (selectedTenant && rolesLoading) {
     return <LoadingSpinner isVisible />
   }
 
   // Only block on CSTAR error if we don't have a selected tenant
   // Once tenant is selected in Redux, we don't need CSTAR anymore
   if (tenantError && !selectedTenant) {
-    return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants(user.id))} />
+    return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants())} />
   }
 
   if (!selectedTenant && !showTenantModal && tenants.length > 0) {
