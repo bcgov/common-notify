@@ -1,15 +1,29 @@
-import { IsOptional, IsUrl, IsString, IsArray, IsBoolean, IsObject, IsEnum } from 'class-validator'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import {
+  IsOptional,
+  IsUrl,
+  IsString,
+  IsArray,
+  IsBoolean,
+  IsObject,
+  IsEnum,
+  IsIn,
+  IsNotEmpty,
+} from 'class-validator'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { PartialType } from '@nestjs/mapped-types'
 import { WebhookType } from '../../../enum/webhook-type.enum'
 
+export const CHANNEL_TYPE_VALUES = ['email', 'sms', 'msgApp'] as const
+export const TRIGGER_VALUES = ['success', 'failure'] as const
+
 export class CallbackRegistrationRequest {
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'HTTPS URL to receive webhook POST requests',
     format: 'uri',
   })
-  @IsOptional()
+  @IsNotEmpty()
   @IsUrl({ protocols: ['https'], require_protocol: true })
-  url?: string
+  url: string
 
   @ApiPropertyOptional({ description: 'Optional HMAC secret for X-Webhook-Signature signing' })
   @IsOptional()
@@ -21,26 +35,25 @@ export class CallbackRegistrationRequest {
   @IsObject()
   headers?: Record<string, string>
 
-  @ApiPropertyOptional({
-    description: 'Channel types to filter on. Omit or leave empty to fire for all channels.',
+  @ApiProperty({
+    description: 'Channel types to filter on.',
     type: [String],
+    enum: CHANNEL_TYPE_VALUES,
     example: ['email', 'sms'],
   })
-  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  channelType?: string[]
+  @IsIn(CHANNEL_TYPE_VALUES, { each: true })
+  channelType: string[]
 
-  @ApiPropertyOptional({
-    description:
-      'Status transitions that trigger delivery. Omit or leave empty to fire for all statuses.',
+  @ApiProperty({
+    description: 'Status transitions that trigger delivery.',
     type: [String],
-    example: ['cancelled', 'failed'],
+    enum: TRIGGER_VALUES,
+    example: ['success', 'failure'],
   })
-  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  trigger?: string[]
+  @IsIn(TRIGGER_VALUES, { each: true })
+  trigger: string[]
 
   @ApiPropertyOptional({ description: 'Enable or disable this webhook configuration' })
   @IsOptional()
@@ -57,15 +70,12 @@ export class CallbackRegistrationRequest {
   webhookType?: WebhookType
 }
 
+export class CallbackRegistrationUpdateRequest extends PartialType(CallbackRegistrationRequest) {}
+
 export class CallbackRegistrationResponse {
   callbackId: string
   url: string
-  secret?: string
   headers?: Record<string, string>
   channelType: string[]
   trigger: string[]
-  active: boolean
-  webhookType: WebhookType
-  createdAt: Date
-  updatedAt: Date
 }

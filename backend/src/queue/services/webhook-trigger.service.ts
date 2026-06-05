@@ -100,9 +100,17 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     for (const webhook of activeWebhooks) {
       const triggerTypes = webhook.triggerOn ?? []
 
-      // Empty triggerOn = fire for any status; otherwise check for match
+      // Map spec trigger values to notification statuses:
+      //   'success' → notification status 'completed'
+      //   'failure' → notification status 'failed'
+      // Empty triggerOn = fire for any status
       const statusMatches =
-        triggerTypes.length === 0 || triggerTypes.includes(notificationStatus ?? '')
+        triggerTypes.length === 0 ||
+        triggerTypes.some((t) => {
+          if (t === 'success') return notificationStatus === 'completed'
+          if (t === 'failure') return notificationStatus === 'failed'
+          return false
+        })
 
       if (!statusMatches) continue
 

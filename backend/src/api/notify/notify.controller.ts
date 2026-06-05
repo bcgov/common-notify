@@ -41,6 +41,7 @@ import { WebhookService } from '../webhook/webhook.service'
 import {
   CallbackRegistrationRequest,
   CallbackRegistrationResponse,
+  CallbackRegistrationUpdateRequest,
 } from '../webhook/schemas/callback-registration.dto'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
@@ -393,7 +394,7 @@ export class NotifyController {
   updateCallback(
     @Req() _req: any,
     @Param('callbackId') callbackId: string,
-    @Body() body: CallbackRegistrationRequest,
+    @Body() body: CallbackRegistrationUpdateRequest,
   ): Promise<CallbackRegistrationResponse> {
     const tenantId = _req?.tenant?.id || null
     if (!tenantId) {

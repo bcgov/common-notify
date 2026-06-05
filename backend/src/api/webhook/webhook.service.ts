@@ -7,6 +7,7 @@ import { EncryptionService } from './encryption.service'
 import {
   CallbackRegistrationRequest,
   CallbackRegistrationResponse,
+  CallbackRegistrationUpdateRequest,
 } from './schemas/callback-registration.dto'
 import { WebhookType } from '../../enum/webhook-type.enum'
 
@@ -49,7 +50,7 @@ export class WebhookService {
   async update(
     tenantId: string,
     id: string,
-    dto: CallbackRegistrationRequest,
+    dto: CallbackRegistrationUpdateRequest,
   ): Promise<CallbackRegistrationResponse> {
     const existing = await this.webhookConfigRepository.findById(tenantId, id)
     if (!existing) {
@@ -108,14 +109,9 @@ export class WebhookService {
     return {
       callbackId: config.id,
       url: config.url,
-      secret: config.secret,
       headers: config.headers,
-      channelType: config.channelType,
+      channelType: config.channelType ?? [],
       trigger: config.triggerOn ?? [],
-      active: config.active,
-      webhookType: config.webhookType ?? WebhookType.GENERIC,
-      createdAt: config.createdAt,
-      updatedAt: config.updatedAt,
     }
   }
 }
