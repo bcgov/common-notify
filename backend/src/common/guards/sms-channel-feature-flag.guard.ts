@@ -32,7 +32,7 @@ export class SmsChannelFeatureFlagGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>()
 
-    // Get tenant from request context (set by TenantGuard)
+    // Get tenant from request context (set by AuthGuard)
     const tenant = (request as any).tenant
     if (!tenant) {
       this.logger.error('Tenant not found in request context')

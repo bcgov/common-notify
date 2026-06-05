@@ -1,7 +1,9 @@
 import type { FC } from 'react'
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
+import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
 
@@ -17,6 +19,7 @@ import '@/scss/components/tenant-switcher.scss'
  * 2. Dropdown opens with list of available tenants
  * 3. Click a tenant to switch context
  * 4. App re-renders with new tenant context
+ * 5. User's roles for that tenant are fetched
  *
  * If user has only 1 tenant, switcher is hidden (no need to switch).
  */
@@ -27,6 +30,7 @@ interface Props {
 
 const TenantSwitcher: FC<Props> = ({ className = '' }) => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -57,6 +61,21 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
 
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
+    // Fetch user's roles in the selected tenant
+    dispatch(fetchCstarRoles({ tenantId: tenant.id })).then((result) => {
+      // Check if the action was rejected (error fetching roles) or returned empty roles
+      if (
+        result.type === 'cstar/fetchRoles/rejected' ||
+        (result.payload && Array.isArray(result.payload) && result.payload.length === 0)
+      ) {
+        // User has no roles in this tenant, redirect to not-authorized
+        // (even if they're NOTIFY_ADMIN - admin role doesn't grant tenant access)
+        navigate({ to: '/not-authorized' })
+      } else if (result.payload && Array.isArray(result.payload) && result.payload.length > 0) {
+        // User has roles in this tenant, navigate to dashboard
+        navigate({ to: '/dashboard' })
+      }
+    })
     setIsOpen(false)
   }
 

@@ -24,9 +24,9 @@ import { ConfigService } from '@nestjs/config'
 import { ClientTenantMappingService } from './client-tenant-mapping.service'
 import { LinkClientToTenantsDto } from './schemas/link-client-to-tenants.dto'
 import { LinkClientToTenantsResponseDto } from './schemas/link-client-to-tenants-response.dto'
-import { AuthJwtGuard } from '../../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../../auth/guards/role.guard'
-import { RequireRole } from '../../../auth/decorators/require-role.decorator'
+import { NotifyFrontendRoleGuard } from '../../../common/guards/notify-frontend-role.guard'
+import { Roles } from '../../../common/decorators/roles.decorator'
+import { CstarRole } from '../../../enum/cstar-role.enum'
 import type Express from 'express'
 
 /**
@@ -36,14 +36,14 @@ import type Express from 'express'
  * This is an admin-only endpoint that enables service-to-service authentication.
  *
  * Security:
- * - Requires NOTIFY_ADMIN role
+ * - Requires NOTIFY_OPERATIONS_ADMIN role in CSTAR
  * - Client secret is used only for OAuth2 token exchange (never stored)
  * - Client ID is extracted from token claims as proof of ownership
  * - Admin selection of tenants proves ownership of CSTAR tenants
  */
 @ApiTags('admin')
 @Controller({ path: 'frontend/admin/clients', version: '1' })
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class ClientTenantMappingController {
   private readonly logger = new Logger(ClientTenantMappingController.name)
@@ -68,12 +68,12 @@ export class ClientTenantMappingController {
    * @returns Confirmation with created mappings
    */
   @Post('link-to-tenants')
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({
     summary: 'Link an API Gateway client to CSTAR tenants',
     description:
       'Admin endpoint to authorize an API Portal client for use with specific tenants. ' +
-      'Requires client credentials from API Portal and NOTIFY_ADMIN role. ' +
+      'Requires client credentials from API Portal and NOTIFY_OPERATIONS_ADMIN role in CSTAR. ' +
       'Client secret is used only for verification and is never stored.',
   })
   @ApiCreatedResponse({
@@ -84,7 +84,7 @@ export class ClientTenantMappingController {
     description: 'Missing or invalid Bearer token',
   })
   @ApiForbiddenResponse({
-    description: 'User does not have NOTIFY_ADMIN role',
+    description: 'User does not have NOTIFY_OPERATIONS_ADMIN role',
   })
   @ApiBadRequestResponse({
     description: 'Invalid client credentials, non-existent tenants, or duplicate mapping',
@@ -163,9 +163,11 @@ export class ClientTenantMappingController {
    * @returns List of all mappings
    */
   @Get('mappings')
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({
     summary: 'Get all client-tenant mappings',
-    description: 'List all active and inactive client-tenant mappings',
+    description:
+      'List all active and inactive client-tenant mappings. Requires NOTIFY_OPERATIONS_ADMIN role.',
   })
   @ApiOkResponse({
     description: 'List of mappings returned successfully',
@@ -196,10 +198,11 @@ export class ClientTenantMappingController {
    * @returns Updated mapping
    */
   @Patch('mappings')
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({
     summary: 'Toggle client-tenant mapping active status',
-    description: 'Enable or disable a client-tenant mapping without deleting it',
+    description:
+      'Enable or disable a client-tenant mapping without deleting it. Requires NOTIFY_OPERATIONS_ADMIN role.',
   })
   @ApiOkResponse({
     description: 'Mapping status updated successfully',
