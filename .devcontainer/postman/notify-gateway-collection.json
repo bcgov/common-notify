@@ -1637,11 +1637,16 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"]\n}",
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\",\n  \"trigger\": [\"success\", \"failure\"]\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -1687,6 +1692,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}",
+                "type": "text"
               }
             ],
             "body": {
@@ -1722,6 +1732,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}",
+                "type": "text"
               }
             ],
             "body": {
@@ -1752,7 +1767,13 @@
               ]
             },
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
               "host": ["{{gateway_url}}"],
