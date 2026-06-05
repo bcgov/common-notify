@@ -173,7 +173,14 @@ export class CstarApiClient {
       throw new InternalServerErrorException('CSTAR API is not configured')
     }
 
-    const url = `${this.baseUrl}/api/v1/users/${ssoUserId}/tenants`
+    const isValidUserId = /^[A-Za-z0-9@._-]+$/.test(ssoUserId)
+    if (!isValidUserId) {
+      this.logger.warn(`Rejected invalid CSTAR user identifier format`)
+      throw new UnauthorizedException('Invalid user identifier format')
+    }
+
+    const safeUserId = encodeURIComponent(ssoUserId)
+    const url = new URL(`/api/v1/users/${safeUserId}/tenants`, this.baseUrl).toString()
 
     try {
       this.logger.debug(`Fetching tenants from CSTAR: ${url}`)
