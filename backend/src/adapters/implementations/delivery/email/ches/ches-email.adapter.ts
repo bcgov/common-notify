@@ -116,6 +116,14 @@ export class ChesEmailTransport implements IEmailTransport {
     const clientSecret = this.configService.get<string>('ches.clientSecret')
     const tokenUrl = this.configService.get<string>('ches.tokenUrl')
 
+    // Debug logging to verify CHES configuration is loaded correctly
+    this.logger.debug(`[CHES] Configuration loaded:`, {
+      baseUrl: baseUrl ? 'SET' : 'MISSING',
+      clientId: clientId ? clientId.substring(0, 8) + '...' : 'MISSING',
+      clientSecret: clientSecret ? '***' : 'MISSING',
+      tokenUrl: tokenUrl ? 'SET' : 'MISSING',
+    })
+
     if (!baseUrl || !clientId || !clientSecret || !tokenUrl) {
       throw new Error(
         'CHES configuration incomplete: CHES_BASE_URL, CHES_CLIENT_ID, CHES_CLIENT_SECRET, CHES_TOKEN_URL are required',
@@ -221,6 +229,10 @@ export class ChesEmailTransport implements IEmailTransport {
     if (this.tokenCache && this.tokenCache.expiresAt > now + 60_000) {
       return this.tokenCache.token
     }
+
+    this.logger.debug(
+      `[CHES] Fetching token from: ${tokenUrl} with clientId: ${clientId.substring(0, 8)}...`,
+    )
 
     const params = new URLSearchParams({
       grant_type: 'client_credentials',
