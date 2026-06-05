@@ -238,6 +238,7 @@ jobs:
               --set-string global.tag="${{ steps.vars.outputs.tag }}" \
               --set-string global.config.databaseUser="${{ inputs.db_user }}" \
               --set-string global.databaseAlias="${{ steps.deploy_crunchy.outputs.release }}-crunchy" \
+              --set-string global.config.redisHost="${{ github.event.repository.name }}-redis-master" \
               --set-string global.config.redisSecret="${{ github.event.repository.name }}-redis" \
               ${{ inputs.params }} \
               --install --wait ${{ inputs.atomic && '--atomic' || '' }} ${{ steps.vars.outputs.release }} \

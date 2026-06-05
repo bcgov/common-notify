@@ -18,8 +18,8 @@ global:
     persist: true
   config:
     databaseUser: ~
-    redisHost: ~ # Redis host, defaults to <release-name>-redis-master if not set
-    redisSecret: ~ # Redis secret name, defaults to <release-name>-redis if not set
+    redisHost: ~ # Redis host, should be set to common-notify-redis-master. Defaults to <release-name>-redis-master if not set
+    redisSecret: ~ # Redis secret name, should be set to common-notify-redis. Defaults to <release-name>-redis if not set
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
   domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
@@ -81,9 +81,14 @@ backend:
     # NOTE: More restrictive namespace selector needed from platform team
   #-- ClamAV antivirus scanning configuration
   clamav:
-    #-- enable or disable ClamAV scanning
+    #-- enable or disable ClamAV deployment
+    #-- Default: true for DEV/TEST/PROD environments (one per namespace)
+    #-- Disabled for PR environments (set in pr-open.yml) - PRs share the namespace's ClamAV instance
+    #-- Similar to shared PVC approach: one ClamAV per namespace, shared by all PRs
+    #-- Each ClamAV instance uses: 200m CPU + 768Mi memory (limits: 2 CPU + 2Gi memory)
     enabled: true
     #-- hostname of the ClamAV service (clamd daemon)
+    #-- PRs override this to 'common-notify-dev-clamav' to use shared instance
     host: clamav
     #-- port of the ClamAV service
     port: 3310
