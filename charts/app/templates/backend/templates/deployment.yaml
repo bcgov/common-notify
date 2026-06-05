@@ -88,11 +88,15 @@ spec:
             - name: CLAMAV_HOST
               value: {{ .Values.backend.clamav.host | default (printf "%s-clamav" .Release.Name) | quote }}
             - name: CLAMAV_PORT
-              value: {{ .Values.backend.clamav.port | default "3310" | quote }}
+              value: {{ .Values.backend.clamav.port | default 3310 | quote }}
             - name: CLAMAV_TIMEOUT
-              value: {{ .Values.backend.clamav.timeout | default "30000" | quote }}
+              value: {{ .Values.backend.clamav.timeout | default 30000 | quote }}
             - name: CLAMAV_ENABLED
               value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
+            - name: ATTACHMENT_STORAGE_DIR
+              value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
+            - name: RELEASE_NAME
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:
@@ -113,6 +117,26 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: TWILIO_FROM_NUMBER
+            - name: FRONTEND_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: FRONTEND_KEYCLOAK_ISSUER
+            - name: API_GATEWAY_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: API_GATEWAY_KEYCLOAK_ISSUER
+            - name: NOTIFY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: NOTIFY_CLIENT_ID
+            - name: CSTAR_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: CSTAR_API_URL
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
@@ -154,6 +178,17 @@ spec:
             limits:
               cpu: 4
               memory: 8Gi
+          {{- if .Values.backend.attachments.pvc.enabled }}
+          volumeMounts:
+            - name: attachments
+              mountPath: {{ .Values.backend.attachments.storageDir | default "/app/attachments" }}
+          {{- end }}
+      {{- if .Values.backend.attachments.pvc.enabled }}
+      volumes:
+        - name: attachments
+          persistentVolumeClaim:
+            claimName: {{ if .Values.backend.attachments.pvc.shared }}nr-notify-attachments-shared{{ else }}{{ include "backend.fullname" . }}-attachments{{ end }}
+      {{- end }}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

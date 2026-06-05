@@ -26,11 +26,11 @@ import { ChesMessageObject } from './schemas/ches-message-object'
 import { ChesTransactionResponse } from './schemas/ches-transaction-response'
 import { ChesMergeRequest } from './schemas/ches-merge-request'
 import { ChesStatusObject } from './schemas/ches-status-object'
-import { TenantGuard } from '../common/guards/tenant.guard'
+import { NotifyServiceGuard } from '../common/guards/notify-service.guard'
 
 @ApiTags('CHES')
 @ApiSecurity('api-key')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 @Controller('ches')
 export class ChesController {
   constructor(private readonly chesApiClient: ChesApiClient) {}

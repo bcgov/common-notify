@@ -1,17 +1,47 @@
 import { SetMetadata } from '@nestjs/common'
-import { Role } from '../../enum/role.enum'
+import { SsoRole } from '../../enum/sso-role.enum'
+import { CstarRole } from '../../enum/cstar-role.enum'
 
 /**
- * Roles decorator for roles based access to API.  The roles defined in role.enum are used as part of the Roles decorator.
- * For example @Roles(Role.USER) will allow users that have the NOTIFY_USER role on the JWT claim.
+ * Metadata key for both CSTAR and SSO roles
  */
 export const ROLES_KEY = 'roles'
-export const Roles = (...roles: (Role[] | Role)[]) => {
-  // Three possible scenarios here
-  // @Roles(Role.NOTIFY_ADMIN)
-  // @Roles(roles) which is an array
-  // @Roles(roles, Roles.NOTIFY_ADMIN)
-  // To handle all cases we accept an array of stuff and then flatten it down.
+
+/**
+ * Roles decorator for both CSTAR and SSO role-based access control.
+ *
+ * Accepts either CstarRole or SsoRole enum values and marks an endpoint as requiring
+ * specific roles. The appropriate guard (CstarRoleGuard or SSORoleGuard) will validate
+ * the roles based on the endpoint's requirements.
+ *
+ * Example with SSO roles:
+ * ```typescript
+ * @Get('admin-only')
+ * @UseGuards(SSORoleGuard)
+ * @Roles(SsoRole.NOTIFY_ADMIN)
+ * getAdminData() { }
+ * ```
+ *
+ * Example with CSTAR roles:
+ * ```typescript
+ * @Get('admin-only')
+ * @UseGuards(CstarRoleGuard)
+ * @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+ * getAdminData() { }
+ * ```
+ *
+ * @param roles One or more role values (CstarRole or SsoRole enum values) required to access this endpoint
+ */
+export const Roles = (...roles: (SsoRole | CstarRole | (SsoRole | CstarRole)[])[]) => {
+  // Handle both individual roles and arrays of roles
   const flattenedRoles = roles.flat()
   return SetMetadata(ROLES_KEY, flattenedRoles)
+}
+
+/**
+ * @deprecated Use @Roles instead
+ */
+export const RequireRole = (...roles: (SsoRole | CstarRole | string)[]) => {
+  // Handle legacy string-based roles for backward compatibility
+  return SetMetadata(ROLES_KEY, roles.flat())
 }

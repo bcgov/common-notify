@@ -15,8 +15,9 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
-import { TenantGuard } from '../../common/guards/tenant.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
@@ -43,7 +44,7 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
  */
 @ApiTags('templates')
 @Controller('frontend/templates')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class TemplatesFrontendController {
   private readonly logger = new Logger(TemplatesFrontendController.name)
@@ -61,6 +62,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get()
   @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List all templates for the specified tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -117,10 +123,16 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get(':templateId')
   @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   async getTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
@@ -134,11 +146,12 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post()
   @HttpCode(201)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async createTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
@@ -155,12 +168,13 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async updateTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
@@ -175,10 +189,12 @@ export class TemplatesFrontendController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async deleteTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
+    const tenant = (req as any).tenant as Tenant
     await this.templatesService.deleteTemplate(tenant.id, templateId)
   }
 
@@ -194,11 +210,13 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async previewTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
   }
 }

@@ -44,8 +44,8 @@ export class ClamavService implements OnModuleInit {
 
   constructor(private configService: ConfigService) {
     this.host = this.configService.get('CLAMAV_HOST', 'localhost')
-    this.port = this.configService.get('CLAMAV_PORT', 3310)
-    this.timeout = this.configService.get('CLAMAV_TIMEOUT', 30000)
+    this.port = parseInt(this.configService.get('CLAMAV_PORT', '3310'), 10)
+    this.timeout = parseInt(this.configService.get('CLAMAV_TIMEOUT', '30000'), 10)
     this.enabled = this.configService.get('CLAMAV_ENABLED', true) !== 'false'
   }
 
