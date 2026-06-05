@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { QueryFailedError } from 'typeorm'
 import { WebhookConfigRepository } from './webhook.repository'
 import { WebhookDeliveryLogRepository } from './webhook-delivery-log.repository'
 import { WebhookConfig } from './entities/webhook-config.entity'
@@ -21,19 +22,28 @@ export class WebhookService {
     tenantId: string,
     dto: CallbackRegistrationRequest,
   ): Promise<CallbackRegistrationResponse> {
-    const config = await this.webhookConfigRepository.create({
-      tenantId,
-      url: dto.url!,
-      secret: dto.secret ? this.encryptionService.encrypt(dto.secret) : undefined,
-      headers: dto.headers,
-      active: dto.active ?? true,
-      webhookType: dto.webhookType ?? WebhookType.GENERIC,
-      channelType: dto.channelType ?? [],
-      triggerOn: dto.trigger ?? [],
-      createdBy: tenantId,
-      updatedBy: tenantId,
-    })
-    return this.toResponse(this.decryptConfig(config))
+    try {
+      const config = await this.webhookConfigRepository.create({
+        tenantId,
+        url: dto.url!,
+        secret: dto.secret ? this.encryptionService.encrypt(dto.secret) : undefined,
+        headers: dto.headers,
+        active: dto.active ?? true,
+        webhookType: dto.webhookType ?? WebhookType.GENERIC,
+        channelType: dto.channelType ?? [],
+        triggerOn: dto.trigger ?? [],
+        createdBy: tenantId,
+        updatedBy: tenantId,
+      })
+      return this.toResponse(this.decryptConfig(config))
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new BadRequestException(
+          `A callback for URL '${dto.url}' already exists for this tenant`,
+        )
+      }
+      throw err
+    }
   }
 
   async update(
@@ -46,19 +56,32 @@ export class WebhookService {
       throw new NotFoundException(`Callback '${id}' not found`)
     }
 
-    const updated = await this.webhookConfigRepository.update(tenantId, id, {
-      ...(dto.url !== undefined && { url: dto.url }),
-      ...(dto.secret !== undefined && { secret: this.encryptionService.encrypt(dto.secret) }),
-      ...(dto.headers !== undefined && { headers: dto.headers }),
-      ...(dto.active !== undefined && { active: dto.active }),
-      ...(dto.webhookType !== undefined && { webhookType: dto.webhookType }),
-      ...(dto.channelType !== undefined && { channelType: dto.channelType }),
-      ...(dto.trigger !== undefined && { triggerOn: dto.trigger }),
-    })
-    return this.toResponse(this.decryptConfig(updated!))
+    try {
+      const updated = await this.webhookConfigRepository.update(tenantId, id, {
+        ...(dto.url !== undefined && { url: dto.url }),
+        ...(dto.secret !== undefined && { secret: this.encryptionService.encrypt(dto.secret) }),
+        ...(dto.headers !== undefined && { headers: dto.headers }),
+        ...(dto.active !== undefined && { active: dto.active }),
+        ...(dto.webhookType !== undefined && { webhookType: dto.webhookType }),
+        ...(dto.channelType !== undefined && { channelType: dto.channelType }),
+        ...(dto.trigger !== undefined && { triggerOn: dto.trigger }),
+      })
+      return this.toResponse(this.decryptConfig(updated!))
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new BadRequestException(
+          `A callback for URL '${dto.url}' already exists for this tenant`,
+        )
+      }
+      throw err
+    }
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
+    const existing = await this.webhookConfigRepository.findById(tenantId, id)
+    if (!existing) {
+      throw new NotFoundException(`Callback '${id}' not found`)
+    }
     await this.webhookConfigRepository.delete(tenantId, id)
   }
 
