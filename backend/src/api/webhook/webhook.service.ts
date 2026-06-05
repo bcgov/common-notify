@@ -19,7 +19,6 @@ export class WebhookService {
   async create(
     tenantId: string,
     dto: CallbackRegistrationRequest,
-    createdBy?: string,
   ): Promise<CallbackRegistrationResponse> {
     const config = await this.webhookConfigRepository.create({
       tenantId,
@@ -31,8 +30,8 @@ export class WebhookService {
         channelType: dto.channelType ?? [],
         trigger: dto.trigger ?? [],
       },
-      createdBy,
-      updatedBy: createdBy,
+      createdBy: tenantId,
+      updatedBy: tenantId,
     })
     return this.toResponse(this.decryptConfig(config))
   }
