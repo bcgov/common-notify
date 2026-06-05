@@ -136,8 +136,8 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
       const authHeader = request.headers.authorization as string
       const userTenants = await this.cstarApiClient.getUserTenants(idirUserGuid, authHeader)
 
-      // userTenants is an array of full tenant objects, extract IDs to check
-      const userTenantIds = userTenants.map((t: any) => t.id)
+      // userTenants can be either an array of strings (tenant IDs) or objects with id property
+      const userTenantIds = userTenants.map((t: any) => (typeof t === 'string' ? t : t.id))
       if (!userTenantIds.includes(xTenantId)) {
         throw new ForbiddenException('User does not have access to this tenant')
       }

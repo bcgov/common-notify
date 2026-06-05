@@ -11,6 +11,24 @@ import { NotifyFrontendRoleGuard } from './notify-frontend-role.guard'
 import { ConfigService } from '@nestjs/config'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
+
+// Helper to create mock tenant objects with required properties
+function createMockTenant(id: string, externalId: string): Tenant {
+  return {
+    id,
+    externalId,
+    name: `Tenant ${externalId}`,
+    slug: externalId,
+    statusCode: null as any, // Not needed for these tests
+    status: 'ACTIVE',
+    createdAt: new Date(),
+    createdBy: null,
+    updatedAt: new Date(),
+    updatedBy: null,
+    isDeleted: false,
+  }
+}
 
 // Mock the parent AuthGuard class
 vi.mock('@nestjs/passport', () => {
@@ -41,7 +59,7 @@ describe('NotifyFrontendRoleGuard', () => {
   beforeEach(async () => {
     mockTenantsService = { findByExternalId: vi.fn().mockResolvedValue(null) }
     mockCstarApiClient = {
-      getUserTenants: vi.fn().mockResolvedValue(['bc-health']),
+      getUserTenants: vi.fn().mockResolvedValue([{ id: 'bc-health', name: 'BC Health' }]),
       getUserRoles: vi.fn().mockResolvedValue(['NOTIFY_VIEWER']),
     }
 
@@ -77,7 +95,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('JWT Signature Validation (positive)', () => {
     it('should allow request with valid JWT from correct issuer', async () => {
-      const mockTenant = { id: 'tenant-uuid-123', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-123', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -137,7 +155,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('Client ID (azp) Validation (positive)', () => {
     it('should allow request with matching azp claim', async () => {
-      const mockTenant = { id: 'tenant-uuid-456', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-456', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -205,7 +223,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('Issuer Validation (positive)', () => {
     it('should allow request with correct issuer', async () => {
-      const mockTenant = { id: 'tenant-uuid-111', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-111', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -273,7 +291,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('x-tenant-id Header Validation (positive)', () => {
     it('should allow request with valid x-tenant-id header', async () => {
-      const mockTenant = { id: 'tenant-uuid-444', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-444', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -361,7 +379,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('Tenant Existence (positive)', () => {
     it('should allow request when tenant exists', async () => {
-      const mockTenant = { id: 'tenant-uuid-888', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-888', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -380,7 +398,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([{ id: 'bc-health' }])
 
       const result = await guard.canActivate(mockContext)
 
@@ -436,7 +454,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('CSTAR Tenant Access (positive)', () => {
     it('should allow request when user has access to tenant in CSTAR', async () => {
-      const mockTenant = { id: 'tenant-uuid-bbb', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-bbb', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -463,7 +481,7 @@ describe('NotifyFrontendRoleGuard', () => {
     })
 
     it('should allow request when CSTAR returns multiple tenants', async () => {
-      const mockTenant = { id: 'tenant-uuid-ccc', externalId: 'bc-education' }
+      const mockTenant = createMockTenant('tenant-uuid-ccc', 'bc-education')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -483,9 +501,9 @@ describe('NotifyFrontendRoleGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
       vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([
-        'bc-education',
-        'bc-other',
-        'bc-third',
+        { id: 'bc-education' },
+        { id: 'bc-other' },
+        { id: 'bc-third' },
       ])
 
       const result = await guard.canActivate(mockContext)
@@ -496,7 +514,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('CSTAR Tenant Access (negative)', () => {
     it('should reject request when user does not have access to tenant in CSTAR', async () => {
-      const mockTenant = { id: 'tenant-uuid-ddd', externalId: 'bc-denied' }
+      const mockTenant = createMockTenant('tenant-uuid-ddd', 'bc-denied')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -515,13 +533,16 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-other', 'bc-third'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([
+        { id: 'bc-other' },
+        { id: 'bc-third' },
+      ])
 
       expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when CSTAR returns empty tenant list', async () => {
-      const mockTenant = { id: 'tenant-uuid-eee', externalId: 'bc-empty' }
+      const mockTenant = createMockTenant('tenant-uuid-eee', 'bc-empty')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -546,7 +567,7 @@ describe('NotifyFrontendRoleGuard', () => {
     })
 
     it('should reject request when CSTAR API call fails', async () => {
-      const mockTenant = { id: 'tenant-uuid-fff', externalId: 'bc-error' }
+      const mockTenant = createMockTenant('tenant-uuid-fff', 'bc-error')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -575,7 +596,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('Role-Based Access Control (positive)', () => {
     it('should allow request with required NOTIFY_VIEWER role', async () => {
-      const mockTenant = { id: 'tenant-uuid-ggg', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-ggg', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
@@ -594,7 +615,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['NOTIFY_VIEWER'])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
-      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue(['bc-health'])
+      vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([{ id: 'bc-health' }])
 
       const result = await guard.canActivate(mockContext)
 
@@ -604,7 +625,7 @@ describe('NotifyFrontendRoleGuard', () => {
 
   describe('Role Decorator Handling', () => {
     it('should allow request when no @Roles() decorator is present', async () => {
-      const mockTenant = { id: 'tenant-uuid-hhh', externalId: 'bc-health' }
+      const mockTenant = createMockTenant('tenant-uuid-hhh', 'bc-health')
 
       const mockContext = {
         switchToHttp: () => ({
