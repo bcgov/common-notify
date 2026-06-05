@@ -56,7 +56,7 @@ describe('useFeatureFlag hooks', () => {
 
     it('should fetch flags if not synced', async () => {
       server.use(
-        http.get('*/api/v1/feature-flags', () => {
+        http.get('*/api/v1/frontend/feature-flags', () => {
           return HttpResponse.json({ sms_notifications: true, dashboard: false })
         }),
       )

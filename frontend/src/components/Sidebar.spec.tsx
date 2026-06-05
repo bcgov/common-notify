@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
+import cstarReducer from '@/redux/slices/cstar.slice'
 import Sidebar from './Sidebar'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -28,9 +29,9 @@ const mockUser = {
   displayName: 'Test User',
 }
 
-function makeStore(user: typeof mockUser | null = null) {
+function makeStore(user: typeof mockUser | null = null, tenants: any[] = []) {
   return configureStore({
-    reducer: { auth: authReducer },
+    reducer: { auth: authReducer, cstar: cstarReducer },
     preloadedState: {
       auth: {
         user,
@@ -38,13 +39,18 @@ function makeStore(user: typeof mockUser | null = null) {
         isInitializing: false,
         error: null,
       },
+      cstar: {
+        tenants,
+        isLoading: false,
+        error: null,
+      },
     },
   })
 }
 
-function renderSidebar(user: typeof mockUser | null = null) {
+function renderSidebar(user: typeof mockUser | null = null, tenants: any[] = []) {
   return render(
-    <Provider store={makeStore(user)}>
+    <Provider store={makeStore(user, tenants)}>
       <Sidebar />
     </Provider>,
   )
@@ -55,8 +61,9 @@ describe('Sidebar', () => {
     vi.clearAllMocks()
   })
 
-  it('renders primary nav items', () => {
-    renderSidebar()
+  it('renders primary nav items when user has CSTAR tenants', () => {
+    const mockTenant = { id: 'tenant-1', name: 'Test Tenant' }
+    renderSidebar(null, [mockTenant])
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /notification events/i })).toBeInTheDocument()
