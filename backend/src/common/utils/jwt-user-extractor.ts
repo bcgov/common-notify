@@ -2,18 +2,14 @@ import { Logger } from '@nestjs/common'
 import * as express from 'express'
 
 /**
- * Utility for extracting user information from JWT tokens and Kong headers
+ * Utility for extracting user information from JWT tokens
  * Centralizes user extraction logic used across controllers
  */
 export class JwtUserExtractor {
   private static readonly logger = new Logger(JwtUserExtractor.name)
 
   /**
-   * Extract user identifier from request headers and JWT token
-   * Checks Kong headers first (higher priority), then JWT claims
-   *
-   * Kong headers (added by API Gateway after auth):
-   * - x-consumer-username: The authenticated user's username
+   * Extract user identifier from JWT token
    *
    * JWT claims (checked in order of preference):
    * 1. preferred_username (Keycloak standard claim)
@@ -28,12 +24,6 @@ export class JwtUserExtractor {
     if (!req) return 'system'
 
     try {
-      // Kong consumer username header
-      const kongUsername = req.headers['x-consumer-username']
-      if (kongUsername) {
-        return kongUsername as string
-      }
-
       // Extract from JWT in Authorization header
       const authHeader = req.headers.authorization
       if (authHeader && authHeader.startsWith('Bearer ')) {

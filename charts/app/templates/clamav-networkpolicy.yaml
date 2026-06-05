@@ -18,11 +18,10 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow traffic from backend pods in the same release
+    # Allow traffic from all backend pods in the namespace (shared ClamAV for PRs)
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/instance: {{ .Release.Name }}
               app.kubernetes.io/name: backend
       ports:
         - protocol: TCP

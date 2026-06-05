@@ -23,7 +23,7 @@ import { FEATURE_FLAG_KEY } from '../decorators/feature-flag.decorator'
  *
  * Extracts tenant ID from (in order of precedence):
  * - x-tenant-id header (if present)
- * - request.tenant (set by TenantGuard)
+ * - request.tenant (set by AuthGuard)
  * - tenantId query parameter (if present)
  *
  * Returns 403 Forbidden if the feature is disabled for the tenant/globally.

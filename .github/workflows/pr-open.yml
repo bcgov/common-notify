@@ -125,7 +125,7 @@ jobs:
       oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
-      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true
+      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true --set backend.clamav.enabled=false --set backend.clamav.host=common-notify-dev-clamav
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')

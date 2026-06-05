@@ -167,8 +167,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               onChange={(value) => setFormData((prev) => ({ ...prev, channelCode: value }))}
               isDisabled
             >
-              <Radio value={NotificationChannel.EMAIL}>Email</Radio>
-              <Radio value={NotificationChannel.SMS}>SMS</Radio>
+              <Radio key="email" value={NotificationChannel.EMAIL}>
+                Email
+              </Radio>
+              <Radio key="sms" value={NotificationChannel.SMS}>
+                SMS
+              </Radio>
             </RadioGroup>
           </div>
 
@@ -189,9 +193,15 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
-              <Radio value={TemplateEngine.HANDLEBARS}>Handlebars</Radio>
-              <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
-              <Radio value={TemplateEngine.LEGACY_GC_NOTIFY}>Legacy GC Notify</Radio>
+              <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
+                Handlebars
+              </Radio>
+              <Radio key="mustache" value={TemplateEngine.MUSTACHE}>
+                Mustache
+              </Radio>
+              <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
+                Legacy GC Notify
+              </Radio>
             </RadioGroup>
           </div>
 
@@ -212,8 +222,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               isInvalid={!!formErrors.bodyType}
               errorMessage={formErrors.bodyType}
             >
-              <Radio value={TemplateBodyType.HTML}>HTML</Radio>
-              <Radio value={TemplateBodyType.MARKDOWN}>Markdown</Radio>
+              <Radio key="html" value={TemplateBodyType.HTML}>
+                HTML
+              </Radio>
+              <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
+                Markdown
+              </Radio>
             </RadioGroup>
           </div>
 
