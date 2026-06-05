@@ -11,6 +11,8 @@ import { TemplateVersion } from './entities/template-version.entity'
 import { TemplateEngineCode } from './entities/template-engine-code.entity'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { NotifyModule } from '../notify/notify.module'
+import { CstarModule } from '../../services/cstar/cstar.module'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 
 /**
  * Feature Module for Templates
@@ -26,10 +28,11 @@ import { NotifyModule } from '../notify/notify.module'
     ClientTenantMappingModule,
     TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode]),
     RenderingModule,
+    CstarModule,
     forwardRef(() => NotifyModule),
   ],
   controllers: [TemplatesController, TemplatesFrontendController],
-  providers: [TemplatesService, TemplatesRepository],
+  providers: [TemplatesService, TemplatesRepository, NotifyFrontendRoleGuard],
   exports: [TemplatesService, TemplatesRepository],
 })
 export class TemplatesModule {}

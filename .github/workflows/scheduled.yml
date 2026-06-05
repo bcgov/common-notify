@@ -42,7 +42,12 @@ jobs:
             [ -z "${RELEASES}" ]|| for r in ${RELEASES[@]}; do
 
               # Get last update and convert the date
-              UPDATED=$(date "+%s" -d <<< echo $(helm status $r -o json | jq -r .info.last_deployed))
+              LAST_DEPLOYED=$(helm status $r -o json 2>/dev/null | jq -r .info.last_deployed || echo "")
+              if [ -z "$LAST_DEPLOYED" ]; then
+                echo "Warning: Could not get last deployed date for $r, skipping"
+                continue
+              fi
+              UPDATED=$(date "+%s" -d "$LAST_DEPLOYED" || echo "0")
 
               # Compare to cutoff and delete as necessary
               if [[ ${UPDATED} < ${BEFORE} ]]; then

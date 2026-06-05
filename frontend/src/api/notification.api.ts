@@ -3,7 +3,6 @@ import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-even
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import UserService from '@/service/user-service'
 
 export interface ListNotificationsOptions {
@@ -50,13 +49,14 @@ export const notificationApi = {
   },
 
   /**
-   * Opens a persistent SSE connection that streams notification_request updates for the
-   * authenticated tenant. Calls onMessage for each notification event received.
+   * Opens a persistent SSE connection that streams refresh signals for the
+   * authenticated tenant. Calls onMessage whenever a change event is received,
+   * allowing the caller to refetch the current page of data.
    *
    * Returns an AbortController — call abort() to close the connection.
    */
   connectNotificationStream(
-    onMessage: (dto: NotificationRequest) => void,
+    onMessage: () => void,
     onError?: (err: unknown) => void,
     tenantId?: string,
   ): AbortController {
@@ -71,7 +71,11 @@ export const notificationApi = {
       const token = await UserService.getToken()
       return fetch(input, {
         ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+        headers: {
+          ...(init?.headers ?? {}),
+          Authorization: `Bearer ${token}`,
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
       })
     }
 
@@ -79,13 +83,8 @@ export const notificationApi = {
       fetch: fetchWithFreshToken,
       signal: controller.signal,
       onmessage(event: EventSourceMessage) {
-        if (event.event === 'keepalive' || !event.data) return
-        try {
-          const dto = JSON.parse(event.data) as NotificationRequest
-          onMessage(dto)
-        } catch (err) {
-          console.error('Failed to parse SSE notification event', err)
-        }
+        if (event.event === 'keepalive') return
+        onMessage()
       },
       onerror(err: Error) {
         onError?.(err)

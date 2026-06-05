@@ -426,3 +426,6 @@ postman/
 # API Gateway generated configs
 api-gateway/generated/
 
+
+# Claude Code local preferences
+.claude/
