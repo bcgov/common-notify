@@ -76,6 +76,7 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="true" remarks="Identifier of user or process that created this code definition." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="updated_at" nullable="false" remarks="Timestamp when this code definition was last updated. Automatically maintained by the trg_feature_flag_code_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="Identifier of user or process that last updated this code definition." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="7" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="code" sequenceNumberInPK="1"/>
          <index name="feature_flag_code_pkey" unique="true">
             <column ascending="true" name="code"/>
@@ -128,6 +129,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the channel code was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;Email&quot;, &quot;SMS&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="7" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="channel_code" sequenceNumberInPK="1"/>
          <index name="notification_channel_code_pkey" unique="true">
             <column ascending="true" name="channel_code"/>
@@ -145,6 +147,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="updated_at" nullable="false" remarks="Timestamp when the event type code was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;Password Reset&quot;, &quot;Invoice Sent&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="8" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="event_type_code" sequenceNumberInPK="1"/>
          <index name="notification_event_type_code_pkey" unique="true">
             <column ascending="true" name="event_type_code"/>
@@ -172,6 +175,7 @@
          </column>
          <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="delayed_send_time" nullable="true" remarks="When set, indicates the notification should be delivered at this time instead of immediately" size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="recipients" nullable="true" remarks="Stores recipients as JSONB object with channels as keys (email, sms, msgApp), each containing an array of recipient addresses/identifiers" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="quarantine_details" nullable="true" remarks="JSONB data structure storing ClamAV quarantine information. Example: {&quot;viruses&quot;: [&quot;Win.Test.EICAR_HDB-1&quot;], &quot;filename&quot;: &quot;document.pdf&quot;, &quot;scannedAt&quot;: &quot;2026-05-19T10:30:00Z&quot;, &quot;reason&quot;: &quot;Malware detected during content scanning&quot;}" size="2147483647" type="jsonb" typeCode="1111"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="notification_request_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -190,6 +194,33 @@
             <column ascending="true" name="tenant_id"/>
          </index>
       </table>
+      <table name="notification_request_history" remarks="Immutable audit log of all changes to notification_request. Each row captures a complete snapshot after INSERT/UPDATE/DELETE. Populated automatically by audit_history() trigger." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="Unique identifier for this history record" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="Foreign key to notification_request.id that was changed" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="Type of operation: I=INSERT, U=UPDATE, D=DELETE" size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="User who performed the operation (from app.current_user or database user)" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="Server timestamp when operation occurred (always NOW() at trigger time)" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="Complete JSON snapshot of the row after the operation. For UPDATE/INSERT: NEW row. For DELETE: OLD row." size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="notification_request_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_nr_history_data" unique="false">
+            <column ascending="true" name="data_after_operation"/>
+         </index>
+         <index name="idx_nr_history_operation" unique="false">
+            <column ascending="true" name="operation_type"/>
+         </index>
+         <index name="idx_nr_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_nr_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
+         </index>
+         <index name="idx_nr_history_user" unique="false">
+            <column ascending="true" name="operation_user"/>
+         </index>
+      </table>
       <table name="notification_status_code" remarks="Lookup table for notification request statuses" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="Unique status code identifier" size="20" type="varchar" typeCode="12">
             <child column="status" foreignKey="fk_notification_status" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
@@ -200,6 +231,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the record was last updated" size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or system that last updated the record" size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="''::character varying" digits="0" id="6" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;Queued&quot;, &quot;Processing&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="7" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="code" sequenceNumberInPK="1"/>
          <index name="notification_status_code_pkey" unique="true">
             <column ascending="true" name="code"/>
@@ -301,6 +333,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the engine code was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;Handlebars&quot;, &quot;Mustache&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="7" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="engine_code" sequenceNumberInPK="1"/>
          <index name="template_engine_code_pkey" unique="true">
             <column ascending="true" name="engine_code"/>
@@ -390,6 +423,7 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the status code was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="6" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <primaryKey column="code" sequenceNumberInPK="1"/>
          <index name="tenant_status_code_pkey" unique="true">
             <column ascending="true" name="code"/>
@@ -427,6 +461,42 @@
       </table>
    </tables>
    <routines>
+      <routine dataAccess="MODIFIES" deterministic="false" name="audit_history()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
+         <comment/>
+         <definition language="plpgsql"><![CDATA[DECLARE
+  v_history_table TEXT;
+  v_pk_column TEXT;
+BEGIN
+  v_history_table := TG_ARGV[0];
+  v_pk_column := TG_ARGV[1];
+
+  -- For INSERT and UPDATE, enforce audit fields
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    NEW.updated_at := now();
+    NEW.updated_by := COALESCE(current_setting('app.current_user', true), current_user);
+    IF TG_OP = 'INSERT' THEN
+      NEW.created_at := now();
+      NEW.created_by := COALESCE(current_setting('app.current_user', true), current_user);
+    ELSE
+      NEW.created_at := OLD.created_at;
+      NEW.created_by := OLD.created_by;
+    END IF;
+  END IF;
+
+  -- Capture to history (AFTER trigger instead)
+  EXECUTE format(
+    'INSERT INTO notify.%I (target_row_id, operation_type, operation_user,
+     operation_executed_at, data_after_operation) VALUES ($1.%I, %L, %L, now(), to_jsonb($1))',
+    v_history_table, v_pk_column, SUBSTRING(TG_OP, 1, 1),
+    COALESCE(current_setting('app.current_user', true), current_user)
+  ) USING NEW;
+
+  RETURN NEW;
+END;]]></definition>
+         <parameters>
+            <parameter mode="IN"/>
+         </parameters>
+      </routine>
       <routine dataAccess="MODIFIES" deterministic="false" name="create_template_version_on_update()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
          <comment/>
          <definition language="plpgsql"><![CDATA[BEGIN

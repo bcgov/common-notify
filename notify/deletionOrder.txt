@@ -1,3 +1,4 @@
+notification_request_history
 notification_event_type_code
 flyway_schema_history
 template_version

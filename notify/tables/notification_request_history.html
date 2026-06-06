@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>notification_request - default.notify</title>
+        <title>notification_request_history - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>notification_request</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>notification_request_history</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>Stores all incoming notification requests for auditing and tracking</p>
+                            <p>Immutable audit log of all changes to notification_request. Each row captures a complete snapshot after INSERT/UPDATE/DELETE. Populated automatically by audit_history() trigger.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -122,12 +122,12 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="id">id</span></td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="h_id">h_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
                                     <td title=''></td>
-                                    <td>notify.uuid_generate_v4()</td>
+                                    <td>gen_random_uuid()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
@@ -136,10 +136,10 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Unique identifier for the notification request</p></td>
+                                    <td><p>Unique identifier for this history record</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="target_row_id">target_row_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -151,39 +151,46 @@
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="notification_request.tenant_id references tenant.id via fk_notification_request_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
-                                                <td class="constraint detail">fk_notification_request_tenant</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
                                         </table>
                                     </td>
-                                    <td><p>Tenant that submitted the request</p></td>
+                                    <td><p>Foreign key to notification_request.id that was changed</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="status">status</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_type">operation_type</span></td>
+                                    <td>bpchar</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Type of operation: I=INSERT, U=UPDATE, D=DELETE</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_user">operation_user</span></td>
                                     <td>varchar</td>
-                                    <td>20</td>
+                                    <td>200</td>
                                     <td title=''></td>
                                     <td title=''></td>
-                                    <td>null</td>
+                                    <td>CURRENT_USER</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="notification_request.status references notification_status_code.code via fk_notification_status"><a href='notification_status_code.html'>notification_status_code</a><span class='relatedKey'>.code</span></td>
-                                                <td class="constraint detail">fk_notification_status</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
                                         </table>
                                     </td>
-                                    <td><p>Processing status of the notification request</p></td>
+                                    <td><p>User who performed the operation (from app.current_user or database user)</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="created_at">created_at</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_executed_at">operation_executed_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
                                     <td title=''></td>
@@ -197,64 +204,13 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp when the request was created</p></td>
+                                    <td><p>Server timestamp when operation occurred (always NOW() at trigger time)</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="created_by">created_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>User or system that created the request</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_at">updated_at</span></td>
-                                    <td>timestamptz</td>
-                                    <td>35,6</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>now()</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp when the request was last updated</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_by">updated_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>User or system that last updated the request</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="payload">payload</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="data_after_operation">data_after_operation</span></td>
                                     <td>jsonb</td>
                                     <td>2147483647</td>
-                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
                                     <td title=''></td>
                                     <td>null</td>
                                     <td>
@@ -265,97 +221,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Stores the request payload as JSON for retry purposes when Redis is temporarily unavailable</p></td>
-                                </tr>
-                                <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="error_reason">error_reason</span></td>
-                                    <td>text</td>
-                                    <td>2147483647</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Stores the error message when a notification fails, useful for debugging and monitoring</p></td>
-                                </tr>
-                                <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
-                                    <td>varchar</td>
-                                    <td>20</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="notification_request.channel_code references notification_channel_code.channel_code via fk_notification_channel_code"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
-                                                <td class="constraint detail">fk_notification_channel_code</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
-                                        </table>
-                                    </td>
-                                    <td><p>The primary channel type for this notification (EMAIL, SMS, MSGAPP, or MULTIPLE if multiple channels)</p></td>
-                                </tr>
-                                <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="delayed_send_time">delayed_send_time</span></td>
-                                    <td>timestamptz</td>
-                                    <td>35,6</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>When set, indicates the notification should be delivered at this time instead of immediately</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="recipients">recipients</span></td>
-                                    <td>jsonb</td>
-                                    <td>2147483647</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Stores recipients as JSONB object with channels as keys (email, sms, msgApp), each containing an array of recipient addresses/identifiers</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="quarantine_details">quarantine_details</span></td>
-                                    <td>jsonb</td>
-                                    <td>2147483647</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>JSONB data structure storing ClamAV quarantine information. Example: {&ldquo;viruses&rdquo;: <a href="./../null#EICAR_HDB-1&quot;">&ldquo;Win.Test.EICAR_HDB-1&rdquo;</a>, &ldquo;filename&rdquo;: &ldquo;document.pdf&rdquo;, &ldquo;scannedAt&rdquo;: &ldquo;2026-05-19T10:30:00Z&rdquo;, &ldquo;reason&rdquo;: &ldquo;Malware detected during content scanning&rdquo;}</p></td>
+                                    <td><p>Complete JSON snapshot of the row after the operation. For UPDATE/INSERT: NEW row. For DELETE: OLD row.</p></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -388,34 +254,40 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> notification_request_pkey</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> notification_request_history_pkey</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>id</td>
+                                    <td>h_id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_notification_request_channel</td>
+                                    <td title='Indexed'>idx_nr_history_data</td>
                                     <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>channel_code</td>
+                                    <td>data_after_operation</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_notification_request_delayed_send</td>
+                                    <td title='Indexed'>idx_nr_history_operation</td>
                                     <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>delayed_send_time</td>
+                                    <td>operation_type</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_notification_request_status_error</td>
-                                    <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
-                                    <td>status + error_reason</td>
-                                </tr>
-                                <tr>
-                                    <td title='Indexed'>idx_notification_request_tenant_id</td>
+                                    <td title='Indexed'>idx_nr_history_target_row</td>
                                     <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td>target_row_id</td>
+                                </tr>
+                                <tr>
+                                    <td title='Indexed'>idx_nr_history_timestamp</td>
+                                    <td>Performance</td>
+                                    <td><span title='Descending'>Desc</span></td>
+                                    <td>operation_executed_at</td>
+                                </tr>
+                                <tr>
+                                    <td title='Indexed'>idx_nr_history_user</td>
+                                    <td>Performance</td>
+                                    <td><span title='Ascending'>Asc</span></td>
+                                    <td>operation_user</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -435,31 +307,13 @@
                                 <h5>Close relationships within degrees of separation</h5>
                                 <ul class="nav nav-tabs pull-left ui-sortable-handle">
                                     <li class="active"><a href="#oneDegreeImg-chart" data-toggle="tab" aria-expanded="true">One</a></li>
-                                    <li class=""><a href="#twodegreesDegreeImg-chart" data-toggle="tab" aria-expanded="true">Two degrees</a></li>
                                 </ul>
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="337,101,691,552">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,368,293,515">
-<area shape="rect" id="node3" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="13,199,286,316">
-<area shape="rect" id="node4" href="tenant.html" target="_top" title="tenant" alt="" coords="79,5,220,181">
+<area shape="rect" id="node1" href="notification_request_history.html" target="_top" title="notification_request_history" alt="" coords="5,5,421,251">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_request.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
-                                    </div>
-                                    <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
-                                        <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="662,5,923,93">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="357,103,499,279">
-<area shape="rect" id="node9" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,164,240,252">
-<area shape="rect" id="node3" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="705,111,880,199">
-<area shape="rect" id="node4" href="notification_request.html" target="_top" title="notification_request" alt="" coords="616,228,969,679">
-<area shape="rect" id="node5" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="284,656,572,803">
-<area shape="rect" id="node6" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="291,296,565,413">
-<area shape="rect" id="node7" href="template.html" target="_top" title="template" alt="" coords="717,732,869,820">
-<area shape="rect" id="node8" href="template_version.html" target="_top" title="template_version" alt="" coords="1013,696,1232,784">
-</map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_request.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_request_history.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

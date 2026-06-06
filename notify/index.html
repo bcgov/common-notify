@@ -78,7 +78,7 @@
                         <div class="col-md-12">
                             <div class="callout callout-info">
                                 <h4>SchemaSpy Analysis of default.notify</h4>
-                                <p>Generated on Sat May 30 11:34 GMT 2026</p>
+                                <p>Generated on Sat Jun 06 11:35 GMT 2026</p>
                             </div>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
                                 <span class="info-box-icon bg-aqua"><i class="fa fa-table"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">TABLES</span>
-                                    <span class="info-box-number">16</span>
+                                    <span class="info-box-number">17</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -118,7 +118,7 @@
                                 <span class="info-box-icon bg-green"><span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">COLUMNS</span>
-                                    <span class="info-box-number">142</span>
+                                    <span class="info-box-number">155</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -154,7 +154,7 @@
                                 <span class="info-box-icon bg-navy"><i class="fa fa-file-code-o" aria-hidden="true"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Routines</span>
-                                    <span class="info-box-number">12</span>
+                                    <span class="info-box-number">13</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -209,7 +209,7 @@
                                         <td class="detail"><a href="tables/feature_flag_code.html">feature_flag_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">8</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Lookup table for valid feature flag codes. Defines all available features that can be toggled. Prevents typos and ensures consistency across backend/frontend. Follows notification_channel_code pattern.</p></td>
@@ -218,7 +218,7 @@
                                         <td class="detail"><a href="tables/notification_channel_code.html">notification_channel_code</a></td>
                                         <td class="detail" align="right">3</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">8</td>
                                         <td class="detail" align="right">2</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS). This ensures consistency with the NotificationChannel TypeScript enum.</p></td>
@@ -254,7 +254,7 @@
                                         <td class="detail"><a href="tables/notification_event_type_code.html">notification_event_type_code</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">8</td>
+                                        <td class="detail" align="right">9</td>
                                         <td class="detail" align="right">3</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for notification event types. Defines all valid events that can trigger notifications.</p></td>
@@ -272,7 +272,7 @@
                                         <td class="detail"><a href="tables/notification_status_code.html">notification_status_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">8</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Lookup table for notification request statuses</p></td>
@@ -290,7 +290,7 @@
                                         <td class="detail"><a href="tables/tenant_status_code.html">tenant_status_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">7</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for tenant status values. Defines all valid statuses for tenants.</p></td>
@@ -323,10 +323,19 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Stores the external authentication providers supported by the system (e.g. IDIR, BCeID).</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/notification_request_history.html">notification_request_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of all changes to notification_request. Each row captures a complete snapshot after INSERT/UPDATE/DELETE. Populated automatically by audit_history() trigger.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/template_engine_code.html">template_engine_code</a></td>
                                         <td class="detail" align="right">2</td>
                                         <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">8</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for template rendering engines. Defines all valid engines for template rendering.</p></td>
@@ -335,7 +344,7 @@
                                         <td class="detail"><a href="tables/notification_request.html">notification_request</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">3</td>
-                                        <td class="detail" align="right">12</td>
+                                        <td class="detail" align="right">13</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Stores all incoming notification requests for auditing and tracking</p></td>
