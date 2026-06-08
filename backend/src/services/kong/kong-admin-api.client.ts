@@ -157,11 +157,10 @@ export class KongAdminApiClient {
         // Try to use it - if it fails, we'll create a new one
         this.logger.debug(`Using existing Kong consumer for tenant ${tenantId}: ${kongConsumerId}`)
         return kongConsumerId
-      } catch (error) {
+      } catch {
         this.logger.warn(
           `Existing Kong consumer ${kongConsumerId} not accessible, will create new one`,
         )
-        // Fall through to create a new one
       }
     }
 

@@ -50,6 +50,7 @@ export class ApiKeyController {
    *
    * POST /api/v1/admin/tenants/{tenantId}/api-keys
    *
+   * The tenantId in the URL is the CSTAR tenant external ID.
    * Returns the key value exactly once - users must copy it immediately.
    * The key is never displayed again for security reasons.
    */
@@ -61,7 +62,7 @@ export class ApiKeyController {
     description:
       'Creates a new API key for the tenant. The key value is returned once in this response and never shown again.',
   })
-  @ApiParam({ name: 'tenantId', description: 'Tenant UUID' })
+  @ApiParam({ name: 'tenantId', description: 'Tenant CSTAR external ID' })
   @ApiResponse({
     status: 201,
     description: 'API key successfully generated',
@@ -88,6 +89,7 @@ export class ApiKeyController {
    *
    * GET /api/v1/admin/tenants/{tenantId}/api-keys
    *
+   * The tenantId in the URL is the CSTAR tenant external ID.
    * Returns key metadata without exposing the actual key values.
    */
   @Get()
@@ -97,7 +99,7 @@ export class ApiKeyController {
     description:
       'Retrieves all API keys (active and revoked) for the specified tenant. Actual key values are never returned.',
   })
-  @ApiParam({ name: 'tenantId', description: 'Tenant UUID' })
+  @ApiParam({ name: 'tenantId', description: 'Tenant CSTAR external ID' })
   @ApiQuery({ name: 'activeOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
@@ -132,6 +134,7 @@ export class ApiKeyController {
    *
    * GET /api/v1/admin/tenants/{tenantId}/api-keys/{keyId}
    *
+   * The tenantId in the URL is the CSTAR tenant external ID.
    * Returns metadata about the key (creation date, usage count, etc.) without the key value.
    */
   @Get(':keyId')
@@ -141,7 +144,7 @@ export class ApiKeyController {
     description:
       'Retrieves metadata about a specific API key. The actual key value is never returned.',
   })
-  @ApiParam({ name: 'tenantId', description: 'Tenant UUID' })
+  @ApiParam({ name: 'tenantId', description: 'Tenant CSTAR external ID' })
   @ApiParam({ name: 'keyId', description: 'API Key UUID' })
   @ApiResponse({
     status: 200,
@@ -163,6 +166,7 @@ export class ApiKeyController {
    *
    * DELETE /api/v1/admin/tenants/{tenantId}/api-keys/{keyId}
    *
+   * The tenantId in the URL is the CSTAR tenant external ID.
    * Removes the key from Kong and marks it as revoked in the database.
    * The key can no longer be used for authentication immediately after revocation.
    */
@@ -174,7 +178,7 @@ export class ApiKeyController {
     description:
       'Revokes the specified API key. The key is immediately removed from Kong and marked as revoked in the database. It can no longer be used for authentication.',
   })
-  @ApiParam({ name: 'tenantId', description: 'Tenant UUID' })
+  @ApiParam({ name: 'tenantId', description: 'Tenant CSTAR external ID' })
   @ApiParam({ name: 'keyId', description: 'API Key UUID' })
   @ApiResponse({
     status: 204,

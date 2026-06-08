@@ -1,7 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { ApiKey } from '../admin/api-keys/entities/api-key.entity'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
-import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
+import { ApiKeyModule } from '../admin/api-keys/api-key.module'
 import { TemplatesController } from './templates.controller'
 import { TemplatesFrontendController } from './templates-frontend.controller'
 import { TemplatesService } from './templates.service'
@@ -25,8 +27,8 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 @Module({
   imports: [
     TenantsModule,
-    ClientTenantMappingModule,
-    TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode]),
+    ApiKeyModule,
+    TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode, ApiKey, Tenant]),
     RenderingModule,
     CstarModule,
     forwardRef(() => NotifyModule),

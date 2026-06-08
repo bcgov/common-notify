@@ -31,41 +31,37 @@ export class ApiKeyService {
   /**
    * Generate a new API key for a tenant.
    *
-   * @param tenantId - Tenant UUID
+   * @param tenantExternalId - Tenant external ID (CSTAR tenant ID)
    * @param dto - Generation request (display name, description, rate limit config)
    * @param createdBy - User ID creating the key
    * @returns Generated key response (includes actual key value - shown only once!)
    */
   async generateKey(
-    tenantId: string,
+    tenantExternalId: string,
     dto: GenerateApiKeyDto,
     createdBy: string,
   ): Promise<ApiKeyGeneratedResponseDto> {
-    this.logger.debug(`Generating API key for tenant ${tenantId}`)
+    this.logger.debug(`Generating API key for tenant ${tenantExternalId}`)
 
     try {
-      // Step 0: Fetch tenant to get its Kong consumer ID (if any)
-      const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } })
+      // Step 0: Fetch tenant by external_id (CSTAR tenant ID)
+      const tenant = await this.tenantRepository.findOne({
+        where: { externalId: tenantExternalId },
+      })
       if (!tenant) {
-        throw new NotFoundException(`Tenant ${tenantId} not found`)
+        throw new NotFoundException(`Tenant ${tenantExternalId} not found`)
       }
 
       // Step 1: Generate key in Kong (will create consumer if needed)
+      // Kong consumer ID is stored only in the api_key table, not on the tenant
       const { keyId, keyValue, consumerId } = await this.kongAdminClient.generateKeyForTenant(
-        tenantId,
-        tenant.kongConsumerId,
+        tenant.id, // Use the internal tenant ID for Kong operations
+        undefined, // Kong consumer not stored on tenant
       )
 
-      // Step 2: Update tenant with Kong consumer ID if it was newly created
-      if (!tenant.kongConsumerId && consumerId) {
-        tenant.kongConsumerId = consumerId
-        await this.tenantRepository.save(tenant)
-        this.logger.debug(`Stored Kong consumer ID for tenant ${tenantId}: ${consumerId}`)
-      }
-
-      // Step 3: Store key metadata in database
+      // Step 2: Store key metadata in database
       const apiKey = this.apiKeyRepository.create({
-        tenantId,
+        tenantId: tenant.id, // Store internal tenant ID in api_key table
         kongConsumerId: consumerId, // Use the Kong consumer ID returned from Kong
         kongKeyId: keyId,
         displayName: dto.displayName,
@@ -77,7 +73,7 @@ export class ApiKeyService {
 
       await this.apiKeyRepository.save(apiKey)
 
-      this.logger.log(`Created API key ${keyId} for tenant ${tenantId}`)
+      this.logger.log(`Created API key ${keyId} for tenant ${tenantExternalId}`)
 
       return {
         id: apiKey.id,
@@ -90,7 +86,7 @@ export class ApiKeyService {
         rateLimitConfig: apiKey.rateLimitConfig,
       }
     } catch (error) {
-      this.logger.error(`Failed to generate API key for tenant ${tenantId}`, error)
+      this.logger.error(`Failed to generate API key for tenant ${tenantExternalId}`, error)
       throw error
     }
   }
@@ -98,20 +94,26 @@ export class ApiKeyService {
   /**
    * Revoke an API key (soft delete in Kong, mark as revoked in DB).
    *
-   * @param tenantId - Tenant UUID
+   * @param tenantExternalId - Tenant external ID (CSTAR tenant ID)
    * @param keyId - API key record UUID (our database ID, not Kong's)
    * @param revokedBy - User ID revoking the key
    */
-  async revokeKey(tenantId: string, keyId: string, revokedBy: string): Promise<void> {
-    this.logger.debug(`Revoking API key ${keyId} for tenant ${tenantId}`)
+  async revokeKey(tenantExternalId: string, keyId: string, revokedBy: string): Promise<void> {
+    this.logger.debug(`Revoking API key ${keyId} for tenant ${tenantExternalId}`)
+
+    // Look up tenant by external ID
+    const tenant = await this.tenantRepository.findOne({ where: { externalId: tenantExternalId } })
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantExternalId} not found`)
+    }
 
     // Find the key record
     const apiKey = await this.apiKeyRepository.findOne({
-      where: { id: keyId, tenantId },
+      where: { id: keyId, tenantId: tenant.id },
     })
 
     if (!apiKey) {
-      throw new NotFoundException(`API key ${keyId} not found for tenant ${tenantId}`)
+      throw new NotFoundException(`API key ${keyId} not found for tenant ${tenantExternalId}`)
     }
 
     if (!apiKey.isActive) {
@@ -120,16 +122,16 @@ export class ApiKeyService {
 
     try {
       // Step 1: Revoke from Kong
-      await this.kongAdminClient.revokeKey(tenantId, apiKey.kongKeyId)
+      await this.kongAdminClient.revokeKey(tenant.id, apiKey.kongKeyId)
 
       // Step 2: Mark as revoked in database
       apiKey.revokedAt = new Date()
       apiKey.revokedBy = revokedBy
       await this.apiKeyRepository.save(apiKey)
 
-      this.logger.log(`Revoked API key ${keyId} for tenant ${tenantId}`)
+      this.logger.log(`Revoked API key ${keyId} for tenant ${tenantExternalId}`)
     } catch (error) {
-      this.logger.error(`Failed to revoke API key ${keyId} for tenant ${tenantId}`, error)
+      this.logger.error(`Failed to revoke API key ${keyId} for tenant ${tenantExternalId}`, error)
       throw error
     }
   }
@@ -137,17 +139,23 @@ export class ApiKeyService {
   /**
    * Get details of a specific API key (without the actual key value).
    *
-   * @param tenantId - Tenant UUID
+   * @param tenantExternalId - Tenant external ID (CSTAR tenant ID)
    * @param keyId - API key record UUID
    * @returns API key details
    */
-  async getKey(tenantId: string, keyId: string): Promise<ApiKeyResponseDto> {
+  async getKey(tenantExternalId: string, keyId: string): Promise<ApiKeyResponseDto> {
+    // Look up tenant by external ID
+    const tenant = await this.tenantRepository.findOne({ where: { externalId: tenantExternalId } })
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantExternalId} not found`)
+    }
+
     const apiKey = await this.apiKeyRepository.findOne({
-      where: { id: keyId, tenantId },
+      where: { id: keyId, tenantId: tenant.id },
     })
 
     if (!apiKey) {
-      throw new NotFoundException(`API key ${keyId} not found for tenant ${tenantId}`)
+      throw new NotFoundException(`API key ${keyId} not found for tenant ${tenantExternalId}`)
     }
 
     return this.mapToResponseDto(apiKey)
@@ -156,16 +164,22 @@ export class ApiKeyService {
   /**
    * List all API keys for a tenant.
    *
-   * @param tenantId - Tenant UUID
+   * @param tenantExternalId - Tenant external ID (CSTAR tenant ID)
    * @param options - Pagination/filtering options
    * @returns List of API key details (active and revoked)
    */
   async listKeys(
-    tenantId: string,
+    tenantExternalId: string,
     options?: { activeOnly?: boolean; skip?: number; take?: number },
   ): Promise<{ data: ApiKeyResponseDto[]; total: number }> {
+    // Look up tenant by external ID
+    const tenant = await this.tenantRepository.findOne({ where: { externalId: tenantExternalId } })
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantExternalId} not found`)
+    }
+
     const query = this.apiKeyRepository.createQueryBuilder('ak').where('ak.tenantId = :tenantId', {
-      tenantId,
+      tenantId: tenant.id,
     })
 
     if (options?.activeOnly) {

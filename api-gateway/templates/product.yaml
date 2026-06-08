@@ -5,7 +5,9 @@ organization: ministry-of-citizens-services
 organizationUnit: devops-and-cloud-services
 notes:
   A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
-  a unified API.
+  a unified API.  Create your tenants via CSTAR and manage your API keys via the Notify admin
+  portal.  Built on top of the BC Gov API Gateway and Kong, with a Keycloak-based authentication
+  system.
 tags: [notify, openapi, notifications, email, sms]
 license_title: Access Only
 view_audience: Government
