@@ -2,7 +2,7 @@
 {{- if .Values.backend.attachments.pvc.enabled }}
 {{- if .Values.backend.attachments.pvc.shared }}
 {{- /* Only create shared PVC once - check if this is a permanent release (dev/test/prod) or if forced */ -}}
-{{- if or (hasPrefix "common-notify-" .Release.Name) (.Values.backend.attachments.pvc.createShared) }}
+{{- if or (has .Release.Name (list "common-notify-dev" "common-notify-test" "common-notify-prod")) (.Values.backend.attachments.pvc.createShared) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
