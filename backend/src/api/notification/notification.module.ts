@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatusCode } from './entities/notification-status-code.entity'
-import { ApiKey } from '../admin/api-keys/entities/api-key.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannelCode } from './entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from './entities/notification-event-type-code.entity'
@@ -23,7 +22,6 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
       NotificationStatusCode,
       NotificationChannelCode,
       NotificationEventTypeCode,
-      ApiKey,
       Tenant,
     ]),
     TenantsModule,

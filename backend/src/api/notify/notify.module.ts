@@ -1,9 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { ApiKey } from '../admin/api-keys/entities/api-key.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
-import { ApiKeyModule } from '../admin/api-keys/api-key.module'
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
@@ -24,9 +22,8 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ApiKey, Tenant]),
+    TypeOrmModule.forFeature([Tenant]),
     TenantsModule,
-    ApiKeyModule,
     ChesModule,
     NotificationModule,
     RenderingModule,
