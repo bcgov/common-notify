@@ -125,10 +125,10 @@ export class NotificationFrontendController {
 
     const tenantId = tenant.id
 
-    // Observable stream
+    // Observable stream — emits a refresh signal so the frontend refetches data
     const updates$ = this.notificationPubSubService
       .getObservable(tenantId)
-      .pipe(map((dto) => ({ data: dto }) as MessageEvent))
+      .pipe(map(() => ({ data: {} }) as MessageEvent))
 
     // Emit a named keepalive event every 25s to prevent proxy/LB idle-connection timeouts.
     // The frontend's onmessage handler ignores events with type 'keepalive'.
