@@ -191,25 +191,39 @@ function buildTeamsPayload(notificationId: string, payload: any): any {
   const deliveredAt = String(payload.updatedAt)
   const themeColor =
     status.toLowerCase() === 'failed'
-      ? 'FF0000'
+      ? 'attention'
       : status.toLowerCase() === 'completed'
-        ? '42814a'
-        : 'FFA500'
+        ? 'good'
+        : 'warning'
 
   return {
-    '@type': 'MessageCard',
-    '@context': 'https://schema.org/extensions',
-    themeColor,
-    summary: `Notification ${status}`,
-    sections: [
+    type: 'message',
+    attachments: [
       {
-        activityTitle: 'Notification Status Changed',
-        facts: [
-          { name: 'Notification ID', value: notificationId },
-          { name: 'Status', value: status },
-          { name: 'Channel', value: channel },
-          { name: 'Delivered At', value: deliveredAt },
-        ],
+        contentType: 'application/vnd.microsoft.card.adaptive',
+        content: {
+          $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+          type: 'AdaptiveCard',
+          version: '1.4',
+          body: [
+            {
+              type: 'TextBlock',
+              text: 'Notification Status Changed',
+              weight: 'Bolder',
+              size: 'Medium',
+            },
+            {
+              type: 'FactSet',
+              facts: [
+                { title: 'Notification ID', value: notificationId },
+                { title: 'Status', value: status },
+                { title: 'Channel', value: channel },
+                { title: 'Delivered At', value: deliveredAt },
+              ],
+            },
+          ],
+          msteams: { width: 'Full' },
+        },
       },
     ],
   }
