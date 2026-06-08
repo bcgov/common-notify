@@ -504,7 +504,7 @@ routes:
     response_buffering: false
 
   # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
-  - name: ${ROUTE_PREFIX}admin-tenants-list
+  - name: ${ROUTE_PREFIX}admin-tenants-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -519,7 +519,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/users/me (upsert current user)
-  - name: ${ROUTE_PREFIX}admin-users-upsert
+  - name: ${ROUTE_PREFIX}admin-users-upsert-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -534,7 +534,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/users (get all users)
-  - name: ${ROUTE_PREFIX}admin-users-list
+  - name: ${ROUTE_PREFIX}admin-users-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -552,7 +552,7 @@ routes:
   # AUTH ROUTES (authenticated users)
   # ============================================================================
   # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
-  - name: ${ROUTE_PREFIX}auth-tenants
+  - name: ${ROUTE_PREFIX}auth-tenants-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -567,7 +567,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
-  - name: ${ROUTE_PREFIX}auth-tenant-roles
+  - name: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -585,7 +585,7 @@ routes:
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-list
+  - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -600,7 +600,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags (create)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-create
+  - name: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -615,7 +615,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (update)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-update
+  - name: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -630,7 +630,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (delete)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-delete
+  - name: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -712,33 +712,36 @@ plugins:
   # ============================================================================
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
@@ -768,143 +771,157 @@ plugins:
       consumer_match_ignore_not_found: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-types
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-list
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-email
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-sms
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notification-by-id
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-templates-list
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-template-by-id
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # ============================================================================
@@ -915,13 +932,14 @@ plugins:
   # Code Tables - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Code Tables - Frontend Token
@@ -955,13 +973,14 @@ plugins:
   # Code Tables Status - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Code Tables Status - Frontend Token
@@ -995,13 +1014,14 @@ plugins:
   # Code Tables Channels - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Code Tables Channels - Frontend Token
@@ -1035,13 +1055,14 @@ plugins:
   # Code Tables Event Types - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Code Tables Event Types - Frontend Token
@@ -1075,13 +1096,14 @@ plugins:
   # Notification Request - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Notification Request - Frontend Token
@@ -1228,7 +1250,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-tenants-list
+    route: ${ROUTE_PREFIX}admin-tenants-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1256,7 +1278,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-upsert
+    route: ${ROUTE_PREFIX}admin-users-upsert-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1284,7 +1306,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-list
+    route: ${ROUTE_PREFIX}admin-users-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1315,7 +1337,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-list
+    route: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1343,7 +1365,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-create
+    route: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1371,7 +1393,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-update
+    route: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1399,7 +1421,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-delete
+    route: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1429,13 +1451,14 @@ plugins:
   # Feature Flags - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}feature-flags
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Feature Flags Frontend - Frontend Token (authenticated users)
@@ -1470,7 +1493,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}auth-tenants
+    route: ${ROUTE_PREFIX}auth-tenants-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1498,7 +1521,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}auth-tenant-roles
+    route: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1525,13 +1548,14 @@ plugins:
   # Code Tables Feature Flags - Service Token
   - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
     config:
       hide_credentials: true
+      key_in_body: false
       key_in_header: true
-      key_names:
-        - X-API-KEY
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
 
   # Code Tables Feature Flags - Frontend Token
