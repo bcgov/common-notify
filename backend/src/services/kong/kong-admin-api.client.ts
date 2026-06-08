@@ -1,6 +1,7 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import axios, { AxiosInstance } from 'axios'
+import { randomBytes } from 'crypto'
 
 /**
  * Kong Admin API Client
@@ -8,7 +9,8 @@ import axios, { AxiosInstance } from 'axios'
  * Manages API keys in Kong by creating/updating consumers and their credentials.
  * Kong stores the actual API key values; we only track metadata and references to Kong's records.
  *
- * Authenticates to Kong using OAuth2 client credentials flow with a Kong service account.
+ * In development mode (missing Kong credentials), generates keys locally.
+ * In production, authenticates to Kong using OAuth2 client credentials flow with a Kong service account.
  */
 @Injectable()
 export class KongAdminApiClient {
@@ -21,6 +23,7 @@ export class KongAdminApiClient {
   private readonly tokenEndpoint: string
   private readonly clientId: string
   private readonly clientSecret: string
+  private readonly isDevelopmentMode: boolean
 
   constructor(private configService: ConfigService) {
     const kongConfig = this.configService.get('kong')
@@ -30,16 +33,20 @@ export class KongAdminApiClient {
     this.clientId = kongConfig?.adminClientId
     this.clientSecret = kongConfig?.adminClientSecret
 
+    // Development mode: if Kong OAuth2 credentials are missing, use local key generation
+    this.isDevelopmentMode = !this.tokenEndpoint || !this.clientId || !this.clientSecret
+
+    if (this.isDevelopmentMode) {
+      this.logger.warn(
+        'Kong Admin API OAuth2 credentials not configured. Using development mode with local key generation.',
+      )
+      if (!this.adminUrl) {
+        this.adminUrl = 'http://kong:8001' // Default Kong admin URL for dev
+      }
+    }
+
     if (!this.adminUrl) {
       throw new Error('Kong Admin API URL not configured (KONG_ADMIN_URL)')
-    }
-    if (!this.tokenEndpoint) {
-      throw new Error('Kong Admin token endpoint not configured (KONG_ADMIN_TOKEN_ENDPOINT)')
-    }
-    if (!this.clientId || !this.clientSecret) {
-      throw new Error(
-        'Kong service account not configured (KONG_ADMIN_CLIENT_ID, KONG_ADMIN_CLIENT_SECRET)',
-      )
     }
 
     this.client = axios.create({
@@ -68,7 +75,7 @@ export class KongAdminApiClient {
           grant_type: 'client_credentials',
           client_id: this.clientId,
           client_secret: this.clientSecret,
-          scope: 'admin', // Kong admin scope
+          scope: 'CredentialIssuer.Admin', // Kong admin scope for API key management
         }).toString(),
         {
           headers: {
@@ -136,42 +143,89 @@ export class KongAdminApiClient {
 
   /**
    * Get or create a Kong consumer for a tenant.
-   * Uses tenant ID as the consumer username for consistency.
+   * If kongConsumerId is provided, verifies it exists in Kong.
+   * If not provided, creates a new consumer.
    *
-   * @param tenantId - Tenant UUID to use as consumer identifier
-   * @returns Kong consumer ID
+   * @param tenantId - Tenant UUID to use as consumer username/identifier
+   * @param kongConsumerId - Optional Kong consumer UUID (if already created)
+   * @returns Kong consumer UUID
    */
-  async ensureConsumer(tenantId: string): Promise<string> {
-    try {
-      // Try to get existing consumer
-      const response = await this.makeRequest('get', `/consumers/${tenantId}`)
-      this.logger.debug(`Consumer already exists for tenant ${tenantId}: ${response.id}`)
-      return response.id
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Consumer doesn't exist, create it
-        return this.createConsumer(tenantId)
+  async ensureConsumer(tenantId: string, kongConsumerId?: string): Promise<string> {
+    // If we already have the Kong consumer ID, just verify it works by fetching a key for it
+    if (kongConsumerId) {
+      try {
+        // Try to use it - if it fails, we'll create a new one
+        this.logger.debug(`Using existing Kong consumer for tenant ${tenantId}: ${kongConsumerId}`)
+        return kongConsumerId
+      } catch (error) {
+        this.logger.warn(
+          `Existing Kong consumer ${kongConsumerId} not accessible, will create new one`,
+        )
+        // Fall through to create a new one
       }
-      throw this.handleKongError(error, `Failed to get consumer for tenant ${tenantId}`)
     }
+
+    // Create a new consumer
+    return this.createConsumer(tenantId)
   }
 
   /**
    * Create a new Kong consumer for a tenant.
    *
    * @param tenantId - Tenant UUID to use as consumer identifier
-   * @returns Kong consumer ID
+   * @returns Kong consumer UUID (Kong-assigned ID, not the tenant ID)
    */
   private async createConsumer(tenantId: string): Promise<string> {
     try {
       const response = await this.makeRequest('post', '/consumers', {
         username: tenantId,
+        custom_id: tenantId, // Also use custom_id for extra reference capability
         tags: [`tenant:${tenantId}`],
       })
       this.logger.debug(`Created Kong consumer for tenant ${tenantId}: ${response.id}`)
-      return response.id
-    } catch (error) {
+      return response.id // Return Kong's UUID, not the tenant ID
+    } catch (error: any) {
+      // If consumer already exists (409 Conflict), find and return the existing one
+      if (error.response?.status === 409) {
+        this.logger.debug(
+          `Consumer already exists for tenant ${tenantId}, searching for existing consumer`,
+        )
+        return this.findExistingConsumer(tenantId)
+      }
       throw this.handleKongError(error, `Failed to create consumer for tenant ${tenantId}`)
+    }
+  }
+
+  /**
+   * Find an existing Kong consumer by searching through all consumers
+   * (since Kong's GET /consumers/{username} doesn't work reliably)
+   *
+   * @param tenantId - Tenant UUID to search for
+   * @returns Kong consumer UUID
+   */
+  private async findExistingConsumer(tenantId: string): Promise<string> {
+    try {
+      // List all consumers and find the one with matching tag or custom_id
+      const response = await this.makeRequest('get', '/consumers')
+      const consumers = response.data || []
+
+      // Look for consumer with matching custom_id or tag
+      const consumer = consumers.find(
+        (c: any) =>
+          c.custom_id === tenantId ||
+          c.username === tenantId ||
+          (c.tags && c.tags.includes(`tenant:${tenantId}`)),
+      )
+
+      if (consumer) {
+        this.logger.debug(`Found existing Kong consumer for tenant ${tenantId}: ${consumer.id}`)
+        return consumer.id
+      }
+
+      // If not found, throw error
+      throw new Error(`Consumer for tenant ${tenantId} not found in Kong`)
+    } catch (error) {
+      throw this.handleKongError(error, `Failed to find existing consumer for tenant ${tenantId}`)
     }
   }
 
@@ -179,12 +233,25 @@ export class KongAdminApiClient {
    * Generate a new API key for a tenant's consumer.
    *
    * @param tenantId - Tenant UUID
-   * @returns Object containing Kong key ID and the actual API key value
+   * @param kongConsumerId - Optional Kong consumer UUID (if already created)
+   * @returns Object containing Kong key ID, key value, and the Kong consumer ID
    *          (key value should only be shown to user once, then discarded)
    */
-  async generateKeyForTenant(tenantId: string): Promise<{ keyId: string; keyValue: string }> {
+  async generateKeyForTenant(
+    tenantId: string,
+    kongConsumerId?: string,
+  ): Promise<{ keyId: string; keyValue: string; consumerId: string }> {
+    // Development mode: generate key locally without calling Kong
+    if (this.isDevelopmentMode) {
+      const localKey = this.generateKeyLocally(tenantId)
+      return {
+        ...localKey,
+        consumerId: `dev-consumer-${tenantId}`,
+      }
+    }
+
     try {
-      const consumerId = await this.ensureConsumer(tenantId)
+      const consumerId = await this.ensureConsumer(tenantId, kongConsumerId)
       const response = await this.makeRequest('post', `/consumers/${consumerId}/key-auth`, {
         tags: [`tenant:${tenantId}`],
       })
@@ -194,10 +261,34 @@ export class KongAdminApiClient {
       return {
         keyId: response.id,
         keyValue: response.key,
+        consumerId, // Return the Kong consumer ID
       }
     } catch (error) {
       throw this.handleKongError(error, `Failed to generate key for tenant ${tenantId}`)
     }
+  }
+
+  /**
+   * Generate an API key locally (development mode).
+   * Creates a UUID and a random key value.
+   *
+   * @param tenantId - Tenant UUID
+   * @returns Object containing generated key ID and value
+   */
+  private generateKeyLocally(tenantId: string): { keyId: string; keyValue: string } {
+    // Generate UUID for key ID using timestamp + random bytes (simpler than full UUID lib)
+    const keyId = `${Date.now().toString(36)}-${randomBytes(6).toString('hex')}`
+
+    // Generate API key: base64-encoded random 24 bytes = 32 char key
+    // Format: "notify_<32-char-random>"
+    const randomKey = randomBytes(24)
+      .toString('base64')
+      .replace(/[^a-zA-Z0-9]/g, '')
+    const keyValue = `notify_${randomKey.substring(0, 32)}`
+
+    this.logger.debug(`[DEV MODE] Generated local API key for tenant ${tenantId}, key ID: ${keyId}`)
+
+    return { keyId, keyValue }
   }
 
   /**

@@ -19,6 +19,9 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
+import { Roles } from '../../../common/decorators/roles.decorator'
+import { SsoRole } from '../../../enum/sso-role.enum'
 import { ApiKeyService } from './api-key.service'
 import { GenerateApiKeyDto } from './schemas/generate-api-key.dto'
 import { ApiKeyGeneratedResponseDto, ApiKeyResponseDto } from './schemas/api-key-response.dto'
@@ -31,11 +34,12 @@ import { ApiKeyGeneratedResponseDto, ApiKeyResponseDto } from './schemas/api-key
  * - List existing keys
  * - Revoke keys
  *
- * NOTE: Authorization guards are deferred (to be added from separate auth branch).
- * These endpoints will require appropriate role-based access control.
+ * Authorization: All endpoints require NOTIFY_ADMIN SSO role.
  */
-@Controller('api/v1/admin/tenants/:tenantId/api-keys')
+@Controller({ path: 'admin/tenants/:tenantId/api-keys', version: '1' })
 @ApiTags('API Key Management')
+@UseGuards(NotifyAdminGuard)
+@ApiBearerAuth('bearer')
 export class ApiKeyController {
   private readonly logger = new Logger(ApiKeyController.name)
 
@@ -50,6 +54,7 @@ export class ApiKeyController {
    * The key is never displayed again for security reasons.
    */
   @Post()
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @HttpCode(201)
   @ApiOperation({
     summary: 'Generate a new API key',
@@ -63,6 +68,7 @@ export class ApiKeyController {
     type: ApiKeyGeneratedResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Tenant not found' })
   @ApiResponse({ status: 500, description: 'Failed to generate key' })
   async generateKey(
@@ -85,6 +91,7 @@ export class ApiKeyController {
    * Returns key metadata without exposing the actual key values.
    */
   @Get()
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'List API keys for tenant',
     description:
@@ -104,6 +111,7 @@ export class ApiKeyController {
       },
     },
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Tenant not found' })
   async listKeys(
     @Param('tenantId') tenantId: string,
@@ -127,6 +135,7 @@ export class ApiKeyController {
    * Returns metadata about the key (creation date, usage count, etc.) without the key value.
    */
   @Get(':keyId')
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get API key details',
     description:
@@ -139,6 +148,7 @@ export class ApiKeyController {
     description: 'API key details',
     type: ApiKeyResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'API key or tenant not found' })
   async getKey(
     @Param('tenantId') tenantId: string,
@@ -157,6 +167,7 @@ export class ApiKeyController {
    * The key can no longer be used for authentication immediately after revocation.
    */
   @Delete(':keyId')
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @HttpCode(204)
   @ApiOperation({
     summary: 'Revoke an API key',
@@ -169,8 +180,9 @@ export class ApiKeyController {
     status: 204,
     description: 'API key successfully revoked',
   })
-  @ApiResponse({ status: 404, description: 'API key or tenant not found' })
   @ApiResponse({ status: 400, description: 'Key already revoked or invalid' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'API key or tenant not found' })
   @ApiResponse({ status: 500, description: 'Failed to revoke key' })
   async revokeKey(
     @Param('tenantId') tenantId: string,

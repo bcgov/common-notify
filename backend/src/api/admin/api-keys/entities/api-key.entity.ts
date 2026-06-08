@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm'
-import { Tenant } from '../tenants/entities/tenant.entity'
+import { Tenant } from '../../tenants/entities/tenant.entity'
 
 /**
  * API Key Entity

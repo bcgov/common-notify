@@ -60,6 +60,10 @@ const adminItems = {
       label: 'Feature Flags',
       to: '/admin/feature-flags',
     },
+    {
+      label: 'API Keys',
+      to: '/admin/api-keys',
+    },
   ],
 } as const
 
@@ -75,10 +79,11 @@ const Sidebar: FC = () => {
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
   const showDashboard = cstarTenants.length > 0
   const showTemplates = cstarTenants.length > 0
-  // Clients requires NOTIFY_OPERATIONS_ADMIN (in CSTAR), so show if they have any CSTAR access
+  // Clients and API Keys require NOTIFY_OPERATIONS_ADMIN (in CSTAR), so show if they have any CSTAR access
   // Feature Flags requires NOTIFY_ADMIN (SSO)
   const showAdminFeatureFlags = isAdmin
   const showAdminClients = cstarTenants.length > 0 || isAdmin
+  const showAdminApiKeys = cstarTenants.length > 0
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -160,6 +165,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Clients</span>
+                  </Link>
+                )}
+                {showAdminApiKeys && (
+                  <Link
+                    to="/admin/api-keys"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">API Keys</span>
                   </Link>
                 )}
               </div>

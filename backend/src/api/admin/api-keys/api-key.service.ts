@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common'
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKey } from './entities/api-key.entity'
 import { GenerateApiKeyDto } from './schemas/generate-api-key.dto'
 import { ApiKeyGeneratedResponseDto, ApiKeyResponseDto } from './schemas/api-key-response.dto'
 import { KongAdminApiClient } from '../../../services/kong/kong-admin-api.client'
+import { Tenant } from '../tenants/entities/tenant.entity'
 
 /**
  * API Key Service
@@ -28,6 +23,8 @@ export class ApiKeyService {
   constructor(
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
+    @InjectRepository(Tenant)
+    private tenantRepository: Repository<Tenant>,
     private kongAdminClient: KongAdminApiClient,
   ) {}
 
@@ -47,13 +44,29 @@ export class ApiKeyService {
     this.logger.debug(`Generating API key for tenant ${tenantId}`)
 
     try {
-      // Step 1: Generate key in Kong
-      const { keyId, keyValue } = await this.kongAdminClient.generateKeyForTenant(tenantId)
+      // Step 0: Fetch tenant to get its Kong consumer ID (if any)
+      const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } })
+      if (!tenant) {
+        throw new NotFoundException(`Tenant ${tenantId} not found`)
+      }
 
-      // Step 2: Store metadata in database
+      // Step 1: Generate key in Kong (will create consumer if needed)
+      const { keyId, keyValue, consumerId } = await this.kongAdminClient.generateKeyForTenant(
+        tenantId,
+        tenant.kongConsumerId,
+      )
+
+      // Step 2: Update tenant with Kong consumer ID if it was newly created
+      if (!tenant.kongConsumerId && consumerId) {
+        tenant.kongConsumerId = consumerId
+        await this.tenantRepository.save(tenant)
+        this.logger.debug(`Stored Kong consumer ID for tenant ${tenantId}: ${consumerId}`)
+      }
+
+      // Step 3: Store key metadata in database
       const apiKey = this.apiKeyRepository.create({
         tenantId,
-        kongConsumerId: tenantId, // We use tenantId as Kong consumer username
+        kongConsumerId: consumerId, // Use the Kong consumer ID returned from Kong
         kongKeyId: keyId,
         displayName: dto.displayName,
         description: dto.description,
@@ -64,7 +77,7 @@ export class ApiKeyService {
 
       await this.apiKeyRepository.save(apiKey)
 
-      this.logger.info(`Created API key ${keyId} for tenant ${tenantId}`)
+      this.logger.log(`Created API key ${keyId} for tenant ${tenantId}`)
 
       return {
         id: apiKey.id,
@@ -114,7 +127,7 @@ export class ApiKeyService {
       apiKey.revokedBy = revokedBy
       await this.apiKeyRepository.save(apiKey)
 
-      this.logger.info(`Revoked API key ${keyId} for tenant ${tenantId}`)
+      this.logger.log(`Revoked API key ${keyId} for tenant ${tenantId}`)
     } catch (error) {
       this.logger.error(`Failed to revoke API key ${keyId} for tenant ${tenantId}`, error)
       throw error

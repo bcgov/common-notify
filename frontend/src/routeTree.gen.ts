@@ -21,6 +21,7 @@ import { Route as TemplatesTemplateIdRouteImport } from './routes/templates/$tem
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as AdminClientsRouteImport } from './routes/admin/clients'
+import { Route as AdminApiKeysRouteImport } from './routes/admin/api-keys'
 
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
@@ -82,6 +83,11 @@ const AdminClientsRoute = AdminClientsRouteImport.update({
   path: '/admin/clients',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminApiKeysRoute = AdminApiKeysRouteImport.update({
+  id: '/admin/api-keys',
+  path: '/admin/api-keys',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/admin/api-keys'
     | '/admin/clients'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/admin/api-keys'
     | '/admin/clients'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/admin/api-keys'
     | '/admin/clients'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
@@ -180,6 +192,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
+  AdminApiKeysRoute: typeof AdminApiKeysRoute
   AdminClientsRoute: typeof AdminClientsRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClientsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/api-keys': {
+      id: '/admin/api-keys'
+      path: '/admin/api-keys'
+      fullPath: '/admin/api-keys'
+      preLoaderRoute: typeof AdminApiKeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -295,6 +315,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
+  AdminApiKeysRoute: AdminApiKeysRoute,
   AdminClientsRoute: AdminClientsRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,

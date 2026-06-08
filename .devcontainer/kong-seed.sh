@@ -170,6 +170,27 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/LOCAL003-GHI789/jwt" \
   --data "secret=jwt-secret-local003" \
   2>/dev/null || echo "JWT credentials may already exist for test-tenant-c"
 
+# Service Account for Notify API Key Management
+echo ""
+echo "  Creating service account: notify-service"
+NOTIFY_SERVICE=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
+  --data-urlencode "username=notify-service" \
+  --data-urlencode "custom_id=notify-service" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$NOTIFY_SERVICE" ]; then
+  echo "    Service account may already exist, fetching..."
+  NOTIFY_SERVICE=$(curl -s "$KONG_ADMIN_URL/consumers/notify-service" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+echo "    Creating OAuth2 credentials for notify-service"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/notify-service/oauth2" \
+  --data-urlencode "client_id=sa-notify-service" \
+  --data-urlencode "client_secret=notify-service-secret-12345678901234" \
+  --data-urlencode "redirect_uris=http://localhost:3000/callback" \
+  --data-urlencode "scopes=CredentialIssuer.Admin" \
+  2>/dev/null || echo "OAuth2 credentials may already exist for notify-service"
+
 echo ""
 echo "✅ Kong seeding complete!"
 echo ""

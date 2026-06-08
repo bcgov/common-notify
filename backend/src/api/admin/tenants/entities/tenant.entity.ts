@@ -14,6 +14,13 @@ export class Tenant {
   @Column({ nullable: true, name: 'external_id' })
   externalId: string
 
+  /**
+   * Kong consumer UUID - stores the Kong-assigned consumer ID for API key management
+   * Set when the tenant is created and the consumer is created in Kong
+   */
+  @Column({ nullable: true, name: 'kong_consumer_id' })
+  kongConsumerId: string
+
   @Column()
   name: string
 

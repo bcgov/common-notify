@@ -1,6 +1,6 @@
-import { useEffect, useState, forwardRef } from 'react'
-import type { FC } from 'react'
-import { Button, Table, Loading, Alert } from '@bcgov/design-system-react-components'
+import { useEffect, useState, forwardRef, useCallback } from 'react'
+import { Button } from '@bcgov/design-system-react-components'
+import { Table } from '@/components/DataTable/Table'
 import { apiKeyService, type ApiKeyResponse, type ApiKeysListResponse } from '@/api/apiKeyService'
 
 interface ApiKeyListProps {
@@ -19,16 +19,7 @@ const ApiKeyList = forwardRef<{ refetch?: () => void }, ApiKeyListProps>(
     const [error, setError] = useState<string | null>(null)
     const [revoking, setRevoking] = useState<string | null>(null)
 
-    // Expose refetch method via ref
-    useEffect(() => {
-      if (typeof ref === 'function') {
-        ref({ refetch: fetchKeys })
-      } else if (ref) {
-        ref.current = { refetch: fetchKeys }
-      }
-    }, [ref])
-
-    const fetchKeys = async () => {
+    const fetchKeys = useCallback(async () => {
       setLoading(true)
       setError(null)
 
@@ -41,7 +32,16 @@ const ApiKeyList = forwardRef<{ refetch?: () => void }, ApiKeyListProps>(
       } finally {
         setLoading(false)
       }
-    }
+    }, [tenantId])
+
+    // Expose refetch method via ref
+    useEffect(() => {
+      if (typeof ref === 'function') {
+        ref({ refetch: fetchKeys })
+      } else if (ref) {
+        ref.current = { refetch: fetchKeys }
+      }
+    }, [ref, fetchKeys])
 
     const handleRevokeKey = async (keyId: string) => {
       if (!confirm('Are you sure you want to revoke this API key? It can no longer be used.')) {
@@ -64,28 +64,36 @@ const ApiKeyList = forwardRef<{ refetch?: () => void }, ApiKeyListProps>(
 
     useEffect(() => {
       fetchKeys()
-    }, [tenantId])
+    }, [fetchKeys])
 
-    if (loading) return <Loading message="Loading API keys..." />
-
-    if (error)
+    if (loading) {
       return (
-        <Alert type="error" title="Error">
-          {error}
-        </Alert>
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+          Loading API keys...
+        </div>
       )
+    }
+
+    if (error) {
+      return (
+        <div className="alert alert-danger" role="alert">
+          <strong>Error:</strong> {error}
+        </div>
+      )
+    }
 
     if (keys.length === 0) {
       return (
-        <Alert type="info" title="No API Keys">
-          No API keys have been generated yet. Click the button above to create one.
-        </Alert>
+        <div className="alert alert-info" role="alert">
+          <strong>No API Keys:</strong> No API keys have been generated yet. Click the button above
+          to create one.
+        </div>
       )
     }
 
     return (
       <div>
-        <Table>
+        <Table variant="striped" size="md">
           <thead>
             <tr>
               <th>Display Name</th>
@@ -119,10 +127,9 @@ const ApiKeyList = forwardRef<{ refetch?: () => void }, ApiKeyListProps>(
                 <td>
                   {key.isActive && (
                     <Button
-                      variant="danger"
-                      size="small"
-                      onClick={() => handleRevokeKey(key.id)}
-                      disabled={revoking === key.id}
+                      variant="primary"
+                      onPress={() => handleRevokeKey(key.id)}
+                      isDisabled={revoking === key.id}
                     >
                       {revoking === key.id ? 'Revoking...' : 'Revoke'}
                     </Button>

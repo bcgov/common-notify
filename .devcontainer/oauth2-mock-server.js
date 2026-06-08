@@ -11,6 +11,7 @@ const testClients = {
   'LOCAL001-ABC123': 'LOCAL001-SECRET-ABC123XYZ789',
   'LOCAL002-DEF456': 'LOCAL002-SECRET-DEF456XYZ789',
   'LOCAL003-GHI789': 'LOCAL003-SECRET-GHI789XYZ789',
+  'sa-notify-service': 'notify-service-secret-12345678901234', // Service account for API key management
 }
 
 // JWT signing secrets (must match Kong JWT credentials created with 'secret' field)
@@ -18,6 +19,7 @@ const jwtSecrets = {
   'LOCAL001-ABC123': 'jwt-secret-local001',
   'LOCAL002-DEF456': 'jwt-secret-local002',
   'LOCAL003-GHI789': 'jwt-secret-local003',
+  'sa-notify-service': 'notify-service-secret-12345678901234', // Same as client secret for service account
 }
 
 // Issuer (should match API_GATEWAY_KEYCLOAK_ISSUER in backend)
@@ -33,6 +35,8 @@ app.get('/health', (req, res) => {
 // Kong will route POST /oauth2/token to POST /
 app.post('/', (req, res) => {
   const { grant_type, client_id, client_secret, scope } = req.body
+
+  console.log('[oauth2-mock] Token request:', { grant_type, client_id, scope })
 
   // Validate grant type
   if (grant_type !== 'client_credentials') {
@@ -56,6 +60,13 @@ app.post('/', (req, res) => {
       error: 'invalid_client',
       error_description: 'client_id or client_secret is invalid',
     })
+  }
+
+  // Validate scopes if provided (accept all for local development)
+  // In production, Kong's OAuth2 plugin would validate registered scopes
+  if (scope) {
+    // Just log the requested scope for debugging
+    console.log(`[oauth2-mock] Token requested with scope: ${scope}`)
   }
 
   // Generate a signed JWT token (HS256)

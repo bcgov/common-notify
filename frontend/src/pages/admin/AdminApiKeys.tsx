@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { FC } from 'react'
-import { useParams } from 'react-router-dom'
-import { Button, Alert } from '@bcgov/design-system-react-components'
+import { useAppSelector } from '@/redux/hooks'
+import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import ApiKeyList from '@/components/ApiKeyList'
 import GenerateApiKeyModal from '@/components/GenerateApiKeyModal'
@@ -16,7 +16,9 @@ import type { GeneratedApiKeyResponse } from '@/api/apiKeyService'
  * (e.g., ROLE_ADMIN or ROLE_API_KEY_MANAGER).
  */
 const AdminApiKeys: FC = () => {
-  const { tenantId } = useParams<{ tenantId: string }>()
+  // Get the currently selected CSTAR tenant
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const tenantId = selectedTenant?.id
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [generatedKey, setGeneratedKey] = useState<GeneratedApiKeyResponse | null>(null)
   const keyListRef = useRef<{ refetch?: () => void }>(null)
@@ -25,9 +27,9 @@ const AdminApiKeys: FC = () => {
     return (
       <div>
         <PageHeading title="API Keys" />
-        <Alert type="error" title="Error">
-          Tenant ID is required to manage API keys.
-        </Alert>
+        <div className="alert alert-danger" role="alert">
+          <strong>Error:</strong> Tenant ID is required to manage API keys.
+        </div>
       </div>
     )
   }
@@ -47,10 +49,10 @@ const AdminApiKeys: FC = () => {
       <PageHeading title="API Key Management" />
 
       {generatedKey && (
-        <Alert type="success" title="API Key Created">
+        <div className="alert alert-success" role="alert">
           Your API key <code>{generatedKey.displayName}</code> has been successfully created and is
           ready to use.
-        </Alert>
+        </div>
       )}
 
       <div className="mb-4">
@@ -78,6 +80,7 @@ const AdminApiKeys: FC = () => {
 
       <GenerateApiKeyModal
         tenantId={tenantId}
+        tenantName={selectedTenant?.name}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleGenerateSuccess}
