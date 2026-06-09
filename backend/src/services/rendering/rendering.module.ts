@@ -3,6 +3,7 @@ import { TemplateRendererRegistry } from './renderer-registry'
 import { HandlebarsTemplateRenderer } from './engines/handlebars-template.renderer'
 import { MustacheTemplateRenderer } from './engines/mustache-template.renderer'
 import { LegacyGcNotifyTemplateRenderer } from './engines/legacy-gc-notify-template.renderer'
+import { MjmlTemplateRenderer } from './engines/mjml-template.renderer'
 import { InlineRenderingService } from './inline-rendering.service'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
 
@@ -25,18 +26,21 @@ import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
     HandlebarsTemplateRenderer,
     MustacheTemplateRenderer,
     LegacyGcNotifyTemplateRenderer,
+    MjmlTemplateRenderer,
     {
       provide: TEMPLATE_RENDERER_REGISTRY_TOKEN,
       useFactory: (
         handlebars: HandlebarsTemplateRenderer,
         mustache: MustacheTemplateRenderer,
         legacyGcNotify: LegacyGcNotifyTemplateRenderer,
+        mjml: MjmlTemplateRenderer,
       ) => {
         return new TemplateRendererRegistry(
           [
             { engine: 'handlebars', instance: handlebars },
             { engine: 'mustache', instance: mustache },
             { engine: 'legacy_gc_notify', instance: legacyGcNotify },
+            { engine: 'mjml', instance: mjml },
           ],
           'handlebars', // default engine
         )
@@ -45,6 +49,7 @@ import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
         HandlebarsTemplateRenderer,
         MustacheTemplateRenderer,
         LegacyGcNotifyTemplateRenderer,
+        MjmlTemplateRenderer,
       ],
     },
     InlineRenderingService,
