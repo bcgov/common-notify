@@ -13,6 +13,7 @@ import { RenderingModule } from '../../services/rendering/rendering.module'
 import { NotifyModule } from '../notify/notify.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 /**
  * Feature Module for Templates
@@ -28,6 +29,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
     TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode, Tenant]),
     RenderingModule,
     CstarModule,
+    ApiKeysModule,
     forwardRef(() => NotifyModule),
   ],
   controllers: [TemplatesController, TemplatesFrontendController],

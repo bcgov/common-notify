@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
@@ -29,6 +30,7 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
     RenderingModule,
     FeatureFlagModule,
     CstarModule,
+    ApiKeysModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],

@@ -4,6 +4,7 @@ import { FeatureFlag } from './entities/feature-flag.entity'
 import { FeatureFlagCode } from './entities/feature-flag-code.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { FeatureFlagService } from './feature-flag.service'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 import {
   FeatureFlagController,
   FeatureFlagClientController,
@@ -20,6 +21,7 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
     TypeOrmModule.forFeature([FeatureFlag, FeatureFlagCode, Tenant]),
     TenantsModule,
     CstarModule,
+    ApiKeysModule,
   ],
   providers: [FeatureFlagService, NotifyAdminGuard, NotifyFrontendRoleGuard, NotifyServiceGuard],
   controllers: [

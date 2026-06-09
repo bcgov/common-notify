@@ -26,6 +26,11 @@ const jwtSecrets = {
 const keycloakIssuer =
   process.env.API_GATEWAY_KEYCLOAK_ISSUER || 'https://test.loginproxy.gov.bc.ca/auth/realms/apigw'
 
+// Local CSTAR tenant IDs aligned to seeded Notify tenant.external_id values.
+const TENANT_1_ID = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
+const TENANT_2_ID = 'd4380e35-68be-40c2-82b6-f3a00e080446'
+const TENANT_3_ID = '44e8b879-3591-4180-a155-49d441f82284'
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
@@ -125,32 +130,38 @@ app.get('/api/v1/users/:ssoUserId/tenants', (req, res) => {
   const userTenants = {
     'user-001': [
       {
-        id: 'tenant-001',
-        name: 'Ministry of Health',
-        ministryName: 'Ministry of Health',
-        description: 'MOH Tenant',
+        id: TENANT_1_ID,
+        name: 'Notify Test Tenant 1',
+        ministryName: 'Test Ministry 1',
+        description: 'Local test tenant 1',
       },
       {
-        id: 'tenant-002',
-        name: 'Ministry of Education',
-        ministryName: 'Ministry of Education',
-        description: 'MOE Tenant',
+        id: TENANT_2_ID,
+        name: 'Notify Test Tenant 2',
+        ministryName: 'Test Ministry 2',
+        description: 'Local test tenant 2',
       },
     ],
     'user-002': [
       {
-        id: 'tenant-002',
-        name: 'Ministry of Education',
-        ministryName: 'Ministry of Education',
-        description: 'MOE Tenant',
+        id: TENANT_2_ID,
+        name: 'Notify Test Tenant 2',
+        ministryName: 'Test Ministry 2',
+        description: 'Local test tenant 2',
       },
     ],
     'user-003': [
       {
-        id: 'tenant-001',
-        name: 'Ministry of Health',
-        ministryName: 'Ministry of Health',
-        description: 'MOH Tenant',
+        id: TENANT_1_ID,
+        name: 'Notify Test Tenant 1',
+        ministryName: 'Test Ministry 1',
+        description: 'Local test tenant 1',
+      },
+      {
+        id: TENANT_3_ID,
+        name: 'Notify Test Tenant 3',
+        ministryName: 'Test Ministry 3',
+        description: 'Local test tenant 3',
       },
     ],
   }
@@ -175,14 +186,14 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
   // Mock data: Different users have different roles in different tenants
   const userRoles = {
     'user-001': {
-      'tenant-001': [
+      [TENANT_1_ID]: [
         {
           id: 'role-1',
           name: 'NOTIFY_OPERATIONS_ADMIN',
           description: 'Full admin access',
         },
       ],
-      'tenant-002': [
+      [TENANT_2_ID]: [
         {
           id: 'role-2',
           name: 'NOTIFY_TEMPLATE_EDITOR',
@@ -191,7 +202,7 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
       ],
     },
     'user-002': {
-      'tenant-002': [
+      [TENANT_2_ID]: [
         {
           id: 'role-3',
           name: 'NOTIFY_VIEWER',
@@ -200,11 +211,18 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
       ],
     },
     'user-003': {
-      'tenant-001': [
+      [TENANT_1_ID]: [
         {
           id: 'role-4',
           name: 'NOTIFY_TEMPLATE_EDITOR',
           description: 'Can create and edit templates',
+        },
+      ],
+      [TENANT_3_ID]: [
+        {
+          id: 'role-5',
+          name: 'NOTIFY_VIEWER',
+          description: 'Read-only access',
         },
       ],
     },
@@ -250,8 +268,10 @@ app.listen(PORT, () => {
   console.log('')
   console.log('Mock Users for CSTAR API:')
   console.log(
-    '  - user-001: Has access to tenant-001 (NOTIFY_OPERATIONS_ADMIN) and tenant-002 (NOTIFY_TEMPLATE_EDITOR)',
+    `  - user-001: Has access to ${TENANT_1_ID} (NOTIFY_OPERATIONS_ADMIN) and ${TENANT_2_ID} (NOTIFY_TEMPLATE_EDITOR)`,
   )
-  console.log('  - user-002: Has access to tenant-002 (NOTIFY_VIEWER)')
-  console.log('  - user-003: Has access to tenant-001 (NOTIFY_TEMPLATE_EDITOR)')
+  console.log(`  - user-002: Has access to ${TENANT_2_ID} (NOTIFY_VIEWER)`)
+  console.log(
+    `  - user-003: Has access to ${TENANT_1_ID} (NOTIFY_TEMPLATE_EDITOR) and ${TENANT_3_ID} (NOTIFY_VIEWER)`,
+  )
 })
