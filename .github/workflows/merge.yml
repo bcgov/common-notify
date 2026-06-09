@@ -39,7 +39,7 @@ jobs:
         package: [backend, frontend, migrations]
     timeout-minutes: 10
     steps:
-      - uses: bcgov/action-builder-ghcr@fe69125408b878f9edb6cd1a3df7c4bf451c963d # v4.3.0
+      - uses: bcgov/action-builder-ghcr@cb2629351c87dd1c2130073e4ebb7233a9653a63 # v4.4.1
         with:
           package: ${{ matrix.package }}
           tags: dev
@@ -55,7 +55,7 @@ jobs:
         package: [backend, frontend, migrations]
     steps:
       - name: Import image to OpenShift ImageStream
-        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
@@ -162,7 +162,7 @@ jobs:
         package: [backend, frontend, migrations]
     steps:
       - name: Tag images for PROD
-        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}

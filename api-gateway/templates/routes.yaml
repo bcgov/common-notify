@@ -202,6 +202,19 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}feature-flags-frontend
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-list
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
@@ -572,6 +585,39 @@ routes:
       - ${GATEWAY_HOSTNAME}
     paths:
       - /api/v1/frontend/users
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # AUTH ROUTES (authenticated users)
+  # ============================================================================
+  # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
+  - name: ${ROUTE_PREFIX}auth-tenants
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/auth/tenants
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
+  - name: ${ROUTE_PREFIX}auth-tenant-roles
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/frontend/auth/tenants/[^/]+/roles
     methods:
       - GET
     strip_path: false

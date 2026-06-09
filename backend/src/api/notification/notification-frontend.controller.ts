@@ -11,13 +11,13 @@ import {
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
-import { RequireRole } from '../../auth/decorators/require-role.decorator'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
@@ -38,7 +38,7 @@ import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
  */
 @ApiTags('notification_request')
 @Controller('frontend/notification_request')
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class NotificationFrontendController {
   private readonly logger = new Logger(NotificationFrontendController.name)
@@ -51,7 +51,11 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Get()
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -93,8 +97,12 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Sse('events')
-  @UseGuards(FeatureFlagGuard)
-  @RequireRole('NOTIFY_ADMIN')
+  @UseGuards(NotifyFrontendRoleGuard, FeatureFlagGuard)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
   @ApiQuery({
@@ -117,10 +125,10 @@ export class NotificationFrontendController {
 
     const tenantId = tenant.id
 
-    // Observable stream
+    // Observable stream — emits a refresh signal so the frontend refetches data
     const updates$ = this.notificationPubSubService
       .getObservable(tenantId)
-      .pipe(map((dto) => ({ data: dto }) as MessageEvent))
+      .pipe(map(() => ({ data: {} }) as MessageEvent))
 
     // Emit a named keepalive event every 25s to prevent proxy/LB idle-connection timeouts.
     // The frontend's onmessage handler ignores events with type 'keepalive'.

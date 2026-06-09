@@ -140,8 +140,12 @@ const TemplateCreate: FC = () => {
               isInvalid={!!formErrors.channelCode}
               errorMessage={formErrors.channelCode}
             >
-              <Radio value={NotificationChannel.EMAIL}>Email</Radio>
-              <Radio value={NotificationChannel.SMS}>SMS</Radio>
+              <Radio key="email" value={NotificationChannel.EMAIL}>
+                Email
+              </Radio>
+              <Radio key="sms" value={NotificationChannel.SMS}>
+                SMS
+              </Radio>
             </RadioGroup>
           </div>
 
@@ -166,6 +170,15 @@ const TemplateCreate: FC = () => {
               <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
               <Radio value={TemplateEngine.LEGACY_GC_NOTIFY}>Legacy GC Notify</Radio>
               <Radio value={TemplateEngine.MJML}>MJML</Radio>
+              <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
+                Handlebars
+              </Radio>
+              <Radio key="mustache" value={TemplateEngine.MUSTACHE}>
+                Mustache
+              </Radio>
+              <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
+                Legacy GC Notify
+              </Radio>
             </RadioGroup>
           </div>
 
@@ -186,8 +199,12 @@ const TemplateCreate: FC = () => {
               isInvalid={!!formErrors.bodyType}
               errorMessage={formErrors.bodyType}
             >
-              <Radio value={TemplateBodyType.HTML}>HTML</Radio>
-              <Radio value={TemplateBodyType.MARKDOWN}>Markdown</Radio>
+              <Radio key="html" value={TemplateBodyType.HTML}>
+                HTML
+              </Radio>
+              <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
+                Markdown
+              </Radio>
             </RadioGroup>
           </div>
 

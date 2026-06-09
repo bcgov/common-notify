@@ -158,16 +158,20 @@ describe('CodeTablesService', () => {
   })
 
   describe('getStatuses', () => {
-    it('should return all status codes transformed to CodeTableItem format', async () => {
+    it('should return all status codes transformed to CodeTableDto format', async () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
 
       const result = await service.getStatuses()
 
       expect(result).toHaveLength(3)
       expect(result[0]).toEqual({
-        id: 'sent',
-        label: 'Sent',
+        code: 'sent',
+        displayName: 'Sent',
         description: 'Notification sent successfully',
+        createdAt: mockStatusCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockStatusCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(statusCodeRepo.find).toHaveBeenCalledWith({
         order: { sort_order: 'ASC' },
@@ -191,16 +195,20 @@ describe('CodeTablesService', () => {
   })
 
   describe('getChannels', () => {
-    it('should return all channel codes transformed to CodeTableItem format', async () => {
+    it('should return all channel codes transformed to CodeTableDto format', async () => {
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
 
       const result = await service.getChannels()
 
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
-        id: 'EMAIL',
-        label: 'Email',
+        code: 'EMAIL',
+        displayName: 'Email',
         description: 'Email notification channel',
+        createdAt: mockChannelCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockChannelCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(channelCodeRepo.find).toHaveBeenCalledWith({
         order: { sort_order: 'ASC' },
@@ -224,16 +232,20 @@ describe('CodeTablesService', () => {
   })
 
   describe('getEventTypes', () => {
-    it('should return all event type codes transformed to CodeTableItem format', async () => {
+    it('should return all event type codes transformed to CodeTableDto format', async () => {
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       const result = await service.getEventTypes()
 
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
-        id: 'PASSWORD_RESET',
-        label: 'Password Reset',
+        code: 'PASSWORD_RESET',
+        displayName: 'Password Reset',
         description: 'Password reset notification',
+        createdAt: mockEventTypeCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockEventTypeCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(eventTypeCodeRepo.find).toHaveBeenCalledWith({
         order: { sort_order: 'ASC' },
