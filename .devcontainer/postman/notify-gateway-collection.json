@@ -659,7 +659,7 @@
                 "header": [
                   {
                     "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                     "type": "text"
                   }
                 ],
@@ -694,7 +694,7 @@
                   },
                   {
                     "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                     "type": "text"
                   }
                 ],
@@ -733,7 +733,7 @@
                   },
                   {
                     "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                     "type": "text"
                   }
                 ],
@@ -1175,7 +1175,7 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                 "type": "text"
               }
             ],
@@ -1214,7 +1214,7 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                 "type": "text"
               }
             ],
@@ -1292,7 +1292,7 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                 "type": "text"
               }
             ],
@@ -1331,7 +1331,7 @@
               },
               {
                 "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
                 "type": "text"
               }
             ],
@@ -1604,7 +1604,7 @@
           "response": []
         },
         {
-          "name": "Notify - Register Callback",
+          "name": "Notify - Register Callback (Teams webhook)",
           "event": [
             {
               "listen": "test",
@@ -1646,7 +1646,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"]\n}",
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -1655,61 +1655,6 @@
               "path": ["api", "v1", "notify", "registerCallback"]
             },
             "description": "Register a callback webhook.\n\n**Setup:**\n1. Go to https://webhook.site, copy your unique URL, set it as `webhook_url` collection variable.\n2. Send a notification (e.g. Simple Send Email).\n3. Watch the POST arrive at webhook.site with `X-Webhook-Signature` header if secret is set.\n\n**Fields:**\n- `url`: HTTPS URL to receive POST requests (required)\n- `channelType`: filter by channel — `email`, `sms`, `msgApp`. Omit to receive all.\n- `trigger`: `success` fires on COMPLETED, `failure` fires on FAILED. Omit to receive all.\n- `secret`: Optional. If provided, each POST includes `X-Webhook-Signature: sha256=<hmac>`.\n- `headers`: Optional key/value pairs merged into every outbound POST.\n- `active`: true/false to enable/disable without deleting.\n\n**callbackId is auto-saved to `{{callback_id}}` collection variable.**"
-          },
-          "response": []
-        },
-        {
-          "name": "Notify - Register Callback (with HMAC secret)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const res = pm.response.json();",
-                  "if (res.callbackId) {",
-                  "  pm.collectionVariables.set('callback_id', res.callbackId);",
-                  "  console.log('Saved callbackId:', res.callbackId);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{jwt_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"secret\": \"my-test-secret-123\",\n  \"channelType\": [\"email\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"headers\": {\n    \"X-My-Custom-Header\": \"my-value\"\n  }\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{gateway_url}}/api/v1/notify/registerCallback",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notify", "registerCallback"]
-            },
-            "description": "Register a callback with an HMAC secret. Each delivered POST will include `X-Webhook-Signature: sha256=<hmac>` computed over the raw JSON body. Verify on your server with HMAC-SHA256 using the same secret."
           },
           "response": []
         },
