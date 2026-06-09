@@ -15,6 +15,7 @@ import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
 import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
 import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
+import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -49,6 +50,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         FeatureFlagCode,
         WebhookConfig,
         WebhookDeliveryLog,
+        WebhookTypeCode,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

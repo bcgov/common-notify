@@ -9,6 +9,7 @@ import {
 } from 'typeorm'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 import { WebhookType } from '../../../enum/webhook-type.enum'
+import { WebhookTypeCode } from './webhook-type.entity'
 
 @Entity('webhook_config')
 export class WebhookConfig {
@@ -47,6 +48,10 @@ export class WebhookConfig {
   /** Webhook type: 'teams' sends a Teams MessageCard payload; 'generic' sends raw JSON */
   @Column({ name: 'webhook_type', type: 'varchar', length: 20, default: WebhookType.GENERIC })
   webhookType: WebhookType
+
+  @ManyToOne(() => WebhookTypeCode)
+  @JoinColumn({ name: 'webhook_type', referencedColumnName: 'code' })
+  webhookTypeCode: WebhookTypeCode
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date

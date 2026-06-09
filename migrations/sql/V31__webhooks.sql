@@ -1,4 +1,20 @@
-CREATE TABLE webhook_config (
+CREATE TABLE notify.webhook_type (
+    code VARCHAR(20) PRIMARY KEY,
+    description VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by VARCHAR(200),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by VARCHAR(200)
+);
+
+COMMENT ON TABLE notify.webhook_type IS 'Defines webhook types that determine the payload format sent to the webhook endpoint.';
+
+INSERT INTO notify.webhook_type (code, description, created_by)
+VALUES
+('generic', 'Generic webhook', 'system'),
+('teams', 'Microsoft Teams webhook', 'system');
+
+CREATE TABLE notify.webhook_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   url VARCHAR(2048) NOT NULL,
@@ -7,15 +23,17 @@ CREATE TABLE webhook_config (
   headers JSONB,
   channel_type JSONB,
   trigger_on JSONB,
-  webhook_type VARCHAR(20) NOT NULL DEFAULT 'generic',
+  webhook_type VARCHAR(20) NOT NULL DEFAULT 'generic' REFERENCES notify.webhook_type(code),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by VARCHAR(255),
-  updated_by VARCHAR(255),
+  created_by VARCHAR(200),
+  updated_by VARCHAR(200),
   UNIQUE(tenant_id, url)
 );
 
-CREATE TABLE webhook_delivery_log (
+COMMENT ON TABLE notify.webhook_config IS 'Stores webhook endpoint configurations per tenant, including the target URL, secret, headers, and rules for which channels and events trigger delivery.';
+
+CREATE TABLE notify.webhook_delivery_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   webhook_config_id UUID NOT NULL REFERENCES webhook_config(id) ON DELETE CASCADE,
   notification_id UUID REFERENCES notification_request(id),
@@ -28,6 +46,8 @@ CREATE TABLE webhook_delivery_log (
   status VARCHAR(20) DEFAULT 'SENT',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMENT ON TABLE notify.webhook_delivery_log IS 'Tracks each webhook delivery attempt, including HTTP status, response body, retry scheduling, and final delivery status.';
 
 CREATE INDEX idx_webhook_config_tenant ON webhook_config(tenant_id, active);
 CREATE INDEX idx_webhook_delivery_log_webhook ON webhook_delivery_log(webhook_config_id);
