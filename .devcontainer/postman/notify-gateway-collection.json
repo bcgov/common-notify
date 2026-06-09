@@ -1679,7 +1679,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"}",
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
