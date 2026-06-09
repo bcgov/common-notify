@@ -166,10 +166,6 @@ const TemplateCreate: FC = () => {
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
-              <Radio value={TemplateEngine.HANDLEBARS}>Handlebars</Radio>
-              <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
-              <Radio value={TemplateEngine.LEGACY_GC_NOTIFY}>Legacy GC Notify</Radio>
-              <Radio value={TemplateEngine.MJML}>MJML</Radio>
               <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
                 Handlebars
               </Radio>
@@ -178,6 +174,9 @@ const TemplateCreate: FC = () => {
               </Radio>
               <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
                 Legacy GC Notify
+              </Radio>
+              <Radio key="mjml" value={TemplateEngine.MJML}>
+                MJML
               </Radio>
             </RadioGroup>
           </div>
