@@ -23,7 +23,12 @@ generate_env_config() {
   local release=$2
 
   local ENV_FILE="${SCRIPT_DIR}/config/${env}.env"
-  local TEMPLATE_FILE="${SCRIPT_DIR}/templates/routes.yaml"
+  # Use PR-specific template with header matching for PR environments
+  if [ "$env" == "pr" ]; then
+    local TEMPLATE_FILE="${SCRIPT_DIR}/templates/routes-pr.yaml"
+  else
+    local TEMPLATE_FILE="${SCRIPT_DIR}/templates/routes.yaml"
+  fi
   local OUTPUT_FILE="${SCRIPT_DIR}/generated/gw-routes-${env}.yaml"
 
   # Set default release name if not provided

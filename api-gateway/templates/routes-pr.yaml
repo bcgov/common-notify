@@ -1,0 +1,1704 @@
+kind: GatewayService
+name: ${GATEWAY_SERVICE_NAME}
+tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+host: ${BACKEND_HOST}
+port: 80
+protocol: http
+retries: 0
+routes:
+  # ============================================================================
+  # PUBLIC ROUTES - No authentication required
+  # ============================================================================
+  - name: ${ROUTE_PREFIX}notify-health
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /health
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-api-health
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/health
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # SERVICE-TO-SERVICE ROUTES (Client Credentials)
+  # Routes that can only be called by backend services using service tokens
+  # ============================================================================
+  - name: ${ROUTE_PREFIX}ches-email
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /ches/api/v1/email
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notifysimple
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/frontend/notifysimple/[^/]+
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-event
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notifyevent
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-event-preview
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notifyevent/preview
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-event-types
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notifyevent/types
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notify
+    methods:
+      - GET
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-status
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notify/status
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-callbacks
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notify/registerCallback
+    methods:
+      - POST
+      - PATCH
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}templates
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/templates
+    methods:
+      - GET
+      - POST
+      - PATCH
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}feature-flags
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}feature-flags-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-notifications-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/notifications
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-notifications-email
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/notifications/email
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/notifications/sms
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/notifications/bulk
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/notifications/*
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-templates-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/templates
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-template-by-id
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/gcnotify/v2/template/*
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # SERVICE & FRONTEND ROUTES
+  # Routes that support BOTH service tokens AND frontend user tokens
+  # Note: Each route appears twice (-service and -frontend variants)
+  #       to handle different issuer/audience combinations
+  # ============================================================================
+
+  # /api/v1/code-tables (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/code-tables (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/notification-status (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-status-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables/notification-status
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/code-tables/notification-status (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-status-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables/notification-status
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/channels (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-channels-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables/channels
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/code-tables/channels (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-channels-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables/channels
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/event-types (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-event-types-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables/event-types
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/code-tables/event-types (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-event-types-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables/event-types
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/feature-flags (service variant)
+  - name: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/code-tables/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/code-tables/feature-flags (frontend variant)
+  - name: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/code-tables/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/notification_request (service variant)
+  - name: ${ROUTE_PREFIX}notification-request-service
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/notification_request
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/notification_request (frontend variant)
+  - name: ${ROUTE_PREFIX}notification-request-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/notification_request
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # /api/v1/frontend/notification_request/events (frontend only)
+  - name: ${ROUTE_PREFIX}notification-request-events-frontend
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/notification_request/events
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: false
+    response_buffering: false
+
+  # /api/v1/frontend/admin/clients/link-to-tenants (frontend admin only)
+  - name: ${ROUTE_PREFIX}admin-clients-link-to-tenants
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/clients/link-to-tenants
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/clients/mappings (frontend admin only)
+  - name: ${ROUTE_PREFIX}admin-clients-mappings-get
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/clients/mappings
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/clients/mappings/:id/toggle-active (frontend admin only)
+  - name: ${ROUTE_PREFIX}admin-clients-mappings-toggle
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/clients/mappings/
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
+  - name: ${ROUTE_PREFIX}admin-tenants-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/admin/tenants
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/users/me (upsert current user)
+  - name: ${ROUTE_PREFIX}admin-users-upsert
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/users/me
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/users (get all users)
+  - name: ${ROUTE_PREFIX}admin-users-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/users
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # AUTH ROUTES (authenticated users)
+  # ============================================================================
+  # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
+  - name: ${ROUTE_PREFIX}auth-tenants
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/auth/tenants
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
+  - name: ${ROUTE_PREFIX}auth-tenant-roles
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~/api/v1/frontend/auth/tenants/[^/]+/roles
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # FEATURE FLAG ADMIN ROUTES (admin only)
+  # ============================================================================
+  # /api/v1/frontend/admin/feature-flags (list all)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags (create)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-create
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags/:id (update)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-update
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags/
+    methods:
+      - PATCH
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/feature-flags/:id (delete)
+  - name: ${ROUTE_PREFIX}admin-feature-flags-delete
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/admin/feature-flags/
+    methods:
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates (frontend variant - list and create)
+  - name: ${ROUTE_PREFIX}templates-frontend-list
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates POST (frontend variant - create)
+  - name: ${ROUTE_PREFIX}templates-frontend-create
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates/:id (frontend variant - get by id, update, delete)
+  - name: ${ROUTE_PREFIX}templates-frontend-by-id
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates/*
+    methods:
+      - GET
+      - POST
+      - DELETE
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v1
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/templates/:id/preview (frontend variant - preview templates)
+  - name: ${ROUTE_PREFIX}templates-frontend-preview
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/frontend/templates/*/preview
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v1
+    request_buffering: true
+    response_buffering: true
+
+plugins:
+  # ============================================================================
+  # SERVICE-TO-SERVICE PLUGINS
+  # ============================================================================
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}ches-email
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-preview
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-list
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-status
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-callbacks
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # ============================================================================
+  # SERVICE & FRONTEND PLUGINS
+  # Each route appears twice: once for service tokens, once for frontend tokens
+  # ============================================================================
+
+  # Code Tables - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # Code Tables - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Status - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-status-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # Code Tables Status - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-status-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Channels - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-channels-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # Code Tables Channels - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-channels-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Event Types - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-event-types-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # Code Tables Event Types - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-event-types-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Notification Request - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notification-request-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: false
+
+  # Notification Request - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notification-request-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Clients Link to Tenants - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-clients-link-to-tenants
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Clients Mappings Get - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-clients-mappings-get
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Clients Mappings Toggle - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-clients-mappings-toggle
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Tenants List - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-tenants-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Users Upsert (me) - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-users-upsert
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Users List - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-users-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # ============================================================================
+  # FEATURE FLAG ADMIN ROUTES PLUGINS
+  # ============================================================================
+  # Admin Feature Flags List - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Create - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-create
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Update - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-update
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin Feature Flags Delete - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-feature-flags-delete
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # ============================================================================
+  # FEATURE FLAG CLIENT & CODE-TABLES PLUGINS
+  # ============================================================================
+  # Feature Flags - Frontend Token (authenticated users)
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Feature Flags - Service Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    config:
+      allowed_iss:
+        - ${KEYCLOAK_ISSUER}
+      allowed_aud: ${ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Code Tables Feature Flags - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - List and Create
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - Get by ID, Update, Delete
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-by-id
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - Preview
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.pr-${PR_NUMBER}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-preview
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
