@@ -4,6 +4,7 @@ import { InlineRenderingService } from './inline-rendering.service'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
 import type { ITemplateRendererRegistry, ITemplateRenderer } from '../../adapters/interfaces'
 import type { NotifyContent } from '../../api/notify/schemas/notify-content'
+import { RenderingModule } from './rendering.module'
 
 describe('InlineRenderingService', () => {
   let service: InlineRenderingService
@@ -542,6 +543,53 @@ describe('InlineRenderingService', () => {
         personalisation: { items: '[1,2,3]' },
         defaultSubject: 'Notification',
       })
+    })
+  })
+
+  describe('MJML integration', () => {
+    let realService: InlineRenderingService
+
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [RenderingModule],
+      }).compile()
+
+      realService = module.get<InlineRenderingService>(InlineRenderingService)
+    })
+
+    it('should render inline MJML email content', async () => {
+      const content: NotifyContent = {
+        subject: 'Welcome {{name}}',
+        body: `
+          <mjml>
+            <mj-body>
+              <mj-section>
+                <mj-column>
+                  <mj-text>Hello {{name}}</mj-text>
+                </mj-column>
+              </mj-section>
+            </mj-body>
+          </mjml>
+        `,
+        renderer: 'mjml',
+      }
+
+      const result = await realService.renderEmail(content, { name: 'John' })
+
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toContain('<!doctype html>')
+      expect(result.body).toContain('Hello John')
+    })
+
+    it('should render inline SMS as plain interpolated text for mjml renderer', async () => {
+      const content: NotifyContent = {
+        body: 'Hello {{name}}, code {{code}}',
+        renderer: 'mjml',
+      }
+
+      const result = await realService.renderSms(content, { name: 'John', code: '123456' })
+
+      expect(result.body).toBe('Hello John, code 123456')
     })
   })
 })

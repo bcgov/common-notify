@@ -59,6 +59,14 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
     // Used to fetch user roles for role-based access control
     cstar: {

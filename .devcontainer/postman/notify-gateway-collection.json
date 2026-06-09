@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "9c2fb158-079f-4845-9bf2-2aef932aeac2",
+    "_postman_id": "d9ee190c-7abc-4ab0-aa5f-bc78e7f9dc11",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -658,8 +658,8 @@
                 "method": "GET",
                 "header": [
                   {
-                    "key": "x-tenant-id",
-                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -693,8 +693,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -732,8 +732,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -1047,14 +1047,47 @@
           "name": "CSTAR",
           "item": [
             {
+              "name": "Bind Tenant to API Key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "tenant-a-local-key",
+                    "type": "text"
+                  },
+                  {
+                    "key": "",
+                    "value": "",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"cstarTenantId\": \"{{tenant-1}}\" }",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/service/api-key/bind",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "service", "api-key", "bind"]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "Tenants",
               "request": {
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "https://cstar-dev.apps.silver.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
+                  "raw": "https://cstar-test.apps.silver.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
                   "protocol": "https",
-                  "host": ["cstar-dev", "apps", "silver", "devops", "gov", "bc", "ca"],
+                  "host": ["cstar-test", "apps", "silver", "devops", "gov", "bc", "ca"],
                   "path": ["api", "v1", "users", ":ssoUserId", "tenants"],
                   "variable": [
                     {
@@ -1174,8 +1207,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1213,8 +1246,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1252,8 +1285,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "20e1da22-2e44-4fbd-ab50-64f825110f56",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1291,8 +1324,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1330,8 +1363,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "e936010f-bb93-4430-87d9-e6e70b63e75f",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1369,8 +1402,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1639,8 +1672,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1679,8 +1712,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1714,8 +1747,8 @@
             "method": "DELETE",
             "header": [
               {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1749,8 +1782,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1788,8 +1821,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
