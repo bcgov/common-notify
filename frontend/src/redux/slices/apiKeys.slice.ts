@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import type { ApiKeyResponse, ApiKeysListResponse } from '@/api/apiKeyService'
+import type { ApiKeyResponse } from '@/api/apiKeyService'
 
 interface ApiKeysState {
   // Store keys by tenant ID for easy lookup

@@ -4,13 +4,25 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyServiceGuard } from './notify-service.guard'
 import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
+import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
+
+type MockRequest = {
+  headers: Record<string, string>
+  tenant?: Tenant
+  tenantId?: string
+  tenantExternalId?: string
+}
 
 describe('NotifyServiceGuard', () => {
   let guard: NotifyServiceGuard
   let mockTenantRepository: any
+  let mockApiKeyConsumerRepository: any
 
   beforeEach(async () => {
     mockTenantRepository = {
+      findOne: vi.fn(),
+    }
+    mockApiKeyConsumerRepository = {
       findOne: vi.fn(),
     }
 
@@ -21,14 +33,18 @@ describe('NotifyServiceGuard', () => {
           provide: getRepositoryToken(Tenant),
           useValue: mockTenantRepository,
         },
+        {
+          provide: getRepositoryToken(ApiKeyConsumer),
+          useValue: mockApiKeyConsumerRepository,
+        },
       ],
     }).compile()
 
     guard = module.get<NotifyServiceGuard>(NotifyServiceGuard)
   })
 
-  describe('X-Consumer-Custom-ID Header Validation', () => {
-    it('should reject request with missing X-Consumer-Custom-ID header', async () => {
+  describe('x-credential-identifier Header Validation', () => {
+    it('should reject request with missing x-credential-identifier header', async () => {
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
@@ -42,12 +58,12 @@ describe('NotifyServiceGuard', () => {
       await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
 
-    it('should reject request with empty X-Consumer-Custom-ID header', async () => {
+    it('should reject request with empty x-credential-identifier header', async () => {
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {
-              'x-consumer-custom-id': '',
+              'x-credential-identifier': '',
             },
           }),
         }),
@@ -58,14 +74,19 @@ describe('NotifyServiceGuard', () => {
       await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
 
-    it('should extract X-Consumer-Custom-ID header and use it to look up tenant', async () => {
+    it('should extract x-credential-identifier header and use it to look up api key mapping', async () => {
       const mockTenant = { id: 'tenant-1', name: 'Test Tenant', externalId: 'ext-tenant-123' }
+      const mockMapping = {
+        credentialIdentifier: 'cred-123',
+        tenantId: 'tenant-1',
+        tenant: mockTenant,
+      }
 
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {
-              'x-consumer-custom-id': 'ext-tenant-123',
+              'x-credential-identifier': 'cred-123',
             },
           }),
         }),
@@ -73,13 +94,14 @@ describe('NotifyServiceGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      mockTenantRepository.findOne.mockResolvedValue(mockTenant)
+      mockApiKeyConsumerRepository.findOne.mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
       expect(result).toBe(true)
-      expect(mockTenantRepository.findOne).toHaveBeenCalledWith({
-        where: { externalId: 'ext-tenant-123', isDeleted: false },
+      expect(mockApiKeyConsumerRepository.findOne).toHaveBeenCalledWith({
+        where: { credentialIdentifier: 'cred-123' },
+        relations: ['tenant'],
       })
     })
   })
@@ -87,10 +109,15 @@ describe('NotifyServiceGuard', () => {
   describe('Tenant Lookup', () => {
     it('should successfully authenticate request with valid tenant mapping', async () => {
       const mockTenant = { id: 'tenant-1', name: 'Production Tenant', externalId: 'ext-tenant-456' }
+      const mockMapping = {
+        credentialIdentifier: 'cred-456',
+        tenantId: 'tenant-1',
+        tenant: mockTenant,
+      }
 
-      const mockRequest = {
+      const mockRequest: MockRequest = {
         headers: {
-          'x-consumer-custom-id': 'ext-tenant-456',
+          'x-credential-identifier': 'cred-456',
         },
       }
 
@@ -102,7 +129,7 @@ describe('NotifyServiceGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      mockTenantRepository.findOne.mockResolvedValue(mockTenant)
+      mockApiKeyConsumerRepository.findOne.mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 
@@ -117,7 +144,7 @@ describe('NotifyServiceGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {
-              'x-consumer-custom-id': 'missing-tenant',
+              'x-credential-identifier': 'missing-credential',
             },
           }),
         }),
@@ -125,7 +152,7 @@ describe('NotifyServiceGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      mockTenantRepository.findOne.mockResolvedValue(null)
+      mockApiKeyConsumerRepository.findOne.mockResolvedValue(null)
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(NotFoundException)
     })
@@ -135,7 +162,7 @@ describe('NotifyServiceGuard', () => {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {
-              'x-consumer-custom-id': 'ext-tenant-id',
+              'x-credential-identifier': 'cred-db-error',
             },
           }),
         }),
@@ -143,19 +170,49 @@ describe('NotifyServiceGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      mockTenantRepository.findOne.mockRejectedValue(new Error('Database connection failed'))
+      mockApiKeyConsumerRepository.findOne.mockRejectedValue(
+        new Error('Database connection failed'),
+      )
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+    })
+
+    it('should reject request when mapping tenant is missing/deleted', async () => {
+      const mockMapping = {
+        credentialIdentifier: 'cred-tenant-missing',
+        tenantId: 'tenant-missing',
+        tenant: null,
+      }
+      const mockContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: {
+              'x-credential-identifier': 'cred-tenant-missing',
+            },
+          }),
+        }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext
+
+      mockApiKeyConsumerRepository.findOne.mockResolvedValue(mockMapping)
+
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(NotFoundException)
     })
   })
 
   describe('Request Context', () => {
     it('should attach tenant context to request', async () => {
       const mockTenant = { id: 'tenant-1', name: 'Test Tenant', externalId: 'ext-123' }
+      const mockMapping = {
+        credentialIdentifier: 'cred-attach',
+        tenantId: 'tenant-1',
+        tenant: mockTenant,
+      }
 
-      const mockRequest = {
+      const mockRequest: MockRequest = {
         headers: {
-          'x-consumer-custom-id': 'ext-123',
+          'x-credential-identifier': 'cred-attach',
         },
       }
 
@@ -167,7 +224,7 @@ describe('NotifyServiceGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      mockTenantRepository.findOne.mockResolvedValue(mockTenant)
+      mockApiKeyConsumerRepository.findOne.mockResolvedValue(mockMapping)
 
       const result = await guard.canActivate(mockContext)
 

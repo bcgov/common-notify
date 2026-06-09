@@ -1,4 +1,3 @@
-import type { AxiosError } from 'axios'
 import { get, generateApiParameters } from '@/common/api'
 
 export interface TenantReference {

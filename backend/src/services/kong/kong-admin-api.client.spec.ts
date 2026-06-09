@@ -6,7 +6,6 @@ import { KongAdminApiClient } from './kong-admin-api.client'
 
 describe('KongAdminApiClient', () => {
   let client: KongAdminApiClient
-  let configService: ConfigService
 
   beforeEach(async () => {
     const mockConfigService = {
@@ -29,7 +28,6 @@ describe('KongAdminApiClient', () => {
     }).compile()
 
     client = module.get<KongAdminApiClient>(KongAdminApiClient)
-    configService = module.get<ConfigService>(ConfigService)
 
     // Mock getAccessToken to return a valid token without making HTTP calls
     vi.spyOn(client as any, 'getAccessToken').mockResolvedValue('mock-access-token')
@@ -140,7 +138,7 @@ describe('KongAdminApiClient', () => {
     it('should throw InternalServerErrorException on Kong API errors', async () => {
       const tenantId = 'tenant-123'
 
-      vi.spyOn(client['client'], 'get').mockRejectedValue({
+      vi.spyOn(client['client'], 'post').mockRejectedValue({
         response: { status: 500, data: { error: 'Kong error' } },
       })
 
