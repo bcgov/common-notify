@@ -16,4 +16,9 @@ export enum TemplateEngine {
    * Mustache template engine with logic-less syntax
    */
   MUSTACHE = 'mustache',
+
+  /**
+   * MJML template engine for responsive email markup
+   */
+  MJML = 'mjml',
 }

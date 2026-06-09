@@ -35,6 +35,31 @@ describe('TemplatesService', () => {
     body: '# Welcome {{userName}}\n\nThis is **bold** text with [link](https://example.com)',
   }
 
+  const mockMjmlTemplate: Template = {
+    ...mockTemplate,
+    subject: 'Welcome {{userName}}',
+    body: `
+      <mjml>
+        <mj-body>
+          <mj-section>
+            <mj-column>
+              <mj-text>Hello {{userName}}</mj-text>
+            </mj-column>
+          </mj-section>
+        </mj-body>
+      </mjml>
+    `,
+    engineCode: TemplateEngine.MJML,
+  }
+
+  const mockMjmlSmsTemplate: Template = {
+    ...mockTemplate,
+    channelCode: NotificationChannel.SMS,
+    subject: undefined,
+    body: 'Your code is {{code}}',
+    engineCode: TemplateEngine.MJML,
+  }
+
   const mockRepository = {
     create: vi.fn(),
     update: vi.fn(),
@@ -181,6 +206,26 @@ describe('TemplatesService', () => {
 
       expect(result).toHaveProperty('subject')
       expect(result).toHaveProperty('body')
+    })
+
+    it('should render stored MJML email templates to HTML', async () => {
+      const result = await service.renderTemplateContent(mockMjmlTemplate, {
+        userName: 'John',
+      })
+
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toContain('<!doctype html>')
+      expect(result.body).toContain('Hello John')
+      expect(result.bodyType).toBe('html')
+    })
+
+    it('should render stored MJML SMS templates as plain text through renderEmail path', async () => {
+      const result = await service.renderTemplateContent(mockMjmlSmsTemplate, {
+        code: '123456',
+      })
+
+      expect(result.body).toBe('Your code is 123456')
+      expect(result.bodyType).toBe('html')
     })
   })
 
