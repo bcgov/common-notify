@@ -26,12 +26,12 @@ export class NotifyContent {
   bodyType?: 'text' | 'markdown' | 'html'
 
   @ApiPropertyOptional({
-    enum: ['handlebars', 'mustache', 'legacy_gc_notify'],
-    description: 'Template rendering engine (handlebars, mustache, legacy_gc_notify)',
+    enum: ['handlebars', 'mustache', 'legacy_gc_notify', 'mjml'],
+    description: 'Template rendering engine (handlebars, mustache, legacy_gc_notify, mjml)',
   })
   @IsOptional()
-  @IsEnum(['handlebars', 'mustache', 'legacy_gc_notify'])
-  renderer?: 'handlebars' | 'mustache' | 'legacy_gc_notify'
+  @IsEnum(['handlebars', 'mustache', 'legacy_gc_notify', 'mjml'])
+  renderer?: 'handlebars' | 'mustache' | 'legacy_gc_notify' | 'mjml'
 
   @ApiPropertyOptional({
     description: 'Character encoding',

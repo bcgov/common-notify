@@ -101,6 +101,27 @@ describe('NotifySimpleRequest', () => {
         custom: 'value',
       })
     })
+
+    it('should accept mjml as a valid renderer', async () => {
+      const data = {
+        email: {
+          recipients: {
+            to: ['test@example.com'],
+          },
+          content: {
+            subject: 'Welcome {{name}}',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{name}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+            renderer: 'mjml',
+          },
+        },
+      }
+
+      const instance = plainToInstance(NotifySimpleRequest, data)
+      const errors = await validate(instance)
+
+      expect(errors).toHaveLength(0)
+      expect(instance.email?.content?.renderer).toBe('mjml')
+    })
   })
 
   describe('Optional Fields', () => {

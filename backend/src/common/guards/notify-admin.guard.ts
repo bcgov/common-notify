@@ -14,7 +14,6 @@ import { SsoRole } from '../../enum/sso-role.enum'
  * - GET /api/v1/admin/tenants
  * - POST /api/v1/admin/tenants
  * - GET /api/v1/frontend/admin/feature-flags (global feature flags)
- * - POST /api/v1/frontend/admin/clients/link-to-tenants
  *
  * Validation flow:
  * 1. Validates JWT signature via Keycloak JWKS (via AuthGuard parent)
