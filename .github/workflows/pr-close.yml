@@ -78,8 +78,8 @@ jobs:
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
-          # Define PR service name
-          PR_SERVICE_NAME="nr-notify-pr-${{ github.event.number }}"
+          # Define PR service name (matches gateway service name from pr.env)
+          PR_SERVICE_NAME="gw-fe8c5-notify-pr-${{ github.event.number }}"
 
           echo "Waiting for service '$PR_SERVICE_NAME' to be deleted..."
 

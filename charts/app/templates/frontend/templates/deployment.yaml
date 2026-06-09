@@ -42,10 +42,18 @@ spec:
               value: "info"
             {{- if .Values.frontend.secrets.enabled }}
             - name: VITE_API_GATEWAY_NOTIFY_URL
+              {{- $repoName := "common-notify" }}
+              {{- if and (hasPrefix $repoName .Release.Name) (regexMatch "^common-notify-[0-9]+$" .Release.Name) }}
+              {{- /* This is a PR deployment - extract PR number and build PR-specific gateway URL */}}
+              {{- $prNumber := trimPrefix (printf "%s-" $repoName) .Release.Name }}
+              value: "https://gw-fe8c5-notify-pr-{{ $prNumber }}.dev.api.gov.bc.ca"
+              {{- else }}
+              {{- /* Non-PR with secrets enabled */}}
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
                   key: api-gateway-notify-url
+              {{- end }}
             - name: VITE_KEYCLOAK_URL
               valueFrom:
                 secretKeyRef:
@@ -73,7 +81,15 @@ spec:
                   key: cstar-tenant-setup-url
             {{- else }}
             - name: VITE_API_GATEWAY_NOTIFY_URL
+              {{- $repoName := "common-notify" }}
+              {{- if and (hasPrefix $repoName .Release.Name) (regexMatch "^common-notify-[0-9]+$" .Release.Name) }}
+              {{- /* This is a PR deployment - extract PR number and build PR-specific gateway URL */}}
+              {{- $prNumber := trimPrefix (printf "%s-" $repoName) .Release.Name }}
+              value: "https://gw-fe8c5-notify-pr-{{ $prNumber }}.dev.api.gov.bc.ca"
+              {{- else }}
+              {{- /* Non-PR without secrets - use default or values */}}
               value: {{ .Values.frontend.apiGatewayNotifyUrl | default "https://gw-cnotify-notify.dev.api.gov.bc.ca" | quote }}
+              {{- end }}
             - name: VITE_KEYCLOAK_URL
               value: {{ .Values.frontend.keycloakUrl | default "https://dev.loginproxy.gov.bc.ca/auth" | quote }}
             - name: VITE_KEYCLOAK_REALM
