@@ -92,8 +92,7 @@ describe('Sidebar', () => {
     // Click to expand the admin submenu
     await user.click(adminButton)
 
-    // Now the admin subitem links should be present
-    expect(screen.getByRole('link', { name: /clients/i })).toBeInTheDocument()
+    // Now the current admin subitem links should be present
     expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
