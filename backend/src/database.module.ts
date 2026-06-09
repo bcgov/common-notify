@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from './api/admin/tenants/entities/tenant.entity'
 import { TenantStatusCode } from './api/admin/tenants/entities/tenant-status-code.entity'
-import { ClientTenantMapping } from './api/admin/client-tenant-mappings/entities/client-tenant-mapping.entity'
 import { NotifyUser } from './api/admin/users/entities/notify-user.entity'
 import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
@@ -13,6 +12,7 @@ import { NotificationChannelCode } from './api/notification/entities/notificatio
 import { NotificationEventTypeCode } from './api/notification/entities/notification-event-type-code.entity'
 import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
 import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
+import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -34,7 +34,6 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
       entities: [
         Tenant,
         TenantStatusCode,
-        ClientTenantMapping,
         NotifyUser,
         NotificationRequest,
         NotificationStatusCode,
@@ -45,6 +44,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TemplateEngineCode,
         FeatureFlag,
         FeatureFlagCode,
+        ApiKeyConsumer,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards, Req, HttpException, HttpStatus, Param } fro
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { BearerTokenGuard } from '../../common/guards/bearer-token.guard'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { TenantsService } from '../admin/tenants/tenants.service'
 import type Express from 'express'
 
 /**
@@ -15,14 +16,18 @@ import type Express from 'express'
 @UseGuards(BearerTokenGuard)
 @ApiBearerAuth()
 export class AuthController {
-  constructor(private readonly cstarApiClient: CstarApiClient) {}
+  constructor(
+    private readonly cstarApiClient: CstarApiClient,
+    private readonly tenantsService: TenantsService,
+  ) {}
 
   /**
    * Get current user's CSTAR tenants
    *
    * GET /api/v1/frontend/auth/tenants
    *
-   * Fetches the list of CSTAR tenants for the authenticated user.
+   * Fetches the list of CSTAR tenants for the authenticated user and syncs them to the database.
+   * This effectively "logs in" the user by ensuring their tenants are up-to-date in our system.
    * Extracts user ID from JWT and passes token to CSTAR.
    *
    * @param req Express request with Authorization header
@@ -30,8 +35,9 @@ export class AuthController {
    */
   @Get('tenants')
   @ApiOperation({
-    summary: 'Get current user tenants from CSTAR',
-    description: 'Retrieves CSTAR tenants for authenticated user. Passes JWT directly to CSTAR.',
+    summary: 'Get current user tenants from CSTAR and sync to database',
+    description:
+      'Retrieves CSTAR tenants for authenticated user and upserts them into the database. Passes JWT directly to CSTAR.',
   })
   @ApiOkResponse({
     description: 'User tenants',
@@ -71,6 +77,17 @@ export class AuthController {
       }
 
       const tenants = await this.cstarApiClient.getUserTenants(userId, authHeader)
+
+      // Sync each tenant to the database (upsert)
+      // This ensures the tenant is in the database and up-to-date
+      for (const cstarTenant of tenants || []) {
+        try {
+          await this.tenantsService.upsertFromCstar(cstarTenant)
+        } catch (error) {
+          // Log sync error but continue - don't fail the entire request if one tenant fails
+          console.error(`Failed to sync tenant ${cstarTenant.id}: ${error}`)
+        }
+      }
 
       return {
         tenants: tenants || [],

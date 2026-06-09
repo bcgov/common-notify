@@ -12,6 +12,7 @@ import {
   Logger,
   ParseUUIDPipe,
   Req,
+  BadRequestException,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
@@ -19,6 +20,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { TenantsService } from '../admin/tenants/tenants.service'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
 import { CreateTemplateDto } from './schemas/create-template.dto'
@@ -49,7 +51,38 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
 export class TemplatesFrontendController {
   private readonly logger = new Logger(TemplatesFrontendController.name)
 
-  constructor(private readonly templatesService: TemplatesService) {}
+  constructor(
+    private readonly templatesService: TemplatesService,
+    private readonly tenantsService: TenantsService,
+  ) {}
+
+  private async requireTenantContext(req: Request | express.Request): Promise<Tenant> {
+    const tenant = (req as any).tenant as Tenant | undefined
+    if (tenant?.id) {
+      return tenant
+    }
+
+    const tenantExternalId = ((req.headers as any)?.['x-tenant-id'] as string | undefined)?.trim()
+    if (!tenantExternalId) {
+      this.logger.error('Tenant context missing and x-tenant-id header was not provided')
+      throw new BadRequestException(
+        'Tenant context is missing from request. Ensure x-tenant-id is provided and authorized.',
+      )
+    }
+
+    this.logger.warn(
+      `Tenant context missing on request. Falling back to x-tenant-id lookup: ${tenantExternalId}`,
+    )
+
+    const resolvedTenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!resolvedTenant?.id) {
+      throw new BadRequestException(
+        `Tenant with ID "${tenantExternalId}" does not exist. Please verify the tenant ID and try again.`,
+      )
+    }
+
+    return resolvedTenant
+  }
 
   /**
    * List all templates for the tenant
@@ -132,7 +165,7 @@ export class TemplatesFrontendController {
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<TemplateResponseDto> {
-    const tenant = (req as any).tenant as Tenant
+    const tenant = await this.requireTenantContext(req)
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
@@ -151,7 +184,7 @@ export class TemplatesFrontendController {
     @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
   ): Promise<TemplateResponseDto> {
-    const tenant = (req as any).tenant as Tenant
+    const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
@@ -174,7 +207,7 @@ export class TemplatesFrontendController {
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
   ): Promise<TemplateResponseDto> {
-    const tenant = (req as any).tenant as Tenant
+    const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
@@ -194,7 +227,7 @@ export class TemplatesFrontendController {
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
-    const tenant = (req as any).tenant as Tenant
+    const tenant = await this.requireTenantContext(req)
     await this.templatesService.deleteTemplate(tenant.id, templateId)
   }
 
@@ -216,7 +249,7 @@ export class TemplatesFrontendController {
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
-    const tenant = (req as any).tenant as Tenant
+    const tenant = await this.requireTenantContext(req)
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
   }
 }

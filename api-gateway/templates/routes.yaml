@@ -503,53 +503,8 @@ routes:
     request_buffering: false
     response_buffering: false
 
-  # /api/v1/frontend/admin/clients/link-to-tenants (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-link-to-tenants
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/link-to-tenants
-    methods:
-      - POST
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/admin/clients/mappings (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-mappings-get
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/mappings
-    methods:
-      - GET
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/admin/clients/mappings/:id/toggle-active (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-mappings-toggle
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/mappings/
-    methods:
-      - PATCH
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
   # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
-  - name: ${ROUTE_PREFIX}admin-tenants-list
+  - name: ${ROUTE_PREFIX}admin-tenants-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -564,7 +519,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/users/me (upsert current user)
-  - name: ${ROUTE_PREFIX}admin-users-upsert
+  - name: ${ROUTE_PREFIX}admin-users-upsert-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -579,7 +534,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/users (get all users)
-  - name: ${ROUTE_PREFIX}admin-users-list
+  - name: ${ROUTE_PREFIX}admin-users-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -597,7 +552,7 @@ routes:
   # AUTH ROUTES (authenticated users)
   # ============================================================================
   # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
-  - name: ${ROUTE_PREFIX}auth-tenants
+  - name: ${ROUTE_PREFIX}auth-tenants-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -612,7 +567,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
-  - name: ${ROUTE_PREFIX}auth-tenant-roles
+  - name: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -630,7 +585,7 @@ routes:
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-list
+  - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -645,7 +600,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags (create)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-create
+  - name: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -660,7 +615,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (update)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-update
+  - name: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -675,7 +630,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (delete)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-delete
+  - name: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
@@ -751,44 +706,84 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # ============================================================================
+  # API KEY MANAGEMENT ROUTES
+  # ============================================================================
+  # /api/v1/service/api-key/bind
+  # Binds an API key to a CSTAR tenant.
+  # Requires: X-API-KEY header (validated by Kong) AND Authorization: Bearer <jwt>
+  # Kong validates the API key and forwards x-credential-identifier to the backend.
+  # The backend uses the JWT to verify CSTAR tenant membership before storing the mapping.
+  - name: ${ROUTE_PREFIX}api-key-bind
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - /api/v1/service/api-key/bind
+    methods:
+      - POST
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
 plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS
   # ============================================================================
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-bind
+    config:
+      hide_credentials: false
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
+    config:
       allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -806,163 +801,161 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+      consumer_match_ignore_not_found: true
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-types
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
 
   # ============================================================================
   # SERVICE & FRONTEND PLUGINS
@@ -970,32 +963,17 @@ plugins:
   # ============================================================================
 
   # Code Tables - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables - Frontend Token
   - name: jwt-keycloak
@@ -1026,32 +1004,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Status - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Status - Frontend Token
   - name: jwt-keycloak
@@ -1082,32 +1045,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Channels - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Channels - Frontend Token
   - name: jwt-keycloak
@@ -1138,32 +1086,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Event Types - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Event Types - Frontend Token
   - name: jwt-keycloak
@@ -1194,14 +1127,27 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Notification Request - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
     config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+
+  # Notification Request - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notification-request-frontend
+    config:
       allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -1219,13 +1165,13 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
+      consumer_match_ignore_not_found: true
 
-  # Notification Request - Frontend Token
+  # Notification Request Events - Frontend Token
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}notification-request-frontend
+    route: ${ROUTE_PREFIX}notification-request-events-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1337,7 +1283,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-tenants-list
+    route: ${ROUTE_PREFIX}admin-tenants-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1365,7 +1311,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-upsert
+    route: ${ROUTE_PREFIX}admin-users-upsert-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1393,7 +1339,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-list
+    route: ${ROUTE_PREFIX}admin-users-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1424,7 +1370,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-list
+    route: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1452,7 +1398,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-create
+    route: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1480,7 +1426,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-update
+    route: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1508,7 +1454,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-delete
+    route: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1535,11 +1481,80 @@ plugins:
   # ============================================================================
   # FEATURE FLAG CLIENT & CODE-TABLES PLUGINS
   # ============================================================================
-  # Feature Flags - Frontend Token (authenticated users)
+  # Feature Flags - Service Token
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+
+  # Feature Flags Frontend - Frontend Token (authenticated users)
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}feature-flags
+    route: ${ROUTE_PREFIX}feature-flags-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Auth Tenants - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}auth-tenants-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Auth Tenant Roles - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1564,32 +1579,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Feature Flags - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: true
 
   # Code Tables Feature Flags - Frontend Token
   - name: jwt-keycloak
@@ -1624,6 +1624,34 @@ plugins:
     tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-list
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Templates Frontend - Create
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-create
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
