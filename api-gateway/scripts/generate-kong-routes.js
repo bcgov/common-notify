@@ -183,6 +183,85 @@ async function createRoutes(serviceName, routes) {
   return { created, skipped }
 }
 
+// Create Kong plugins
+async function createPlugins(serviceName, plugins) {
+  let created = 0
+  let updated = 0
+  let skipped = 0
+
+  for (const plugin of plugins) {
+    const pluginName = plugin.name
+    try {
+      // Find the route ID by name
+      const routesResponse = await kongRequest('GET', `/services/${serviceName}/routes`)
+      if (routesResponse.status !== 200) {
+        console.log(`  ✗ ${pluginName} on route ${plugin.route} (could not fetch routes)`)
+        continue
+      }
+
+      const targetRoute = routesResponse.data.data?.find((r) => r.name === plugin.route)
+      if (!targetRoute) {
+        console.log(`  ✗ ${pluginName} on route ${plugin.route} (route not found)`)
+        continue
+      }
+
+      const pluginData = {
+        name: pluginName,
+        enabled: plugin.enabled !== undefined ? plugin.enabled : true,
+        config: plugin.config || {},
+        tags: plugin.tags || [],
+      }
+
+      // Try POST first (create new plugin)
+      let response = await kongRequest('POST', `/routes/${targetRoute.id}/plugins`, pluginData)
+
+      if (response.status === 201) {
+        console.log(`  ✓ ${pluginName} on ${plugin.route}`)
+        created++
+      } else if (response.status === 409) {
+        // Plugin already exists, try to update it with PATCH
+        // First get the existing plugin ID
+        const existingPluginsResponse = await kongRequest(
+          'GET',
+          `/routes/${targetRoute.id}/plugins?name=${pluginName}`,
+        )
+        if (
+          existingPluginsResponse.status === 200 &&
+          existingPluginsResponse.data.data?.length > 0
+        ) {
+          const existingPlugin = existingPluginsResponse.data.data[0]
+          response = await kongRequest(
+            'PATCH',
+            `/routes/${targetRoute.id}/plugins/${existingPlugin.id}`,
+            pluginData,
+          )
+
+          if (response.status === 200) {
+            console.log(`  ↻ ${pluginName} on ${plugin.route} (updated)`)
+            updated++
+          } else {
+            console.log(
+              `  ✗ ${pluginName} on ${plugin.route} (update failed, status ${response.status})`,
+            )
+          }
+        } else {
+          console.log(`  ~ ${pluginName} on ${plugin.route} (exists but not updateable)`)
+          skipped++
+        }
+      } else {
+        console.log(`  ✗ ${pluginName} on ${plugin.route} (status ${response.status})`)
+        if (response.data?.message) {
+          console.log(`    Error: ${response.data.message}`)
+        }
+      }
+    } catch (err) {
+      console.error(`  ✗ ${pluginName} on ${plugin.route} (error: ${err.message})`)
+    }
+  }
+
+  return { created, updated, skipped }
+}
+
 // Main execution
 ;(async () => {
   try {
@@ -197,11 +276,27 @@ async function createRoutes(serviceName, routes) {
     // Create routes
     console.log('\nCreating routes...')
     const routes = routesConfig.routes || []
-    const { created, skipped } = await createRoutes(serviceName, routes)
+    const { created: routesCreated, skipped: routesSkipped } = await createRoutes(
+      serviceName,
+      routes,
+    )
 
-    console.log(`\n✅ Routes generation complete!`)
-    console.log(`   Created: ${created}, Skipped (existing): ${skipped}`)
+    // Create plugins
+    console.log('\nCreating plugins...')
+    const plugins = routesConfig.plugins || []
+    const {
+      created: pluginsCreated,
+      updated: pluginsUpdated,
+      skipped: pluginsSkipped,
+    } = await createPlugins(serviceName, plugins)
+
+    console.log(`\n✅ Routes and plugins generation complete!`)
+    console.log(`   Routes - Created: ${routesCreated}, Skipped: ${routesSkipped}`)
+    console.log(
+      `   Plugins - Created: ${pluginsCreated}, Updated: ${pluginsUpdated}, Skipped: ${pluginsSkipped}`,
+    )
     console.log(`   Total routes: ${routes.length}`)
+    console.log(`   Total plugins: ${plugins.length}`)
   } catch (err) {
     console.error(`\n❌ Error: ${err.message}`)
     process.exit(1)

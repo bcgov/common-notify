@@ -53,10 +53,6 @@ const adminItems = {
   icon: <AdminPanelSettingsOutlinedIcon />,
   subItems: [
     {
-      label: 'Clients',
-      to: '/admin/clients',
-    },
-    {
       label: 'Feature Flags',
       to: '/admin/feature-flags',
     },
@@ -75,10 +71,8 @@ const Sidebar: FC = () => {
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
   const showDashboard = cstarTenants.length > 0
   const showTemplates = cstarTenants.length > 0
-  // Clients requires NOTIFY_OPERATIONS_ADMIN (in CSTAR), so show if they have any CSTAR access
   // Feature Flags requires NOTIFY_ADMIN (SSO)
   const showAdminFeatureFlags = isAdmin
-  const showAdminClients = cstarTenants.length > 0 || isAdmin
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -127,7 +121,7 @@ const Sidebar: FC = () => {
             </Link>
           ) : null
         })}
-        {(isAdmin || showAdminClients) && (
+        {isAdmin && (
           <div className="sidebar__menu-group">
             <button
               onClick={() => setAdminExpanded(!adminExpanded)}
@@ -151,15 +145,6 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Feature Flags</span>
-                  </Link>
-                )}
-                {showAdminClients && (
-                  <Link
-                    to="/admin/clients"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Clients</span>
                   </Link>
                 )}
               </div>

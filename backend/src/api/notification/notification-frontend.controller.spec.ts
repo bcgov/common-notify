@@ -6,7 +6,6 @@ import { NotificationService } from './notification.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
-import { ClientTenantMappingService } from '../admin/client-tenant-mappings/client-tenant-mapping.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 
@@ -22,10 +21,6 @@ const mockNotificationPubSubService = {
 const mockTenantsService = {
   findByExternalId: vi.fn(),
   findOne: vi.fn(),
-}
-
-const mockClientTenantMappingService = {
-  findTenantsByClientId: vi.fn(),
 }
 
 const mockFeatureFlagService = {
@@ -52,10 +47,6 @@ describe('NotificationFrontendController', () => {
         {
           provide: TenantsService,
           useValue: mockTenantsService,
-        },
-        {
-          provide: ClientTenantMappingService,
-          useValue: mockClientTenantMappingService,
         },
         {
           provide: FeatureFlagService,
