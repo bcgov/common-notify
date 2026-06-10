@@ -81,8 +81,8 @@ export class IngestionWorker {
           )
 
           for (const attachment of request.email.attachments) {
-            // Skip attachments without content
-            if (!attachment.content) {
+            // Skip attachments that are already stored metadata (no inline content)
+            if (!('content' in attachment) || !attachment.content) {
               logger.debug(`[${notifyId}] Skipping attachment without content`)
               continue
             }
