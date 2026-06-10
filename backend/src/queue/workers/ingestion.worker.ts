@@ -39,7 +39,7 @@ export class IngestionWorker {
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
-    clamavService: ClamavService,
+    clamavService?: ClamavService,
     concurrency: number = 1,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
@@ -76,6 +76,10 @@ export class IngestionWorker {
 
         // Scan email attachments for malware
         if (request.email?.attachments && request.email.attachments.length > 0) {
+          if (!clamavService) {
+            throw new Error('Attachment scan service unavailable')
+          }
+
           logger.log(
             `[${notifyId}] Scanning ${request.email.attachments.length} email attachment(s) for malware`,
           )

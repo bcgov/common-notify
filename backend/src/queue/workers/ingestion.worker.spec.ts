@@ -11,6 +11,7 @@ describe('IngestionWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockConfigService: any
+  let mockClamavService: any
   let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
 
@@ -28,6 +29,14 @@ describe('IngestionWorker', () => {
           'queue.jobBackoffDelay': 2000,
         }
         return config[key]
+      }),
+    }
+
+    mockClamavService = {
+      scanBuffer: vi.fn().mockResolvedValue({
+        isInfected: false,
+        viruses: [],
+        scannedAt: new Date(),
       }),
     }
 
@@ -74,6 +83,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       expect(mockIngestionQueue.process).toHaveBeenCalled()
@@ -86,6 +96,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
@@ -98,6 +109,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -105,7 +117,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -133,6 +145,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -140,7 +153,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-456',
           tenantId: 'tenant-456',
           request: {
-            sms: { recipients: ['+1234567890'], body: 'SMS test' },
+            sms: { recipients: { to: ['+1234567890'] }, body: 'SMS test' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -167,6 +180,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -174,8 +188,8 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-789',
           tenantId: 'tenant-789',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
-            sms: { recipients: ['+1234567890'], body: 'SMS test' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            sms: { recipients: { to: ['+1234567890'] }, body: 'SMS test' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -195,6 +209,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       // Schedule for 1 minute from now
@@ -205,7 +220,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
           scheduledFor,
@@ -234,6 +249,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const futureDate = new Date(Date.now() + 60000).toISOString()
@@ -243,7 +259,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
           scheduledFor: futureDate,
@@ -271,6 +287,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -294,6 +311,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -317,6 +335,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -324,7 +343,7 @@ describe('IngestionWorker', () => {
           notifyId: undefined as any,
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -342,6 +361,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -349,7 +369,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: null as any,
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -367,6 +387,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -374,7 +395,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: undefined as any,
         },
@@ -392,6 +413,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
@@ -404,6 +426,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -442,10 +465,11 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const emailPayload = {
-        recipients: ['test@example.com'],
+        recipients: { to: ['test@example.com'] },
         subject: 'Test Subject',
         body: 'Test body',
       }
@@ -481,6 +505,7 @@ describe('IngestionWorker', () => {
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
+        mockClamavService,
       )
 
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
@@ -488,7 +513,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-retry',
           tenantId: 'tenant-retry',
           request: {
-            email: { recipients: ['test@example.com'], subject: 'Test', body: 'Test body' },
+            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -508,6 +533,57 @@ describe('IngestionWorker', () => {
           removeOnFail: false,
         }),
       )
+    })
+
+    it('should retry the ingestion job when fail-closed scanning blocks unavailable ClamAV', async () => {
+      mockClamavService.scanBuffer.mockRejectedValueOnce(
+        new Error('ClamAV is unavailable while fail-closed mode is enabled'),
+      )
+
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockClamavService,
+      )
+
+      const attachmentContent = Buffer.from('clean attachment').toString('base64')
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-attachment-retry',
+          tenantId: 'tenant-attachment-retry',
+          request: {
+            email: {
+              recipients: { to: ['test@example.com'] },
+              subject: 'Test',
+              body: 'Test body',
+              attachments: [
+                {
+                  filename: 'receipt.pdf',
+                  content: attachmentContent,
+                },
+              ],
+            },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Attachment scan failed: ClamAV is unavailable while fail-closed mode is enabled',
+      )
+
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-attachment-retry',
+        'tenant-attachment-retry',
+        expect.objectContaining({
+          status: 'failed',
+          updatedBy: 'ingestion-worker',
+        }),
+      )
+      expect(mockEmailQueue.add).not.toHaveBeenCalled()
     })
   })
 })
