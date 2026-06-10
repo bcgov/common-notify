@@ -1,6 +1,6 @@
 kind: GatewayService
 name: ${GATEWAY_SERVICE_NAME}
-tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
 host: ${BACKEND_HOST}
 port: 80
 protocol: http
@@ -10,7 +10,7 @@ routes:
   # PUBLIC ROUTES - No authentication required
   # ============================================================================
   - name: ${ROUTE_PREFIX}notify-health
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -23,7 +23,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-api-health
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -41,7 +41,7 @@ routes:
   # Routes that can only be called by backend services using service tokens
   # ============================================================================
   - name: ${ROUTE_PREFIX}ches-email
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -54,7 +54,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -67,7 +67,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -80,7 +80,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -93,7 +93,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -106,7 +106,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-preview
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -119,7 +119,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-types
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -132,7 +132,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-list
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -146,7 +146,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-status
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -159,7 +159,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-callbacks
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -174,7 +174,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}templates
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -190,7 +190,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}feature-flags
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -203,7 +203,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}feature-flags-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -216,7 +216,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-list
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -229,7 +229,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-email
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -242,7 +242,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-sms
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -255,7 +255,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-bulk
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -268,7 +268,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notification-by-id
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -281,7 +281,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-templates-list
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -294,7 +294,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-template-by-id
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -316,7 +316,7 @@ routes:
 
   # /api/v1/code-tables (service variant)
   - name: ${ROUTE_PREFIX}code-tables-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -330,7 +330,7 @@ routes:
     response_buffering: true
   # /api/v1/code-tables (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -345,7 +345,7 @@ routes:
 
   # /api/v1/code-tables/notification-status (service variant)
   - name: ${ROUTE_PREFIX}code-tables-status-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -359,7 +359,7 @@ routes:
     response_buffering: true
   # /api/v1/code-tables/notification-status (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-status-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -374,7 +374,7 @@ routes:
 
   # /api/v1/code-tables/channels (service variant)
   - name: ${ROUTE_PREFIX}code-tables-channels-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -388,7 +388,7 @@ routes:
     response_buffering: true
   # /api/v1/code-tables/channels (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-channels-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -403,7 +403,7 @@ routes:
 
   # /api/v1/code-tables/event-types (service variant)
   - name: ${ROUTE_PREFIX}code-tables-event-types-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -417,7 +417,7 @@ routes:
     response_buffering: true
   # /api/v1/code-tables/event-types (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-event-types-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -432,7 +432,7 @@ routes:
 
   # /api/v1/code-tables/feature-flags (service variant)
   - name: ${ROUTE_PREFIX}code-tables-feature-flags-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -447,7 +447,7 @@ routes:
 
   # /api/v1/code-tables/feature-flags (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -462,7 +462,7 @@ routes:
 
   # /api/v1/notification_request (service variant)
   - name: ${ROUTE_PREFIX}notification-request-service
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -476,7 +476,7 @@ routes:
     response_buffering: true
   # /api/v1/notification_request (frontend variant)
   - name: ${ROUTE_PREFIX}notification-request-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -490,7 +490,7 @@ routes:
     response_buffering: true
   # /api/v1/frontend/notification_request/events (frontend only)
   - name: ${ROUTE_PREFIX}notification-request-events-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -505,7 +505,7 @@ routes:
 
   # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
   - name: ${ROUTE_PREFIX}admin-tenants-list-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -520,7 +520,7 @@ routes:
 
   # /api/v1/frontend/users/me (upsert current user)
   - name: ${ROUTE_PREFIX}admin-users-upsert-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -535,7 +535,7 @@ routes:
 
   # /api/v1/frontend/users (get all users)
   - name: ${ROUTE_PREFIX}admin-users-list-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -553,7 +553,7 @@ routes:
   # ============================================================================
   # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
   - name: ${ROUTE_PREFIX}auth-tenants-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -568,7 +568,7 @@ routes:
 
   # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
   - name: ${ROUTE_PREFIX}auth-tenant-roles-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -586,7 +586,7 @@ routes:
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
   - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -601,7 +601,7 @@ routes:
 
   # /api/v1/frontend/admin/feature-flags (create)
   - name: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -616,7 +616,7 @@ routes:
 
   # /api/v1/frontend/admin/feature-flags/:id (update)
   - name: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -631,7 +631,7 @@ routes:
 
   # /api/v1/frontend/admin/feature-flags/:id (delete)
   - name: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -646,7 +646,7 @@ routes:
 
   # /api/v1/frontend/templates (frontend variant - list and create)
   - name: ${ROUTE_PREFIX}templates-frontend-list
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -661,7 +661,7 @@ routes:
 
   # /api/v1/frontend/templates POST (frontend variant - create)
   - name: ${ROUTE_PREFIX}templates-frontend-create
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -676,7 +676,7 @@ routes:
 
   # /api/v1/frontend/templates/:id (frontend variant - get by id, update, delete)
   - name: ${ROUTE_PREFIX}templates-frontend-by-id
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -693,7 +693,7 @@ routes:
 
   # /api/v1/frontend/templates/:id/preview (frontend variant - preview templates)
   - name: ${ROUTE_PREFIX}templates-frontend-preview
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -715,7 +715,7 @@ routes:
   # Kong validates the API key and forwards x-credential-identifier to the backend.
   # The backend uses the JWT to verify CSTAR tenant membership before storing the mapping.
   - name: ${ROUTE_PREFIX}api-key-bind
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -733,7 +733,7 @@ plugins:
   # SERVICE-TO-SERVICE PLUGINS
   # ============================================================================
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}api-key-bind
@@ -744,7 +744,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
@@ -755,7 +755,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
@@ -766,7 +766,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
@@ -777,7 +777,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
     config:
@@ -803,7 +803,7 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
@@ -814,7 +814,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
@@ -825,7 +825,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-types
@@ -836,7 +836,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
@@ -847,7 +847,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
@@ -858,7 +858,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
@@ -869,7 +869,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}templates
@@ -880,7 +880,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-list
@@ -891,7 +891,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-email
@@ -902,7 +902,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-sms
@@ -913,7 +913,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
@@ -924,7 +924,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notification-by-id
@@ -935,7 +935,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-templates-list
@@ -946,7 +946,7 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-template-by-id
@@ -964,7 +964,7 @@ plugins:
 
   # Code Tables - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
@@ -977,7 +977,7 @@ plugins:
 
   # Code Tables - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-frontend
     config:
@@ -1005,7 +1005,7 @@ plugins:
 
   # Code Tables Status - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-service
@@ -1018,7 +1018,7 @@ plugins:
 
   # Code Tables Status - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-frontend
     config:
@@ -1046,7 +1046,7 @@ plugins:
 
   # Code Tables Channels - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
@@ -1059,7 +1059,7 @@ plugins:
 
   # Code Tables Channels - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-frontend
     config:
@@ -1087,7 +1087,7 @@ plugins:
 
   # Code Tables Event Types - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-service
@@ -1100,7 +1100,7 @@ plugins:
 
   # Code Tables Event Types - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-frontend
     config:
@@ -1128,7 +1128,7 @@ plugins:
 
   # Notification Request - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
@@ -1141,7 +1141,7 @@ plugins:
 
   # Notification Request - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-frontend
     config:
@@ -1169,7 +1169,7 @@ plugins:
 
   # Notification Request Events - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-events-frontend
     config:
@@ -1197,7 +1197,7 @@ plugins:
 
   # Admin Tenants List - Frontend Admin Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-tenants-list-frontend
     config:
@@ -1225,7 +1225,7 @@ plugins:
 
   # Admin Users Upsert (me) - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-upsert-frontend
     config:
@@ -1253,7 +1253,7 @@ plugins:
 
   # Admin Users List - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-list-frontend
     config:
@@ -1284,7 +1284,7 @@ plugins:
   # ============================================================================
   # Admin Feature Flags List - Frontend Admin Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     config:
@@ -1312,7 +1312,7 @@ plugins:
 
   # Admin Feature Flags Create - Frontend Admin Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     config:
@@ -1340,7 +1340,7 @@ plugins:
 
   # Admin Feature Flags Update - Frontend Admin Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     config:
@@ -1368,7 +1368,7 @@ plugins:
 
   # Admin Feature Flags Delete - Frontend Admin Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     config:
@@ -1399,7 +1399,7 @@ plugins:
   # ============================================================================
   # Feature Flags - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}feature-flags
@@ -1412,7 +1412,7 @@ plugins:
 
   # Feature Flags Frontend - Frontend Token (authenticated users)
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}feature-flags-frontend
     config:
@@ -1440,7 +1440,7 @@ plugins:
 
   # Auth Tenants - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}auth-tenants-frontend
     config:
@@ -1468,7 +1468,7 @@ plugins:
 
   # Auth Tenant Roles - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     config:
@@ -1496,7 +1496,7 @@ plugins:
 
   # Code Tables Feature Flags - Service Token
   - name: key-auth
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
@@ -1509,7 +1509,7 @@ plugins:
 
   # Code Tables Feature Flags - Frontend Token
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
     config:
@@ -1537,7 +1537,7 @@ plugins:
 
   # Templates Frontend - List and Create
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-list
     config:
@@ -1565,7 +1565,7 @@ plugins:
 
   # Templates Frontend - Create
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-create
     config:
@@ -1593,7 +1593,7 @@ plugins:
 
   # Templates Frontend - Get by ID, Update, Delete
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-by-id
     config:
@@ -1621,7 +1621,7 @@ plugins:
 
   # Templates Frontend - Preview
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}, env.${ENVIRONMENT}]
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-preview
     config:
