@@ -93,6 +93,8 @@ spec:
               value: {{ .Values.backend.clamav.timeout | default 30000 | quote }}
             - name: CLAMAV_ENABLED
               value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
+            - name: CLAMAV_FAIL_CLOSED
+              value: {{ .Values.backend.clamav.failClosed | default "false" | quote }}
             - name: ATTACHMENT_STORAGE_DIR
               value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
             - name: RELEASE_NAME

@@ -91,6 +91,15 @@ export default () => {
       storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
     },
 
+    // ClamAV
+    clamav: {
+      host: process.env.CLAMAV_HOST || 'localhost',
+      port: parseInt(process.env.CLAMAV_PORT || '3310', 10),
+      timeout: parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
+      enabled: process.env.CLAMAV_ENABLED !== 'false',
+      failClosed: process.env.CLAMAV_FAIL_CLOSED === 'true',
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
