@@ -34,6 +34,8 @@ import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
+import { AttachmentValidationService } from './services/attachment-validation.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -61,6 +63,8 @@ export class NotifySimpleController {
   constructor(
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
+    readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -269,6 +273,8 @@ export class NotifySimpleFrontendController {
   constructor(
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
+    readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -299,6 +305,8 @@ export class NotifySimpleFrontendController {
     const simpleController = new NotifySimpleController(
       this.notifyService,
       this.notificationService,
+      this.attachmentValidationService,
+      this.attachmentProcessingService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)

@@ -25,12 +25,13 @@ export class NodemailerEmailTransport implements IEmailTransport {
   }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
-    const attachments: Array<{ filename: string; content: Buffer | string }> =
+    const attachments: Array<{ filename: string; content: Buffer | string; contentType?: string }> =
       options.attachments
         ?.filter((a) => a.sendingMethod === 'attach')
         .map((a) => ({
           filename: a.filename,
           content: a.content,
+          contentType: a.contentType,
         })) ?? []
 
     const info = await this.transporter.sendMail({

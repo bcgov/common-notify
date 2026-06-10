@@ -25,6 +25,7 @@ import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
 import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
+import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
 import { ClamavService } from '../services/clamav.service'
 
 /**
@@ -218,6 +219,7 @@ export class QueueModule implements OnModuleInit {
     private readonly templatesRepository?: TemplatesRepository,
     private readonly templatesService?: TemplatesService,
     private readonly inlineRenderingService?: InlineRenderingService,
+    private readonly attachmentResolverService?: AttachmentResolverService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly clamavService?: ClamavService,
@@ -270,6 +272,7 @@ export class QueueModule implements OnModuleInit {
         this.templatesRepository,
         this.templatesService,
         this.inlineRenderingService,
+        this.attachmentResolverService,
         this.emailAdapter,
         emailConcurrency,
       )
