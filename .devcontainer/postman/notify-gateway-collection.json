@@ -1285,7 +1285,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"SGVsbG8hICBUZXN0IGF0dGFjaG1lbnQgZnJvbSBOb3RpZnkuCg==\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
