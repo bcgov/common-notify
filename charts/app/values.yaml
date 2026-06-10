@@ -94,6 +94,8 @@ backend:
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
+    #-- fail closed when ClamAV is disabled or unavailable
+    failClosed: false
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored
