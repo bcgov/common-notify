@@ -14,12 +14,13 @@ import {
   BadRequestException,
   Logger,
   Request,
+  Req,
 } from '@nestjs/common'
 import Bull from 'bull'
-import { TenantGuard } from '../../common/guards/tenant.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
@@ -36,9 +37,8 @@ import { NotificationService } from '../notification/notification.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
-import { RequireRole } from '../../auth/decorators/require-role.decorator'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -46,8 +46,11 @@ import { RoleGuard } from '../../auth/guards/role.guard'
 //
 // Anything requiring queueing should use the @Queueable decorator and implement the method with an
 // empty body (the decorator will handle the logic).
+//
+// Uses NotifyServiceGuard for service-to-service calls that require x-tenant-id header
+// and valid client_id + tenant_id mapping in the database.
 @Controller('notifysimple')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -67,7 +70,7 @@ export class NotifySimpleController {
   @UseGuards(SmsChannelFeatureFlagGuard)
   @Queueable(QueueName.INGESTION)
   simpleSend(
-    @GetTenant() _tenant: Tenant,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -80,7 +83,7 @@ export class NotifySimpleController {
   @HttpCode(202)
   @Queueable(QueueName.INGESTION)
   simpleSendEmail(
-    @GetTenant() _tenant: Tenant,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -95,7 +98,7 @@ export class NotifySimpleController {
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
   @Queueable(QueueName.INGESTION)
   simpleSendSms(
-    @GetTenant() _tenant: Tenant,
+    @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
@@ -106,11 +109,13 @@ export class NotifySimpleController {
   @Version('1')
   @Patch(':notificationId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async cancelOrRescheduleNotification(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('notificationId') notificationId: string,
     @Body() body: CancelNotificationDto | RescheduleNotificationDto,
   ): Promise<NotificationRequestDto> {
+    const tenant = (req as any).tenant as Tenant
     return this.doCancelOrReschedule(
       tenant.id,
       tenant.id, // For service-to-service, use tenantId as updatedBy
@@ -255,7 +260,7 @@ export class NotifySimpleController {
  * Both controllers delegate to the same service for consistency.
  */
 @Controller('frontend/notifysimple')
-@UseGuards(AuthJwtGuard, RoleGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 export class NotifySimpleFrontendController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -270,7 +275,7 @@ export class NotifySimpleFrontendController {
   @Version('1')
   @Patch(':notificationId')
   @HttpCode(200)
-  @RequireRole('NOTIFY_ADMIN')
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async cancelOrRescheduleNotification(
     @Request() req: any,
     @Param('notificationId') notificationId: string,
@@ -299,7 +304,7 @@ export class NotifySimpleFrontendController {
 }
 
 @Controller('notifyevent')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifyEventController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -333,7 +338,7 @@ export class NotifyEventController {
 }
 
 @Controller('notify')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 export class NotifyController {
   constructor(private readonly notifyService: NotifyService) {}
 
@@ -387,7 +392,7 @@ export class NotifyController {
 }
 
 @Controller('ches/api/v1/email')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 export class ChesEmailController {
   constructor(private readonly notifyService: NotifyService) {}
 

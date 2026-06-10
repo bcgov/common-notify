@@ -144,7 +144,7 @@ const GenericModal: FC<GenericModalProps> = ({
                 <>
                   {children}
                   <div className="d-flex gap-2 justify-content-end mt-3">
-                    <Button variant="secondary" onClick={onClose}>
+                    <Button variant="primary" onClick={onClose}>
                       {cancelText}
                     </Button>
                   </div>

@@ -5,7 +5,9 @@ organization: ministry-of-citizens-services
 organizationUnit: devops-and-cloud-services
 notes:
   A multi-tenant notification service for sending and scheduling email, SMS, and other messages via
-  a unified API.
+  a unified API.  Create your tenants via CSTAR and manage your API keys via the Notify admin
+  portal.  Built on top of the BC Gov API Gateway and Kong, with a Keycloak-based authentication
+  system.
 tags: [notify, openapi, notifications, email, sms]
 license_title: Access Only
 view_audience: Government
@@ -15,9 +17,9 @@ record_publish_date: '2026-04-10'
 kind: CredentialIssuer
 name: ${GATEWAY_ID} default dev
 description: Built-in OAuth2/OIDC using BC Gov Keycloak (DEV)
-flow: client-credentials
+flow: kong-api-key-only
 mode: auto
-authPlugin: jwt-keycloak
+authPlugin: key-auth
 clientAuthenticator: client-secret
 clientRoles: []
 inheritFrom: Gold Shared IdP
@@ -25,9 +27,9 @@ inheritFrom: Gold Shared IdP
 kind: CredentialIssuer
 name: ${GATEWAY_ID} default test
 description: Built-in OAuth2/OIDC using BC Gov Keycloak (TEST)
-flow: client-credentials
+flow: kong-api-key-only
 mode: auto
-authPlugin: jwt-keycloak
+authPlugin: key-auth
 clientAuthenticator: client-secret
 clientRoles: []
 inheritFrom: Gold Shared IdP
@@ -35,9 +37,9 @@ inheritFrom: Gold Shared IdP
 kind: CredentialIssuer
 name: ${GATEWAY_ID} default prod
 description: Built-in OAuth2/OIDC using BC Gov Keycloak (PROD)
-flow: client-credentials
+flow: kong-api-key-only
 mode: auto
-authPlugin: jwt-keycloak
+authPlugin: key-auth
 clientAuthenticator: client-secret
 clientRoles: []
 inheritFrom: Gold Shared IdP
@@ -49,21 +51,21 @@ environments:
   - name: dev
     active: true
     approval: false
-    flow: client-credentials
+    flow: kong-api-key-only
     credentialIssuer: ${GATEWAY_ID} default dev
     services:
       - ${GATEWAY_ID}-notify-dev
   - name: test
     active: true
     approval: false
-    flow: client-credentials
+    flow: kong-api-key-only
     credentialIssuer: ${GATEWAY_ID} default test
     services:
       - ${GATEWAY_ID}-notify-test
   - name: prod
     active: true
     approval: false
-    flow: client-credentials
+    flow: kong-api-key-only
     credentialIssuer: ${GATEWAY_ID} default prod
     services:
       - ${GATEWAY_ID}-notify-prod

@@ -25,8 +25,7 @@ spec:
         app.kubernetes.io/name: clamav
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      securityContext:
-        fsGroup: 1018590000
+      securityContext: {}
       containers:
         - name: clamav
           # Using official ClamAV image with custom command to bypass chown operations

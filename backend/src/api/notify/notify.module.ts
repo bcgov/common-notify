@@ -1,10 +1,12 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
-import { ClientTenantMappingModule } from '../admin/client-tenant-mappings/client-tenant-mapping.module'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { CstarModule } from '../../services/cstar/cstar.module'
 import {
   NotifyController,
   NotifySimpleController,
@@ -26,12 +28,19 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 @Module({
   imports: [
     TypeOrmModule.forFeature([MimeTypeCode, NotifyConfiguration]),
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Tenant]),
     TenantsModule,
-    ClientTenantMappingModule,
     ChesModule,
     NotificationModule,
     RenderingModule,
     FeatureFlagModule,
+    CstarModule,
+    ApiKeysModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],
@@ -44,6 +53,8 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
   ],
   providers: [
     NotifyService,
+    NotifyFrontendRoleGuard,
+    NotifyServiceGuard,
     AttachmentValidationService,
     AttachmentProcessingService,
     AttachmentResolverService,

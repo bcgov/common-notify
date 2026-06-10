@@ -18,7 +18,8 @@ import {
 } from './notify.controller'
 import { NotifyService } from './notify.service'
 import { NotificationService } from '../../api/notification/notification.service'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { ChesApiClient } from '../../ches/ches-api.client'
@@ -31,8 +32,8 @@ import { AttachmentValidationService } from './services/attachment-validation.se
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 
-// Mock TenantGuard to bypass authentication in tests
-const mockTenantGuard: CanActivate = {
+// Mock AuthGuard to bypass authentication in tests
+const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest()
     // Attach a mock tenant to the request
@@ -115,12 +116,14 @@ describe('Notify Controllers', () => {
         { provide: TenantsService, useValue: mockTenantsService },
       ],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(NotifyServiceGuard)
+      .useValue(mockAuthGuard)
+      .overrideGuard(NotifyFrontendRoleGuard)
+      .useValue(mockAuthGuard)
       .overrideGuard(FeatureFlagGuard)
-      .useValue(mockTenantGuard)
+      .useValue(mockAuthGuard)
       .overrideGuard(SmsChannelFeatureFlagGuard)
-      .useValue(mockTenantGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     service = module.get<NotifyService>(NotifyService)

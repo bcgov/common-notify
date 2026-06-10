@@ -53,10 +53,6 @@ const adminItems = {
   icon: <AdminPanelSettingsOutlinedIcon />,
   subItems: [
     {
-      label: 'Clients',
-      to: '/admin/clients',
-    },
-    {
       label: 'Feature Flags',
       to: '/admin/feature-flags',
     },
@@ -68,7 +64,15 @@ const Sidebar: FC = () => {
   const [adminExpanded, setAdminExpanded] = useState(false)
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
+  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+
+  // Determine which menu items to show based on roles
+  // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
+  const showDashboard = cstarTenants.length > 0
+  const showTemplates = cstarTenants.length > 0
+  // Feature Flags requires NOTIFY_ADMIN (SSO)
+  const showAdminFeatureFlags = isAdmin
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -95,20 +99,28 @@ const Sidebar: FC = () => {
 
       {/* Top nav */}
       <nav className="sidebar__nav" aria-label="Primary">
-        {navItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className="sidebar__item"
-            activeProps={{ className: 'active' }}
-            title={collapsed ? item.label : ''}
-          >
-            <span className="sidebar__icon" aria-hidden="true">
-              {item.icon}
-            </span>
-            <span className="sidebar__label">{item.label}</span>
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          // Conditionally show nav items based on user roles
+          const shouldShow =
+            (item.label === 'Dashboard' && showDashboard) ||
+            (item.label === 'Templates' && showTemplates) ||
+            (item.label !== 'Dashboard' && item.label !== 'Templates') // Always show non-conditional items
+
+          return shouldShow ? (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="sidebar__item"
+              activeProps={{ className: 'active' }}
+              title={collapsed ? item.label : ''}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="sidebar__label">{item.label}</span>
+            </Link>
+          ) : null
+        })}
         {isAdmin && (
           <div className="sidebar__menu-group">
             <button
@@ -126,16 +138,15 @@ const Sidebar: FC = () => {
             </button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
-                {adminItems.subItems.map((subItem) => (
+                {showAdminFeatureFlags && (
                   <Link
-                    key={subItem.to}
-                    to={subItem.to}
+                    to="/admin/feature-flags"
                     className="sidebar__subitem"
                     activeProps={{ className: 'active' }}
                   >
-                    <span className="sidebar__label">{subItem.label}</span>
+                    <span className="sidebar__label">Feature Flags</span>
                   </Link>
-                ))}
+                )}
               </div>
             )}
           </div>

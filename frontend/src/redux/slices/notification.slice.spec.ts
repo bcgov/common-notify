@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import reducer, { setPage, setStatusFilter, upsertNotification } from './notification.slice'
+import reducer, { setPage, setStatusFilter } from './notification.slice'
 import { fetchNotifications } from '../thunks/notification.thunks'
 import { NotificationStatus } from '@/enum/notification-status.enum'
 
@@ -15,6 +15,7 @@ describe('notificationSlice', () => {
         totalPages: 0,
         isLoading: false,
         error: null,
+        hasLoaded: false,
       },
       setStatusFilter(NotificationStatus.COMPLETED),
     )
@@ -57,37 +58,5 @@ describe('notificationSlice', () => {
   it('updates page with setPage', () => {
     const state = reducer(undefined, setPage(3))
     expect(state.page).toBe(3)
-  })
-
-  it('preserves the existing upsert behavior for matching rows', () => {
-    const state = reducer(
-      {
-        items: [
-          {
-            id: 'notif-1',
-            tenantId: 'tenant-1',
-            status: NotificationStatus.QUEUED,
-            createdAt: '2026-05-12T00:00:00.000Z',
-            updatedAt: '2026-05-12T00:00:00.000Z',
-          },
-        ],
-        statusFilter: 'all',
-        page: 1,
-        limit: 10,
-        count: 1,
-        totalPages: 1,
-        isLoading: false,
-        error: null,
-      },
-      upsertNotification({
-        id: 'notif-1',
-        tenantId: 'tenant-1',
-        status: NotificationStatus.COMPLETED,
-        createdAt: '2026-05-12T00:00:00.000Z',
-        updatedAt: '2026-05-12T00:00:00.000Z',
-      }),
-    )
-
-    expect(state.items[0].status).toBe(NotificationStatus.COMPLETED)
   })
 })

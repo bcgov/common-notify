@@ -40,8 +40,9 @@ export default () => {
     // Keycloak / JWT authentication
     auth: {
       jwksUri: process.env.JWKS_URI,
-      jwtIssuer: process.env.JWT_ISSUER,
-      keycloakClientId: process.env.KEYCLOAK_CLIENT_ID,
+      frontendKeycloakIssuer: process.env.FRONTEND_KEYCLOAK_ISSUER,
+      apiGatewayKeycloakIssuer: process.env.API_GATEWAY_KEYCLOAK_ISSUER,
+      notifyClientId: process.env.NOTIFY_CLIENT_ID,
     },
 
     // CHES (Common Hosted Email Service)
@@ -56,6 +57,20 @@ export default () => {
     // GC Notify
     gcNotify: {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
+    },
+
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
+    // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
+    // Used to fetch user roles for role-based access control
+    cstar: {
+      baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
     },
 
     // Twilio SMS Service

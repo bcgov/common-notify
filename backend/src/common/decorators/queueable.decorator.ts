@@ -57,11 +57,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const logger = new Logger(`Queueable[${queueName}]`)
 
-    descriptor.value = async function (
-      this: QueueableContext,
-      tenant?: unknown,
-      payload?: unknown,
-    ) {
+    descriptor.value = async function (this: QueueableContext, req?: any, payload?: unknown) {
       try {
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
@@ -86,6 +82,18 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           )
         }
 
+        // Get tenant from request object (set by TenantGuard)
+        const tenant = req?.tenant
+        if (!isValidTenantContext(tenant)) {
+          logger.error(
+            `Queueable decorator: Invalid or missing tenant context. req.tenant = ${JSON.stringify(req?.tenant)}`,
+          )
+          throw new BadRequestException(
+            'Tenant information is required but was not provided or invalid',
+          )
+        }
+       
+
         // Validate queueMap exists and is a Map
         const queueMap = (this as QueueableContext).queueMap
         if (!(queueMap instanceof Map)) {
@@ -99,13 +107,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         if (!queue) {
           throw new InternalServerErrorException(
             `Queue "${queueName}" not available in queueMap. Available queues: ${Array.from(queueMap.keys()).join(', ')}`,
-          )
-        }
-
-        // Validate tenant context with type guard
-        if (!isValidTenantContext(tenant)) {
-          throw new BadRequestException(
-            'Tenant information is required but was not provided or invalid',
           )
         }
 
