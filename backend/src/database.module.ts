@@ -14,6 +14,9 @@ import { MimeTypeCode } from './api/notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from './api/notification/entities/configuration.entity'
 import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
 import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
+import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
+import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
+import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
@@ -48,6 +51,9 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TemplateEngineCode,
         FeatureFlag,
         FeatureFlagCode,
+        WebhookConfig,
+        WebhookDeliveryLog,
+        WebhookTypeCode,
         ApiKeyConsumer,
       ],
       synchronize: false, // Use Flyway for migrations

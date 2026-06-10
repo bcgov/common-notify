@@ -145,11 +145,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             payload: processedPayload, // Store sanitized request payload for retry purposes
           })
           logger.debug(
-            `Notification record created in DB with PENDING status: ${notificationRecord.id}`,
-            {
-              notifyId: notificationRecord.id,
-              tenantId,
-            },
+            `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,
           )
 
           // Publish initial record to SSE subscribers (fire-and-forget)
@@ -254,11 +250,9 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
             await queue.add(jobPayload, queueOptions)
 
-            logger.log(`Job successfully enqueued: ${notificationRecord.id}`, {
-              tenantId,
-              queue: queueName,
-              jobId: notificationRecord.id,
-            })
+            logger.log(
+              `Job successfully enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,
+            )
 
             // Update status after queuing
             // For scheduled sends, keep status as SCHEDULED

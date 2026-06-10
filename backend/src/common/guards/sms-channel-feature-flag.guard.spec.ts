@@ -243,7 +243,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
         sms_notifications: false,
       })
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
       expect(featureFlagService.getFlagsForTenant).toHaveBeenCalledWith('tenant-123')
     })
 
@@ -261,7 +261,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
 
       vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(false)
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject SMS request when flag check throws error', async () => {
@@ -278,7 +278,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
 
       vi.spyOn(featureFlagService, 'isEnabled').mockRejectedValue(new Error('Service error'))
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
   })
 
@@ -294,7 +294,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when tenant is null', async () => {
@@ -309,7 +309,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when tenant is undefined', async () => {
@@ -324,7 +324,7 @@ describe('SmsChannelFeatureFlagGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should use tenant ID from request context', async () => {
