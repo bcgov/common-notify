@@ -267,6 +267,8 @@ export class NotifySimpleFrontendController {
   constructor(
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
+    readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -297,6 +299,8 @@ export class NotifySimpleFrontendController {
     const simpleController = new NotifySimpleController(
       this.notifyService,
       this.notificationService,
+      this.attachmentValidationService,
+      this.attachmentProcessingService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)
