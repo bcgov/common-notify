@@ -255,6 +255,54 @@ describe('ChesEmailTransport', () => {
       })
     })
 
+    it('includes attachments in the CHES payload with preserved content type', async () => {
+      mockConfig()
+
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'token-123',
+              expires_in: 300,
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              messages: [{ msgId: 'msg-456', to: ['user@example.com'] }],
+              txId: 'tx-789',
+            }),
+        })
+
+      await transport.send({
+        to: 'user@example.com',
+        subject: 'Attachment Test',
+        body: 'Hello',
+        attachments: [
+          {
+            filename: 'hello.txt',
+            content: Buffer.from('hello world'),
+            contentType: 'text/plain',
+            sendingMethod: 'attach',
+          },
+        ],
+      })
+
+      const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit]
+      const bodyStr = typeof init?.body === 'string' ? init.body : ''
+      const emailBody = JSON.parse(bodyStr) as Record<string, any>
+      expect(emailBody.attachments).toEqual([
+        {
+          content: Buffer.from('hello world').toString('base64'),
+          contentType: 'text/plain',
+          encoding: 'base64',
+          filename: 'hello.txt',
+        },
+      ])
+    })
+
     it('handles text body type', async () => {
       mockConfig()
 

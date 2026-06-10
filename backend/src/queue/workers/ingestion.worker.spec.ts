@@ -117,7 +117,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -153,7 +156,7 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-456',
           tenantId: 'tenant-456',
           request: {
-            sms: { recipients: { to: ['+1234567890'] }, body: 'SMS test' },
+            sms: { recipients: { to: ['+1234567890'] }, content: { body: 'SMS test' } },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -188,8 +191,11 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-789',
           tenantId: 'tenant-789',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
-            sms: { recipients: { to: ['+1234567890'] }, body: 'SMS test' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
+            sms: { recipients: { to: ['+1234567890'] }, content: { body: 'SMS test' } },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -220,7 +226,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
           scheduledFor,
@@ -259,7 +268,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
           scheduledFor: futureDate,
@@ -343,7 +355,10 @@ describe('IngestionWorker', () => {
           notifyId: undefined as any,
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -369,7 +384,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: null as any,
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
         },
@@ -395,7 +413,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: undefined as any,
         },
@@ -470,8 +491,7 @@ describe('IngestionWorker', () => {
 
       const emailPayload = {
         recipients: { to: ['test@example.com'] },
-        subject: 'Test Subject',
-        body: 'Test body',
+        content: { subject: 'Test Subject', body: 'Test body' },
       }
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
@@ -513,7 +533,10 @@ describe('IngestionWorker', () => {
           notifyId: 'notify-retry',
           tenantId: 'tenant-retry',
           request: {
-            email: { recipients: { to: ['test@example.com'] }, subject: 'Test', body: 'Test body' },
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
           },
           requestedAt: new Date().toISOString(),
         },

@@ -12,6 +12,7 @@ export interface SendEmailOptions {
   attachments?: Array<{
     filename: string
     content: Buffer | string
+    contentType?: string
     sendingMethod: 'attach' | 'link'
   }>
 }

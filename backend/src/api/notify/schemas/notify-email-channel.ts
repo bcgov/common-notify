@@ -1,17 +1,11 @@
-import { IsString, IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
+import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { NotifyAttachment } from './notify-attachment'
 import { NotifyEmailRecipients } from './notify-email-recipients'
 import { NotifyContent } from './notify-content'
-
-export class NotifyAttachment {
-  @ApiPropertyOptional() @IsOptional() @IsString() content?: string
-  @ApiPropertyOptional() @IsOptional() @IsString() contentType?: string
-  @ApiPropertyOptional() @IsOptional() @IsString() filename?: string
-  @ApiPropertyOptional() @IsOptional() @IsString() disposition?: string
-}
 
 @ValidateTemplateOrRenderer()
 export class NotifyEmailChannel {

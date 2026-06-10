@@ -172,6 +172,7 @@ export class ChesEmailTransport implements IEmailTransport {
         subject: payload.subject.substring(0, 50),
         bodyType: payload.bodyType,
         bodyLength: payload.body.length,
+        attachmentCount: payload.attachments?.length ?? 0,
       })}`,
     )
 
@@ -315,7 +316,7 @@ export class ChesEmailTransport implements IEmailTransport {
           typeof a.content === 'string'
             ? Buffer.from(a.content, 'utf-8').toString('base64')
             : a.content.toString('base64'),
-        contentType: 'application/octet-stream',
+        contentType: a.contentType || 'application/octet-stream',
         encoding: 'base64' as const,
         filename: a.filename,
       }))
