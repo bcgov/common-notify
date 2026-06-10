@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "9c2fb158-079f-4845-9bf2-2aef932aeac2",
+    "_postman_id": "d9ee190c-7abc-4ab0-aa5f-bc78e7f9dc11",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -658,8 +658,8 @@
                 "method": "GET",
                 "header": [
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -676,14 +676,7 @@
               "name": "Notify - Create Template - Handlebars",
               "request": {
                 "auth": {
-                  "type": "bearer",
-                  "bearer": [
-                    {
-                      "key": "token",
-                      "value": "{{jwt_token}}",
-                      "type": "string"
-                    }
-                  ]
+                  "type": "noauth"
                 },
                 "method": "POST",
                 "header": [
@@ -693,8 +686,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -732,8 +725,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -1047,14 +1040,47 @@
           "name": "CSTAR",
           "item": [
             {
+              "name": "Bind Tenant to API Key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "",
+                    "value": "",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"cstarTenantId\": \"{{tenant-1}}\" }",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/service/api-key/bind",
+                  "host": ["{{gateway_url}}"],
+                  "path": ["api", "v1", "service", "api-key", "bind"]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "Tenants",
               "request": {
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "https://cstar-dev.apps.silver.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
+                  "raw": "https://cstar-test.apps.gold.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
                   "protocol": "https",
-                  "host": ["cstar-dev", "apps", "silver", "devops", "gov", "bc", "ca"],
+                  "host": ["cstar-test", "apps", "gold", "devops", "gov", "bc", "ca"],
                   "path": ["api", "v1", "users", ":ssoUserId", "tenants"],
                   "variable": [
                     {
@@ -1070,6 +1096,11 @@
           "auth": {
             "type": "oauth2",
             "oauth2": [
+              {
+                "key": "clientId",
+                "value": "{{frontend_client_id}}",
+                "type": "string"
+              },
               {
                 "key": "refreshRequestParams",
                 "value": [],
@@ -1103,11 +1134,6 @@
               {
                 "key": "grant_type",
                 "value": "authorization_code_with_pkce",
-                "type": "string"
-              },
-              {
-                "key": "clientId",
-                "value": "{{frontend_client_id}}",
                 "type": "string"
               },
               {
@@ -1174,14 +1200,92 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple"]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Attachment",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"SGVsbG8hICBUZXN0IGF0dGFjaG1lbnQgZnJvbSBOb3RpZnkuCg==\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple"]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Attachment Virus",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1213,8 +1317,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1252,8 +1356,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "20e1da22-2e44-4fbd-ab50-64f825110f56",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1291,8 +1395,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1330,14 +1434,14 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"templateId\": \"3dfe0442-1f24-4763-9885-5aa088693f33\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
+              "raw": "{\n  \"templateId\": \"a982bb71-3271-47cb-bbbf-b9a10315031f\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1369,8 +1473,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1604,7 +1708,22 @@
           "response": []
         },
         {
-          "name": "Notify - Register Callback",
+          "name": "Notify - Register Callback (Teams webhook)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.callbackId) {",
+                  "  pm.collectionVariables.set('callback_id', res.callbackId);",
+                  "  console.log('Saved callbackId:', res.callbackId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "bearer",
@@ -1622,20 +1741,24 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook\",\n  \"events\": [\"notification.sent\", \"notification.failed\"]\n}"
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback",
+              "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notify", "registerCallback"]
             },
-            "description": "Register a callback webhook for notification events"
+            "description": "Register a callback webhook.\n\n**Setup:**\n1. Go to https://webhook.site, copy your unique URL, set it as `webhook_url` collection variable.\n2. Send a notification (e.g. Simple Send Email).\n3. Watch the POST arrive at webhook.site with `X-Webhook-Signature` header if secret is set.\n\n**Fields:**\n- `url`: HTTPS URL to receive POST requests (required)\n- `channelType`: filter by channel — `email`, `sms`, `msgApp`. Omit to receive all.\n- `trigger`: `success` fires on COMPLETED, `failure` fires on FAILED. Omit to receive all.\n- `secret`: Optional. If provided, each POST includes `X-Webhook-Signature: sha256=<hmac>`.\n- `headers`: Optional key/value pairs merged into every outbound POST.\n- `active`: true/false to enable/disable without deleting.\n\n**callbackId is auto-saved to `{{callback_id}}` collection variable.**"
           },
           "response": []
         },
@@ -1658,20 +1781,24 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook/updated\",\n  \"events\": [\"notification.sent\"]\n}"
+              "raw": "{\n  \"active\": false\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notify", "registerCallback", "{{callback_id}}"]
             },
-            "description": "Update a registered callback"
+            "description": "Partial update of an existing callback. Only include fields to change.\n\nExample: disable without deleting by setting `\"active\": false`."
           },
           "response": []
         },
@@ -1689,15 +1816,19 @@
               ]
             },
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notify", "registerCallback", "{{callback_id}}"]
             },
-            "description": "Delete a registered callback"
+            "description": "Permanently remove a registered callback. Returns 204 No Content on success."
           },
           "response": []
         },
@@ -1722,8 +1853,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1761,8 +1892,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1940,6 +2071,16 @@
     {
       "key": "gc_notify_notification_id",
       "value": ""
+    },
+    {
+      "key": "webhook_url",
+      "value": "https://webhook.site/YOUR-UNIQUE-ID-HERE",
+      "description": "Paste your webhook.site URL here (or any HTTPS URL). Must be HTTPS."
+    },
+    {
+      "key": "callback_id",
+      "value": "",
+      "description": "Auto-populated by Register Callback test script. Used by Update/Delete Callback requests."
     }
   ]
 }

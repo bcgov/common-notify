@@ -188,7 +188,7 @@ describe('FeatureFlagGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue('DISABLED_FEATURE')
       vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(false)
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject request when feature flag check returns false', async () => {
@@ -205,7 +205,7 @@ describe('FeatureFlagGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue('ANOTHER_DISABLED_FEATURE')
       vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(false)
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -279,7 +279,7 @@ describe('FeatureFlagGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue('TEST_FEATURE')
       vi.spyOn(tenantsService, 'findByExternalId').mockRejectedValue(new Error('Lookup failed'))
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
   })
 
@@ -313,7 +313,7 @@ describe('FeatureFlagGuard', () => {
       const result1 = await guard.canActivate(mockContext1)
       expect(result1).toBe(true)
 
-      expect(guard.canActivate(mockContext2)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext2)).rejects.toThrow(ForbiddenException)
     })
   })
 })

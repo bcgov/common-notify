@@ -2,17 +2,30 @@ import { NotificationStatus } from '../enum/notification-status.enum'
 import { NotificationChannel } from '../enum/notification-channel.enum'
 import { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
 import { NotifyEmailChannel } from '../api/notify/schemas/notify-email-channel'
+import { NotifyMsgAppChannel } from '../api/notify/schemas/notify-msg-app-channel'
 import { NotifySmsChannel } from '../api/notify/schemas/notify-sms-channel'
+import {
+  ProcessedNotifyEmailChannel,
+  ProcessedNotifyMsgAppChannel,
+  ProcessedNotifySimpleRequest,
+  ProcessedNotifySmsChannel,
+} from '../api/notify/schemas/stored-notify-attachment'
 
 /**
  * Union type for all supported request payloads
  */
-export type NotifyRequest = NotifySimpleRequest
+export type NotifyRequest = NotifySimpleRequest | ProcessedNotifySimpleRequest
 
 /**
  * Union type for all supported delivery payloads
  */
-export type DeliveryPayload = NotifyEmailChannel | NotifySmsChannel
+export type DeliveryPayload =
+  | NotifyEmailChannel
+  | NotifySmsChannel
+  | NotifyMsgAppChannel
+  | ProcessedNotifyEmailChannel
+  | ProcessedNotifySmsChannel
+  | ProcessedNotifyMsgAppChannel
 
 /**
  * Notification Request record stored in database
@@ -49,4 +62,15 @@ export interface DeliveryJobPayload {
   request: NotifyRequest // Original request (may contain templateId)
   payload: DeliveryPayload // Channel-specific payload
   attempt: number
+}
+
+/**
+ * Job payload for webhook delivery queue
+ */
+export interface WebhookJobPayload {
+  notificationId: string // Database notification_request.id
+  tenantId: string
+  webhookId: string // webhook_config.id
+  event: string // e.g. 'notification.status.changed'
+  payload: Record<string, unknown> // Notification data to POST to the callback URL
 }

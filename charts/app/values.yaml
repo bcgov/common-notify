@@ -88,12 +88,15 @@ backend:
     #-- Each ClamAV instance uses: 200m CPU + 768Mi memory (limits: 2 CPU + 2Gi memory)
     enabled: true
     #-- hostname of the ClamAV service (clamd daemon)
+    #-- Leave null to use chart default: <release-name>-clamav
     #-- PRs override this to 'common-notify-dev-clamav' to use shared instance
-    host: clamav
+    host: ~
     #-- port of the ClamAV service
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
+    #-- fail closed when ClamAV is disabled or unavailable
+    failClosed: false
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored

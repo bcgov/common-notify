@@ -135,7 +135,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
 
     it('should reject request with missing user payload', async () => {
@@ -149,7 +149,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(UnauthorizedException)
     })
   })
 
@@ -199,7 +199,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject request with missing azp claim', async () => {
@@ -217,7 +217,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -267,7 +267,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
 
     it('should reject request with missing issuer claim', async () => {
@@ -285,7 +285,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -335,7 +335,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
     })
 
     it('should reject request with empty x-tenant-id header', async () => {
@@ -354,7 +354,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
     })
 
     it('should reject request with null x-tenant-id header', async () => {
@@ -373,7 +373,7 @@ describe('NotifyFrontendRoleGuard', () => {
         getClass: () => ({}),
       } as unknown as ExecutionContext
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -426,7 +426,7 @@ describe('NotifyFrontendRoleGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(null)
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(BadRequestException)
     })
 
     it('should reject request when tenant lookup throws error', async () => {
@@ -448,7 +448,7 @@ describe('NotifyFrontendRoleGuard', () => {
       vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
       vi.spyOn(tenantsService, 'findByExternalId').mockRejectedValue(new Error('Database error'))
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
   })
 
@@ -538,7 +538,7 @@ describe('NotifyFrontendRoleGuard', () => {
         { id: 'bc-third' },
       ])
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when CSTAR returns empty tenant list', async () => {
@@ -563,7 +563,7 @@ describe('NotifyFrontendRoleGuard', () => {
       vi.spyOn(tenantsService, 'findByExternalId').mockResolvedValue(mockTenant)
       vi.spyOn(cstarApiClient, 'getUserTenants').mockResolvedValue([])
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
 
     it('should reject request when CSTAR API call fails', async () => {
@@ -590,7 +590,7 @@ describe('NotifyFrontendRoleGuard', () => {
         new Error('CSTAR service unavailable'),
       )
 
-      expect(guard.canActivate(mockContext)).rejects.toThrow()
+      await expect(guard.canActivate(mockContext)).rejects.toThrow()
     })
   })
 

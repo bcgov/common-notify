@@ -59,6 +59,14 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
     // Used to fetch user roles for role-based access control
     cstar: {
@@ -83,6 +91,15 @@ export default () => {
       storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
     },
 
+    // ClamAV
+    clamav: {
+      host: process.env.CLAMAV_HOST || 'localhost',
+      port: parseInt(process.env.CLAMAV_PORT || '3310', 10),
+      timeout: parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
+      enabled: process.env.CLAMAV_ENABLED !== 'false',
+      failClosed: process.env.CLAMAV_FAIL_CLOSED === 'true',
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
@@ -97,6 +114,11 @@ export default () => {
       jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
       pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
+    },
+
+    // Encryption
+    encryption: {
+      key: process.env.WEBHOOK_ENCRYPTION_KEY,
     },
   }
 }

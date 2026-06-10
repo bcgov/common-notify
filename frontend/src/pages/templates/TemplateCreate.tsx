@@ -175,6 +175,9 @@ const TemplateCreate: FC = () => {
               <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
                 Legacy GC Notify
               </Radio>
+              <Radio key="mjml" value={TemplateEngine.MJML}>
+                MJML
+              </Radio>
             </RadioGroup>
           </div>
 

@@ -11,6 +11,7 @@ import { UpdateNotificationRequestDto } from './schemas/update-notification-requ
 import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -87,7 +88,9 @@ export class NotificationService {
   /**
    * Extract channel code, recipients, and delayed send time from notification payload
    */
-  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+  private extractChannelAndRecipients(
+    payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
+  ): {
     channel: string | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
@@ -263,7 +266,7 @@ export class NotificationService {
 
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
-    this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    this.logger.log(`Updated notification request: ${id} (status=${dto.status})`)
     // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
@@ -283,7 +286,10 @@ export class NotificationService {
    * @param request The NotifySimpleRequest to validate
    * @returns Array of validation error messages (empty if valid)
    */
-  async validateBusinessRules(tenantId: string, request: NotifySimpleRequest): Promise<string[]> {
+  async validateBusinessRules(
+    tenantId: string,
+    request: NotifySimpleRequest | ProcessedNotifySimpleRequest,
+  ): Promise<string[]> {
     const errors: string[] = []
 
     // Verify tenant exists and is active

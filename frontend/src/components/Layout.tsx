@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchCstarTenants, fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
@@ -19,12 +19,15 @@ type Props = {
 const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const tenantError = useAppSelector((state) => state.cstar.error)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const showTenantModal = useAppSelector((state) => state.tenant.showTenantModal)
   const rolesLoading = useAppSelector((state) => state.user.rolesLoading)
+  const rolesError = useAppSelector((state) => state.user.rolesError)
+  const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
 
   // Track which tenants we've already fetched roles for in this session
   const rolesFetchedRef = useRef<Set<string>>(new Set())
@@ -43,6 +46,27 @@ const Layout: FC<Props> = ({ children }) => {
     rolesFetchedRef.current.add(selectedTenant.id)
     dispatch(fetchCstarRoles({ tenantId: selectedTenant.id }))
   }, [selectedTenant?.id, dispatch])
+
+  useEffect(() => {
+    // Enforce tenant-level authorization after roles fetch completes.
+    // If user has no roles in selected tenant (or roles lookup fails), show not-authorized.
+    if (!selectedTenant?.id) {
+      return
+    }
+
+    if (!rolesFetchedRef.current.has(selectedTenant.id) || rolesLoading) {
+      return
+    }
+
+    if (location.pathname === '/not-authorized') {
+      return
+    }
+
+    const hasNoRoles = Array.isArray(cstarRoles) && cstarRoles.length === 0
+    if (rolesError || hasNoRoles) {
+      navigate({ to: '/not-authorized' })
+    }
+  }, [selectedTenant?.id, rolesLoading, rolesError, cstarRoles, location.pathname, navigate])
 
   // Block rendering while we're fetching roles for the selected tenant
   // This ensures authorization checks have the correct roles loaded
