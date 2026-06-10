@@ -19,6 +19,8 @@ describe('AppController (e2e)', () => {
           'auth.jwtIssuer': 'https://example.com/realms/test',
           'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
           'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
+          // 32-byte base64 key for webhook encryption (32 bytes -> 44 base64 chars)
+          'encryption.key': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         }
         return config[key]
       },
@@ -30,6 +32,8 @@ describe('AppController (e2e)', () => {
           'auth.jwtIssuer': 'https://example.com/realms/test',
           'auth.frontendKeycloakIssuer': 'https://example.com/realms/frontend',
           'auth.apiGatewayKeycloakIssuer': 'https://example.com/realms/apigw',
+          // 32-byte base64 key for webhook encryption (32 bytes -> 44 base64 chars)
+          'encryption.key': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         }
         const value = config[key]
         if (!value) {
@@ -60,7 +64,9 @@ describe('AppController (e2e)', () => {
   })
 
   afterAll(async () => {
-    await app.close()
+    if (app) {
+      await app.close()
+    }
   })
 
   it('/ (GET)', () =>

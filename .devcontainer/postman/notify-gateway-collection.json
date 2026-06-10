@@ -658,8 +658,8 @@
                 "method": "GET",
                 "header": [
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -725,8 +725,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -1285,7 +1285,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"SGVsbG8hICBUZXN0IGF0dGFjaG1lbnQgZnJvbSBOb3RpZnkuCg==\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
@@ -1708,7 +1708,22 @@
           "response": []
         },
         {
-          "name": "Notify - Register Callback",
+          "name": "Notify - Register Callback (Teams webhook)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.callbackId) {",
+                  "  pm.collectionVariables.set('callback_id', res.callbackId);",
+                  "  console.log('Saved callbackId:', res.callbackId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "bearer",
@@ -1726,20 +1741,24 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook\",\n  \"events\": [\"notification.sent\", \"notification.failed\"]\n}"
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback",
+              "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notify", "registerCallback"]
             },
-            "description": "Register a callback webhook for notification events"
+            "description": "Register a callback webhook.\n\n**Setup:**\n1. Go to https://webhook.site, copy your unique URL, set it as `webhook_url` collection variable.\n2. Send a notification (e.g. Simple Send Email).\n3. Watch the POST arrive at webhook.site with `X-Webhook-Signature` header if secret is set.\n\n**Fields:**\n- `url`: HTTPS URL to receive POST requests (required)\n- `channelType`: filter by channel — `email`, `sms`, `msgApp`. Omit to receive all.\n- `trigger`: `success` fires on COMPLETED, `failure` fires on FAILED. Omit to receive all.\n- `secret`: Optional. If provided, each POST includes `X-Webhook-Signature: sha256=<hmac>`.\n- `headers`: Optional key/value pairs merged into every outbound POST.\n- `active`: true/false to enable/disable without deleting.\n\n**callbackId is auto-saved to `{{callback_id}}` collection variable.**"
           },
           "response": []
         },
@@ -1762,20 +1781,24 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook/updated\",\n  \"events\": [\"notification.sent\"]\n}"
+              "raw": "{\n  \"active\": false\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notify", "registerCallback", "{{callback_id}}"]
             },
-            "description": "Update a registered callback"
+            "description": "Partial update of an existing callback. Only include fields to change.\n\nExample: disable without deleting by setting `\"active\": false`."
           },
           "response": []
         },
@@ -1793,15 +1816,19 @@
               ]
             },
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notify", "registerCallback", "{{callback_id}}"]
             },
-            "description": "Delete a registered callback"
+            "description": "Permanently remove a registered callback. Returns 204 No Content on success."
           },
           "response": []
         },
@@ -2044,6 +2071,16 @@
     {
       "key": "gc_notify_notification_id",
       "value": ""
+    },
+    {
+      "key": "webhook_url",
+      "value": "https://webhook.site/YOUR-UNIQUE-ID-HERE",
+      "description": "Paste your webhook.site URL here (or any HTTPS URL). Must be HTTPS."
+    },
+    {
+      "key": "callback_id",
+      "value": "",
+      "description": "Auto-populated by Register Callback test script. Used by Update/Delete Callback requests."
     }
   ]
 }

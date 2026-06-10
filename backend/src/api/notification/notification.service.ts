@@ -266,7 +266,7 @@ export class NotificationService {
 
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
-    this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    this.logger.log(`Updated notification request: ${id} (status=${dto.status})`)
     // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
