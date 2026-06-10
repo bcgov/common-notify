@@ -192,10 +192,23 @@ export class ClamavService implements OnModuleInit {
       const socket = net.createConnection(
         { host: this.host, port: this.port, timeout: this.timeout },
         () => {
-          // Send INSTREAM command followed by buffer
-          socket.write(`INSTREAM\n`)
-          socket.write(buffer)
-          socket.write('\0')
+          // clamd INSTREAM protocol requires null-terminated command and chunked payload.
+          // Format: zINSTREAM\0 + [len(4 bytes BE) + chunk]* + len(0)
+          const chunks: Buffer[] = [Buffer.from('zINSTREAM\0')]
+          const chunkSize = 64 * 1024
+
+          for (let offset = 0; offset < buffer.length; offset += chunkSize) {
+            const chunk = buffer.subarray(offset, Math.min(offset + chunkSize, buffer.length))
+            const lengthPrefix = Buffer.alloc(4)
+            lengthPrefix.writeUInt32BE(chunk.length, 0)
+            chunks.push(lengthPrefix, chunk)
+          }
+
+          const terminator = Buffer.alloc(4)
+          terminator.writeUInt32BE(0, 0)
+          chunks.push(terminator)
+
+          socket.end(Buffer.concat(chunks))
         },
       )
 
@@ -208,6 +221,7 @@ export class ClamavService implements OnModuleInit {
       socket.on('end', () => {
         try {
           const result = this.parseResponse(response, filename)
+          this.isHealthy = true
           resolve(result)
         } catch (error) {
           reject(error)
@@ -216,6 +230,7 @@ export class ClamavService implements OnModuleInit {
 
       socket.on('error', (error) => {
         socket.destroy()
+        this.isHealthy = false
         this.logger.error(
           `ClamAV scan error for ${filename || 'buffer'}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         )
@@ -224,6 +239,7 @@ export class ClamavService implements OnModuleInit {
 
       socket.on('timeout', () => {
         socket.destroy()
+        this.isHealthy = false
         const timeoutError = new Error('ClamAV scan timeout')
         this.logger.error(`ClamAV scan timeout for ${filename || 'buffer'}: ${this.timeout}ms`)
         reject(timeoutError)
@@ -245,6 +261,13 @@ export class ClamavService implements OnModuleInit {
       .map((l) => l.trim())
       .filter((l) => l.length > 0)
 
+    const errorLine = lines.find((line) =>
+      /UNKNOWN COMMAND|\bERROR\b|INSTREAM size limit exceeded/i.test(line),
+    )
+    if (errorLine) {
+      throw new Error(`ClamAV returned error response: ${errorLine}`)
+    }
+
     const viruses: string[] = []
     let isInfected = false
 
@@ -261,7 +284,9 @@ export class ClamavService implements OnModuleInit {
     }
 
     if (!isInfected && !lines.some((l) => l.includes('OK'))) {
-      this.logger.debug(`Unexpected ClamAV response for ${filename || 'buffer'}: ${response}`)
+      throw new Error(
+        `Unexpected ClamAV response for ${filename || 'buffer'}: ${response || '<empty response>'}`,
+      )
     }
 
     const scannedAt = new Date()

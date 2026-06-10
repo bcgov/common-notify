@@ -7,6 +7,8 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
+import { StoredNotifyAttachment } from '../../api/notify/schemas/stored-notify-attachment'
+import { LocalAttachmentStorageService } from '../../api/notify/services/local-attachment-storage.service'
 
 /**
  * Ingestion Worker
@@ -41,6 +43,7 @@ export class IngestionWorker {
     configService: ConfigService,
     clamavService?: ClamavService,
     concurrency: number = 1,
+    localAttachmentStorageService?: LocalAttachmentStorageService,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -74,31 +77,58 @@ export class IngestionWorker {
           throw new Error('Invalid request: request payload is missing or invalid')
         }
 
-        // Scan email attachments for malware
-        if (request.email?.attachments && request.email.attachments.length > 0) {
+        const channelAttachments = [
+          ...(request.email?.attachments ?? []),
+          ...(request.sms?.attachments ?? []),
+          ...(request.msgApp?.attachments ?? []),
+        ]
+
+        // Scan inline and stored attachments for malware
+        if (channelAttachments.length > 0) {
           if (!clamavService) {
             throw new Error('Attachment scan service unavailable')
           }
 
           logger.log(
-            `[${notifyId}] Scanning ${request.email.attachments.length} email attachment(s) for malware`,
+            `[${notifyId}] Scanning ${channelAttachments.length} attachment(s) for malware`,
           )
 
-          for (const attachment of request.email.attachments) {
-            // Skip attachments that are already stored metadata (no inline content)
-            if (!('content' in attachment) || !attachment.content) {
-              logger.debug(`[${notifyId}] Skipping attachment without content`)
+          for (const attachment of channelAttachments) {
+            if (!attachment) {
               continue
             }
 
             try {
-              // Convert base64 content to Buffer for scanning
               let buffer: Buffer
-              try {
-                buffer = Buffer.from(attachment.content, 'base64')
-              } catch {
-                // If base64 decode fails, treat as raw content
-                buffer = Buffer.from(attachment.content, 'utf-8')
+
+              if ('content' in attachment && typeof attachment.content === 'string') {
+                // Inline attachment payload (pre-processed)
+                try {
+                  buffer = Buffer.from(attachment.content, 'base64')
+                } catch {
+                  // If base64 decode fails, treat as raw content
+                  buffer = Buffer.from(attachment.content, 'utf-8')
+                }
+              } else if ('storageKey' in attachment && typeof attachment.storageKey === 'string') {
+                // Stored attachment payload (post-processed)
+                if (!localAttachmentStorageService) {
+                  throw new Error('Attachment storage service unavailable')
+                }
+
+                const storedAttachment = attachment as StoredNotifyAttachment
+                buffer = await localAttachmentStorageService.readAttachment(
+                  storedAttachment.storageKey,
+                  storedAttachment.contentSha256,
+                )
+
+                if (buffer.byteLength !== storedAttachment.sizeBytes) {
+                  throw new Error(
+                    `Stored attachment size verification failed for ${storedAttachment.filename}`,
+                  )
+                }
+              } else {
+                logger.debug(`[${notifyId}] Skipping unrecognized attachment shape`)
+                continue
               }
 
               logger.debug(

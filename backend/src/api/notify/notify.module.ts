@@ -62,6 +62,7 @@ import { LocalAttachmentStorageService } from './services/local-attachment-stora
     AttachmentValidationService,
     AttachmentProcessingService,
     AttachmentResolverService,
+    LocalAttachmentStorageService,
   ],
 })
 export class NotifyModule {}

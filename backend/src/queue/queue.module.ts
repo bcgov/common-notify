@@ -21,6 +21,7 @@ import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { NotifyModule } from '../api/notify/notify.module'
 import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
+import { LocalAttachmentStorageService } from '../api/notify/services/local-attachment-storage.service'
 import { ClamavService } from '../services/clamav.service'
 
 /**
@@ -182,6 +183,7 @@ export class QueueModule implements OnModuleInit {
     private readonly templatesService?: TemplatesService,
     private readonly inlineRenderingService?: InlineRenderingService,
     private readonly attachmentResolverService?: AttachmentResolverService,
+    private readonly localAttachmentStorageService?: LocalAttachmentStorageService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly clamavService?: ClamavService,
@@ -216,6 +218,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.clamavService,
         concurrency,
+        this.localAttachmentStorageService,
       )
       this.logger.debug('Ingestion worker initialization started')
 

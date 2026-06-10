@@ -12,6 +12,7 @@ describe('IngestionWorker', () => {
   let mockNotificationService: any
   let mockConfigService: any
   let mockClamavService: any
+  let mockLocalAttachmentStorageService: any
   let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
 
@@ -38,6 +39,10 @@ describe('IngestionWorker', () => {
         viruses: [],
         scannedAt: new Date(),
       }),
+    }
+
+    mockLocalAttachmentStorageService = {
+      readAttachment: vi.fn().mockResolvedValue(Buffer.from('stored attachment content')),
     }
 
     // Mock the queues
@@ -580,11 +585,11 @@ describe('IngestionWorker', () => {
           request: {
             email: {
               recipients: { to: ['test@example.com'] },
-              subject: 'Test',
-              body: 'Test body',
+              content: { subject: 'Test', body: 'Test body' },
               attachments: [
                 {
                   filename: 'receipt.pdf',
+                  mimeType: 'application/pdf',
                   content: attachmentContent,
                 },
               ],
@@ -605,6 +610,92 @@ describe('IngestionWorker', () => {
           status: 'failed',
           updatedBy: 'ingestion-worker',
         }),
+      )
+      expect(mockEmailQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('should scan stored attachments produced by attachment processing', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockClamavService,
+        1,
+        mockLocalAttachmentStorageService,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-stored-attachment',
+          tenantId: 'tenant-stored-attachment',
+          request: {
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+              attachments: [
+                {
+                  filename: 'stored.pdf',
+                  mimeType: 'application/pdf',
+                  storageKey: 'aa/aabbcc.bin',
+                  sizeBytes: 'stored attachment content'.length,
+                  contentSha256: 'abc123',
+                  storageProvider: 'local',
+                },
+              ],
+            },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+      expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
+      expect(mockLocalAttachmentStorageService.readAttachment).toHaveBeenCalledWith(
+        'aa/aabbcc.bin',
+        'abc123',
+      )
+      expect(mockClamavService.scanBuffer).toHaveBeenCalledWith(expect.any(Buffer), 'stored.pdf')
+    })
+
+    it('should fail when stored attachments cannot be read for scanning', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockClamavService,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-stored-attachment-no-storage',
+          tenantId: 'tenant-stored-attachment-no-storage',
+          request: {
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+              attachments: [
+                {
+                  filename: 'stored.pdf',
+                  mimeType: 'application/pdf',
+                  storageKey: 'aa/aabbcc.bin',
+                  sizeBytes: 10,
+                  contentSha256: 'abc123',
+                  storageProvider: 'local',
+                },
+              ],
+            },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+        'Attachment scan failed: Attachment storage service unavailable',
       )
       expect(mockEmailQueue.add).not.toHaveBeenCalled()
     })
