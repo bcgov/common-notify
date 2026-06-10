@@ -24,7 +24,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@nestjs/cli": "^11.0.2",
+    "@nestjs/cli": "^11.0.21",
     "@nestjs/common": "^11.0.6",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.6",
@@ -65,7 +65,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.38.0",
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.10.12",
@@ -75,7 +75,7 @@
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "chokidar": "^5.0.0",
-    "eslint": "^9.38.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.2.3",
     "istanbul-badges-readme": "^1.9.0",
