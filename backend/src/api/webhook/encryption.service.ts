@@ -11,14 +11,14 @@ export class EncryptionService {
     const keyFromEnv = this.configService.get<string>('encryption.key')
 
     if (!keyFromEnv) {
-      throw new Error('ENCRYPTION_KEY is not defined in environment variables')
+      throw new Error('WEBHOOK_ENCRYPTION_KEY is not defined in environment variables')
     }
 
     // Convert base64 key to Buffer (32 bytes for AES-256)
     this.key = Buffer.from(keyFromEnv, 'base64')
 
     if (this.key.length !== 32) {
-      throw new Error('ENCRYPTION_KEY must be 32 bytes (64 characters in base64)')
+      throw new Error('WEBHOOK_ENCRYPTION_KEY must be 32 bytes (64 characters in base64)')
     }
   }
 

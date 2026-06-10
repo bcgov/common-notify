@@ -23,6 +23,7 @@ import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { WebhookService } from '../../api/webhook/webhook.service'
 
 // Mock AuthGuard to bypass authentication in tests
 const mockAuthGuard: CanActivate = {
@@ -73,6 +74,12 @@ const mockTenantsService = {
   }),
 }
 
+const mockWebhookService = {
+  create: vi.fn().mockResolvedValue({ id: 'cb-1' }),
+  update: vi.fn().mockResolvedValue({ id: 'cb-1' }),
+  delete: vi.fn().mockResolvedValue(undefined),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -95,6 +102,7 @@ describe('Notify Controllers', () => {
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
         { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         { provide: TenantsService, useValue: mockTenantsService },
+        { provide: WebhookService, useValue: mockWebhookService },
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -305,28 +313,32 @@ describe('Notify Controllers', () => {
     })
 
     describe('POST /api/v1/notify/registerCallback', () => {
-      it('should return 501 status', async () => {
+      it('should return 201 status', async () => {
         return request(app.getHttpServer())
           .post('/api/v1/notify/registerCallback')
-          .send({ url: 'http://example.com/callback' })
-          .expect(501)
+          .send({
+            url: 'https://example.com/callback',
+            channelType: ['email'],
+            trigger: ['success'],
+          })
+          .expect(201)
       })
     })
 
     describe('PATCH /api/v1/notify/registerCallback/:callbackId', () => {
-      it('should return 501 status', async () => {
+      it('should return 200 status', async () => {
         return request(app.getHttpServer())
           .patch('/api/v1/notify/registerCallback/callback-123')
-          .send({ url: 'http://example.com/callback-updated' })
-          .expect(501)
+          .send({ url: 'https://example.com/callback-updated' })
+          .expect(200)
       })
     })
 
     describe('DELETE /api/v1/notify/registerCallback/:callbackId', () => {
-      it('should return 501 status', async () => {
+      it('should return 204 status', async () => {
         return request(app.getHttpServer())
           .delete('/api/v1/notify/registerCallback/callback-123')
-          .expect(501)
+          .expect(204)
       })
     })
   })

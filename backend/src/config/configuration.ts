@@ -109,7 +109,7 @@ export default () => {
 
     // Encryption
     encryption: {
-      key: process.env.ENCRYPTION_KEY,
+      key: process.env.WEBHOOK_ENCRYPTION_KEY,
     },
   }
 }
