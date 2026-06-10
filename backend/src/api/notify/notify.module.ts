@@ -18,22 +18,18 @@ import { NotifyService } from './notify.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
-import { AttachmentProcessingService } from './services/attachment-processing.service'
-import { AttachmentResolverService } from './services/attachment-resolver.service'
-import { AttachmentValidationService } from './services/attachment-validation.service'
-import { LocalAttachmentStorageService } from './services/local-attachment-storage.service'
-import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
-import { NotifyConfiguration } from '../notification/entities/configuration.entity'
-
-@Module({
-  imports: [
-    TypeOrmModule.forFeature([MimeTypeCode, NotifyConfiguration]),
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { AttachmentValidationService } from './services/attachment-validation.service'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
+import { AttachmentResolverService } from './services/attachment-resolver.service'
+import { LocalAttachmentStorageService } from './services/local-attachment-storage.service'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant]),
+    TypeOrmModule.forFeature([Tenant, MimeTypeCode, NotifyConfiguration]),
     TenantsModule,
     ChesModule,
     NotificationModule,
