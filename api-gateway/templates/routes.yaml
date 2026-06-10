@@ -14,9 +14,6 @@ routes:
     protocols:
       - https
       - http
-    protocols:
-      - https
-      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
