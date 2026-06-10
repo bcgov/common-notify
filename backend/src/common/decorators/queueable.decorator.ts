@@ -92,7 +92,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             'Tenant information is required but was not provided or invalid',
           )
         }
-       
 
         // Validate queueMap exists and is a Map
         const queueMap = (this as QueueableContext).queueMap

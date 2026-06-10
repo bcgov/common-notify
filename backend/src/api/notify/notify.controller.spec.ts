@@ -253,7 +253,7 @@ describe('Notify Controllers', () => {
                 {
                   filename: '../bad.txt',
                   mimeType: 'text/plain',
-                  data: 'SGVsbG8=',
+                  content: 'SGVsbG8=',
                 },
               ],
             },
