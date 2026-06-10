@@ -25,7 +25,10 @@ spec:
         app.kubernetes.io/name: clamav
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      securityContext: {}
+      # Do not set fsGroup - let OpenShift assign based on namespace's allowed range
+      # DEV: 1018590000-1018599999, TEST: 1018600000-1018609999, PROD: varies
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: clamav
           # Using official ClamAV image with custom command to bypass chown operations
