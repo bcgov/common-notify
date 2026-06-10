@@ -14,6 +14,8 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   annotations:
     helm.sh/resource-policy: keep
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
     - ReadWriteMany
@@ -33,6 +35,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "backend.labels" . | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
     - ReadWriteMany

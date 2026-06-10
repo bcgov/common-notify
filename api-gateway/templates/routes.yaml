@@ -11,6 +11,12 @@ routes:
   # ============================================================================
   - name: ${ROUTE_PREFIX}notify-health
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -24,6 +30,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-api-health
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -42,6 +51,9 @@ routes:
   # ============================================================================
   - name: ${ROUTE_PREFIX}ches-email
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -55,6 +67,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -68,6 +83,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -81,6 +99,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -94,6 +115,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -107,6 +131,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-preview
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -120,6 +147,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-event-types
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -133,6 +163,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -147,6 +180,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-status
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -160,6 +196,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-callbacks
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -175,6 +214,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}templates
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -191,6 +233,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}feature-flags
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -204,6 +249,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}feature-flags-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -217,6 +265,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -230,6 +281,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-email
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -243,6 +297,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-sms
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -256,6 +313,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notifications-bulk
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -269,6 +329,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-notification-by-id
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -282,6 +345,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-templates-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -295,6 +361,9 @@ routes:
     response_buffering: true
   - name: ${ROUTE_PREFIX}gcnotify-template-by-id
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -317,6 +386,9 @@ routes:
   # /api/v1/code-tables (service variant)
   - name: ${ROUTE_PREFIX}code-tables-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -331,6 +403,9 @@ routes:
   # /api/v1/code-tables (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -346,6 +421,9 @@ routes:
   # /api/v1/code-tables/notification-status (service variant)
   - name: ${ROUTE_PREFIX}code-tables-status-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -360,6 +438,9 @@ routes:
   # /api/v1/code-tables/notification-status (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-status-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -375,6 +456,9 @@ routes:
   # /api/v1/code-tables/channels (service variant)
   - name: ${ROUTE_PREFIX}code-tables-channels-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -389,6 +473,9 @@ routes:
   # /api/v1/code-tables/channels (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-channels-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -404,6 +491,9 @@ routes:
   # /api/v1/code-tables/event-types (service variant)
   - name: ${ROUTE_PREFIX}code-tables-event-types-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -418,6 +508,9 @@ routes:
   # /api/v1/code-tables/event-types (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-event-types-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -433,6 +526,9 @@ routes:
   # /api/v1/code-tables/feature-flags (service variant)
   - name: ${ROUTE_PREFIX}code-tables-feature-flags-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -448,6 +544,9 @@ routes:
   # /api/v1/code-tables/feature-flags (frontend variant)
   - name: ${ROUTE_PREFIX}code-tables-feature-flags-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -463,6 +562,9 @@ routes:
   # /api/v1/notification_request (service variant)
   - name: ${ROUTE_PREFIX}notification-request-service
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -477,6 +579,9 @@ routes:
   # /api/v1/notification_request (frontend variant)
   - name: ${ROUTE_PREFIX}notification-request-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -491,6 +596,9 @@ routes:
   # /api/v1/frontend/notification_request/events (frontend only)
   - name: ${ROUTE_PREFIX}notification-request-events-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -506,6 +614,9 @@ routes:
   # /api/v1/frontend/admin/clients/link-to-tenants (frontend admin only)
   - name: ${ROUTE_PREFIX}admin-clients-link-to-tenants
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -521,6 +632,9 @@ routes:
   # /api/v1/frontend/admin/clients/mappings (frontend admin only)
   - name: ${ROUTE_PREFIX}admin-clients-mappings-get
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -536,6 +650,9 @@ routes:
   # /api/v1/frontend/admin/clients/mappings/:id/toggle-active (frontend admin only)
   - name: ${ROUTE_PREFIX}admin-clients-mappings-toggle
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -551,6 +668,9 @@ routes:
   # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
   - name: ${ROUTE_PREFIX}admin-tenants-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -566,6 +686,9 @@ routes:
   # /api/v1/frontend/users/me (upsert current user)
   - name: ${ROUTE_PREFIX}admin-users-upsert
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -581,6 +704,9 @@ routes:
   # /api/v1/frontend/users (get all users)
   - name: ${ROUTE_PREFIX}admin-users-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -599,6 +725,9 @@ routes:
   # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
   - name: ${ROUTE_PREFIX}auth-tenants
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -614,6 +743,9 @@ routes:
   # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
   - name: ${ROUTE_PREFIX}auth-tenant-roles
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -632,6 +764,9 @@ routes:
   # /api/v1/frontend/admin/feature-flags (list all)
   - name: ${ROUTE_PREFIX}admin-feature-flags-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -647,6 +782,9 @@ routes:
   # /api/v1/frontend/admin/feature-flags (create)
   - name: ${ROUTE_PREFIX}admin-feature-flags-create
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -662,6 +800,9 @@ routes:
   # /api/v1/frontend/admin/feature-flags/:id (update)
   - name: ${ROUTE_PREFIX}admin-feature-flags-update
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -677,6 +818,9 @@ routes:
   # /api/v1/frontend/admin/feature-flags/:id (delete)
   - name: ${ROUTE_PREFIX}admin-feature-flags-delete
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -692,6 +836,9 @@ routes:
   # /api/v1/frontend/templates (frontend variant - list and create)
   - name: ${ROUTE_PREFIX}templates-frontend-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -707,6 +854,9 @@ routes:
   # /api/v1/frontend/templates POST (frontend variant - create)
   - name: ${ROUTE_PREFIX}templates-frontend-create
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -722,6 +872,9 @@ routes:
   # /api/v1/frontend/templates/:id (frontend variant - get by id, update, delete)
   - name: ${ROUTE_PREFIX}templates-frontend-by-id
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -739,6 +892,9 @@ routes:
   # /api/v1/frontend/templates/:id/preview (frontend variant - preview templates)
   - name: ${ROUTE_PREFIX}templates-frontend-preview
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols:
+      - https
+      - http
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
