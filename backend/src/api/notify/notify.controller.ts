@@ -39,6 +39,12 @@ import { AttachmentValidationService } from './services/attachment-validation.se
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
+import { WebhookService } from '../webhook/webhook.service'
+import {
+  CallbackRegistrationRequest,
+  CallbackRegistrationResponse,
+  CallbackRegistrationUpdateRequest,
+} from '../webhook/schemas/callback-registration.dto'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -344,7 +350,10 @@ export class NotifyEventController {
 @Controller('notify')
 @UseGuards(NotifyServiceGuard)
 export class NotifyController {
-  constructor(private readonly notifyService: NotifyService) {}
+  constructor(
+    private readonly notifyService: NotifyService,
+    private readonly webhookService: WebhookService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -375,23 +384,42 @@ export class NotifyController {
 
   @Version('1')
   @Post('registerCallback')
-  @HttpCode(501)
-  registerCallback(@Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(201)
+  registerCallback(
+    @Req() _req: any,
+    @Body() body: CallbackRegistrationRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.create(tenantId, body)
   }
 
   @Version('1')
   @Patch('registerCallback/:callbackId')
-  @HttpCode(501)
-  updateCallback(@Param('callbackId') _callbackId: string, @Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(200)
+  updateCallback(
+    @Req() _req: any,
+    @Param('callbackId') callbackId: string,
+    @Body() body: CallbackRegistrationUpdateRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.update(tenantId, callbackId, body)
   }
 
   @Version('1')
   @Delete('registerCallback/:callbackId')
-  @HttpCode(501)
-  deleteCallback(@Param('callbackId') _callbackId: string) {
-    return this.notifyService.notImplemented()
+  @HttpCode(204)
+  deleteCallback(@Req() _req: any, @Param('callbackId') callbackId: string): Promise<void> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.delete(tenantId, callbackId)
   }
 }
 

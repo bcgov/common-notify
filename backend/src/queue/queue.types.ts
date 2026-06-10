@@ -63,3 +63,14 @@ export interface DeliveryJobPayload {
   payload: DeliveryPayload // Channel-specific payload
   attempt: number
 }
+
+/**
+ * Job payload for webhook delivery queue
+ */
+export interface WebhookJobPayload {
+  notificationId: string // Database notification_request.id
+  tenantId: string
+  webhookId: string // webhook_config.id
+  event: string // e.g. 'notification.status.changed'
+  payload: Record<string, unknown> // Notification data to POST to the callback URL
+}

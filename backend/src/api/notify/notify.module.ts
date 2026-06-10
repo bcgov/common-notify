@@ -20,6 +20,7 @@ import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { WebhookModule } from '../webhook/webhook.module'
 import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { AttachmentValidationService } from './services/attachment-validation.service'
@@ -36,6 +37,7 @@ import { LocalAttachmentStorageService } from './services/local-attachment-stora
     RenderingModule,
     FeatureFlagModule,
     CstarModule,
+    WebhookModule,
     ApiKeysModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
