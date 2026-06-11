@@ -52,11 +52,11 @@ export class FeatureFlagGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest()
 
-    // Try to extract tenant ID from header, request.tenant (set by TenantGuard), or query param
+    // Try to extract tenant ID from request.tenant (set by AuthGuard), x-tenant-id header, or query param
     let tenantId =
       (request.tenant?.id ? String(request.tenant.id) : undefined) ||
-      (request.query?.tenantId as string) ||
       (request.headers['x-tenant-id'] as string) ||
+      (request.query?.tenantId as string) ||
       undefined
 
     // If tenantId came from query param, it might be an external tenant ID
