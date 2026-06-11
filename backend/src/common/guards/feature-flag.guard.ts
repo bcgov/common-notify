@@ -54,7 +54,6 @@ export class FeatureFlagGuard implements CanActivate {
 
     // Try to extract tenant ID from header, request.tenant (set by TenantGuard), or query param
     let tenantId =
-      (request.headers['x-tenant-id'] as string) ||
       (request.tenant?.id ? String(request.tenant.id) : undefined) ||
       (request.query?.tenantId as string) ||
       undefined
