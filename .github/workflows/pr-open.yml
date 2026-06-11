@@ -64,42 +64,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch current DEV config from main branch
-        run: |
-          # Save current PR branch configs
-          mkdir -p /tmp/pr-configs
-          cp -r api-gateway /tmp/pr-configs/
-
-          # Fetch main branch to get DEV config
-          git fetch origin main
-          git checkout origin/main -- api-gateway/
-
-          # Generate DEV config only from main branch
-          # DEV and PR share the same gateway tag (ns.gw-fe8c5.dev) so they must be published together
-          # TEST and PROD have separate tags and remain unchanged
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          api-gateway/scripts/generate-gateway-config.sh dev
-
-          # Save DEV config
-          cp api-gateway/generated/gw-routes-dev.yaml /tmp/dev-config.yaml
-
       - name: Generate PR config from PR branch
         run: |
-          # Restore PR branch configs
-          rm -rf api-gateway
-          cp -r /tmp/pr-configs/api-gateway .
-
           # Generate PR config only from PR branch code
+          # PR shares tag ns.gw-fe8c5.dev with DEV (path-based routing)
+          # DEV service already exists from merge workflow - only apply PR service
           chmod +x api-gateway/scripts/generate-gateway-config.sh
           api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-          # Combine: DEV config (main) + PR config (PR branch)
-          # Both share the same gateway tag (ns.gw-fe8c5.dev) for path-based routing
-          cp /tmp/dev-config.yaml api-gateway/generated/gw-combined-dev-pr.yaml
-          echo "---" >> api-gateway/generated/gw-combined-dev-pr.yaml
-          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-dev-pr.yaml
-
-      - name: Apply DEV+PR config (path-based routing)
+      - name: Apply PR config (path-based routing)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -115,27 +88,30 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Publish: DEV config (from main) + PR config (from PR branch)
-          # Both share tag ns.gw-fe8c5.dev for path-based routing
-          # TEST and PROD configs remain unchanged (separate tags, already published)
-          echo "✅ Publishing DEV+PR config (path-based routing on shared tag ns.gw-fe8c5.dev)"
+          # Apply PR config only
+          # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
+          # DEV service already exists from merge workflow
+          # This adds PR routes without affecting DEV routes (different paths)
+          echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
 
-          # Use publish-gateway with --qualifier dev (both DEV and PR share this qualifier)
-          # This properly handles updating existing services instead of trying to create them
-          if ! gwa publish-gateway api-gateway/generated/gw-combined-dev-pr.yaml --qualifier dev 2>&1 | tee /tmp/gwa-output.txt; then
-            echo "❌ gwa publish-gateway command failed"
-            cat /tmp/gwa-output.txt
-            exit 1
+          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+
+          # Check results
+          if grep -q "Published" /tmp/gwa-output.txt; then
+            PUBLISHED_COUNT=$(grep -oP '\d+(?=/\d+ Published)' /tmp/gwa-output.txt || echo "0")
+            echo "✅ Published $PUBLISHED_COUNT gateway service(s)"
+
+            if [ "$PUBLISHED_COUNT" -gt 0 ]; then
+              echo "✅ PR gateway config published successfully"
+              echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
+              exit 0
+            fi
           fi
 
-          # Check if publish actually succeeded
-          if grep -q "0/[0-9]* Published" /tmp/gwa-output.txt; then
-            echo "❌ Gateway config failed to publish (0 published)"
-            cat /tmp/gwa-output.txt
-            exit 1
-          fi
-
-          echo "✅ Gateway config published successfully"
+          # If we got here, nothing was published
+          echo "❌ Gateway config failed to publish"
+          cat /tmp/gwa-output.txt
+          exit 1
 
   deploys:
     name: Deploys (${{ github.event.number }})
