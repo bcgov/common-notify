@@ -13,17 +13,15 @@ import { NotifyAttachment } from '../schemas/notify-attachment'
 import { MimeTypeCode } from '../../notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from '../../notification/entities/configuration.entity'
 
-type AttachmentChannel = 'email' | 'sms' | 'msgApp'
-
 interface AttachmentConfig {
+  maxAttachmentSizeMb: number
+  maxRequestSizeMb: number
   maxAttachmentSizeBytes: number
   maxRequestSizeBytes: number
   maxFilenameLength: number
 }
 
 interface CollectedAttachment {
-  channel: AttachmentChannel
-  index: number
   attachment: NotifyAttachment
 }
 
@@ -54,22 +52,22 @@ export class AttachmentValidationService {
     for (const entry of attachments) {
       const { attachment } = entry
 
-      this.validateMimeType(entry, attachment.mimeType, allowedMimeTypes)
-      this.validateFilename(entry, attachment.filename, config.maxFilenameLength)
+      this.validateMimeType(attachment.mimeType, allowedMimeTypes)
+      this.validateFilename(attachment.filename, config.maxFilenameLength)
 
       const decoded = this.decodeBase64(entry, attachment.content)
       const decodedBytes = decoded.byteLength
 
       if (decodedBytes > config.maxAttachmentSizeBytes) {
         throw new PayloadTooLargeException(
-          `Attachment "${attachment.filename}" exceeds the maximum allowed size of ${config.maxAttachmentSizeBytes} bytes`,
+          `Attachment '${attachment.filename}' exceeds the maximum allowed size of ${config.maxAttachmentSizeMb} MB.`,
         )
       }
 
       totalDecodedBytes += decodedBytes
       if (totalDecodedBytes > config.maxRequestSizeBytes) {
         throw new PayloadTooLargeException(
-          `Total attachment size exceeds the maximum allowed size of ${config.maxRequestSizeBytes} bytes`,
+          `Combined attachment size exceeds the maximum allowed size of ${config.maxRequestSizeMb} MB.`,
         )
       }
     }
@@ -77,15 +75,15 @@ export class AttachmentValidationService {
 
   private collectAttachments(request: NotifySimpleRequest): CollectedAttachment[] {
     const collected: CollectedAttachment[] = []
-    const channels: Array<{ channel: AttachmentChannel; attachments?: NotifyAttachment[] }> = [
-      { channel: 'email', attachments: request.email?.attachments },
-      { channel: 'sms', attachments: request.sms?.attachments },
-      { channel: 'msgApp', attachments: request.msgApp?.attachments },
+    const channels: Array<{ attachments?: NotifyAttachment[] }> = [
+      { attachments: request.email?.attachments },
+      { attachments: request.sms?.attachments },
+      { attachments: request.msgApp?.attachments },
     ]
 
-    for (const { channel, attachments } of channels) {
-      attachments?.forEach((attachment, index) => {
-        collected.push({ channel, index, attachment })
+    for (const { attachments } of channels) {
+      attachments?.forEach((attachment) => {
+        collected.push({ attachment })
       })
     }
 
@@ -122,6 +120,8 @@ export class AttachmentValidationService {
     const maxFilenameLength = this.readNumericConfig(configMap, 'attachment_max_filename_length')
 
     return {
+      maxAttachmentSizeMb,
+      maxRequestSizeMb,
       maxAttachmentSizeBytes: maxAttachmentSizeMb * 1024 * 1024,
       maxRequestSizeBytes: maxRequestSizeMb * 1024 * 1024,
       maxFilenameLength,
@@ -143,56 +143,44 @@ export class AttachmentValidationService {
     return value
   }
 
-  private validateMimeType(
-    entry: CollectedAttachment,
-    mimeType: string,
-    allowedMimeTypes: Set<string>,
-  ): void {
+  private validateMimeType(mimeType: string, allowedMimeTypes: Set<string>): void {
     if (!allowedMimeTypes.has(mimeType)) {
-      throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} has disallowed MIME type "${mimeType}"`,
-      )
+      throw new BadRequestException(`Attachment MIME type '${mimeType}' is not allowed.`)
     }
   }
 
-  private validateFilename(
-    entry: CollectedAttachment,
-    filename: string,
-    maxFilenameLength: number,
-  ): void {
+  private validateFilename(filename: string, maxFilenameLength: number): void {
     if (!filename.trim()) {
-      throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} must include a valid filename`,
-      )
+      throw new BadRequestException('Attachment filename is required and must be a string.')
     }
 
     if (filename.length > maxFilenameLength) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} filename exceeds the maximum length of ${maxFilenameLength}`,
+        `Attachment filename exceeds the maximum allowed length of ${maxFilenameLength} characters.`,
       )
     }
 
     if (path.posix.isAbsolute(filename) || path.win32.isAbsolute(filename)) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} filename must not be an absolute path`,
+        `Attachment filename '${filename}' is invalid. Use a filename without directory paths.`,
       )
     }
 
     if (filename.includes('/') || filename.includes('\\')) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} filename must not contain path separators`,
+        `Attachment filename '${filename}' is invalid. Use a filename without directory paths.`,
       )
     }
 
     if (filename.includes('..')) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} filename must not contain path traversal sequences`,
+        `Attachment filename '${filename}' is invalid. Use a filename without directory paths.`,
       )
     }
 
     if (filename !== path.posix.basename(filename) || filename !== path.win32.basename(filename)) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} filename is invalid`,
+        `Attachment filename '${filename}' is invalid. Use a filename without directory paths.`,
       )
     }
   }
@@ -202,21 +190,17 @@ export class AttachmentValidationService {
 
     if (data.length % 4 !== 0 || !base64Pattern.test(data)) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} contains invalid base64 data`,
+        `Attachment '${entry.attachment.filename}' content is not valid base64.`,
       )
     }
 
     const decoded = Buffer.from(data, 'base64')
     if (decoded.toString('base64') !== data) {
       throw new BadRequestException(
-        `Attachment ${this.describeAttachment(entry)} contains invalid base64 data`,
+        `Attachment '${entry.attachment.filename}' content is not valid base64.`,
       )
     }
 
     return decoded
-  }
-
-  private describeAttachment(entry: CollectedAttachment): string {
-    return `"${entry.channel}" attachment at index ${entry.index}`
   }
 }
