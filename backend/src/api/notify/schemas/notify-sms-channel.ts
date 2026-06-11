@@ -1,8 +1,9 @@
-import { IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
+import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { NotifyAttachment } from './notify-attachment'
 import { NotifySmsRecipients } from './notify-sms-recipients'
 import { NotifyContent } from './notify-content'
 
@@ -21,6 +22,13 @@ export class NotifySmsChannel {
   @ValidateNested()
   @Type(() => NotifyContent)
   content?: NotifyContent
+
+  @ApiPropertyOptional({ type: [NotifyAttachment] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NotifyAttachment)
+  attachments?: NotifyAttachment[]
 
   @ApiPropertyOptional({
     description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',

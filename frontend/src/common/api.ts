@@ -85,7 +85,10 @@ if (!responseInterceptorRegistered) {
 
         // If error message mentions tenant, show error
         if (errorMessage.includes('tenant') || errorMessage.includes('Tenant')) {
-          showErrorToast(`Authorization failed: ${errorMessage}`)
+          // But don't show if we're already on the not-authorized page
+          if (!window.location.pathname.includes('/not-authorized')) {
+            showErrorToast(`Authorization failed: ${errorMessage}`)
+          }
           return Promise.reject(error)
         }
 
@@ -93,7 +96,10 @@ if (!responseInterceptorRegistered) {
         return Promise.reject(error)
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
-        showErrorToast('You do not have permission to access this resource')
+        // But don't show if we're already on the not-authorized page
+        if (!window.location.pathname.includes('/not-authorized')) {
+          showErrorToast('You do not have permission to access this resource')
+        }
       }
       return Promise.reject(error)
     },

@@ -3,14 +3,6 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DataTable } from './DataTable'
 
-vi.mock('../PaginationControls', () => ({
-  default: ({ page, totalPages, onPageChange }: any) => (
-    <div data-testid="pagination" data-page={page} data-total-pages={totalPages}>
-      <button onClick={() => onPageChange(page + 1)}>Next</button>
-    </div>
-  ),
-}))
-
 vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <span>▼</span> }))
 vi.mock('@mui/icons-material/KeyboardArrowUp', () => ({ default: () => <span>▲</span> }))
 vi.mock('@mui/icons-material/UnfoldMore', () => ({ default: () => <span>⇅</span> }))
@@ -317,7 +309,7 @@ describe('DataTable', () => {
         />,
       )
 
-      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
 
       expect(onPageChange).toHaveBeenCalledWith(2)
     })

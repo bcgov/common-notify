@@ -12,12 +12,15 @@ import {
   Logger,
   ParseUUIDPipe,
   Req,
+  BadRequestException,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
-import { TenantGuard } from '../../common/guards/tenant.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { TenantsService } from '../admin/tenants/tenants.service'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
 import { CreateTemplateDto } from './schemas/create-template.dto'
@@ -43,12 +46,43 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
  */
 @ApiTags('templates')
 @Controller('frontend/templates')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class TemplatesFrontendController {
   private readonly logger = new Logger(TemplatesFrontendController.name)
 
-  constructor(private readonly templatesService: TemplatesService) {}
+  constructor(
+    private readonly templatesService: TemplatesService,
+    private readonly tenantsService: TenantsService,
+  ) {}
+
+  private async requireTenantContext(req: Request | express.Request): Promise<Tenant> {
+    const tenant = (req as any).tenant as Tenant | undefined
+    if (tenant?.id) {
+      return tenant
+    }
+
+    const tenantExternalId = ((req.headers as any)?.['x-tenant-id'] as string | undefined)?.trim()
+    if (!tenantExternalId) {
+      this.logger.error('Tenant context missing and x-tenant-id header was not provided')
+      throw new BadRequestException(
+        'Tenant context is missing from request. Ensure x-tenant-id is provided and authorized.',
+      )
+    }
+
+    this.logger.warn(
+      `Tenant context missing on request. Falling back to x-tenant-id lookup: ${tenantExternalId}`,
+    )
+
+    const resolvedTenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!resolvedTenant?.id) {
+      throw new BadRequestException(
+        `Tenant with ID "${tenantExternalId}" does not exist. Please verify the tenant ID and try again.`,
+      )
+    }
+
+    return resolvedTenant
+  }
 
   /**
    * List all templates for the tenant
@@ -61,6 +95,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get()
   @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List all templates for the specified tenant' })
   @ApiQuery({
     name: 'tenantId',
@@ -117,10 +156,16 @@ export class TemplatesFrontendController {
   @Version('1')
   @Get(':templateId')
   @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   async getTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<TemplateResponseDto> {
+    const tenant = await this.requireTenantContext(req)
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
@@ -134,11 +179,12 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post()
   @HttpCode(201)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async createTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
@@ -155,12 +201,13 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async updateTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
@@ -175,10 +222,12 @@ export class TemplatesFrontendController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async deleteTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
+    const tenant = await this.requireTenantContext(req)
     await this.templatesService.deleteTemplate(tenant.id, templateId)
   }
 
@@ -194,11 +243,13 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async previewTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
+    const tenant = await this.requireTenantContext(req)
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
   }
 }

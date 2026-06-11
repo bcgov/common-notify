@@ -9,7 +9,14 @@ import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
+import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
+import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
+import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
+
+type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
+  attachments?: SendEmailOptions['attachments']
+}
 
 /**
  * Email Delivery Worker
@@ -27,6 +34,21 @@ import { IEmailTransport } from '../../adapters'
  */
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
+
+  private static hasStoredAttachmentReferences(
+    attachments: unknown,
+  ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.some(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { storageKey?: unknown }).storageKey === 'string' &&
+          typeof (attachment as { storageProvider?: unknown }).storageProvider === 'string',
+      )
+    )
+  }
 
   /**
    * Initialize the email delivery worker on a queue
@@ -46,6 +68,7 @@ export class EmailDeliveryWorker {
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
+    attachmentResolverService: AttachmentResolverService,
     emailAdapter: IEmailTransport,
     requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
@@ -76,7 +99,10 @@ export class EmailDeliveryWorker {
         }
 
         // Cast payload to email channel type for type safety
-        let emailPayload = payload as NotifyEmailChannel
+        let emailPayload = payload as
+          | NotifyEmailChannel
+          | ProcessedNotifyEmailChannel
+          | ResolvedEmailDeliveryPayload
 
         if (
           !emailPayload.recipients ||
@@ -174,6 +200,46 @@ export class EmailDeliveryWorker {
           }
         }
 
+        if (
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+          throw new Error('Invalid email payload: subject is missing or invalid')
+        }
+
+        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+          throw new Error('Invalid email payload: body is missing or invalid')
+        }
+
+        if (EmailDeliveryWorker.hasStoredAttachmentReferences(emailPayload.attachments)) {
+          if (!attachmentResolverService) {
+            throw new Error(
+              'AttachmentResolverService is not available to resolve stored email attachments',
+            )
+          }
+
+          logger.debug(
+            `[${notifyId}] Resolving stored email attachments: ${JSON.stringify({
+              storedAttachmentCount: emailPayload.attachments.length,
+            })}`,
+          )
+
+          const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+            emailPayload.attachments,
+          )
+
+          emailPayload = {
+            ...emailPayload,
+            attachments: resolvedAttachments as SendEmailOptions['attachments'],
+          } as ResolvedEmailDeliveryPayload
+        }
+
         // Update status to SENDING (only after all validations pass)
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
@@ -253,12 +319,20 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: NotifyEmailChannel,
+    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel | ResolvedEmailDeliveryPayload,
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(`[${notifyId}] Sending email via ${emailAdapter.name} adapter`)
+    const attachmentCount = Array.isArray((payload as { attachments?: unknown[] }).attachments)
+      ? ((payload as { attachments?: unknown[] }).attachments?.length ?? 0)
+      : 0
+
+    logger.debug(
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter: ${JSON.stringify({
+        attachmentCount,
+      })}`,
+    )
 
     const result = await emailAdapter.send(payload as any)
 

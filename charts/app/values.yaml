@@ -18,6 +18,8 @@ global:
     persist: true
   config:
     databaseUser: ~
+    redisHost: ~ # Redis host, should be set to common-notify-redis-master. Defaults to <release-name>-redis-master if not set
+    redisSecret: ~ # Redis secret name, should be set to common-notify-redis. Defaults to <release-name>-redis if not set
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
   domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
@@ -77,6 +79,40 @@ backend:
     # 3. Monitoring namespace (monitoring policy-group)
     # 4. Any namespace on port 3000 (for Kong API Gateway)
     # NOTE: More restrictive namespace selector needed from platform team
+  #-- ClamAV antivirus scanning configuration
+  clamav:
+    #-- enable or disable ClamAV deployment
+    #-- Default: true for DEV/TEST/PROD environments (one per namespace)
+    #-- Disabled for PR environments (set in pr-open.yml) - PRs share the namespace's ClamAV instance
+    #-- Similar to shared PVC approach: one ClamAV per namespace, shared by all PRs
+    #-- Each ClamAV instance uses: 200m CPU + 768Mi memory (limits: 2 CPU + 2Gi memory)
+    enabled: true
+    #-- hostname of the ClamAV service (clamd daemon)
+    #-- Leave null to use chart default: <release-name>-clamav
+    #-- PRs override this to 'common-notify-dev-clamav' to use shared instance
+    host: ~
+    #-- port of the ClamAV service
+    port: 3310
+    #-- connection timeout in milliseconds
+    timeout: 30000
+    #-- fail closed when ClamAV is disabled or unavailable
+    failClosed: false
+  #-- File attachments storage configuration
+  attachments:
+    #-- directory where attachments will be stored
+    storageDir: /app/attachments
+    #-- PersistentVolumeClaim configuration for attachment storage
+    pvc:
+      #-- enable or disable PVC for attachment storage
+      enabled: true
+      #-- use shared PVC across all PRs (recommended to save storage)
+      shared: true
+      #-- force creation of shared PVC (only needed once per namespace)
+      createShared: false
+      #-- size of the PVC (storage capacity) - only used when creating new PVC
+      size: 3Gi
+      #-- storage class name (leave empty for default)
+      storageClassName: netapp-file-standard
 
 frontend:
   # -- enable or disable a component deployment.

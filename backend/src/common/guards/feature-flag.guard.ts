@@ -23,7 +23,7 @@ import { FEATURE_FLAG_KEY } from '../decorators/feature-flag.decorator'
  *
  * Extracts tenant ID from (in order of precedence):
  * - x-tenant-id header (if present)
- * - request.tenant (set by TenantGuard)
+ * - request.tenant (set by AuthGuard)
  * - tenantId query parameter (if present)
  *
  * Returns 403 Forbidden if the feature is disabled for the tenant/globally.
@@ -52,10 +52,10 @@ export class FeatureFlagGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest()
 
-    // Try to extract tenant ID from header, request.tenant (set by TenantGuard), or query param
+    // Try to extract tenant ID from request.tenant (set by AuthGuard), x-tenant-id header, or query param
     let tenantId =
-      (request.headers['x-tenant-id'] as string) ||
       (request.tenant?.id ? String(request.tenant.id) : undefined) ||
+      (request.headers['x-tenant-id'] as string) ||
       (request.query?.tenantId as string) ||
       undefined
 

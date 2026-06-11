@@ -40,8 +40,9 @@ export default () => {
     // Keycloak / JWT authentication
     auth: {
       jwksUri: process.env.JWKS_URI,
-      jwtIssuer: process.env.JWT_ISSUER,
-      keycloakClientId: process.env.KEYCLOAK_CLIENT_ID,
+      frontendKeycloakIssuer: process.env.FRONTEND_KEYCLOAK_ISSUER,
+      apiGatewayKeycloakIssuer: process.env.API_GATEWAY_KEYCLOAK_ISSUER,
+      notifyClientId: process.env.NOTIFY_CLIENT_ID,
     },
 
     // CHES (Common Hosted Email Service)
@@ -58,6 +59,20 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
+    // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
+    // Used to fetch user roles for role-based access control
+    cstar: {
+      baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+    },
+
     // Twilio SMS Service
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,
@@ -69,6 +84,20 @@ export default () => {
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+    },
+
+    // Attachment Storage
+    attachments: {
+      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
+    },
+
+    // ClamAV
+    clamav: {
+      host: process.env.CLAMAV_HOST || 'localhost',
+      port: parseInt(process.env.CLAMAV_PORT || '3310', 10),
+      timeout: parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
+      enabled: process.env.CLAMAV_ENABLED !== 'false',
+      failClosed: process.env.CLAMAV_FAIL_CLOSED === 'true',
     },
 
     // Job Queue Worker Configuration
@@ -85,6 +114,11 @@ export default () => {
       jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
       pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
+    },
+
+    // Encryption
+    encryption: {
+      key: process.env.WEBHOOK_ENCRYPTION_KEY,
     },
   }
 }

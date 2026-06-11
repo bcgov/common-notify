@@ -170,12 +170,121 @@ curl -s -X POST "$KONG_ADMIN_URL/consumers/LOCAL003-GHI789/jwt" \
   --data "secret=jwt-secret-local003" \
   2>/dev/null || echo "JWT credentials may already exist for test-tenant-c"
 
+# Service Account for Notify API Key Management
+echo ""
+echo "  Creating service account: notify-service"
+NOTIFY_SERVICE=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
+  --data-urlencode "username=notify-service" \
+  --data-urlencode "custom_id=notify-service" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$NOTIFY_SERVICE" ]; then
+  echo "    Service account may already exist, fetching..."
+  NOTIFY_SERVICE=$(curl -s "$KONG_ADMIN_URL/consumers/notify-service" 2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+fi
+
+echo "    Creating OAuth2 credentials for notify-service"
+curl -s -X POST "$KONG_ADMIN_URL/consumers/notify-service/oauth2" \
+  --data-urlencode "client_id=sa-notify-service" \
+  --data-urlencode "client_secret=notify-service-secret-12345678901234" \
+  --data-urlencode "redirect_uris=http://localhost:3000/callback" \
+  --data-urlencode "scopes=CredentialIssuer.Admin" \
+  2>/dev/null || echo "OAuth2 credentials may already exist for notify-service"
+
+# Notify tenant mappings (external tenant ID -> Kong consumer custom_id)
+echo ""
+echo "Creating Notify tenant API key mappings..."
+
+# Tenant A mapping
+echo "  Mapping tenant-a to external tenant id 44e8b879-3591-4180-a155-49d441f82284"
+TENANT_A=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
+  --data-urlencode "username=tenant-a" \
+  --data-urlencode "custom_id=44e8b879-3591-4180-a155-49d441f82284" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$TENANT_A" ]; then
+  echo "    Consumer may already exist, updating custom_id..."
+  curl -s -X PATCH "$KONG_ADMIN_URL/consumers/tenant-a" \
+    --data-urlencode "custom_id=44e8b879-3591-4180-a155-49d441f82284" \
+    >/dev/null 2>&1 || true
+fi
+
+echo "    Creating API key for tenant-a"
+TENANT_A_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/tenant-a/key-auth" \
+  --data-urlencode "key=tenant-a-local-key" \
+  2>/dev/null)
+TENANT_A_HTTP_CODE=$(echo "$TENANT_A_KEY_RESPONSE" | tail -n 1)
+if [ "$TENANT_A_HTTP_CODE" = "201" ] || [ "$TENANT_A_HTTP_CODE" = "200" ] || [ "$TENANT_A_HTTP_CODE" = "409" ]; then
+  echo "    API key created successfully"
+  echo "    API Key: tenant-a-local-key"
+else
+  echo "    API key may already exist"
+fi
+
+# Tenant B mapping
+echo "  Mapping tenant-b to external tenant id d4380e35-68be-40c2-82b6-f3a00e080446"
+TENANT_B=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
+  --data-urlencode "username=tenant-b" \
+  --data-urlencode "custom_id=d4380e35-68be-40c2-82b6-f3a00e080446" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$TENANT_B" ]; then
+  echo "    Consumer may already exist, updating custom_id..."
+  curl -s -X PATCH "$KONG_ADMIN_URL/consumers/tenant-b" \
+    --data-urlencode "custom_id=d4380e35-68be-40c2-82b6-f3a00e080446" \
+    >/dev/null 2>&1 || true
+fi
+
+echo "    Creating API key for tenant-b"
+TENANT_B_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/tenant-b/key-auth" \
+  --data-urlencode "key=tenant-b-local-key" \
+  2>/dev/null)
+TENANT_B_HTTP_CODE=$(echo "$TENANT_B_KEY_RESPONSE" | tail -n 1)
+if [ "$TENANT_B_HTTP_CODE" = "201" ] || [ "$TENANT_B_HTTP_CODE" = "200" ] || [ "$TENANT_B_HTTP_CODE" = "409" ]; then
+  echo "    API key created successfully"
+  echo "    API Key: tenant-b-local-key"
+else
+  echo "    API key may already exist"
+fi
+
+# Tenant C mapping
+echo "  Mapping tenant-c to external tenant id e936010f-bb93-4430-87d9-e6e70b63e75f"
+TENANT_C=$(curl -s -X POST "$KONG_ADMIN_URL/consumers" \
+  --data-urlencode "username=tenant-c" \
+  --data-urlencode "custom_id=e936010f-bb93-4430-87d9-e6e70b63e75f" \
+  2>/dev/null | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$TENANT_C" ]; then
+  echo "    Consumer may already exist, updating custom_id..."
+  curl -s -X PATCH "$KONG_ADMIN_URL/consumers/tenant-c" \
+    --data-urlencode "custom_id=e936010f-bb93-4430-87d9-e6e70b63e75f" \
+    >/dev/null 2>&1 || true
+fi
+
+echo "    Creating API key for tenant-c"
+TENANT_C_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$KONG_ADMIN_URL/consumers/tenant-c/key-auth" \
+  --data-urlencode "key=tenant-c-local-key" \
+  2>/dev/null)
+TENANT_C_HTTP_CODE=$(echo "$TENANT_C_KEY_RESPONSE" | tail -n 1)
+if [ "$TENANT_C_HTTP_CODE" = "201" ] || [ "$TENANT_C_HTTP_CODE" = "200" ] || [ "$TENANT_C_HTTP_CODE" = "409" ]; then
+  echo "    API key created successfully"
+  echo "    API Key: tenant-c-local-key"
+else
+  echo "    API key may already exist"
+fi
+
 echo ""
 echo "✅ Kong seeding complete!"
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 echo "AUTHENTICATION METHODS - LOCAL DEVELOPMENT"
 echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "✅ Notify tenant mappings (external tenant IDs via custom_id)"
+echo "   tenant-a -> 44e8b879-3591-4180-a155-49d441f82284"
+echo "   tenant-b -> d4380e35-68be-40c2-82b6-f3a00e080446"
+echo "   tenant-c -> e936010f-bb93-4430-87d9-e6e70b63e75f"
+echo "   API keys: tenant-a-local-key, tenant-b-local-key, tenant-c-local-key"
 echo ""
 echo "✅ API Key Authentication"
 echo "   Test credentials:"

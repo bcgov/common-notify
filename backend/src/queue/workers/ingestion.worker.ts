@@ -5,6 +5,10 @@ import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
+import { ClamavService } from '../../services/clamav.service'
+import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
+import { StoredNotifyAttachment } from '../../api/notify/schemas/stored-notify-attachment'
+import { LocalAttachmentStorageService } from '../../api/notify/services/local-attachment-storage.service'
 
 /**
  * Ingestion Worker
@@ -27,8 +31,8 @@ export class IngestionWorker {
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
    * @param notificationService Service for database updates
-   * @param notifyService Service for template resolution
    * @param configService Configuration service for queue settings
+   * @param clamavService Service for malware scanning
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
   static async initialize(
@@ -37,7 +41,9 @@ export class IngestionWorker {
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
+    clamavService?: ClamavService,
     concurrency: number = 1,
+    localAttachmentStorageService?: LocalAttachmentStorageService,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -69,6 +75,114 @@ export class IngestionWorker {
         // Validate request structure
         if (!request || typeof request !== 'object') {
           throw new Error('Invalid request: request payload is missing or invalid')
+        }
+
+        const channelAttachments = [
+          ...(request.email?.attachments ?? []),
+          ...(request.sms?.attachments ?? []),
+          ...(request.msgApp?.attachments ?? []),
+        ]
+
+        // Scan inline and stored attachments for malware
+        if (channelAttachments.length > 0) {
+          if (!clamavService) {
+            throw new Error('Attachment scan service unavailable')
+          }
+
+          logger.log(
+            `[${notifyId}] Scanning ${channelAttachments.length} attachment(s) for malware`,
+          )
+
+          for (const attachment of channelAttachments) {
+            if (!attachment) {
+              continue
+            }
+
+            try {
+              let buffer: Buffer
+
+              if ('content' in attachment && typeof attachment.content === 'string') {
+                // Inline attachment payload (pre-processed)
+                try {
+                  buffer = Buffer.from(attachment.content, 'base64')
+                } catch {
+                  // If base64 decode fails, treat as raw content
+                  buffer = Buffer.from(attachment.content, 'utf-8')
+                }
+              } else if ('storageKey' in attachment && typeof attachment.storageKey === 'string') {
+                // Stored attachment payload (post-processed)
+                if (!localAttachmentStorageService) {
+                  throw new Error('Attachment storage service unavailable')
+                }
+
+                const storedAttachment = attachment as StoredNotifyAttachment
+                buffer = await localAttachmentStorageService.readAttachment(
+                  storedAttachment.storageKey,
+                  storedAttachment.contentSha256,
+                )
+
+                if (buffer.byteLength !== storedAttachment.sizeBytes) {
+                  throw new Error(
+                    `Stored attachment size verification failed for ${storedAttachment.filename}`,
+                  )
+                }
+              } else {
+                logger.debug(`[${notifyId}] Skipping unrecognized attachment shape`)
+                continue
+              }
+
+              logger.debug(
+                `[${notifyId}] Scanning attachment: ${attachment.filename || 'unnamed'} (${buffer.length} bytes)`,
+              )
+
+              // Scan buffer for malware using CLAMD protocol
+              const scanResult = await clamavService.scanBuffer(buffer, attachment.filename)
+
+              if (scanResult.isInfected) {
+                // Malware detected - quarantine the notification
+                logger.warn(
+                  `[${notifyId}] SECURITY: Malware detected in attachment: ${attachment.filename || 'unnamed'}. Viruses: ${scanResult.quarantineInfo?.viruses.join(', ')}`,
+                )
+
+                // Create quarantine details from scan result
+                const quarantineDetails: QuarantineDetails = {
+                  viruses: scanResult.quarantineInfo?.viruses || [],
+                  filename: attachment.filename,
+                  scannedAt: scanResult.quarantineInfo?.scannedAt
+                    ? scanResult.quarantineInfo.scannedAt.toISOString()
+                    : new Date().toISOString(),
+                  reason: 'Malware detected during attachment scanning',
+                }
+
+                // Update notification to QUARANTINED status
+                await notificationService.update(notifyId, tenantId, {
+                  status: NotificationStatus.QUARANTINED,
+                  quarantineDetails,
+                  updatedBy: 'ingestion-worker-scanner',
+                })
+
+                logger.log(
+                  `[${notifyId}] Notification marked as QUARANTINED due to malware detection`,
+                )
+
+                // Stop processing - do not queue delivery jobs
+                return { success: false, reason: 'Quarantined due to malware detection' }
+              }
+
+              logger.debug(
+                `[${notifyId}] Attachment ${attachment.filename || 'unnamed'} passed malware scan`,
+              )
+            } catch (scanError) {
+              const errorMsg = scanError instanceof Error ? scanError.message : String(scanError)
+              logger.error(
+                `[${notifyId}] Attachment scan error: ${errorMsg}. Strict mode: retrying job.`,
+              )
+              // Strict mode: throw error to trigger BullMQ retry if ClamAV is unavailable
+              throw new Error(`Attachment scan failed: ${errorMsg}`)
+            }
+          }
+
+          logger.log(`[${notifyId}] All attachments passed malware scanning`)
         }
 
         // Determine channels and fan-out to delivery queues

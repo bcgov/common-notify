@@ -3,13 +3,13 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import { VersioningType, CanActivate, ExecutionContext } from '@nestjs/common'
 import request from 'supertest'
+import { vi } from 'vitest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { NotificationRequestDetailService } from './notification-request-detail.service'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
-import { RoleGuard } from '../../auth/guards/role.guard'
 
-// Mock AuthJwtGuard to bypass authentication and populate request.tenant
+// Mock AuthGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const req = context.switchToHttp().getRequest()
@@ -21,11 +21,6 @@ const mockAuthGuard: CanActivate = {
     }
     return true
   },
-}
-
-// Mock RoleGuard to bypass role checking
-const mockRoleGuard: CanActivate = {
-  canActivate: () => true,
 }
 
 const mockNotificationService = {
@@ -52,10 +47,8 @@ describe('NotificationController', () => {
         },
       ],
     })
-      .overrideGuard(AuthJwtGuard)
+      .overrideGuard(NotifyFrontendRoleGuard)
       .useValue(mockAuthGuard)
-      .overrideGuard(RoleGuard)
-      .useValue(mockRoleGuard)
       .compile()
 
     service = module.get<NotificationService>(NotificationService)

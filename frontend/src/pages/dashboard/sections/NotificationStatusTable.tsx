@@ -1,8 +1,9 @@
 import { Link, Select } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
+import { setLimit } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
@@ -34,13 +35,13 @@ const NotificationStatusTable: FC = () => {
   const [selectedNotification, setSelectedNotification] = useState<NotificationRequest | null>(null)
   const [showRecipientsModal, setShowRecipientsModal] = useState(false)
 
-  // Fetch notifications when status filter, page, or selected tenant changes
+  // Fetch notifications when status filter, page, limit, or selected tenant changes
   // Only fetch if a tenant is selected
   useEffect(() => {
     if (selectedTenant) {
       dispatch(fetchNotifications())
     }
-  }, [statusFilter, page, selectedTenant, dispatch])
+  }, [statusFilter, page, limit, selectedTenant, dispatch])
 
   // Fetch feature flags for the selected tenant
   // This ensures byCode contains flags that apply to this tenant (global + tenant-specific)
@@ -59,14 +60,19 @@ const NotificationStatusTable: FC = () => {
     return () => controller.abort()
   }, [dispatch, selectedTenant, sseEnabled])
 
-  // Build status filter items from Redux
-  const statusFilterItems = [
-    { id: 'all', label: 'All' },
-    ...statuses.map((s) => ({
-      id: s.id,
-      label: s.label,
-    })),
-  ]
+  // Build status filter items from Redux with index-based unique identifiers
+  // Memoized to prevent unnecessary re-renders of Select component
+  const statusFilterItems = useMemo(
+    () => [
+      { id: 'all', label: 'All', key: 'all' },
+      ...statuses.map((s, idx) => ({
+        id: String(s.id || `unknown-${idx}`),
+        label: s.label,
+        key: `status-${idx}-${s.id}`,
+      })),
+    ],
+    [statuses],
+  )
 
   const handleShowRecipients = (notification: NotificationRequest) => {
     setSelectedNotification(notification)
@@ -127,14 +133,19 @@ const NotificationStatusTable: FC = () => {
 
   return (
     <div>
-      <div className="mb-3" style={{ maxWidth: '220px' }}>
-        <Select
-          label="Filter by status"
-          items={statusFilterItems}
-          selectedKey={statusFilter}
-          onSelectionChange={(key) => dispatch(setStatusFilter(key as NotificationStatus | 'all'))}
-        />
-      </div>
+      {statuses.length > 0 && (
+        <div className="mb-3" style={{ maxWidth: '220px' }}>
+          <Select
+            key={`status-filter-${statusFilterItems.map((s) => s.id).join('-')}`}
+            label="Filter by status"
+            items={statusFilterItems}
+            selectedKey={statusFilter}
+            onSelectionChange={(key) =>
+              dispatch(setStatusFilter(key as NotificationStatus | 'all'))
+            }
+          />
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -147,6 +158,8 @@ const NotificationStatusTable: FC = () => {
         pageSize={limit}
         totalCount={count}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+        onPageSizeChange={(newLimit) => dispatch(setLimit(newLimit))}
+        pageSizeOptions={[15, 30]}
       />
 
       <RecipientsModal

@@ -6,6 +6,7 @@ import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { IEmailTransport } from '../../adapters'
+import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
@@ -14,6 +15,7 @@ describe('EmailDeliveryWorker', () => {
   let mockTemplatesRepository: any
   let mockTemplatesService: any
   let mockInlineRenderingService: any
+  let mockAttachmentResolverService: any
   let mockEmailAdapter: IEmailTransport
   let mockRequestDetailService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
@@ -78,6 +80,10 @@ describe('EmailDeliveryWorker', () => {
       }),
     }
 
+    mockAttachmentResolverService = {
+      resolveEmailAttachments: vi.fn().mockResolvedValue(undefined),
+    }
+
     // Mock the email queue
     mockEmailQueue = {
       process: vi.fn().mockImplementation((...args) => {
@@ -115,6 +121,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -130,6 +137,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -146,6 +154,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -206,6 +215,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -250,6 +260,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -288,6 +299,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -327,6 +339,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -367,6 +380,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -407,6 +421,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -447,6 +462,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -487,6 +503,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -528,6 +545,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -578,6 +596,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -644,6 +663,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -688,6 +708,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -730,6 +751,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -776,6 +798,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -823,6 +846,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
       )
@@ -870,6 +894,7 @@ describe('EmailDeliveryWorker', () => {
         mockTemplatesRepository,
         mockTemplatesService,
         mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
         mockRequestDetailService,
         5, // Custom concurrency
@@ -881,6 +906,178 @@ describe('EmailDeliveryWorker', () => {
       expect(processArgs[0]).toBe(5)
 
       initSpy.mockRestore()
+    })
+
+    it('should resolve stored attachments and pass adapter-ready attachments to the email adapter', async () => {
+      const content = Buffer.from('hello world')
+      mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
+        {
+          filename: 'hello.txt',
+          content,
+          contentType: 'text/plain',
+          sendingMethod: 'attach',
+        },
+      ])
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-attachments',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+            attachments: [
+              {
+                filename: 'hello.txt',
+                mimeType: 'text/plain',
+                storageKey: 'ab/abcdef.bin',
+                sizeBytes: 11,
+                contentSha256: 'hash',
+                storageProvider: 'local',
+              },
+            ],
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockAttachmentResolverService.resolveEmailAttachments).toHaveBeenCalledTimes(1)
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [
+            {
+              filename: 'hello.txt',
+              content,
+              contentType: 'text/plain',
+              sendingMethod: 'attach',
+            },
+          ],
+        }),
+      )
+    })
+
+    it('should log attachment counts when stored attachments are resolved and sent', async () => {
+      const debugSpy = vi.spyOn(Logger.prototype, 'debug')
+      const content = Buffer.from('hello world')
+      mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
+        {
+          filename: 'hello.txt',
+          content,
+          contentType: 'text/plain',
+          sendingMethod: 'attach',
+        },
+      ])
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-attachment-logs',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+            attachments: [
+              {
+                filename: 'hello.txt',
+                mimeType: 'text/plain',
+                storageKey: 'ab/abcdef.bin',
+                sizeBytes: 11,
+                contentSha256: 'hash',
+                storageProvider: 'local',
+              },
+            ],
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[notify-attachment-logs] Resolving stored email attachments:'),
+      )
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[notify-attachment-logs] Sending email via ches adapter:'),
+      )
+    })
+
+    it('should fail delivery when a stored attachment cannot be resolved', async () => {
+      mockAttachmentResolverService.resolveEmailAttachments.mockRejectedValue(
+        new Error('Failed to read stored attachment'),
+      )
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-missing-file',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+            attachments: [
+              {
+                filename: 'missing.txt',
+                mimeType: 'text/plain',
+                storageKey: 'ab/missing.bin',
+                sizeBytes: 11,
+                contentSha256: 'hash',
+                storageProvider: 'local',
+              },
+            ],
+          },
+          attempt: 2,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 2,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Failed to read stored attachment',
+      )
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
     })
   })
 })
