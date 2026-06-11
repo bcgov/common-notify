@@ -133,10 +133,9 @@ export class CstarApiClient {
 
       const data = (await response.json()) as CstarRolesResponseDto
       const roleNames = data.data.sharedServiceRoles.map((role) => role.name)
-      this.logger.debug(`Successfully fetched roles for user ${ssoUserId} in tenant ${tenantId}`, {
-        roleCount: roleNames.length,
-        roles: roleNames,
-      })
+      this.logger.debug(
+        `Successfully fetched roles for user ${ssoUserId} in tenant ${tenantId} (${roleNames.length} roles: ${roleNames.join(', ')})`,
+      )
 
       return roleNames
     } catch (error) {
@@ -235,9 +234,6 @@ export class CstarApiClient {
       const data = (await response.json()) as CstarTenantsResponseDto
       this.logger.debug(
         `Successfully fetched ${data.data.tenants.length} tenants for user ${ssoUserId}`,
-        {
-          tenantCount: data.data.tenants.length,
-        },
       )
 
       // Return full tenant objects, not just IDs
