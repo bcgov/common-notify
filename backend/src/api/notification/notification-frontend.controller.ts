@@ -157,7 +157,7 @@ export class NotificationFrontendController {
   }
 
   @Version('1')
-  @Get(':id/request_details')
+  @Get('request_details/:id')
   @ApiOperation({ summary: 'List notification request detail records for a notification request' })
   async findDeliveries(@Headers('x-tenant-id') tenantExternalId: string, @Param('id') id: string) {
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
