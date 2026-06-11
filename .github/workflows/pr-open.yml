@@ -64,22 +64,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch current production configs from main branch
+      - name: Fetch current DEV config from main branch
         run: |
           # Save current PR branch configs
           mkdir -p /tmp/pr-configs
           cp -r api-gateway /tmp/pr-configs/
 
-          # Fetch main branch to get production configs
+          # Fetch main branch to get DEV config
           git fetch origin main
           git checkout origin/main -- api-gateway/
 
-          # Generate production configs (DEV+TEST+PROD) from main branch
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          api-gateway/scripts/generate-gateway-for-stage.sh prod
+          # Generate DEV config only from main branch
+          # DEV and PR share the same gateway tag (ns.gw-fe8c5.dev) so they must be published together
+          # TEST and PROD have separate tags and remain unchanged
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          api-gateway/scripts/generate-gateway-config.sh dev
 
-          # Save production configs
-          cp api-gateway/generated/gw-active-services.yaml /tmp/prod-configs.yaml
+          # Save DEV config
+          cp api-gateway/generated/gw-routes-dev.yaml /tmp/dev-config.yaml
 
       - name: Generate PR config from PR branch
         run: |
@@ -91,12 +93,13 @@ jobs:
           chmod +x api-gateway/scripts/generate-gateway-config.sh
           api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-          # Combine: Production configs (main) + PR config (PR branch)
-          cp /tmp/prod-configs.yaml api-gateway/generated/gw-combined-pr.yaml
-          echo "---" >> api-gateway/generated/gw-combined-pr.yaml
-          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-pr.yaml
+          # Combine: DEV config (main) + PR config (PR branch)
+          # Both share the same gateway tag (ns.gw-fe8c5.dev) for path-based routing
+          cp /tmp/dev-config.yaml api-gateway/generated/gw-combined-dev-pr.yaml
+          echo "---" >> api-gateway/generated/gw-combined-dev-pr.yaml
+          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-dev-pr.yaml
 
-      - name: Apply PR config without touching production
+      - name: Apply DEV+PR config (path-based routing)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -112,9 +115,11 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply: Production configs (from main) + New PR config (from PR branch)
-          echo "✅ Applying PR config with CURRENT production configs (DEV/TEST/PROD unchanged)"
-          gwa apply -i api-gateway/generated/gw-combined-pr.yaml
+          # Apply: DEV config (from main) + PR config (from PR branch)
+          # Both share tag ns.gw-fe8c5.dev for path-based routing
+          # TEST and PROD configs remain unchanged (separate tags, already published)
+          echo "✅ Applying DEV+PR config (path-based routing on shared tag ns.gw-fe8c5.dev)"
+          gwa apply -i api-gateway/generated/gw-combined-dev-pr.yaml
 
   deploys:
     name: Deploys (${{ github.event.number }})

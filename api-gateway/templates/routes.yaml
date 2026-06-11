@@ -14,10 +14,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /health
+      - ${PATH_PREFIX}/health
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -27,10 +27,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/health
+      - ${PATH_PREFIX}/api/health
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -45,10 +45,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /ches/api/v1/email
+      - ${PATH_PREFIX}/ches/api/v1/email
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -58,10 +58,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifysimple
+      - ${PATH_PREFIX}/api/v1/notifysimple
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -71,10 +71,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/notifysimple/[^/]+
+      - ~${PATH_PREFIX}/api/v1/notifysimple/[^/]+
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -84,10 +84,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/frontend/notifysimple/[^/]+
+      - ~${PATH_PREFIX}/api/v1/frontend/notifysimple/[^/]+
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -97,10 +97,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent
+      - ${PATH_PREFIX}/api/v1/notifyevent
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -110,10 +110,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent/preview
+      - ${PATH_PREFIX}/api/v1/notifyevent/preview
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -123,10 +123,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent/types
+      - ${PATH_PREFIX}/api/v1/notifyevent/types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -136,11 +136,11 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify
+      - ${PATH_PREFIX}/api/v1/notify
     methods:
       - GET
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -150,10 +150,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify/status
+      - ${PATH_PREFIX}/api/v1/notify/status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -163,12 +163,12 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify/registerCallback
+      - ${PATH_PREFIX}/api/v1/notify/registerCallback
     methods:
       - POST
       - PATCH
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -178,13 +178,13 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/templates
+      - ${PATH_PREFIX}/api/v1/templates
     methods:
       - GET
       - POST
       - PATCH
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -194,10 +194,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/feature-flags
+      - ${PATH_PREFIX}/api/v1/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -207,10 +207,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -220,10 +220,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications
+      - ${PATH_PREFIX}/api/gcnotify/v2/notifications
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -233,10 +233,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/email
+      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/email
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -246,10 +246,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/sms
+      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/sms
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -259,10 +259,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/bulk
+      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/bulk
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -272,10 +272,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/*
+      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/*
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -285,10 +285,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/templates
+      - ${PATH_PREFIX}/api/gcnotify/v2/templates
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -298,10 +298,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/template/*
+      - ${PATH_PREFIX}/api/gcnotify/v2/template/*
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -320,10 +320,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables
+      - ${PATH_PREFIX}/api/v1/code-tables
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -334,10 +334,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -349,10 +349,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/notification-status
+      - ${PATH_PREFIX}/api/v1/code-tables/notification-status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -363,10 +363,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/notification-status
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/notification-status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -378,10 +378,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/channels
+      - ${PATH_PREFIX}/api/v1/code-tables/channels
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -392,10 +392,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/channels
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/channels
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -407,10 +407,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/event-types
+      - ${PATH_PREFIX}/api/v1/code-tables/event-types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -421,10 +421,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/event-types
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/event-types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -436,10 +436,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/feature-flags
+      - ${PATH_PREFIX}/api/v1/code-tables/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -451,10 +451,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -466,10 +466,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notification_request
+      - ${PATH_PREFIX}/api/v1/notification_request
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -480,10 +480,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/notification_request
+      - ${PATH_PREFIX}/api/v1/frontend/notification_request
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -494,10 +494,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/notification_request/events
+      - ${PATH_PREFIX}/api/v1/frontend/notification_request/events
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: false
@@ -509,10 +509,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/admin/tenants
+      - ${PATH_PREFIX}/api/v1/admin/tenants
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -524,10 +524,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/users/me
+      - ${PATH_PREFIX}/api/v1/frontend/users/me
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -539,10 +539,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/users
+      - ${PATH_PREFIX}/api/v1/frontend/users
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -557,10 +557,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/auth/tenants
+      - ${PATH_PREFIX}/api/v1/frontend/auth/tenants
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -572,10 +572,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/frontend/auth/tenants/[^/]+/roles
+      - ~${PATH_PREFIX}/api/v1/frontend/auth/tenants/[^/]+/roles
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -590,10 +590,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -605,10 +605,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -620,10 +620,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags/
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags/
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -635,10 +635,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags/
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags/
     methods:
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -650,10 +650,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates
+      - ${PATH_PREFIX}/api/v1/frontend/templates
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -665,10 +665,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates
+      - ${PATH_PREFIX}/api/v1/frontend/templates
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -680,12 +680,12 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates/*
+      - ${PATH_PREFIX}/api/v1/frontend/templates/*
     methods:
       - GET
       - POST
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v1
     request_buffering: true
@@ -697,10 +697,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates/*/preview
+      - ${PATH_PREFIX}/api/v1/frontend/templates/*/preview
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v1
     request_buffering: true
@@ -719,10 +719,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/service/api-key/bind
+      - ${PATH_PREFIX}/api/v1/service/api-key/bind
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
