@@ -115,11 +115,27 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply: DEV config (from main) + PR config (from PR branch)
+          # Publish: DEV config (from main) + PR config (from PR branch)
           # Both share tag ns.gw-fe8c5.dev for path-based routing
           # TEST and PROD configs remain unchanged (separate tags, already published)
-          echo "✅ Applying DEV+PR config (path-based routing on shared tag ns.gw-fe8c5.dev)"
-          gwa apply -i api-gateway/generated/gw-combined-dev-pr.yaml
+          echo "✅ Publishing DEV+PR config (path-based routing on shared tag ns.gw-fe8c5.dev)"
+
+          # Use publish-gateway with --qualifier dev (both DEV and PR share this qualifier)
+          # This properly handles updating existing services instead of trying to create them
+          if ! gwa publish-gateway api-gateway/generated/gw-combined-dev-pr.yaml --qualifier dev 2>&1 | tee /tmp/gwa-output.txt; then
+            echo "❌ gwa publish-gateway command failed"
+            cat /tmp/gwa-output.txt
+            exit 1
+          fi
+
+          # Check if publish actually succeeded
+          if grep -q "0/[0-9]* Published" /tmp/gwa-output.txt; then
+            echo "❌ Gateway config failed to publish (0 published)"
+            cat /tmp/gwa-output.txt
+            exit 1
+          fi
+
+          echo "✅ Gateway config published successfully"
 
   deploys:
     name: Deploys (${{ github.event.number }})
