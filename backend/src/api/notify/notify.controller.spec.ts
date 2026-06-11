@@ -32,6 +32,7 @@ import { AttachmentValidationService } from './services/attachment-validation.se
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { WebhookService } from '../../api/webhook/webhook.service'
+import { ValidationExceptionFilter } from '../../common/filters/validation.filter'
 
 // Mock AuthGuard to bypass authentication in tests
 const mockAuthGuard: CanActivate = {
@@ -138,12 +139,12 @@ describe('Notify Controllers', () => {
     app = module.createNestApplication()
     app.useGlobalPipes(
       new ValidationPipe({
-        errorHttpStatusCode: 422,
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
       }),
     )
+    app.useGlobalFilters(new ValidationExceptionFilter())
     app.enableVersioning({
       type: VersioningType.URI,
       prefix: 'api/v',
@@ -271,6 +272,76 @@ describe('Notify Controllers', () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockNotificationService.validateBusinessRules).not.toHaveBeenCalled()
         expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      })
+
+      it('should return a clear DTO error when attachment content is missing', async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                },
+              ],
+            },
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body).toEqual({
+              statusCode: 400,
+              message: 'Validation failed',
+              errors: ['Attachment content is required and must be a base64-encoded string.'],
+              fieldErrors: {
+                'email.attachments.0.content':
+                  'Attachment content is required and must be a base64-encoded string.',
+              },
+            })
+          })
+
+        expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+      })
+
+      it("should map the legacy attachment 'data' field to a clearer validation error", async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  data: 'SGVsbG8=',
+                },
+              ],
+            },
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body).toEqual({
+              statusCode: 400,
+              message: 'Validation failed',
+              errors: [
+                "The attachment field 'data' is not supported. Use 'content' instead.",
+                'Attachment content is required and must be a base64-encoded string.',
+              ],
+              fieldErrors: {
+                'email.attachments.0.data':
+                  "The attachment field 'data' is not supported. Use 'content' instead.",
+                'email.attachments.0.content':
+                  'Attachment content is required and must be a base64-encoded string.',
+              },
+            })
+          })
+
+        expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
       })
 
       it('should process attachments before persisting and remove raw data from the stored payload', async () => {

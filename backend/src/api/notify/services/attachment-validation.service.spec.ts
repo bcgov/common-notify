@@ -35,6 +35,15 @@ function makeRequest(overrides: Partial<NotifySimpleRequest> = {}): NotifySimple
   } as NotifySimpleRequest
 }
 
+async function captureError(promise: Promise<unknown>) {
+  try {
+    await promise
+    throw new Error('Expected promise to reject')
+  } catch (error) {
+    return error as BadRequestException | PayloadTooLargeException
+  }
+}
+
 describe('AttachmentValidationService', () => {
   let service: AttachmentValidationService
   let mimeTypeRepository: Repository<MimeTypeCode>
@@ -137,7 +146,11 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(BadRequestException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getStatus()).toBe(400)
+    expect(error.message).toBe("Attachment MIME type 'application/x-msdownload' is not allowed.")
   })
 
   it('should throw BadRequestException for invalid filename with path traversal', async () => {
@@ -153,7 +166,13 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(BadRequestException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getStatus()).toBe(400)
+    expect(error.message).toBe(
+      "Attachment filename '../secret.txt' is invalid. Use a filename without directory paths.",
+    )
   })
 
   it('should throw BadRequestException for invalid filename with slash or backslash', async () => {
@@ -169,7 +188,13 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(BadRequestException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getStatus()).toBe(400)
+    expect(error.message).toBe(
+      "Attachment filename 'folder\\hello.txt' is invalid. Use a filename without directory paths.",
+    )
   })
 
   it('should throw BadRequestException for invalid base64', async () => {
@@ -185,7 +210,11 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(BadRequestException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getStatus()).toBe(400)
+    expect(error.message).toBe("Attachment 'hello.txt' content is not valid base64.")
   })
 
   it('should throw PayloadTooLargeException for an individual attachment over the configured limit', async () => {
@@ -202,11 +231,15 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(PayloadTooLargeException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(PayloadTooLargeException)
+    expect(error.getStatus()).toBe(413)
+    expect(error.message).toBe("Attachment 'large.txt' exceeds the maximum allowed size of 5 MB.")
   })
 
   it('should throw PayloadTooLargeException when total attachments exceed the configured limit', async () => {
-    const largeBuffer = Buffer.alloc(13 * 1024 * 1024, 'a')
+    const largeBuffer = Buffer.alloc(Math.floor(4.5 * 1024 * 1024), 'a')
     const request = makeRequest({
       email: {
         attachments: [
@@ -224,11 +257,37 @@ describe('AttachmentValidationService', () => {
             mimeType: 'text/plain',
             content: largeBuffer.toString('base64'),
           },
+          {
+            filename: 'large-three.txt',
+            mimeType: 'text/plain',
+            content: largeBuffer.toString('base64'),
+          },
+          {
+            filename: 'large-four.txt',
+            mimeType: 'text/plain',
+            content: largeBuffer.toString('base64'),
+          },
+          {
+            filename: 'large-five.txt',
+            mimeType: 'text/plain',
+            content: largeBuffer.toString('base64'),
+          },
+          {
+            filename: 'large-six.txt',
+            mimeType: 'text/plain',
+            content: largeBuffer.toString('base64'),
+          },
         ],
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(PayloadTooLargeException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(PayloadTooLargeException)
+    expect(error.getStatus()).toBe(413)
+    expect(error.message).toBe(
+      'Combined attachment size exceeds the maximum allowed size of 25 MB.',
+    )
   })
 
   it('should throw BadRequestException when filename exceeds the configured limit', async () => {
@@ -244,6 +303,12 @@ describe('AttachmentValidationService', () => {
       } as any,
     })
 
-    await expect(service.validateAttachments(request)).rejects.toThrow(BadRequestException)
+    const error = await captureError(service.validateAttachments(request))
+
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getStatus()).toBe(400)
+    expect(error.message).toBe(
+      'Attachment filename exceeds the maximum allowed length of 255 characters.',
+    )
   })
 })
