@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?><database name="default" schema="notify" type="PostgreSQL - 17.0 (Debian 17.0-1.pgdg110+1)">
    <tables>
+      <table name="api_key_consumer" remarks="" schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="credential_identifier" nullable="false" remarks="" size="512" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="consumer_id" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_consumer_tenant" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="bound_by_idir_guid" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="" size="29" type="timestamp" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="updated_at" nullable="false" remarks="" size="29" type="timestamp" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_api_key_consumer" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_api_key_consumer_tenant_id" unique="false">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="uq_api_key_consumer_credential" unique="true">
+            <column ascending="true" name="credential_identifier"/>
+         </index>
+      </table>
       <table name="client_tenant_mapping" remarks="Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for this mapping record." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="client_id" nullable="false" remarks="API Gateway client ID (issued via API Portal). Not a foreign key as the API Gateway is external." size="255" type="varchar" typeCode="12"/>
@@ -29,6 +50,24 @@
          <index name="uk_client_tenant_mapping_partial" unique="true">
             <column ascending="true" name="client_id"/>
             <column ascending="true" name="tenant_id"/>
+         </index>
+      </table>
+      <table name="configuration" remarks="Stores application configuration values as JSONB for runtime validation and limits." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="key" nullable="false" remarks="Unique configuration key. Primary key." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="config" nullable="false" remarks="Configuration payload stored as JSONB. Includes value, type, and description metadata." size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the configuration record was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the configuration record was last updated. Automatically maintained by trg_configuration_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="key" sequenceNumberInPK="1"/>
+         <index name="configuration_pkey" unique="true">
+            <column ascending="true" name="key"/>
+         </index>
+         <index name="idx_configuration_config" unique="false">
+            <column ascending="true" name="config"/>
+         </index>
+         <index name="idx_configuration_key" unique="false">
+            <column ascending="true" name="key"/>
          </index>
       </table>
       <table name="feature_flag" remarks="Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false." schema="notify" type="TABLE">
@@ -117,6 +156,22 @@
             <column ascending="true" name="code"/>
          </index>
       </table>
+      <table name="mime_type_code" remarks="Code table for allowed attachment MIME types. Defines which MIME types can be used for inline attachments in notification requests." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="MIME type code (e.g., application/pdf). Primary key." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the MIME type." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;PDF Document&quot;, &quot;PNG Image&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="3" name="created_at" nullable="false" remarks="Timestamp when the MIME type code was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="updated_at" nullable="false" remarks="Timestamp when the MIME type code was last updated. Automatically maintained by trg_mime_type_code_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="mime_type_code_pkey" unique="true">
+            <column ascending="true" name="code"/>
+         </index>
+         <index name="idx_mime_type_code_description" unique="false">
+            <column ascending="true" name="description"/>
+         </index>
+      </table>
       <table name="notification_channel_code" numRows="2" remarks="Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS).&#10;This ensures consistency with the NotificationChannel TypeScript enum." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="channel_code" nullable="false" remarks="Channel code (e.g., EMAIL, SMS). Primary key." size="20" type="varchar" typeCode="12">
             <child column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
@@ -157,7 +212,9 @@
          </index>
       </table>
       <table name="notification_request" remarks="Stores all incoming notification requests for auditing and tracking" schema="notify" type="TABLE">
-         <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the notification request" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the notification request" size="2147483647" type="uuid" typeCode="1111">
+            <child column="notification_id" foreignKey="webhook_delivery_log_notification_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_delivery_log"/>
+         </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant that submitted the request" size="2147483647" type="uuid" typeCode="1111">
             <parent column="id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
          </column>
@@ -382,9 +439,12 @@
       </table>
       <table name="tenant" remarks="Represents an organization or service using BC Notify. All data in the system is scoped under a tenant." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the tenant." size="2147483647" type="uuid" typeCode="1111">
+            <child column="tenant_id" foreignKey="fk_api_key_consumer_tenant" implied="false" onDeleteCascade="false" schema="notify" table="api_key_consumer"/>
             <child column="tenant_id" foreignKey="client_tenant_mapping_tenant_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="client_tenant_mapping"/>
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="tenant_id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
+            <child column="tenant_id" foreignKey="webhook_delivery_log_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_delivery_log"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="external_id" nullable="true" remarks="External identifier from CSTAR or Gateway used to correlate this tenant with external systems." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="name" nullable="false" remarks="Human-readable name of the tenant organization (e.g. Ministry of Health)." size="200" type="varchar" typeCode="12"/>
@@ -457,6 +517,85 @@
          <index name="user_identity_provider_id_subject_key" unique="true">
             <column ascending="true" name="provider_id"/>
             <column ascending="true" name="subject"/>
+         </index>
+      </table>
+      <table name="webhook_config" remarks="Stores webhook endpoint configurations per tenant, including the target URL, secret, headers, and rules for which channels and events trigger delivery." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="webhook_config_id" foreignKey="webhook_delivery_log_webhook_config_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_delivery_log"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="url" nullable="false" remarks="" size="2048" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="secret" nullable="true" remarks="" size="512" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="4" name="active" nullable="true" remarks="" size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="headers" nullable="true" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="channel_type" nullable="true" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="trigger_on" nullable="true" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="'generic'::character varying" digits="0" id="8" name="webhook_type" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="code" foreignKey="webhook_config_webhook_type_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_type"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="9" name="created_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="updated_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="webhook_config_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_webhook_config_tenant" unique="false">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="active"/>
+         </index>
+         <index name="webhook_config_tenant_id_url_key" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="url"/>
+         </index>
+      </table>
+      <table name="webhook_delivery_log" remarks="Tracks each webhook delivery attempt, including HTTP status, response body, retry scheduling, and final delivery status." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="webhook_config_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="webhook_delivery_log_webhook_config_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="notification_id" nullable="true" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="webhook_delivery_log_notification_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="webhook_delivery_log_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="event_type" nullable="true" remarks="" size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="http_status_code" nullable="true" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="response_body" nullable="true" remarks="" size="2147483647" type="text" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="1" digits="0" id="7" name="attempt_number" nullable="true" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="8" name="next_retry_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="'SENT'::character varying" digits="0" id="9" name="status" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="webhook_delivery_log_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_webhook_delivery_log_notification" unique="false">
+            <column ascending="true" name="notification_id"/>
+         </index>
+         <index name="idx_webhook_delivery_log_status" unique="false">
+            <column ascending="true" name="status"/>
+         </index>
+         <index name="idx_webhook_delivery_log_webhook" unique="false">
+            <column ascending="true" name="webhook_config_id"/>
+         </index>
+      </table>
+      <table name="webhook_type" remarks="Defines webhook types that determine the payload format sent to the webhook endpoint." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <child column="webhook_type" foreignKey="webhook_config_webhook_type_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_config"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="webhook_type_pkey" unique="true">
+            <column ascending="true" name="code"/>
          </index>
       </table>
    </tables>

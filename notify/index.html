@@ -78,7 +78,7 @@
                         <div class="col-md-12">
                             <div class="callout callout-info">
                                 <h4>SchemaSpy Analysis of default.notify</h4>
-                                <p>Generated on Sat Jun 06 11:35 GMT 2026</p>
+                                <p>Generated on Sat Jun 13 11:40 GMT 2026</p>
                             </div>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
                                 <span class="info-box-icon bg-aqua"><i class="fa fa-table"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">TABLES</span>
-                                    <span class="info-box-number">17</span>
+                                    <span class="info-box-number">23</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -118,7 +118,7 @@
                                 <span class="info-box-icon bg-green"><span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">COLUMNS</span>
-                                    <span class="info-box-number">155</span>
+                                    <span class="info-box-number">205</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -130,7 +130,7 @@
                                 <span class="info-box-icon bg-yellow"><i class="ion ion-key"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Constraints</span>
-                                    <span class="info-box-number">14</span>
+                                    <span class="info-box-number">20</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -242,6 +242,24 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/configuration.html">configuration</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Stores application configuration values as JSONB for runtime validation and limits.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/mime_type_code.html">mime_type_code</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Code table for allowed attachment MIME types. Defines which MIME types can be used for inline attachments in notification requests.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/flyway_schema_history.html">flyway_schema_history</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">0</td>
@@ -261,7 +279,7 @@
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/tenant.html">tenant</a></td>
-                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">6</td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">10</td>
                                         <td class="detail" align="right">-1</td>
@@ -276,6 +294,15 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Lookup table for notification request statuses</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/webhook_delivery_log.html">webhook_delivery_log</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Tracks each webhook delivery attempt, including HTTP status, response body, retry scheduling, and final delivery status.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/notify_user.html">notify_user</a></td>
@@ -305,6 +332,15 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/webhook_type.html">webhook_type</a></td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Defines webhook types that determine the payload format sent to the webhook endpoint.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/feature_flag.html">feature_flag</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">2</td>
@@ -312,6 +348,15 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/webhook_config.html">webhook_config</a></td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">13</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Stores webhook endpoint configurations per tenant, including the target URL, secret, headers, and rules for which channels and events trigger delivery.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/identity_provider.html">identity_provider</a></td>
@@ -342,12 +387,21 @@
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/notification_request.html">notification_request</a></td>
-                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">3</td>
                                         <td class="detail" align="right">13</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Stores all incoming notification requests for auditing and tracking</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/api_key_consumer.html">api_key_consumer</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">7</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"></td>
                                     </tr>
                             </table>
                         </div>
