@@ -64,39 +64,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch current production configs from main branch
-        run: |
-          # Save current PR branch configs
-          mkdir -p /tmp/pr-configs
-          cp -r api-gateway /tmp/pr-configs/
-
-          # Fetch main branch to get production configs
-          git fetch origin main
-          git checkout origin/main -- api-gateway/
-
-          # Generate production configs (DEV+TEST+PROD) from main branch
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          api-gateway/scripts/generate-gateway-for-stage.sh prod
-
-          # Save production configs
-          cp api-gateway/generated/gw-active-services.yaml /tmp/prod-configs.yaml
-
       - name: Generate PR config from PR branch
         run: |
-          # Restore PR branch configs
-          rm -rf api-gateway
-          cp -r /tmp/pr-configs/api-gateway .
-
           # Generate PR config only from PR branch code
+          # PR shares tag ns.gw-fe8c5.dev with DEV (path-based routing)
+          # DEV service already exists from merge workflow - only apply PR service
           chmod +x api-gateway/scripts/generate-gateway-config.sh
           api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-          # Combine: Production configs (main) + PR config (PR branch)
-          cp /tmp/prod-configs.yaml api-gateway/generated/gw-combined-pr.yaml
-          echo "---" >> api-gateway/generated/gw-combined-pr.yaml
-          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-pr.yaml
-
-      - name: Apply PR config without touching production
+      - name: Apply PR config (path-based routing)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -112,9 +88,30 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply: Production configs (from main) + New PR config (from PR branch)
-          echo "✅ Applying PR config with CURRENT production configs (DEV/TEST/PROD unchanged)"
-          gwa apply -i api-gateway/generated/gw-combined-pr.yaml
+          # Apply PR config only
+          # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
+          # DEV service already exists from merge workflow
+          # This adds PR routes without affecting DEV routes (different paths)
+          echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
+
+          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+
+          # Check results
+          if grep -q "Published" /tmp/gwa-output.txt; then
+            PUBLISHED_COUNT=$(grep -oP '\d+(?=/\d+ Published)' /tmp/gwa-output.txt || echo "0")
+            echo "✅ Published $PUBLISHED_COUNT gateway service(s)"
+
+            if [ "$PUBLISHED_COUNT" -gt 0 ]; then
+              echo "✅ PR gateway config published successfully"
+              echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
+              exit 0
+            fi
+          fi
+
+          # If we got here, nothing was published
+          echo "❌ Gateway config failed to publish"
+          cat /tmp/gwa-output.txt
+          exit 1
 
   deploys:
     name: Deploys (${{ github.event.number }})
