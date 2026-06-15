@@ -123,10 +123,15 @@ function parseSort(sort: string | undefined, config: QueryableFieldsConfig): Lis
   return parsed.length > 0 ? parsed : (config.defaultSort ?? [])
 }
 
-export function parseListQuery(query: ListQueryDto, config: QueryableFieldsConfig): ParsedListQuery {
+export function parseListQuery(
+  query: ListQueryDto,
+  config: QueryableFieldsConfig,
+): ParsedListQuery {
   const page = Math.max(1, Number(query.page || 1))
   const limit = Math.min(Math.max(1, Number(query.limit || 10)), 100)
-  const filters: ListQueryFilter[] = (query.filter ?? []).map((token) => parseFilterToken(token, config))
+  const filters: ListQueryFilter[] = (query.filter ?? []).map((token) =>
+    parseFilterToken(token, config),
+  )
   const sorts = parseSort(query.sort, config)
 
   return {
