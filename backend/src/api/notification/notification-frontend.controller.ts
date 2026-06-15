@@ -20,6 +20,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+import { ListQueryDto } from '../../common/query/list-query.dto'
 
 /**
  * Frontend Notification API Controller
@@ -78,21 +79,23 @@ export class NotificationFrontendController {
     description: 'Items per page (max 100)',
   })
   @ApiQuery({
-    name: 'status',
+    name: 'sort',
     required: false,
     type: String,
-    description: 'Filter by notification status',
+    example: '-createdAt,status',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['status:eq:QUEUED', 'createdAt:gte:2026-01-01T00:00:00.000Z'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
-  findAll(
-    @Query('tenantId') tenantExternalId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-  ) {
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(tenantExternalId, pageNum, limitNum, status)
+  findAll(@Query('tenantId') tenantExternalId: string, @Query() query: ListQueryDto) {
+    return this.notificationService.findAll(tenantExternalId, query)
   }
 
   @Version('1')
