@@ -18,6 +18,7 @@ import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
+import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -55,6 +56,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         WebhookDeliveryLog,
         WebhookTypeCode,
         ApiKeyConsumer,
+        AttachmentEntity,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],
