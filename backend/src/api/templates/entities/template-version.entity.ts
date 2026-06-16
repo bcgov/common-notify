@@ -105,8 +105,8 @@ export class TemplateVersion {
   /**
    * Body content type for this version: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
    */
-  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html' })
-  bodyType: 'text' | 'markdown' | 'html'
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html', nullable: true })
+  bodyType?: 'text' | 'markdown' | 'html' | null
 
   /**
    * User or process that created this version
