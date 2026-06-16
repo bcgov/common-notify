@@ -33,6 +33,7 @@ const TemplateCreate: FC = () => {
   })
 
   const isSaveDisabled = saving || !formData.name.trim()
+  const isMjml = formData.engineCode === TemplateEngine.MJML
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -57,7 +58,7 @@ const TemplateCreate: FC = () => {
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
     }
-    if (!formData.bodyType) {
+    if (!isMjml && !formData.bodyType) {
       errors.bodyType = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
@@ -79,9 +80,11 @@ const TemplateCreate: FC = () => {
         name: formData.name,
         channelCode: formData.channelCode as NotificationChannel,
         engineCode: formData.engineCode as TemplateEngine,
-        bodyType: formData.bodyType as TemplateBodyType,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
+        ...(!isMjml && formData.bodyType
+          ? { bodyType: formData.bodyType as TemplateBodyType }
+          : {}),
       })
       showSuccessToast('Template created successfully')
       navigate({ to: '/templates' })
@@ -160,8 +163,16 @@ const TemplateCreate: FC = () => {
               }
               value={formData.engineCode}
               onChange={(value) => {
-                setFormData((prev) => ({ ...prev, engineCode: value }))
-                setFormErrors((prev) => ({ ...prev, engineCode: '' }))
+                setFormData((prev) => ({
+                  ...prev,
+                  engineCode: value,
+                  bodyType: value === TemplateEngine.MJML ? '' : prev.bodyType,
+                }))
+                setFormErrors((prev) => ({
+                  ...prev,
+                  engineCode: '',
+                  bodyType: '',
+                }))
               }}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
@@ -181,31 +192,33 @@ const TemplateCreate: FC = () => {
             </RadioGroup>
           </div>
 
-          <div className="mb-4 error-after-label">
-            <RadioGroup
-              label={
-                (
-                  <>
-                    <strong>Body type</strong> (required)
-                  </>
-                ) as any
-              }
-              value={formData.bodyType}
-              onChange={(value) => {
-                setFormData((prev) => ({ ...prev, bodyType: value }))
-                setFormErrors((prev) => ({ ...prev, bodyType: '' }))
-              }}
-              isInvalid={!!formErrors.bodyType}
-              errorMessage={formErrors.bodyType}
-            >
-              <Radio key="html" value={TemplateBodyType.HTML}>
-                HTML
-              </Radio>
-              <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
-                Markdown
-              </Radio>
-            </RadioGroup>
-          </div>
+          {!isMjml && (
+            <div className="mb-4 error-after-label">
+              <RadioGroup
+                label={
+                  (
+                    <>
+                      <strong>Body type</strong> (required)
+                    </>
+                  ) as any
+                }
+                value={formData.bodyType}
+                onChange={(value) => {
+                  setFormData((prev) => ({ ...prev, bodyType: value }))
+                  setFormErrors((prev) => ({ ...prev, bodyType: '' }))
+                }}
+                isInvalid={!!formErrors.bodyType}
+                errorMessage={formErrors.bodyType}
+              >
+                <Radio key="html" value={TemplateBodyType.HTML}>
+                  HTML
+                </Radio>
+                <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
+                  Markdown
+                </Radio>
+              </RadioGroup>
+            </div>
+          )}
 
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="mb-4 desc-above">

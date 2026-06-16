@@ -62,7 +62,7 @@ export class CreateTemplateDto {
 
   /**
    * Body content type for rendering: text (plain), markdown (markdown→HTML), html (raw HTML)
-   * Defaults to 'html'
+   * Optional for MJML templates
    * @example "markdown"
    */
   @IsOptional()
