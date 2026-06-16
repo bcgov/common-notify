@@ -97,6 +97,8 @@ spec:
               value: {{ .Values.backend.clamav.failClosed | default "false" | quote }}
             - name: ATTACHMENT_STORAGE_DIR
               value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
+            - name: S3_FORCE_PATH_STYLE
+              value: {{ .Values.backend.s3.forcePathStyle | default true | quote }}
             - name: RELEASE_NAME
               value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL

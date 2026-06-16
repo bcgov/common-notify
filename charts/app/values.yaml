@@ -113,6 +113,9 @@ backend:
       size: 3Gi
       #-- storage class name (leave empty for default)
       storageClassName: netapp-file-standard
+  s3:
+    #-- use path-style requests by default for MinIO and ObjectScale compatibility
+    forcePathStyle: true
 
 frontend:
   # -- enable or disable a component deployment.
