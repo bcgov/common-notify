@@ -13,6 +13,7 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
+import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
 /**
  * Context required by the Queueable decorator.
@@ -23,6 +24,7 @@ export interface QueueableContext {
   attachmentValidationService: AttachmentValidationService
   attachmentProcessingService: AttachmentProcessingService
   NotificationPubSubService?: NotificationPubSubService
+  notificationRequestDetailService: NotificationRequestDetailService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -179,6 +181,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           })
           throw dbError
         }
+
+        await (this as QueueableContext).notificationRequestDetailService.createPending(
+          notificationRecord.id,
+          processedPayload,
+          tenantId,
+        )
 
         // Return 202 Accepted immediately without waiting for queue operation
         // Queue operation continues asynchronously in the background

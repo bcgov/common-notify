@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
+import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 
 @Injectable()
 export class NotificationRequestDetailService {
@@ -11,17 +13,22 @@ export class NotificationRequestDetailService {
   ) {}
 
   /**
-   * Create pending request detail records (one per recipient) at the start of a first attempt.
+   * Create pending request detail records (one per recipient) before reaching the ingestion queue.
    */
   async createPending(
     notificationRequestId: string,
-    recipients: string[],
-    channel: string,
+    payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
     createdBy?: string,
   ): Promise<void> {
-    if (recipients.length === 0) return
+    const { recipients } = this.extractRecipients(payload)
+    if (
+      recipients.email.length === 0 &&
+      recipients.sms.length === 0 &&
+      recipients.msgApp.length === 0
+    )
+      return
     const now = new Date()
-    const entities = recipients.map((address) =>
+    const makeEntity = (address: string, channel: string) =>
       this.detailRepository.create({
         notificationRequestId,
         recipientAddress: address,
@@ -31,8 +38,12 @@ export class NotificationRequestDetailService {
         lastAttemptAt: now,
         createdBy,
         updatedBy: createdBy,
-      }),
-    )
+      })
+    const entities = [
+      ...recipients.email.map((address) => makeEntity(address, 'EMAIL')),
+      ...recipients.sms.map((address) => makeEntity(address, 'SMS')),
+      ...recipients.msgApp.map((address) => makeEntity(address, 'MSGAPP')),
+    ]
     await this.detailRepository.save(entities)
   }
 
@@ -101,5 +112,50 @@ export class NotificationRequestDetailService {
       relations: { notificationRequest: true },
       order: { createdAt: 'DESC' },
     })
+  }
+
+  /**
+   * Extract channel code, recipients, and delayed send time from notification payload
+   */
+  private extractRecipients(
+    payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
+  ): {
+    recipients: { email: string[]; sms: string[]; msgApp: string[] }
+  } {
+    if (!payload) {
+      return { recipients: { email: [], sms: [], msgApp: [] } }
+    }
+
+    const recipients = { email: [] as string[], sms: [] as string[], msgApp: [] as string[] }
+    let delayedSendTime: Date | null = null
+
+    if (payload.email) {
+      recipients.email = [
+        ...(payload.email.recipients?.to || []),
+        ...(payload.email.recipients?.cc || []),
+        ...(payload.email.recipients?.bcc || []),
+      ]
+      if (payload.email.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.email.delayedSend)
+      }
+    }
+
+    if (payload.sms) {
+      recipients.sms = payload.sms.recipients?.to || []
+      if (payload.sms.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.sms.delayedSend)
+      }
+    }
+
+    if (payload.msgApp) {
+      recipients.msgApp = payload.msgApp.recipients?.to || []
+      if (payload.msgApp.delayedSend && !delayedSendTime) {
+        delayedSendTime = new Date(payload.msgApp.delayedSend)
+      }
+    }
+
+    return {
+      recipients,
+    }
   }
 }

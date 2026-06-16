@@ -121,15 +121,7 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
-        // Track per-recipient delivery status
-        if ((job.attemptsMade ?? 0) === 0) {
-          await requestDetailService.createPending(
-            notifyId,
-            (payload as NotifyEmailChannel).recipients.to,
-            'EMAIL',
-            tenantId,
-          )
-        } else {
+        if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 

@@ -74,16 +74,7 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
-        // Resolve template if templateId is provided in the original request
-        // Track per-recipient delivery status
-        if ((job.attemptsMade ?? 0) === 0) {
-          await requestDetailService.createPending(
-            notifyId,
-            (payload as any).recipients?.to ?? [],
-            'SMS',
-            tenantId,
-          )
-        } else {
+        if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 
