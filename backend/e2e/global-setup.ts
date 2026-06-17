@@ -107,7 +107,7 @@ async function globalSetup(_config: FullConfig) {
       }
     }
 
-    let tokenResult = await fetchToken(clientId, clientSecret)
+    const tokenResult = await fetchToken(clientId, clientSecret)
 
     if (!tokenResult.accessToken) {
       throw new Error('No access_token in response')
@@ -223,14 +223,14 @@ async function globalSetup(_config: FullConfig) {
             fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
 
           if (!fallbackMessage.includes('invalid_client')) {
-            console.error('❌ Failed to fetch token with fallback client:', fallbackError)
+            console.error('Failed to fetch token with fallback client:', fallbackError)
             throw fallbackError
           }
         }
       }
     }
 
-    console.error('❌ Failed to fetch token:', error)
+    console.error('Failed to fetch token:', error)
     throw error
   }
 }
