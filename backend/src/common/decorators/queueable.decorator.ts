@@ -278,6 +278,10 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
                   updatedBy: 'system',
                 },
               )
+              await (this as QueueableContext).notificationRequestDetailService.updateStatus(
+                notificationRecord.id,
+                statusAfterQueuing,
+              )
             } catch (updateError) {
               logger.error(`Failed to update status after queuing: ${notificationRecord.id}`, {
                 tenantId,

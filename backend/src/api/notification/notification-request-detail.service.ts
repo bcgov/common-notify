@@ -79,6 +79,16 @@ export class NotificationRequestDetailService {
   // need more info on what the smtp gateway returns on individual failure
 
   /**
+   * Update the status of all detail records for a notification request.
+   */
+  async updateStatus(notificationRequestId: string, status: string): Promise<void> {
+    await this.detailRepository.update(
+      { notificationRequestId },
+      { status, updatedBy: 'system' },
+    )
+  }
+
+  /**
    * Increment attempt_count and reset status to pending before a retry attempt.
    */
   async resetForRetry(notificationRequestId: string): Promise<void> {
