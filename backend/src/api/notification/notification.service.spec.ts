@@ -172,7 +172,7 @@ describe('NotificationService', () => {
       mockRepository.createQueryBuilder.mockReturnValue(queryBuilder)
       queryBuilder.getManyAndCount.mockResolvedValue([mockNotifications, 2])
 
-      const result = await service.findAll('cstar-external-id', {})
+      const result = await service.findAll('cstar-external-id', { page: 1, limit: 10 })
 
       expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('notification')
       expect(queryBuilder.where).toHaveBeenCalledWith('notification.tenantId = :tenantId', {
@@ -226,7 +226,7 @@ describe('NotificationService', () => {
     it('should return empty data when tenant is not found', async () => {
       mockTenantsService.findByExternalId.mockResolvedValue(null)
 
-      const result = await service.findAll('missing-tenant', {})
+      const result = await service.findAll('missing-tenant', { page: 1, limit: 10 })
 
       expect(result).toEqual({
         data: [],

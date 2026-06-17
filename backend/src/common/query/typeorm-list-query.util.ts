@@ -54,7 +54,7 @@ export function applyParsedListQueryToQueryBuilder<T>(
 
     if (filter.operator === 'like') {
       const value = escapeLikePattern(String(filter.value))
-      qb.andWhere(`${column} ILIKE :${paramName} ESCAPE '\\\\'`, { [paramName]: `%${value}%` })
+      qb.andWhere(`${column} ILIKE :${paramName} ESCAPE '\\'`, { [paramName]: `%${value}%` })
       continue
     }
 

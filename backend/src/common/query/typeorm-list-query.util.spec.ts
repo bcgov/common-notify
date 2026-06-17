@@ -82,7 +82,7 @@ describe('applyParsedListQueryToQueryBuilder', () => {
     })
     expect(qb.andWhere).toHaveBeenNthCalledWith(
       4,
-      "notification.createdBy ILIKE :filter_3 ESCAPE '\\\\'",
+      "notification.createdBy ILIKE :filter_3 ESCAPE '\\'",
       {
         filter_3: '%smith%',
       },
@@ -113,11 +113,8 @@ describe('applyParsedListQueryToQueryBuilder', () => {
 
     applyParsedListQueryToQueryBuilder(qb as any, parsedQuery, queryConfig)
 
-    expect(qb.andWhere).toHaveBeenCalledWith(
-      "notification.createdBy ILIKE :filter_0 ESCAPE '\\\\'",
-      {
-        filter_0: '%100\\%\\_\\\\ops%',
-      },
-    )
+    expect(qb.andWhere).toHaveBeenCalledWith("notification.createdBy ILIKE :filter_0 ESCAPE '\\'", {
+      filter_0: '%100\\%\\_\\\\ops%',
+    })
   })
 })

@@ -35,8 +35,8 @@ const queryConfig: QueryableFieldsConfig = {
 }
 
 describe('parseListQuery', () => {
-  it('applies default pagination and sort when query parameters are missing', () => {
-    const parsed = parseListQuery({}, queryConfig)
+  it('applies default sort when query parameters are missing', () => {
+    const parsed = parseListQuery({ page: 1, limit: 10 }, queryConfig)
 
     expect(parsed).toEqual({
       page: 1,
@@ -50,8 +50,8 @@ describe('parseListQuery', () => {
   it('parses repeatable filters and multi-field sort expressions', () => {
     const parsed = parseListQuery(
       {
-        page: '2',
-        limit: '25',
+        page: 2,
+        limit: 25,
         sort: '-createdAt,status',
         filter: [
           'status:eq:QUEUED',

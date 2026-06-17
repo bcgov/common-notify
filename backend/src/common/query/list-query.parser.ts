@@ -127,8 +127,7 @@ export function parseListQuery(
   query: ListQueryDto,
   config: QueryableFieldsConfig,
 ): ParsedListQuery {
-  const page = Math.max(1, Number(query.page || 1))
-  const limit = Math.min(Math.max(1, Number(query.limit || 10)), 100)
+  const { page, limit } = query
   const filters: ListQueryFilter[] = (query.filter ?? []).map((token) =>
     parseFilterToken(token, config),
   )
