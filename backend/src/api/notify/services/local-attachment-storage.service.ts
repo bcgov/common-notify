@@ -3,7 +3,15 @@ import { ConfigService } from '@nestjs/config'
 import * as crypto from 'crypto'
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import { StoredNotifyAttachment } from '../schemas/stored-notify-attachment'
+
+interface LegacyStoredNotifyAttachment {
+  filename: string
+  mimeType: string
+  storageKey: string
+  sizeBytes: number
+  contentSha256: string
+  storageProvider: 'local'
+}
 
 interface StoreAttachmentInput {
   filename: string
@@ -21,7 +29,7 @@ export class LocalAttachmentStorageService {
       this.configService.get<string>('attachments.storageDir') || '/tmp/common-notify/attachments'
   }
 
-  async storeAttachment(input: StoreAttachmentInput): Promise<StoredNotifyAttachment> {
+  async storeAttachment(input: StoreAttachmentInput): Promise<LegacyStoredNotifyAttachment> {
     const contentSha256 = crypto.createHash('sha256').update(input.content).digest('hex')
     const storageKey = path.posix.join(contentSha256.slice(0, 2), `${contentSha256}.bin`)
     const absoluteBaseDirectory = path.resolve(this.baseDirectory)

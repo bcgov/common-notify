@@ -4,8 +4,9 @@ import { ConfigService } from '@nestjs/config'
 import { S3Client } from '@aws-sdk/client-s3'
 import { AttachmentEntity } from './entities/attachment.entity'
 import { AttachmentRepository } from './attachment.repository'
-import { ATTACHMENT_S3_CLIENT } from './attachment.constants'
+import { ATTACHMENT_S3_CLIENT, ATTACHMENT_STORAGE } from './attachment.constants'
 import { S3AttachmentStorageService } from './s3-attachment-storage.service'
+import { AttachmentService } from './attachment.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([AttachmentEntity])],
@@ -26,7 +27,12 @@ import { S3AttachmentStorageService } from './s3-attachment-storage.service'
       inject: [ConfigService],
     },
     S3AttachmentStorageService,
+    {
+      provide: ATTACHMENT_STORAGE,
+      useExisting: S3AttachmentStorageService,
+    },
+    AttachmentService,
   ],
-  exports: [AttachmentRepository, S3AttachmentStorageService],
+  exports: [AttachmentRepository, S3AttachmentStorageService, AttachmentService, ATTACHMENT_STORAGE],
 })
 export class AttachmentModule {}

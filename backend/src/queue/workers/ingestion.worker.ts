@@ -7,7 +7,6 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
-import { StoredNotifyAttachment } from '../../api/notify/schemas/stored-notify-attachment'
 import { LocalAttachmentStorageService } from '../../api/notify/services/local-attachment-storage.service'
 
 /**
@@ -100,6 +99,7 @@ export class IngestionWorker {
 
             try {
               let buffer: Buffer
+              const attachmentWithFilename = attachment as { filename?: string }
 
               if ('content' in attachment && typeof attachment.content === 'string') {
                 // Inline attachment payload (pre-processed)
@@ -115,7 +115,12 @@ export class IngestionWorker {
                   throw new Error('Attachment storage service unavailable')
                 }
 
-                const storedAttachment = attachment as StoredNotifyAttachment
+                const storedAttachment = attachment as unknown as {
+                  filename: string
+                  storageKey: string
+                  contentSha256?: string
+                  sizeBytes: number
+                }
                 buffer = await localAttachmentStorageService.readAttachment(
                   storedAttachment.storageKey,
                   storedAttachment.contentSha256,
@@ -132,22 +137,25 @@ export class IngestionWorker {
               }
 
               logger.debug(
-                `[${notifyId}] Scanning attachment: ${attachment.filename || 'unnamed'} (${buffer.length} bytes)`,
+                `[${notifyId}] Scanning attachment: ${attachmentWithFilename.filename || 'unnamed'} (${buffer.length} bytes)`,
               )
 
               // Scan buffer for malware using CLAMD protocol
-              const scanResult = await clamavService.scanBuffer(buffer, attachment.filename)
+              const scanResult = await clamavService.scanBuffer(
+                buffer,
+                attachmentWithFilename.filename,
+              )
 
               if (scanResult.isInfected) {
                 // Malware detected - quarantine the notification
                 logger.warn(
-                  `[${notifyId}] SECURITY: Malware detected in attachment: ${attachment.filename || 'unnamed'}. Viruses: ${scanResult.quarantineInfo?.viruses.join(', ')}`,
+                  `[${notifyId}] SECURITY: Malware detected in attachment: ${attachmentWithFilename.filename || 'unnamed'}. Viruses: ${scanResult.quarantineInfo?.viruses.join(', ')}`,
                 )
 
                 // Create quarantine details from scan result
                 const quarantineDetails: QuarantineDetails = {
                   viruses: scanResult.quarantineInfo?.viruses || [],
-                  filename: attachment.filename,
+                  filename: attachmentWithFilename.filename,
                   scannedAt: scanResult.quarantineInfo?.scannedAt
                     ? scanResult.quarantineInfo.scannedAt.toISOString()
                     : new Date().toISOString(),
@@ -170,7 +178,7 @@ export class IngestionWorker {
               }
 
               logger.debug(
-                `[${notifyId}] Attachment ${attachment.filename || 'unnamed'} passed malware scan`,
+                `[${notifyId}] Attachment ${attachmentWithFilename.filename || 'unnamed'} passed malware scan`,
               )
             } catch (scanError) {
               const errorMsg = scanError instanceof Error ? scanError.message : String(scanError)

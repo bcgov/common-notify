@@ -24,29 +24,38 @@ export class AttachmentResolverService {
 
     const resolvedAttachments = await Promise.all(
       attachments.map(async (attachment) => {
-        switch (attachment.storageProvider) {
+        const legacyAttachment = attachment as StoredNotifyAttachment & {
+          filename?: string
+          mimeType?: string
+          storageKey?: string
+          sizeBytes?: number
+          contentSha256?: string
+          storageProvider?: string
+        }
+
+        switch (legacyAttachment.storageProvider) {
           case 'local': {
             const content = await this.localAttachmentStorageService.readAttachment(
-              attachment.storageKey,
-              attachment.contentSha256,
+              legacyAttachment.storageKey!,
+              legacyAttachment.contentSha256,
             )
 
-            if (content.byteLength !== attachment.sizeBytes) {
+            if (content.byteLength !== legacyAttachment.sizeBytes) {
               throw new InternalServerErrorException(
-                `Stored attachment "${attachment.filename}" size verification failed`,
+                `Stored attachment "${legacyAttachment.filename}" size verification failed`,
               )
             }
 
             return {
-              filename: attachment.filename,
+              filename: legacyAttachment.filename!,
               content,
-              contentType: attachment.mimeType,
+              contentType: legacyAttachment.mimeType,
               sendingMethod: 'attach' as const,
             }
           }
           default:
             throw new InternalServerErrorException(
-              `Unsupported attachment storage provider "${(attachment as any).storageProvider}"`,
+              `Unsupported attachment storage provider "${legacyAttachment.storageProvider ?? 'attachmentId'}"`,
             )
         }
       }),

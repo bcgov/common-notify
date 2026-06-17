@@ -27,6 +27,7 @@ import { AttachmentValidationService } from './services/attachment-validation.se
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LocalAttachmentStorageService } from './services/local-attachment-storage.service'
+import { AttachmentModule } from '../attachment/attachment.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { LocalAttachmentStorageService } from './services/local-attachment-stora
     CstarModule,
     WebhookModule,
     ApiKeysModule,
+    AttachmentModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],
