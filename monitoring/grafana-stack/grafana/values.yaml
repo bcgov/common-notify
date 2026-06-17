@@ -1,0 +1,126 @@
+# Grafana - Visualization & Dashboards (DEV Environment)
+# Deployment: f6bc3f-tools namespace
+# Purpose: Query logs from Loki, display dashboards, alerting
+# Resource Profile: Minimal - optimized for dev environment
+
+# Admin credentials from OpenShift Secret
+# The secret is created separately in secret.yaml
+admin:
+  existingSecret: grafana-admin-credentials
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Persistence for dashboards
+persistence:
+  enabled: false  # Disable persistence for simpler deployment
+  # storageClassName: netapp-file-standard
+  # size: 2Gi
+
+# Minimal resources for dev
+resources:
+  limits:
+    cpu: 300m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Datasources - Pre-configure Loki
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      # Loki datasource
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-dev.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            # Extract notificationId from logs for easy linking
+            - datasourceUid: Loki
+              matcherRegex: '"notificationId":"([^"]+)"'
+              name: NotificationID
+              url: ''
+
+      # Mimir datasource (metrics) - will add after Mimir is deployed
+      - name: Mimir
+        type: prometheus
+        access: proxy
+        url: http://mimir.f6bc3f-dev.svc.cluster.local:9009/prometheus
+        isDefault: false
+
+# Dashboard providers - Load dashboards from ConfigMaps
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: 'Common Notify'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Pre-load dashboards (we'll create these next)
+dashboards:
+  default: {}  # Dashboards will be added via ConfigMaps
+
+# Grafana configuration
+grafana.ini:
+  server:
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+    serve_from_sub_path: false
+
+  users:
+    allow_sign_up: false
+
+  auth.anonymous:
+    enabled: false
+
+  log:
+    mode: console
+    level: info
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Route/Ingress - Disabled for now (use port-forward for testing)
+# route:
+#   enabled: false
+
+# Plugins to install
+plugins:
+  - grafana-piechart-panel
+  - grafana-clock-panel
+
+# Security context - OpenShift compatible (let OpenShift assign UIDs)
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: null
+  runAsUser: null
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Disable init containers for OpenShift compatibility
+initChownData:
+  enabled: false
+
+downloadDashboards:
+  enabled: false
+
+# Environment variables
+env:
+  TZ: America/Vancouver

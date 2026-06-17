@@ -1,0 +1,137 @@
+# Grafana Loki - Log Aggregation (DEV Environment)
+# Deployment: f6bc3f-tools namespace
+# Purpose: Collect and store application logs from dev/test/prod
+# Resource Profile: Minimal - optimized for dev environment
+
+loki:
+  auth_enabled: false
+
+  commonConfig:
+    replication_factor: 1
+
+  # OpenShift-compatible pod security context (applied globally)
+  podSecurityContext:
+    fsGroup: null
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+
+  # OpenShift-compatible container security context (applied globally)
+  containerSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+
+  # Retention: 7 days (conservative for dev)
+  limits_config:
+    retention_period: 168h  # 7 days
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    max_cache_freshness_per_query: 10m
+    split_queries_by_interval: 15m
+
+  querier:
+    max_concurrent: 10
+
+# Schema config at root level (required by newer Loki Helm chart)
+schemaConfig:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+
+deploymentMode: SingleBinary
+
+# Explicitly disable simple scalable components
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+singleBinary:
+  replicas: 1
+
+  persistence:
+    enabled: true
+    storageClass: netapp-file-standard
+    size: 3Gi  # Minimal storage for 7 days retention
+
+  # Minimal resources for dev
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  extraEnv:
+    - name: TZ
+      value: America/Vancouver
+
+  # OpenShift-compatible security context (let OpenShift assign UIDs)
+  podSecurityContext:
+    fsGroup: null
+    runAsGroup: null
+    runAsNonRoot: true
+    runAsUser: null
+
+  containerSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+
+# Disable canary to simplify deployment
+lokiCanary:
+  enabled: false
+
+# Disable caching for simpler deployment (dev environment)
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 3100
+
+gateway:
+  enabled: false
+
+test:
+  enabled: false  # Disable test pod to save resources
+
+# OpenShift-specific RBAC configuration
+rbac:
+  pspEnabled: false
+  sccEnabled: false  # Disable SCC creation (requires cluster-admin)
+  namespaced: true  # Use namespace-only RBAC, not cluster-wide
+serviceAccount:
+  create: true

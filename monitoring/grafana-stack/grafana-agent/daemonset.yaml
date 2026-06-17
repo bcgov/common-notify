@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: grafana-agent
+  namespace: f6bc3f-dev
+spec:
+  selector:
+    matchLabels:
+      app: grafana-agent
+  template:
+    metadata:
+      labels:
+        app: grafana-agent
+    spec:
+      serviceAccountName: grafana-agent
+
+      containers:
+        - name: grafana-agent
+          image: grafana/agent:v0.40.2
+          imagePullPolicy: IfNotPresent
+
+          args:
+            - -config.file=/etc/agent/agent.yaml
+            - -server.http.address=0.0.0.0:8080
+
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          ports:
+            - containerPort: 8080
+              name: http-metrics
+              protocol: TCP
+
+          # Minimal resources
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 64Mi
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/agent
+            - name: positions
+              mountPath: /tmp
+
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: config
+          configMap:
+            name: grafana-agent
+        - name: positions
+          emptyDir: {}
+
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists

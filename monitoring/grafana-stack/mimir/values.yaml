@@ -1,0 +1,65 @@
+# Grafana Mimir - Metrics Storage (DEV Environment)
+# Deployment: f6bc3f-tools namespace
+# Purpose: Store application metrics (optional but recommended)
+# Resource Profile: Minimal - optimized for dev environment
+
+# Run Mimir in single-binary mode (simplest deployment)
+mimir:
+  structuredConfig:
+    multitenancy_enabled: false
+
+    limits:
+      # Retention: 7 days (matching Loki)
+      compactor_blocks_retention_period: 168h
+
+# Minimal deployment for dev
+deploymentMode: monolithic
+
+monolithic:
+  replicas: 1
+
+  persistence:
+    enabled: true
+    storageClass: netapp-file-standard
+    size: 2Gi  # Minimal storage
+
+  # Minimal resources
+  resources:
+    limits:
+      cpu: 300m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  extraEnv:
+    - name: TZ
+      value: America/Vancouver
+
+# Disable unused components to save resources
+alertmanager:
+  enabled: false
+
+ruler:
+  enabled: false
+
+overrides_exporter:
+  enabled: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 9009
+
+# Gateway disabled
+gateway:
+  enabled: false
+
+# Monitoring disabled
+metaMonitoring:
+  serviceMonitor:
+    enabled: false
+
+  grafanaAgent:
+    enabled: false
+    installOperator: false

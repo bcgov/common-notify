@@ -1,0 +1,136 @@
+# Minimal Grafana Configuration for OpenShift
+# Optimized to work with restricted-v2 SCC
+
+# Admin credentials from secret
+admin:
+  existingSecret: grafana-admin-credentials
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Extra secret mounts for admin credentials
+extraSecretMounts:
+  - name: admin-credentials
+    secretName: grafana-admin-credentials
+    defaultMode: 0440
+    mountPath: /etc/secrets
+    readOnly: true
+
+# Disable persistence for simplicity
+persistence:
+  enabled: false
+
+# Minimal resources
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Loki datasource
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-dev.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 1000
+
+# Basic Grafana config
+grafana.ini:
+  server:
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+  users:
+    allow_sign_up: false
+  auth.anonymous:
+    enabled: false
+  log:
+    mode: console
+    level: info
+
+# Service
+service:
+  type: ClusterIP
+  port: 80
+
+# Pod annotations - prevent legacy seccomp annotations
+podAnnotations: {}
+
+# OpenShift-compatible security contexts
+# NOTE: The Grafana Helm chart ignores null values and sets UID 472 by default.
+# This causes SCC validation errors in OpenShift (requires UID in range 1018590000-1018599999).
+# The deploy.sh script automatically patches the deployment after Helm install to remove
+# the hardcoded UIDs and let OpenShift assign them dynamically.
+podSecurityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+  runAsNonRoot: null
+  seccompProfile: null
+
+containerSecurityContext:
+  runAsUser: null
+  runAsNonRoot: null
+  allowPrivilegeEscalation: false
+  seccompProfile: null
+  capabilities:
+    drop:
+      - ALL
+
+# Disable ALL init containers (they cause SCC issues)
+initChownData:
+  enabled: false
+
+downloadDashboards:
+  enabled: false
+
+downloadDashboardsImage:
+  repository: curlimages/curl
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Disable sidecar containers
+sidecar:
+  dashboards:
+    enabled: false
+  datasources:
+    enabled: false
+  plugins:
+    enabled: false
+  notifiers:
+    enabled: false
+
+# No plugins to avoid init containers
+plugins: []
+
+# Environment
+env:
+  TZ: America/Vancouver
+  GF_SECURITY_ADMIN_USER__FILE: /etc/secrets/admin-user
+  GF_SECURITY_ADMIN_PASSWORD__FILE: /etc/secrets/admin-password
+
+# Minimal RBAC
+rbac:
+  create: true
+  pspEnabled: false
+  namespaced: true
+
+serviceAccount:
+  create: true
+
+# No test framework
+testFramework:
+  enabled: false
+
+# Simplified deployment
+replicas: 1
+
+# No affinity/node selectors
+affinity: {}
+nodeSelector: {}
+tolerations: []

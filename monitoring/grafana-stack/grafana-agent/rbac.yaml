@@ -1,0 +1,40 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-agent
+  namespace: f6bc3f-dev
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-agent
+  namespace: f6bc3f-dev
+rules:
+  # Read pods and their logs within the namespace
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+
+  # Read pod logs
+  - apiGroups: [""]
+    resources:
+      - pods/log
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-agent
+  namespace: f6bc3f-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-agent
+subjects:
+  - kind: ServiceAccount
+    name: grafana-agent
+    namespace: f6bc3f-dev

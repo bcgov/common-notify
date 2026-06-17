@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-agent
+  namespace: f6bc3f-dev
+data:
+  agent.yaml: |
+    server:
+      log_level: debug
+      log_format: json
+
+    logs:
+      configs:
+        - name: default
+          positions:
+            filename: /tmp/positions.yaml
+
+          # Scrape config for all pods in this namespace using Kubernetes API
+          scrape_configs:
+            - job_name: kubernetes-pods
+              kubernetes_sd_configs:
+                - role: pod
+                  namespaces:
+                    names:
+                      - f6bc3f-dev
+
+              pipeline_stages:
+                # CRI format parsing (works with containerd/cri-o)
+                - cri: {}
+
+              relabel_configs:
+                # Add namespace label
+                - source_labels: [__meta_kubernetes_namespace]
+                  target_label: namespace
+
+                # Add pod name label
+                - source_labels: [__meta_kubernetes_pod_name]
+                  target_label: pod
+
+          # Send logs to Loki
+          clients:
+            - url: http://loki.f6bc3f-dev.svc.cluster.local:3100/loki/api/v1/push
+              tenant_id: common-notify-dev
+              external_labels:
+                cluster: silver
+                environment: dev
