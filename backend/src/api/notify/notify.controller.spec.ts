@@ -424,6 +424,62 @@ describe('Notify Controllers', () => {
         expect(processingOrder).toBeLessThan(createOrder)
       })
 
+      it('should enqueue only sanitized attachmentId payloads after processing', async () => {
+        const processedPayload = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+            attachments: [{ attachmentId: 'attachment-123' }],
+          },
+        }
+
+        mockAttachmentProcessingService.processAttachments.mockResolvedValueOnce(
+          processedPayload as any,
+        )
+        mockIngestionQueue.add.mockResolvedValueOnce({ id: 'job-123' })
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(202)
+
+        await vi.waitFor(() => {
+          expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            expect.objectContaining({
+              request: processedPayload,
+            }),
+            expect.any(Object),
+          )
+        })
+
+        expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            request: expect.not.objectContaining({
+              email: expect.objectContaining({
+                attachments: expect.arrayContaining([
+                  expect.objectContaining({
+                    content: expect.anything(),
+                  }),
+                ]),
+              }),
+            }),
+          }),
+          expect.any(Object),
+        )
+      })
+
       it('should not persist or queue when attachment upload fails during processing', async () => {
         mockAttachmentProcessingService.processAttachments.mockRejectedValueOnce(
           new BadRequestException('Attachment upload failed'),
