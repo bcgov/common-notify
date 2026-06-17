@@ -7,7 +7,7 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
-import { LocalAttachmentStorageService } from '../../api/notify/services/local-attachment-storage.service'
+import { AttachmentService } from '../../api/attachment/attachment.service'
 
 /**
  * Ingestion Worker
@@ -23,6 +23,20 @@ import { LocalAttachmentStorageService } from '../../api/notify/services/local-a
  */
 export class IngestionWorker {
   private readonly logger = new Logger(IngestionWorker.name)
+
+  private static hasAttachmentReferences(
+    attachments: unknown,
+  ): attachments is Array<{ attachmentId: string }> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.every(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
+      )
+    )
+  }
 
   /**
    * Initialize the ingestion worker on a queue
@@ -42,7 +56,7 @@ export class IngestionWorker {
     configService: ConfigService,
     clamavService?: ClamavService,
     concurrency: number = 1,
-    localAttachmentStorageService?: LocalAttachmentStorageService,
+    attachmentService?: AttachmentService,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -82,10 +96,15 @@ export class IngestionWorker {
           ...(request.msgApp?.attachments ?? []),
         ]
 
-        // Scan inline and stored attachments for malware
         if (channelAttachments.length > 0) {
           if (!clamavService) {
             throw new Error('Attachment scan service unavailable')
+          }
+          if (!IngestionWorker.hasAttachmentReferences(channelAttachments)) {
+            throw new Error('Invalid processed attachment reference payload')
+          }
+          if (!attachmentService) {
+            throw new Error('Attachment service unavailable')
           }
 
           logger.log(
@@ -93,69 +112,41 @@ export class IngestionWorker {
           )
 
           for (const attachment of channelAttachments) {
-            if (!attachment) {
-              continue
-            }
-
             try {
-              let buffer: Buffer
-              const attachmentWithFilename = attachment as { filename?: string }
-
-              if ('content' in attachment && typeof attachment.content === 'string') {
-                // Inline attachment payload (pre-processed)
-                try {
-                  buffer = Buffer.from(attachment.content, 'base64')
-                } catch {
-                  // If base64 decode fails, treat as raw content
-                  buffer = Buffer.from(attachment.content, 'utf-8')
-                }
-              } else if ('storageKey' in attachment && typeof attachment.storageKey === 'string') {
-                // Stored attachment payload (post-processed)
-                if (!localAttachmentStorageService) {
-                  throw new Error('Attachment storage service unavailable')
-                }
-
-                const storedAttachment = attachment as unknown as {
-                  filename: string
-                  storageKey: string
-                  contentSha256?: string
-                  sizeBytes: number
-                }
-                buffer = await localAttachmentStorageService.readAttachment(
-                  storedAttachment.storageKey,
-                  storedAttachment.contentSha256,
-                )
-
-                if (buffer.byteLength !== storedAttachment.sizeBytes) {
-                  throw new Error(
-                    `Stored attachment size verification failed for ${storedAttachment.filename}`,
-                  )
-                }
-              } else {
-                logger.debug(`[${notifyId}] Skipping unrecognized attachment shape`)
-                continue
-              }
+              const downloadedAttachment = await attachmentService.downloadAttachmentByIdAndTenantId(
+                attachment.attachmentId,
+                tenantId,
+              )
+              const buffer = downloadedAttachment.content
+              const attachmentFilename = downloadedAttachment.filename
 
               logger.debug(
-                `[${notifyId}] Scanning attachment: ${attachmentWithFilename.filename || 'unnamed'} (${buffer.length} bytes)`,
+                `[${notifyId}] Scanning attachment: ${JSON.stringify({
+                  tenantId,
+                  attachmentId: attachment.attachmentId,
+                  filename: attachmentFilename,
+                  sizeBytes: buffer.length,
+                })}`,
               )
 
               // Scan buffer for malware using CLAMD protocol
-              const scanResult = await clamavService.scanBuffer(
-                buffer,
-                attachmentWithFilename.filename,
-              )
+              const scanResult = await clamavService.scanBuffer(buffer, attachmentFilename)
 
               if (scanResult.isInfected) {
                 // Malware detected - quarantine the notification
                 logger.warn(
-                  `[${notifyId}] SECURITY: Malware detected in attachment: ${attachmentWithFilename.filename || 'unnamed'}. Viruses: ${scanResult.quarantineInfo?.viruses.join(', ')}`,
+                  `[${notifyId}] SECURITY: Malware detected in attachment: ${JSON.stringify({
+                    tenantId,
+                    attachmentId: attachment.attachmentId,
+                    filename: attachmentFilename,
+                    viruses: scanResult.quarantineInfo?.viruses || [],
+                  })}`,
                 )
 
                 // Create quarantine details from scan result
                 const quarantineDetails: QuarantineDetails = {
                   viruses: scanResult.quarantineInfo?.viruses || [],
-                  filename: attachmentWithFilename.filename,
+                  filename: attachmentFilename,
                   scannedAt: scanResult.quarantineInfo?.scannedAt
                     ? scanResult.quarantineInfo.scannedAt.toISOString()
                     : new Date().toISOString(),
@@ -178,7 +169,7 @@ export class IngestionWorker {
               }
 
               logger.debug(
-                `[${notifyId}] Attachment ${attachmentWithFilename.filename || 'unnamed'} passed malware scan`,
+                `[${notifyId}] Attachment ${attachmentFilename || 'unnamed'} passed malware scan`,
               )
             } catch (scanError) {
               const errorMsg = scanError instanceof Error ? scanError.message : String(scanError)

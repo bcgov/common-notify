@@ -1,27 +1,27 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { InternalServerErrorException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { AttachmentResolverService } from './attachment-resolver.service'
-import { LocalAttachmentStorageService } from './local-attachment-storage.service'
+import { AttachmentService } from '../../attachment/attachment.service'
 
 describe('AttachmentResolverService', () => {
   let service: AttachmentResolverService
-  let mockLocalAttachmentStorageService: {
-    readAttachment: ReturnType<typeof vi.fn>
+  let mockAttachmentService: {
+    downloadAttachmentByIdAndTenantId: ReturnType<typeof vi.fn>
   }
 
   beforeEach(async () => {
-    mockLocalAttachmentStorageService = {
-      readAttachment: vi.fn(),
+    mockAttachmentService = {
+      downloadAttachmentByIdAndTenantId: vi.fn(),
     }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttachmentResolverService,
         {
-          provide: LocalAttachmentStorageService,
-          useValue: mockLocalAttachmentStorageService,
+          provide: AttachmentService,
+          useValue: mockAttachmentService,
         },
       ],
     }).compile()
@@ -34,27 +34,27 @@ describe('AttachmentResolverService', () => {
   })
 
   it('should return undefined when there are no attachments', async () => {
-    await expect(service.resolveEmailAttachments(undefined)).resolves.toBeUndefined()
+    await expect(service.resolveEmailAttachments('tenant-123', undefined)).resolves.toBeUndefined()
   })
 
-  it('should resolve stored local attachments into adapter-ready attachments', async () => {
+  it('should resolve attachmentIds into adapter-ready attachments', async () => {
     const content = Buffer.from('hello world')
-    mockLocalAttachmentStorageService.readAttachment.mockResolvedValue(content)
+    mockAttachmentService.downloadAttachmentByIdAndTenantId.mockResolvedValue({
+      attachmentId: 'attachment-123',
+      filename: 'hello.txt',
+      fileExtension: 'txt',
+      mimeType: 'text/plain',
+      sizeBytes: content.byteLength,
+      content,
+    } as any)
 
-    const result = await service.resolveEmailAttachments([
-      {
-        filename: 'hello.txt',
-        mimeType: 'text/plain',
-        storageKey: 'ab/abcdef.bin',
-        sizeBytes: content.byteLength,
-        contentSha256: 'hash',
-        storageProvider: 'local',
-      },
+    const result = await service.resolveEmailAttachments('tenant-123', [
+      { attachmentId: 'attachment-123' },
     ])
 
-    expect(mockLocalAttachmentStorageService.readAttachment).toHaveBeenCalledWith(
-      'ab/abcdef.bin',
-      'hash',
+    expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).toHaveBeenCalledWith(
+      'attachment-123',
+      'tenant-123',
     )
     expect(result).toEqual([
       {
@@ -66,20 +66,13 @@ describe('AttachmentResolverService', () => {
     ])
   })
 
-  it('should throw when stored file size does not match metadata', async () => {
-    mockLocalAttachmentStorageService.readAttachment.mockResolvedValue(Buffer.from('short'))
+  it('should surface attachment lookup failures', async () => {
+    mockAttachmentService.downloadAttachmentByIdAndTenantId.mockRejectedValue(
+      new NotFoundException("Attachment 'attachment-404' not found"),
+    )
 
     await expect(
-      service.resolveEmailAttachments([
-        {
-          filename: 'hello.txt',
-          mimeType: 'text/plain',
-          storageKey: 'ab/abcdef.bin',
-          sizeBytes: 999,
-          contentSha256: 'hash',
-          storageProvider: 'local',
-        },
-      ]),
-    ).rejects.toThrow(InternalServerErrorException)
+      service.resolveEmailAttachments('tenant-123', [{ attachmentId: 'attachment-404' }]),
+    ).rejects.toThrow("Attachment 'attachment-404' not found")
   })
 })
