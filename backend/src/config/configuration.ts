@@ -86,11 +86,6 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
-    // Attachment Storage
-    attachments: {
-      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
-    },
-
     // S3-compatible object storage
     s3: {
       endpoint: process.env.S3_ENDPOINT,

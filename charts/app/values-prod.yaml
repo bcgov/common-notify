@@ -1,0 +1,4 @@
+backend:
+  s3:
+    bucket: notify-prod
+    region: ca-central-1
