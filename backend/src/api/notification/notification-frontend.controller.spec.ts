@@ -76,9 +76,9 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-123', undefined, undefined, undefined)
+      const result = await controller.findAll('tenant-123', {} as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-123', 1, 10, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-123', {})
       expect(result).toEqual(mockResponse)
     })
 
@@ -92,9 +92,9 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-456', '2', undefined, undefined)
+      await controller.findAll('tenant-456', { page: 2 } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-456', 2, 10, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-456', { page: 2 })
     })
 
     it('should parse limit parameter as integer', async () => {
@@ -107,12 +107,12 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-789', undefined, '20', undefined)
+      await controller.findAll('tenant-789', { limit: 20 } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-789', 1, 20, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-789', { limit: 20 })
     })
 
-    it('should pass status filter to service', async () => {
+    it('should pass sort and filter query parameters to service', async () => {
       const mockResponse = {
         data: [{ id: 'notif-1', status: NotificationStatus.COMPLETED }],
         count: 1,
@@ -122,14 +122,15 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-111', undefined, undefined, NotificationStatus.COMPLETED)
+      await controller.findAll('tenant-111', {
+        sort: '-createdAt,status',
+        filter: ['status:eq:COMPLETED', 'createdBy:like:smith'],
+      } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
-        'tenant-111',
-        1,
-        10,
-        NotificationStatus.COMPLETED,
-      )
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-111', {
+        sort: '-createdAt,status',
+        filter: ['status:eq:COMPLETED', 'createdBy:like:smith'],
+      })
     })
 
     it('should handle all parameters together', async () => {
@@ -142,14 +143,27 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-222', '3', '15', NotificationStatus.QUEUED)
+      await controller.findAll('tenant-222', {
+        page: 3,
+        limit: 15,
+        sort: '-createdAt',
+        filter: [
+          'status:eq:QUEUED',
+          'channelCode:in:EMAIL|SMS',
+          'createdAt:gte:2026-01-01T00:00:00.000Z',
+        ],
+      } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
-        'tenant-222',
-        3,
-        15,
-        NotificationStatus.QUEUED,
-      )
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-222', {
+        page: 3,
+        limit: 15,
+        sort: '-createdAt',
+        filter: [
+          'status:eq:QUEUED',
+          'channelCode:in:EMAIL|SMS',
+          'createdAt:gte:2026-01-01T00:00:00.000Z',
+        ],
+      })
       expect(mockResponse.page).toBe(3)
       expect(mockResponse.limit).toBe(15)
     })
@@ -168,7 +182,7 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-333', '1', '10', undefined)
+      const result = await controller.findAll('tenant-333', { page: 1, limit: 10 } as any)
 
       expect(result.data).toEqual(mockNotifications)
       expect(result.count).toBe(25)
@@ -185,7 +199,7 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-444', '5', '10', undefined)
+      const result = await controller.findAll('tenant-444', { page: 5, limit: 10 } as any)
 
       expect(result.data).toEqual([])
       expect(result.count).toBe(0)
@@ -195,12 +209,10 @@ describe('NotificationFrontendController', () => {
       const error = new Error('Database error')
       mockNotificationService.findAll.mockRejectedValue(error)
 
-      await expect(
-        controller.findAll('tenant-555', undefined, undefined, undefined),
-      ).rejects.toThrow('Database error')
+      await expect(controller.findAll('tenant-555', {} as any)).rejects.toThrow('Database error')
     })
 
-    it('should handle non-numeric page parameter', async () => {
+    it('should preserve the raw query object from the framework', async () => {
       const mockResponse = {
         data: [],
         count: 0,
@@ -211,13 +223,14 @@ describe('NotificationFrontendController', () => {
       // parseInt('invalid', 10) returns NaN
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-666', 'invalid', undefined, undefined)
+      await controller.findAll('tenant-666', { page: 'invalid' } as any)
 
-      // Service should be called with NaN
-      expect(mockNotificationService.findAll).toHaveBeenCalled()
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-666', {
+        page: 'invalid',
+      })
     })
 
-    it('should handle non-numeric limit parameter', async () => {
+    it('should pass a repeatable filter list without modification', async () => {
       const mockResponse = {
         data: [],
         count: 0,
@@ -227,12 +240,16 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-777', undefined, 'invalid', undefined)
+      await controller.findAll('tenant-777', {
+        filter: ['status:eq:QUEUED', 'status:ne:COMPLETED'],
+      } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalled()
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-777', {
+        filter: ['status:eq:QUEUED', 'status:ne:COMPLETED'],
+      })
     })
 
-    it('should support zero-based and large page numbers', async () => {
+    it('should support large page numbers', async () => {
       const mockResponse = {
         data: [],
         count: 0,
@@ -242,9 +259,9 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-888', '999', undefined, undefined)
+      await controller.findAll('tenant-888', { page: 999 } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-888', 999, 10, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-888', { page: 999 })
     })
 
     it('should support large limit values', async () => {
@@ -257,9 +274,9 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-999', undefined, '100', undefined)
+      await controller.findAll('tenant-999', { limit: 100 } as any)
 
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-999', 1, 100, undefined)
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-999', { limit: 100 })
     })
 
     it('should handle multiple status values (service handles filtering)', async () => {
@@ -280,8 +297,10 @@ describe('NotificationFrontendController', () => {
       ]
 
       for (const status of allStatuses) {
-        await controller.findAll('tenant-aaa', undefined, undefined, status)
-        expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-aaa', 1, 10, status)
+        await controller.findAll('tenant-aaa', { filter: [`status:eq:${status}`] } as any)
+        expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-aaa', {
+          filter: [`status:eq:${status}`],
+        })
       }
     })
 
@@ -304,7 +323,7 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll(undefined, undefined, undefined)
+      const result = await controller.findAll(undefined as any, {} as any)
 
       expect(result.data[0]).toEqual(mockNotification)
       expect(result.data[0].id).toBe('unique-id')

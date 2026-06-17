@@ -16,19 +16,39 @@ export function applyParsedListQueryToQueryBuilder<T>(
     const fieldConfig = config.filterableFields[filter.field]
     const column = fieldConfig.column
     const paramName = `filter_${paramIndex++}`
+    const isStringField = (fieldConfig.valueType ?? 'string') === 'string'
 
     if (filter.operator === 'eq') {
-      qb.andWhere(`${column} = :${paramName}`, { [paramName]: filter.value })
+      if (isStringField) {
+        qb.andWhere(`LOWER(${column}) = :${paramName}`, {
+          [paramName]: String(filter.value).toLowerCase(),
+        })
+      } else {
+        qb.andWhere(`${column} = :${paramName}`, { [paramName]: filter.value })
+      }
       continue
     }
 
     if (filter.operator === 'ne') {
-      qb.andWhere(`${column} != :${paramName}`, { [paramName]: filter.value })
+      if (isStringField) {
+        qb.andWhere(`LOWER(${column}) != :${paramName}`, {
+          [paramName]: String(filter.value).toLowerCase(),
+        })
+      } else {
+        qb.andWhere(`${column} != :${paramName}`, { [paramName]: filter.value })
+      }
       continue
     }
 
     if (filter.operator === 'in') {
-      qb.andWhere(`${column} IN (:...${paramName})`, { [paramName]: filter.value })
+      if (isStringField) {
+        const loweredValues = (filter.value as Array<string | number | boolean | Date>).map((v) =>
+          String(v).toLowerCase(),
+        )
+        qb.andWhere(`LOWER(${column}) IN (:...${paramName})`, { [paramName]: loweredValues })
+      } else {
+        qb.andWhere(`${column} IN (:...${paramName})`, { [paramName]: filter.value })
+      }
       continue
     }
 

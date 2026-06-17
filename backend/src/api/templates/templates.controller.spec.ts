@@ -5,12 +5,14 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { vi } from 'vitest'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
+import * as listQueryParser from '../../common/query/list-query.parser'
 
 describe('TemplatesController', () => {
   let controller: TemplatesController
@@ -90,70 +92,172 @@ describe('TemplatesController', () => {
   })
 
   describe('listTemplates', () => {
-    it('should return a list of templates with default pagination', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
-
-      const result = await controller.listTemplates(createMockRequest())
-
-      expect(result).toEqual(templates)
-      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 1, 10)
+    beforeEach(() => {
+      vi.spyOn(listQueryParser, 'parseListQuery').mockImplementation((query, _config) => ({
+        page: query.page || 1,
+        limit: query.limit || 10,
+        filters: Array.isArray(query.filter)
+          ? query.filter.map((f: string) => {
+              const [field, operator, value] = f.split(':')
+              return { field, operator, value }
+            })
+          : [],
+        sorts: query.sort
+          ? query.sort.split(',').map((s: string) => {
+              const isDesc = s.startsWith('-')
+              const field = isDesc ? s.slice(1) : s
+              return { field, direction: isDesc ? 'DESC' : 'ASC' }
+            })
+          : [{ field: 'updatedAt', direction: 'DESC' }],
+      }))
     })
 
-    it('should return templates with custom page and limit', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
-
-      const result = await controller.listTemplates(createMockRequest(), '2', '20')
-
-      expect(result).toEqual(templates)
-      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 2, 20)
+    afterEach(() => {
+      vi.restoreAllMocks()
     })
 
-    it('should handle invalid page number (non-numeric)', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
+    it('should return a paginated list of templates with default pagination', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(createMockRequest(), 'invalid', '10')
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
-      // parseInt will return NaN for 'invalid', which should default to 1
+      expect(result).toEqual(mockResponse)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',
-        expect.any(Number),
-        10,
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+        }),
       )
     })
 
-    it('should handle invalid limit (non-numeric)', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
+    it('should return templates with custom page and limit', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 2,
+        limit: 20,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(createMockRequest(), '1', 'invalid')
+      const req = createMockRequest()
+      const query = { page: 2, limit: 20 }
+      const result = await controller.listTemplates(req, query as any)
 
+      expect(result).toEqual(mockResponse)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',
-        1,
-        expect.any(Number),
+        expect.objectContaining({
+          page: 2,
+          limit: 20,
+        }),
+      )
+    })
+
+    it('should accept sort parameter and parse it', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10, sort: '-updatedAt,name' }
+      const result = await controller.listTemplates(req, query as any)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
+        'tenant-123',
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+          sorts: expect.arrayContaining([
+            expect.objectContaining({ field: 'updatedAt', direction: 'DESC' }),
+            expect.objectContaining({ field: 'name', direction: 'ASC' }),
+          ]),
+        }),
+      )
+    })
+
+    it('should accept filter parameters and parse them', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = {
+        page: 1,
+        limit: 10,
+        filter: ['channelCode:eq:EMAIL', 'name:like:welcome'],
+      }
+      const result = await controller.listTemplates(req, query as any)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
+        'tenant-123',
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+          filters: expect.arrayContaining([
+            expect.objectContaining({ field: 'channelCode', operator: 'eq', value: 'EMAIL' }),
+            expect.objectContaining({ field: 'name', operator: 'like', value: 'welcome' }),
+          ]),
+        }),
       )
     })
 
     it('should return empty array when no templates exist', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([])
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      const result = await controller.listTemplates(createMockRequest())
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
     })
 
     it('should pass tenant ID to service', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(createMockRequest())
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      await controller.listTemplates(req, query as any)
 
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         mockTenant.id,
-        expect.any(Number),
-        expect.any(Number),
+        expect.any(Object),
       )
     })
   })
@@ -500,10 +604,43 @@ describe('TemplatesController', () => {
   })
 
   describe('HTTP Status Codes', () => {
-    it('should return 200 for listTemplates', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
+    beforeEach(() => {
+      vi.spyOn(listQueryParser, 'parseListQuery').mockImplementation((query, _config) => ({
+        page: query.page || 1,
+        limit: query.limit || 10,
+        filters: Array.isArray(query.filter)
+          ? query.filter.map((f: string) => {
+              const [field, operator, value] = f.split(':')
+              return { field, operator, value }
+            })
+          : [],
+        sorts: query.sort
+          ? query.sort.split(',').map((s: string) => {
+              const isDesc = s.startsWith('-')
+              const field = isDesc ? s.slice(1) : s
+              return { field, direction: isDesc ? 'DESC' : 'ASC' }
+            })
+          : [{ field: 'updatedAt', direction: 'DESC' }],
+      }))
+    })
 
-      const result = await controller.listTemplates(createMockRequest())
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('should return 200 for listTemplates', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
       expect(result).toBeDefined()
       // Status code 200 is implicit for @Get() without @HttpCode override
