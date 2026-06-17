@@ -24,8 +24,8 @@ export class StructuredLoggerService implements LoggerService {
   private logger: winston.Logger
   private context: string
 
-  constructor(context: string = 'Application') {
-    this.context = context
+  constructor(context?: string) {
+    this.context = context || 'Application'
 
     // Determine if we're in production/k8s environment
     const isProduction = process.env.NODE_ENV === 'production' ||
