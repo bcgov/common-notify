@@ -23,7 +23,7 @@ export interface QueueableContext {
   notificationService: NotificationService
   attachmentValidationService: AttachmentValidationService
   attachmentProcessingService: AttachmentProcessingService
-  NotificationPubSubService?: NotificationPubSubService
+  notificationPubSubService?: NotificationPubSubService
   notificationRequestDetailService: NotificationRequestDetailService
   queueMap: Map<QueueName, Bull.Queue>
 }
@@ -151,7 +151,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           )
 
           // Publish initial record to SSE subscribers (fire-and-forget)
-          const updateSvc = (this as QueueableContext).NotificationPubSubService
+          const updateSvc = (this as QueueableContext).notificationPubSubService
           if (updateSvc) {
             updateSvc
               .publish(tenantId, {
