@@ -259,6 +259,7 @@ export class QueueModule implements OnModuleInit {
         this.emailQueue,
         this.smsQueue,
         this.notificationService,
+        this.notificationRequestDetailService,
         this.configService,
         this.clamavService,
         concurrency,

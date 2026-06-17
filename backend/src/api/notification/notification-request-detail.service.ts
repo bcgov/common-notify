@@ -28,11 +28,16 @@ export class NotificationRequestDetailService {
     )
       return
     const now = new Date()
-    const makeEntity = (address: string, channel: string) =>
+    const makeEntity = (
+      address: string,
+      channel: string,
+      emailAddressType?: 'primary' | 'cc' | 'bcc',
+    ) =>
       this.detailRepository.create({
         notificationRequestId,
         recipientAddress: address,
         channel,
+        emailAddressType,
         status: 'pending',
         attemptCount: 1,
         lastAttemptAt: now,
@@ -40,7 +45,9 @@ export class NotificationRequestDetailService {
         updatedBy: createdBy,
       })
     const entities = [
-      ...recipients.email.map((address) => makeEntity(address, 'EMAIL')),
+      ...recipients.email.map(({ address, emailAddressType }) =>
+        makeEntity(address, 'EMAIL', emailAddressType),
+      ),
       ...recipients.sms.map((address) => makeEntity(address, 'SMS')),
       ...recipients.msgApp.map((address) => makeEntity(address, 'MSGAPP')),
     ]
@@ -130,20 +137,37 @@ export class NotificationRequestDetailService {
   private extractRecipients(
     payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
   ): {
-    recipients: { email: string[]; sms: string[]; msgApp: string[] }
+    recipients: {
+      email: { address: string; emailAddressType: 'primary' | 'cc' | 'bcc' }[]
+      sms: string[]
+      msgApp: string[]
+    }
   } {
     if (!payload) {
       return { recipients: { email: [], sms: [], msgApp: [] } }
     }
 
-    const recipients = { email: [] as string[], sms: [] as string[], msgApp: [] as string[] }
+    const recipients = {
+      email: [] as { address: string; emailAddressType: 'primary' | 'cc' | 'bcc' }[],
+      sms: [] as string[],
+      msgApp: [] as string[],
+    }
     let delayedSendTime: Date | null = null
 
     if (payload.email) {
       recipients.email = [
-        ...(payload.email.recipients?.to || []),
-        ...(payload.email.recipients?.cc || []),
-        ...(payload.email.recipients?.bcc || []),
+        ...(payload.email.recipients?.to || []).map((address) => ({
+          address,
+          emailAddressType: 'primary' as const,
+        })),
+        ...(payload.email.recipients?.cc || []).map((address) => ({
+          address,
+          emailAddressType: 'cc' as const,
+        })),
+        ...(payload.email.recipients?.bcc || []).map((address) => ({
+          address,
+          emailAddressType: 'bcc' as const,
+        })),
       ]
       if (payload.email.delayedSend && !delayedSendTime) {
         delayedSendTime = new Date(payload.email.delayedSend)

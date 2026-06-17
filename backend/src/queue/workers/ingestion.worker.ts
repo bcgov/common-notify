@@ -9,6 +9,7 @@ import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
 import { StoredNotifyAttachment } from '../../api/notify/schemas/stored-notify-attachment'
 import { LocalAttachmentStorageService } from '../../api/notify/services/local-attachment-storage.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
 /**
  * Ingestion Worker
@@ -40,6 +41,7 @@ export class IngestionWorker {
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    requestDetailService: NotificationRequestDetailService,
     configService: ConfigService,
     clamavService?: ClamavService,
     concurrency: number = 1,
@@ -160,6 +162,7 @@ export class IngestionWorker {
                   quarantineDetails,
                   updatedBy: 'ingestion-worker-scanner',
                 })
+                await requestDetailService.updateStatus(notifyId, NotificationStatus.QUARANTINED)
 
                 logger.log(
                   `[${notifyId}] Notification marked as QUARANTINED due to malware detection`,

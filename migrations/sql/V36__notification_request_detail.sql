@@ -11,6 +11,7 @@ CREATE TABLE notification_request_detail (
   notification_request_id UUID NOT NULL,
   recipient_address VARCHAR(255) NOT NULL,
   channel VARCHAR(20) NOT NULL DEFAULT 'EMAIL',
+  email_address_type VARCHAR(10) CHECK (email_address_type IN ('primary', 'cc', 'bcc')),
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   provider_response_id VARCHAR(255),
   provider_response JSONB,
@@ -39,6 +40,7 @@ COMMENT ON COLUMN notification_request_detail.id IS 'Unique identifier for this 
 COMMENT ON COLUMN notification_request_detail.notification_request_id IS 'Reference to the parent notification request';
 COMMENT ON COLUMN notification_request_detail.recipient_address IS 'Address of the recipient (email, phone number, etc)';
 COMMENT ON COLUMN notification_request_detail.channel IS 'Channel used for delivery (email, sms, etc)';
+COMMENT ON COLUMN notification_request_detail.email_address_type IS 'Email address role (primary, cc, bcc); null for non-email channels';
 COMMENT ON COLUMN notification_request_detail.status IS 'Current delivery status (pending, sent, failed, bounced)';
 COMMENT ON COLUMN notification_request_detail.provider_response_id IS 'Message ID or transaction ID from the provider (GC Notify, etc)';
 COMMENT ON COLUMN notification_request_detail.provider_response IS 'Full JSON response from the provider for debugging';

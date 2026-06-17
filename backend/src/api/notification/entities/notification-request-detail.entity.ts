@@ -27,6 +27,9 @@ export class NotificationRequestDetail {
   @Column({ length: 20, default: 'EMAIL' })
   channel: string
 
+  @Column({ name: 'email_address_type', length: 10, nullable: true })
+  emailAddressType?: 'primary' | 'cc' | 'bcc'
+
   @Column({ length: 20, default: 'pending' })
   status: string
 
