@@ -38,6 +38,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
+  const isMjml = formData.engineCode === TemplateEngine.MJML
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -76,7 +77,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
     }
-    if (!formData.bodyType) {
+    if (!isMjml && !formData.bodyType) {
       errors.bodyType = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
@@ -97,9 +98,11 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       await updateTemplate(templateId, {
         name: formData.name,
         engineCode: formData.engineCode as TemplateEngine,
-        bodyType: formData.bodyType as TemplateBodyType,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
+        ...(!isMjml && formData.bodyType
+          ? { bodyType: formData.bodyType as TemplateBodyType }
+          : {}),
       })
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
@@ -187,16 +190,16 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               }
               value={formData.engineCode}
               onChange={(value) => {
-                setFormData((prev) => ({ ...prev, engineCode: value }))
-                setFormErrors((prev) => ({ ...prev, engineCode: '' }))
+                setFormData((prev) => ({
+                  ...prev,
+                  engineCode: value,
+                  bodyType: value === TemplateEngine.MJML ? '' : prev.bodyType,
+                }))
+                setFormErrors((prev) => ({ ...prev, engineCode: '', bodyType: '' }))
               }}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
-              <Radio value={TemplateEngine.HANDLEBARS}>Handlebars</Radio>
-              <Radio value={TemplateEngine.MUSTACHE}>Mustache</Radio>
-              <Radio value={TemplateEngine.LEGACY_GC_NOTIFY}>Legacy GC Notify</Radio>
-              <Radio value={TemplateEngine.MJML}>MJML</Radio>
               <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
                 Handlebars
               </Radio>
@@ -206,34 +209,39 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
                 Legacy GC Notify
               </Radio>
+              <Radio key="mjml" value={TemplateEngine.MJML}>
+                MJML
+              </Radio>
             </RadioGroup>
           </div>
 
-          <div className="mb-4 error-after-label">
-            <RadioGroup
-              label={
-                (
-                  <>
-                    <strong>Body type</strong> (required)
-                  </>
-                ) as any
-              }
-              value={formData.bodyType}
-              onChange={(value) => {
-                setFormData((prev) => ({ ...prev, bodyType: value }))
-                setFormErrors((prev) => ({ ...prev, bodyType: '' }))
-              }}
-              isInvalid={!!formErrors.bodyType}
-              errorMessage={formErrors.bodyType}
-            >
-              <Radio key="html" value={TemplateBodyType.HTML}>
-                HTML
-              </Radio>
-              <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
-                Markdown
-              </Radio>
-            </RadioGroup>
-          </div>
+          {!isMjml && (
+            <div className="mb-4 error-after-label">
+              <RadioGroup
+                label={
+                  (
+                    <>
+                      <strong>Body type</strong> (required)
+                    </>
+                  ) as any
+                }
+                value={formData.bodyType}
+                onChange={(value) => {
+                  setFormData((prev) => ({ ...prev, bodyType: value }))
+                  setFormErrors((prev) => ({ ...prev, bodyType: '' }))
+                }}
+                isInvalid={!!formErrors.bodyType}
+                errorMessage={formErrors.bodyType}
+              >
+                <Radio key="html" value={TemplateBodyType.HTML}>
+                  HTML
+                </Radio>
+                <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
+                  Markdown
+                </Radio>
+              </RadioGroup>
+            </div>
+          )}
 
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="mb-4 desc-above">

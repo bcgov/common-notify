@@ -26,7 +26,7 @@ export interface TemplateResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
-  bodyType: TemplateBodyType
+  bodyType?: TemplateBodyType
   engineCode: TemplateEngine
   version: number
   active: boolean

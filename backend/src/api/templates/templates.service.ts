@@ -137,6 +137,9 @@ export class TemplatesService {
       throw new ConflictException(`Template name "${createDto.name}" already exists`)
     }
 
+    const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
+    const bodyType = engineCode === TemplateEngine.MJML ? null : (createDto.bodyType ?? 'html')
+
     const template = await this.templatesRepository.create({
       tenantId,
       name: createDto.name,
@@ -144,8 +147,8 @@ export class TemplatesService {
       channelCode: createDto.channelCode,
       subject: createDto.subject,
       body: createDto.body,
-      engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
-      bodyType: createDto.bodyType || 'html',
+      engineCode,
+      bodyType,
       version: 1,
       active: true,
       createdBy: userId,
@@ -205,13 +208,18 @@ export class TemplatesService {
     }
 
     // Update the template
+    const nextEngineCode = updateDto.engineCode || template.engineCode
     template.name = updateDto.name || template.name
     template.description = updateDto.description ?? template.description
     template.channelCode = updateDto.channelCode || template.channelCode
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
-    template.engineCode = updateDto.engineCode || template.engineCode
-    template.bodyType = updateDto.bodyType ?? template.bodyType
+    template.engineCode = nextEngineCode
+    if (nextEngineCode === TemplateEngine.MJML) {
+      template.bodyType = null
+    } else {
+      template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'html'
+    }
     template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)
