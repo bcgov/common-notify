@@ -152,11 +152,19 @@ async function createRoutes(serviceName, routes) {
   for (const route of routes) {
     const routeName = route.name || `route-${created}`
     try {
+      // Local development backend expects full /api/... paths, so do not strip
+      // matched route prefixes when ENVIRONMENT=local.
+      const forceNoStripPath = env.ENVIRONMENT === 'local'
+
       const routeData = {
         name: routeName,
         paths: route.paths,
         methods: route.methods || [],
-        strip_path: route.strip_path !== undefined ? route.strip_path : false,
+        strip_path: forceNoStripPath
+          ? false
+          : route.strip_path !== undefined
+            ? route.strip_path
+            : false,
         https_redirect_status_code: route.https_redirect_status_code || 426,
         path_handling: route.path_handling || 'v0',
         request_buffering: route.request_buffering !== undefined ? route.request_buffering : true,
