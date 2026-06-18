@@ -9,6 +9,7 @@ import {
   UseGuards,
   Param,
   Headers,
+  Req,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
@@ -23,6 +24,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
 
 /**
  * Frontend Notification API Controller
@@ -148,22 +150,16 @@ export class NotificationFrontendController {
   @ApiOperation({
     summary: 'List all notification request detail records for the authenticated tenant',
   })
-  async findAllDeliveries(@Headers('x-tenant-id') tenantExternalId: string) {
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
-    }
-    return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
+  async findAllDeliveries(@Req() req: Request) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findAllByTenantId(tenant.externalId)
   }
 
   @Version('1')
   @Get('request_details/:id')
   @ApiOperation({ summary: 'List notification request detail records for a notification request' })
-  async findDeliveries(@Headers('x-tenant-id') tenantExternalId: string, @Param('id') id: string) {
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
-    }
-    return this.notificationRequestDetailService.findByRequestId(id, tenant.id)
+  async findDeliveries(@Req() req: Request, @Param('id') id: string) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findByRequestId(id, tenant.externalId)
   }
 }
