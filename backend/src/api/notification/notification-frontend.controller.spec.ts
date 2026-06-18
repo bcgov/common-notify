@@ -59,14 +59,6 @@ describe('NotificationFrontendController', () => {
           provide: NotificationPubSubService,
           useValue: mockNotificationPubSubService,
         },
-        {
-          provide: TenantsService,
-          useValue: mockTenantsService,
-        },
-        {
-          provide: FeatureFlagService,
-          useValue: mockFeatureFlagService,
-        },
       ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)
