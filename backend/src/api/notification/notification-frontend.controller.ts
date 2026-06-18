@@ -4,8 +4,9 @@ import {
   Version,
   Logger,
   Query,
+  Req,
+  Request,
   Sse,
-  BadRequestException,
   UseGuards,
   Param,
   Headers,
@@ -20,11 +21,11 @@ import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
-import { TenantsService } from '../admin/tenants/tenants.service'
+import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
-import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { ListQueryDto } from '../../common/query/list-query.dto'
 
 /**
  * Frontend Notification API Controller
@@ -52,7 +53,6 @@ export class NotificationFrontendController {
     private readonly notificationService: NotificationService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
     private readonly notificationPubSubService: NotificationPubSubService,
-    private readonly tenantsService: TenantsService,
   ) {}
 
   @Version('1')
@@ -63,12 +63,6 @@ export class NotificationFrontendController {
     CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
   )
   @ApiOperation({ summary: 'List all notification requests for the authenticated tenant' })
-  @ApiQuery({
-    name: 'tenantId',
-    required: true,
-    type: String,
-    description: 'CSTAR external tenant ID to filter by',
-  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -84,21 +78,24 @@ export class NotificationFrontendController {
     description: 'Items per page (max 100)',
   })
   @ApiQuery({
-    name: 'status',
+    name: 'sort',
     required: false,
     type: String,
-    description: 'Filter by notification status',
+    example: '-createdAt,status',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['status:eq:QUEUED', 'createdAt:gte:2026-01-01T00:00:00.000Z'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
-  findAll(
-    @Query('tenantId') tenantExternalId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-  ) {
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(tenantExternalId, pageNum, limitNum, status)
+  findAll(@Req() req: Request, @Query() query: ListQueryDto) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationService.findAll(tenant.externalId, query)
   }
 
   @Version('1')
@@ -111,29 +108,15 @@ export class NotificationFrontendController {
   )
   @FeatureFlag(FeatureFlagCode.SSE_NOTIFICATIONS)
   @ApiOperation({ summary: 'Stream real-time notification request updates via SSE' })
-  @ApiQuery({
-    name: 'tenantId',
-    required: true,
-    type: String,
-    description: 'CSTAR external tenant ID to filter by',
-  })
   @ApiOkResponse({
     description: 'Server-sent stream of notification_request updates for the authenticated tenant',
   })
-  async streamEvents(
-    @Query('tenantId') tenantExternalId: string,
-  ): Promise<Observable<MessageEvent>> {
-    // Convert external tenant ID to internal UUID
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantExternalId}`)
-    }
-
-    const tenantId = tenant.id
+  async streamEvents(@Req() req: Request): Promise<Observable<MessageEvent>> {
+    const tenant = (req as any).tenant as Tenant
 
     // Observable stream — emits a refresh signal so the frontend refetches data
     const updates$ = this.notificationPubSubService
-      .getObservable(tenantId)
+      .getObservable(tenant.id)
       .pipe(map(() => ({ data: {} }) as MessageEvent))
 
     // Emit a named keepalive event every 25s to prevent proxy/LB idle-connection timeouts.
