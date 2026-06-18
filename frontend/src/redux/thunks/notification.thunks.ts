@@ -10,10 +10,8 @@ export const fetchNotifications = createAsyncThunk<
 >('notification/fetchAll', async (_, { getState, rejectWithValue }) => {
   try {
     const state = getState()
-    const selectedTenant = state.tenant.selectedTenant
     const { statusFilter, page, limit } = state.notification
     return await notificationApi.listNotifications({
-      tenantId: selectedTenant?.id,
       page,
       limit,
       status: statusFilter,

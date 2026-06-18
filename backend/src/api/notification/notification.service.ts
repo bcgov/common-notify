@@ -15,6 +15,42 @@ import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-at
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
+
+const notificationListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {
+    createdAt: 'notification.createdAt',
+    updatedAt: 'notification.updatedAt',
+    status: 'notification.status',
+    channelCode: 'notification.channelCode',
+  },
+  filterableFields: {
+    status: {
+      column: 'notification.status',
+      valueType: 'string',
+      operators: ['eq', 'ne', 'in'],
+    },
+    channelCode: {
+      column: 'notification.channelCode',
+      valueType: 'string',
+      operators: ['eq', 'in', 'isnull'],
+    },
+    createdAt: {
+      column: 'notification.createdAt',
+      valueType: 'date',
+      operators: ['gte', 'lte'],
+    },
+    createdBy: {
+      column: 'notification.createdBy',
+      valueType: 'string',
+      operators: ['eq', 'like', 'isnull'],
+    },
+  },
+  defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
+}
 
 @Injectable()
 export class NotificationService {
@@ -175,57 +211,39 @@ export class NotificationService {
 
   async findAll(
     tenantExternalId: string,
-    page: number = 1,
-    limit: number = 10,
-    status?: string,
+    query: ListQueryDto,
   ): Promise<PaginatedNotificationResponse> {
-    // Ensure page and limit are valid
-    const pageNum = Math.max(1, page)
-    const limitNum = Math.min(Math.max(1, limit), 100) // Cap at 100 to prevent abuse
+    const parsedQuery = parseListQuery(query, notificationListQueryConfig)
 
-    const skip = (pageNum - 1) * limitNum
-
-    // Build where clause - include status filter and tenantId
-    const where: any = {}
-
-    // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {
-      // Return empty result if tenant not found
       this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
       return {
         data: [],
         count: 0,
-        page: pageNum,
-        limit: limitNum,
+        page: parsedQuery.page,
+        limit: parsedQuery.limit,
         totalPages: 0,
       }
     }
     this.logger.debug(
       `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
     )
-    where.tenantId = tenant.id
+    const queryBuilder = this.notificationRepository
+      .createQueryBuilder('notification')
+      .leftJoinAndSelect('notification.tenant', 'tenant')
+      .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
 
-    if (status && status !== 'all') {
-      where.status = status
-    }
+    applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
+    const [notifications, total] = await queryBuilder.getManyAndCount()
 
-    // Get both the data and total count
-    const [notifications, total] = await this.notificationRepository.findAndCount({
-      where,
-      relations: ['tenant'],
-      skip,
-      take: limitNum,
-      order: { createdAt: 'DESC' },
-    })
-
-    const totalPages = Math.ceil(total / limitNum)
+    const totalPages = Math.ceil(total / parsedQuery.limit)
 
     return {
       data: notifications.map((n) => this.mapToDto(n)),
       count: total,
-      page: pageNum,
-      limit: limitNum,
+      page: parsedQuery.page,
+      limit: parsedQuery.limit,
       totalPages,
     }
   }

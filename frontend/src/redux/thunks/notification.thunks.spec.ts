@@ -32,17 +32,11 @@ describe('fetchNotifications', () => {
         page: 2,
         limit: 10,
       },
-      tenant: {
-        selectedTenant: {
-          id: 'tenant-123',
-        },
-      },
     }))
 
     const result = await fetchNotifications()(dispatch, getState, undefined)
 
     expect(notificationApi.listNotifications).toHaveBeenCalledWith({
-      tenantId: 'tenant-123',
       page: 2,
       limit: 10,
       status: NotificationStatus.COMPLETED,

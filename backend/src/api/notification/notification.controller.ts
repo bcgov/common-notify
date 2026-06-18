@@ -17,6 +17,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { ListQueryDto } from '../../common/query/list-query.dto'
 
 @ApiTags('notification_request')
 @Controller('notification_request')
@@ -49,22 +50,24 @@ export class NotificationController {
     description: 'Items per page (max 100)',
   })
   @ApiQuery({
-    name: 'status',
+    name: 'sort',
     required: false,
     type: String,
-    description: 'Filter by notification status',
+    example: '-createdAt,status',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['status:eq:QUEUED', 'createdAt:gte:2026-01-01T00:00:00.000Z'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
-  findAll(
-    @Req() req: Request,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-  ) {
+  findAll(@Req() req: Request, @Query() query: ListQueryDto) {
     const tenant = (req as any).tenant as Tenant
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(tenant.externalId, pageNum, limitNum, status)
+    return this.notificationService.findAll(tenant.externalId, query)
   }
 
   @Version('1')
