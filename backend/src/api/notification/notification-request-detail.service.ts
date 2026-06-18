@@ -152,7 +152,6 @@ export class NotificationRequestDetailService {
       sms: [] as string[],
       msgApp: [] as string[],
     }
-    let delayedSendTime: Date | null = null
 
     if (payload.email) {
       recipients.email = [
@@ -169,23 +168,14 @@ export class NotificationRequestDetailService {
           emailAddressType: 'bcc' as const,
         })),
       ]
-      if (payload.email.delayedSend && !delayedSendTime) {
-        delayedSendTime = new Date(payload.email.delayedSend)
-      }
     }
 
     if (payload.sms) {
       recipients.sms = payload.sms.recipients?.to || []
-      if (payload.sms.delayedSend && !delayedSendTime) {
-        delayedSendTime = new Date(payload.sms.delayedSend)
-      }
     }
 
     if (payload.msgApp) {
       recipients.msgApp = payload.msgApp.recipients?.to || []
-      if (payload.msgApp.delayedSend && !delayedSendTime) {
-        delayedSendTime = new Date(payload.msgApp.delayedSend)
-      }
     }
 
     return {
