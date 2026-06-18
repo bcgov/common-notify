@@ -56,6 +56,9 @@ if (isProduction) {
       json: true,
       format: winston.format.json(),
       replaceTimestamp: true,
+      interval: 5, // Send logs every 5 seconds
+      batching: true,
+      clearOnError: true,
       onConnectionError: (err) => {
         console.error('Loki connection error:', err)
       },
