@@ -19,6 +19,7 @@ import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
+//
 
 const notificationListQueryConfig: QueryableFieldsConfig = {
   sortableFields: {
