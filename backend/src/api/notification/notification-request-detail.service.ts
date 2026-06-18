@@ -89,10 +89,7 @@ export class NotificationRequestDetailService {
    * Update the status of all detail records for a notification request.
    */
   async updateStatus(notificationRequestId: string, status: string): Promise<void> {
-    await this.detailRepository.update(
-      { notificationRequestId },
-      { status, updatedBy: 'system' },
-    )
+    await this.detailRepository.update({ notificationRequestId }, { status, updatedBy: 'system' })
   }
 
   /**
