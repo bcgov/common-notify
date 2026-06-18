@@ -9,7 +9,6 @@ import {
   Sse,
   UseGuards,
   Param,
-  Req,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
