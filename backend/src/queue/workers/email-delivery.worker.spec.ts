@@ -35,6 +35,7 @@ describe('EmailDeliveryWorker', () => {
     mockRequestDetailService = {
       createPending: vi.fn().mockResolvedValue(undefined),
       resetForRetry: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined),
       markSent: vi.fn().mockResolvedValue(undefined),
       markFailed: vi.fn().mockResolvedValue(undefined),
     }

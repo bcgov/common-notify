@@ -33,6 +33,7 @@ import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { WebhookService } from '../../api/webhook/webhook.service'
 import { ValidationExceptionFilter } from '../../common/filters/validation.filter'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
 // Mock AuthGuard to bypass authentication in tests
 const mockAuthGuard: CanActivate = {
@@ -98,6 +99,10 @@ const mockWebhookService = {
   delete: vi.fn().mockResolvedValue(undefined),
 }
 
+const mockNotificationRequestDetailService = {
+  createPending: vi.fn().mockResolvedValue(undefined),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -116,6 +121,10 @@ describe('Notify Controllers', () => {
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
         { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
         { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
