@@ -43,10 +43,11 @@ if (isProduction) {
   const podName = process.env.HOSTNAME || 'unknown'
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
-  console.log(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
+  console.error(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
+  console.error(`[Logger] isProduction: ${isProduction}`)
 
-  transports.push(
-    new LokiTransport({
+  try {
+    const lokiTransport = new LokiTransport({
       host: lokiUrl,
       labels: {
         job: 'common-notify-backend',
@@ -65,7 +66,11 @@ if (isProduction) {
         console.error('Loki connection error:', err)
       },
     })
-  )
+    transports.push(lokiTransport)
+    console.error('[Logger] Loki transport added successfully')
+  } catch (error) {
+    console.error('[Logger] Failed to create Loki transport:', error)
+  }
 }
 
 export const customLogger: LoggerService = WinstonModule.createLogger({
