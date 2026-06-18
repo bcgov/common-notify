@@ -4,12 +4,14 @@ import { Repository } from 'typeorm'
 import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 @Injectable()
 export class NotificationRequestDetailService {
   constructor(
     @InjectRepository(NotificationRequestDetail)
     private readonly detailRepository: Repository<NotificationRequestDetail>,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   /**
@@ -117,6 +119,14 @@ export class NotificationRequestDetailService {
     })
   }
 
+  async findByRequestIdFrontend(
+    notificationRequestId: string,
+    frontendId: string,
+  ): Promise<NotificationRequestDetail[]> {
+    const tenant = await this.tenantsService.findByExternalId(frontendId)
+    return this.findByRequestId(notificationRequestId, tenant.id)
+  }
+
   /**
    * Retrieve all request detail records for a tenant, newest first.
    */
@@ -126,6 +136,16 @@ export class NotificationRequestDetailService {
       relations: { notificationRequest: true },
       order: { createdAt: 'DESC' },
     })
+  }
+
+  /**
+   * The frontend (CSS / IDIR) id is not the same as the cstar tenant id
+   * @param frontendId
+   * @returns
+   */
+  async findAllByTenantIdFrontend(frontendId: string): Promise<NotificationRequestDetail[]> {
+    const tenant = await this.tenantsService.findByExternalId(frontendId)
+    return this.findAllByTenantId(tenant.id)
   }
 
   /**
