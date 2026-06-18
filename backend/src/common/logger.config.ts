@@ -28,9 +28,9 @@ const jsonFormat = winston.format.combine(
 const transports: winston.transport[] = [
   new winston.transports.Console({
     level: 'silly',
-    format: winston.format.combine(
+    format: isProduction ? jsonFormat : winston.format.combine(
       globalLoggerFormat,
-      isProduction ? jsonFormat : localLoggerFormat,
+      localLoggerFormat,
       winston.format.colorize({ level: true }),
     ),
   }),
