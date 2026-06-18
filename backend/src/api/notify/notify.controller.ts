@@ -34,6 +34,7 @@ import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
+import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
@@ -65,6 +66,7 @@ export class NotifySimpleController {
     private readonly notificationService: NotificationService,
     readonly attachmentValidationService: AttachmentValidationService,
     readonly attachmentProcessingService: AttachmentProcessingService,
+    readonly notificationRequestDetailService: NotificationRequestDetailService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -275,6 +277,7 @@ export class NotifySimpleFrontendController {
     private readonly notificationService: NotificationService,
     readonly attachmentValidationService: AttachmentValidationService,
     readonly attachmentProcessingService: AttachmentProcessingService,
+    readonly notificationRequestDetailService: NotificationRequestDetailService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -307,6 +310,7 @@ export class NotifySimpleFrontendController {
       this.notificationService,
       this.attachmentValidationService,
       this.attachmentProcessingService,
+      this.notificationRequestDetailService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)

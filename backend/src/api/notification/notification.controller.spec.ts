@@ -7,6 +7,7 @@ import { vi } from 'vitest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 
 // Mock AuthGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {
@@ -26,6 +27,11 @@ const mockNotificationService = {
   findAll: vi.fn(),
 }
 
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
+}
+
 describe('NotificationController', () => {
   let service: NotificationService
   let app: INestApplication
@@ -33,7 +39,13 @@ describe('NotificationController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationController],
-      providers: [{ provide: NotificationService, useValue: mockNotificationService }],
+      providers: [
+        { provide: NotificationService, useValue: mockNotificationService },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
+      ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)
       .useValue(mockAuthGuard)

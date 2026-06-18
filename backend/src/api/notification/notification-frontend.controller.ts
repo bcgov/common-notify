@@ -8,9 +8,11 @@ import {
   Request,
   Sse,
   UseGuards,
+  Param,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -47,6 +49,7 @@ export class NotificationFrontendController {
 
   constructor(
     private readonly notificationService: NotificationService,
+    private readonly notificationRequestDetailService: NotificationRequestDetailService,
     private readonly notificationPubSubService: NotificationPubSubService,
   ) {}
 
@@ -121,5 +124,30 @@ export class NotificationFrontendController {
     )
 
     return merge(updates$, keepalive$)
+  }
+
+  @Version('1')
+  @Get('request_details')
+  @ApiOperation({
+    summary: 'List all notification request detail records for the authenticated tenant',
+  })
+  async findAllRequestDetails(@Req() req: Request) {
+    const frontendUser = (req as any).tenant as Tenant
+    this.logger.log('tenant')
+    this.logger.log(frontendUser)
+    this.logger.log('finding all deliveries')
+    const deliveries = await this.notificationRequestDetailService.findAllByTenantIdFrontend(
+      frontendUser.externalId,
+    )
+    this.logger.log(deliveries)
+    return deliveries
+  }
+
+  @Version('1')
+  @Get('request_details/:id')
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  async findRequestDetails(@Req() req: Request, @Param('id') id: string) {
+    const frontendUser = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findByRequestId(id, frontendUser.externalId)
   }
 }

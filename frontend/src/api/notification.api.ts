@@ -2,6 +2,7 @@ import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
+import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
 
@@ -44,6 +45,26 @@ export const notificationApi = {
         }`,
       )
     }
+  },
+
+  /**
+   * Fetch individual delivery records for a notification request.
+   * GET /api/v1/frontend/notification_request/:id/request_details
+   */
+  async listRequestDetails(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+    const params = generateApiParameters(
+      `/api/v1/frontend/notification_request/request_details/${notificationRequestId}`,
+    )
+    return get<NotificationRequestDetail[]>(params)
+  },
+
+  /**
+   * Fetch all delivery records for the authenticated tenant.
+   * GET /api/v1/frontend/notification_request/request_details
+   */
+  async listAllRequestDetails(): Promise<NotificationRequestDetail[]> {
+    const params = generateApiParameters('/api/v1/frontend/notification_request/request_details')
+    return get<NotificationRequestDetail[]>(params)
   },
 
   /**

@@ -1,6 +1,17 @@
-import { Controller, Get, Version, UseGuards, Logger, Query, Req, Request } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Version,
+  UseGuards,
+  Logger,
+  Query,
+  Req,
+  Request,
+  Param,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -15,7 +26,10 @@ import { ListQueryDto } from '../../common/query/list-query.dto'
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly notificationRequestDetailService: NotificationRequestDetailService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -54,5 +68,25 @@ export class NotificationController {
   findAll(@Req() req: Request, @Query() query: ListQueryDto) {
     const tenant = (req as any).tenant as Tenant
     return this.notificationService.findAll(tenant.externalId, query)
+  }
+
+  @Version('1')
+  @Get('request_details')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
+  @ApiOperation({
+    summary: 'List all notification request detail records for the authenticated tenant',
+  })
+  findAllDeliveries(@Req() req: Request) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
+  }
+
+  @Version('1')
+  @Get(':id/request_details')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  findDeliveries(@Req() req: Request, @Param('id') id: string) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findByRequestId(id, tenant.id)
   }
 }

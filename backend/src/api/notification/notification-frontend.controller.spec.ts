@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
@@ -30,6 +31,11 @@ const mockNotificationService = {
   findAll: vi.fn(),
 }
 
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
+}
+
 const mockNotificationPubSubService = {
   getObservable: vi.fn(),
 }
@@ -41,8 +47,18 @@ describe('NotificationFrontendController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationFrontendController],
       providers: [
-        { provide: NotificationService, useValue: mockNotificationService },
-        { provide: NotificationPubSubService, useValue: mockNotificationPubSubService },
+        {
+          provide: NotificationService,
+          useValue: mockNotificationService,
+        },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
+        {
+          provide: NotificationPubSubService,
+          useValue: mockNotificationPubSubService,
+        },
       ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)

@@ -13,7 +13,9 @@ import { WebhookDeliveryWorker } from './workers/webhook-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
 import { WebhookTriggerService } from './services/webhook-trigger.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
+import { NotificationRequestDetail } from '../api/notification/entities/notification-request-detail.entity'
 import { NotificationService } from '../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
@@ -45,7 +47,7 @@ import { ClamavService } from '../services/clamav.service'
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotificationRequest]),
+    TypeOrmModule.forFeature([NotificationRequest, NotificationRequestDetail]),
     TenantsModule,
     TemplatesModule,
     WebhookModule,
@@ -54,6 +56,7 @@ import { ClamavService } from '../services/clamav.service'
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    NotificationRequestDetailService,
     NotificationPubSubService,
     ClamavService,
     // Provides a direct Redis connection for advanced use cases
@@ -224,6 +227,7 @@ export class QueueModule implements OnModuleInit {
     private readonly localAttachmentStorageService?: LocalAttachmentStorageService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
+    private readonly notificationRequestDetailService?: NotificationRequestDetailService,
     private readonly clamavService?: ClamavService,
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
@@ -255,6 +259,7 @@ export class QueueModule implements OnModuleInit {
         this.emailQueue,
         this.smsQueue,
         this.notificationService,
+        this.notificationRequestDetailService,
         this.configService,
         this.clamavService,
         concurrency,
@@ -277,6 +282,7 @@ export class QueueModule implements OnModuleInit {
         this.inlineRenderingService,
         this.attachmentResolverService,
         this.emailAdapter,
+        this.notificationRequestDetailService,
         emailConcurrency,
       )
       this.logger.log('Email delivery worker initialization started')
@@ -295,6 +301,7 @@ export class QueueModule implements OnModuleInit {
         this.templatesService,
         this.inlineRenderingService,
         this.smsAdapter,
+        this.notificationRequestDetailService,
         smsConcurrency,
       )
       this.logger.log('SMS delivery worker initialization started')

@@ -15,6 +15,7 @@ describe('SmsDeliveryWorker', () => {
   let mockTemplatesService: any
   let mockInlineRenderingService: any
   let mockSmsAdapter: ISmsTransport
+  let mockRequestDetailService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
@@ -68,6 +69,15 @@ describe('SmsDeliveryWorker', () => {
       }),
     }
 
+    // Mock the request detail service
+    mockRequestDetailService = {
+      createPending: vi.fn().mockResolvedValue(undefined),
+      resetForRetry: vi.fn().mockResolvedValue(undefined),
+      markSent: vi.fn().mockResolvedValue(undefined),
+      markFailed: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined),
+    }
+
     // Mock the SMS queue
     mockSmsQueue = {
       process: vi.fn().mockImplementation((...args) => {
@@ -102,6 +112,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       expect(mockSmsQueue.process).toHaveBeenCalled()
@@ -116,6 +127,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       expect(mockSmsQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
@@ -133,6 +145,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -191,6 +204,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -228,6 +242,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -266,6 +281,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -303,6 +319,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -342,6 +359,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -381,6 +399,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -421,6 +440,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('DB Error'))
@@ -469,6 +489,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -525,6 +546,7 @@ describe('SmsDeliveryWorker', () => {
         mockTemplatesService,
         mockInlineRenderingService,
         mockSmsAdapter,
+        mockRequestDetailService,
       )
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('Send failed'))
