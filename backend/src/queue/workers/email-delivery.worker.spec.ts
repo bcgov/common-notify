@@ -929,6 +929,7 @@ describe('EmailDeliveryWorker', () => {
         mockInlineRenderingService,
         mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -995,6 +996,7 @@ describe('EmailDeliveryWorker', () => {
         mockInlineRenderingService,
         mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -1047,6 +1049,7 @@ describe('EmailDeliveryWorker', () => {
         mockInlineRenderingService,
         mockAttachmentResolverService as AttachmentResolverService,
         mockEmailAdapter,
+        mockRequestDetailService,
       )
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
