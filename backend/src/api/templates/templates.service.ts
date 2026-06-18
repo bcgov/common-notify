@@ -68,25 +68,6 @@ export class TemplatesService {
   }
 
   /**
-   * List all active templates for a tenant by external (CSTAR) ID
-   * @param tenantExternalId The tenant external ID
-   * @param parsedQuery Parsed list query with pagination, sort, and filter
-   */
-  async listTemplatesByExternalId(
-    tenantExternalId: string,
-    parsedQuery: ParsedListQuery,
-  ): Promise<PaginatedTemplateResponse> {
-    // Look up tenant by external ID and get internal ID
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new NotFoundException(`Tenant with external ID '${tenantExternalId}' not found`)
-    }
-
-    // Use the internal tenant ID to list templates
-    return this.listTemplates(tenant.id, parsedQuery)
-  }
-
-  /**
    * Get a specific template
    */
   async getTemplate(tenantId: string, templateId: string): Promise<TemplateResponseDto> {

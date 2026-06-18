@@ -123,7 +123,7 @@ export class TemplatesFrontendController {
   /**
    * List all templates for the tenant
    *
-   * @param tenantExternalId CSTAR external tenant ID
+   * @param req Request, used to resolve the authenticated tenant context
    * @param query List query parameters (pagination, sort, filter)
    * @returns Paginated list of templates with advanced filtering & sorting
    */
@@ -135,13 +135,7 @@ export class TemplatesFrontendController {
     CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
     CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
   )
-  @ApiOperation({ summary: 'List all templates for the specified tenant' })
-  @ApiQuery({
-    name: 'tenantId',
-    required: true,
-    type: String,
-    description: 'CSTAR external tenant ID to filter by',
-  })
+  @ApiOperation({ summary: 'List all templates for the authenticated tenant' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -173,11 +167,12 @@ export class TemplatesFrontendController {
   })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
-    @Query('tenantId') tenantExternalId: string,
+    @Req() req: Request,
     @Query() query: ListQueryDto,
   ): Promise<PaginatedTemplateResponse> {
+    const tenant = await this.requireTenantContext(req)
     const parsedQuery = parseListQuery(query, this.templateListQueryConfig)
-    return this.templatesService.listTemplatesByExternalId(tenantExternalId, parsedQuery)
+    return this.templatesService.listTemplates(tenant.id, parsedQuery)
   }
 
   /**
