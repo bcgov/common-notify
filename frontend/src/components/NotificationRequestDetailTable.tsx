@@ -35,6 +35,8 @@ const NotificationRequestDetailTable: FC = () => {
   const [deliveries, setDeliveries] = useState<NotificationRequestDetail[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(15)
 
   useEffect(() => {
     notificationApi
@@ -46,16 +48,27 @@ const NotificationRequestDetailTable: FC = () => {
       .finally(() => setIsLoading(false))
   }, [])
 
+  const pagedDeliveries = deliveries.slice((page - 1) * limit, page * limit)
+
   return (
     <div>
       {error && <p className="text-danger">{error}</p>}
       <DataTable
         columns={columns}
-        data={deliveries}
+        data={pagedDeliveries}
         keyExtractor={(row) => row.id}
         isLoading={isLoading}
         emptyMessage="No request detail records found"
         label="Notification Request Details"
+        currentPage={page}
+        pageSize={limit}
+        totalCount={deliveries.length}
+        onPageChange={setPage}
+        onPageSizeChange={(newLimit) => {
+          setLimit(newLimit)
+          setPage(1)
+        }}
+        pageSizeOptions={[15, 30]}
       />
     </div>
   )
