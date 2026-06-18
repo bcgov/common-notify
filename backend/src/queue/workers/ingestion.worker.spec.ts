@@ -10,6 +10,7 @@ describe('IngestionWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
+  let mockNotificationDetailService: any
   let mockConfigService: any
   let mockClamavService: any
   let mockLocalAttachmentStorageService: any
@@ -620,6 +621,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockNotificationDetailService,
         mockConfigService,
         mockClamavService,
         1,
