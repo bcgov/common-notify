@@ -2,10 +2,7 @@ import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
-import type {
-  NotificationRequest,
-  NotificationRequestDetail,
-} from '@/interfaces/NotificationRequest'
+import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
 
