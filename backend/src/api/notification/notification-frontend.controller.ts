@@ -8,7 +8,6 @@ import {
   BadRequestException,
   UseGuards,
   Param,
-  Headers,
   Req,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
