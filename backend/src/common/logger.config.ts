@@ -38,14 +38,14 @@ const transports: winston.transport[] = [
 
 // Add Loki transport in Kubernetes/production
 if (isProduction) {
-  const lokiUrl = process.env.LOKI_URL || 'http://loki.f6bc3f-dev.svc.cluster.local:3100'
+  const lokiHost = process.env.LOKI_HOST || 'loki.f6bc3f-dev.svc.cluster.local:3100'
   const namespace = process.env.NAMESPACE || 'f6bc3f-dev'
   const podName = process.env.HOSTNAME || 'unknown'
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
   transports.push(
     new LokiTransport({
-      host: lokiUrl,
+      host: lokiHost,
       labels: {
         job: 'common-notify-backend',
         namespace: namespace,
