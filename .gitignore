@@ -257,6 +257,7 @@ cover/
 test-results/
 playwright-report/
 .auth/
+.playwright-token
 
 # Translations
 *.mo

@@ -27,13 +27,16 @@ import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 
 /**
  * Templates API Controller
  * Provides REST endpoints for template management
  *
  * Routes:
- * - GET /templates - List all templates for the tenant
+ * - GET /templates - List all templates for the tenant (supports advanced filtering & sorting)
  * - POST /templates - Create a new template
  * - GET /templates/:templateId - Get a specific template
  * - PATCH /templates/:templateId - Update a template
@@ -47,15 +50,47 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name)
 
+  // Template list queryable fields configuration
+  private readonly templateListQueryConfig: QueryableFieldsConfig = {
+    sortableFields: {
+      name: 'template.name',
+      createdAt: 'template.createdAt',
+      updatedAt: 'template.updatedAt',
+      channelCode: 'template.channelCode',
+    },
+    filterableFields: {
+      name: {
+        column: 'template.name',
+        valueType: 'string',
+        operators: ['eq', 'like'],
+      },
+      body: {
+        column: 'template.body',
+        valueType: 'string',
+        operators: ['like'],
+      },
+      channelCode: {
+        column: 'template.channelCode',
+        valueType: 'string',
+        operators: ['eq', 'in'],
+      },
+      createdAt: {
+        column: 'template.createdAt',
+        valueType: 'date',
+        operators: ['gte', 'lte'],
+      },
+    },
+    defaultSort: [{ field: 'updatedAt', direction: 'DESC' }],
+  }
+
   constructor(private readonly templatesService: TemplatesService) {}
 
   /**
    * List all templates for the tenant
    *
    * @param tenant Current tenant from JWT
-   * @param page Page number (1-indexed, default: 1)
-   * @param limit Items per page (default: 10, max: 100)
-   * @returns Paginated list of templates
+   * @param query List query parameters (pagination, sort, filter)
+   * @returns Paginated list of templates with advanced filtering & sorting
    */
   @Version('1')
   @Get()
@@ -75,16 +110,29 @@ export class TemplatesController {
     example: 10,
     description: 'Items per page (max 100)',
   })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    example: '-updatedAt,name',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['channelCode:eq:EMAIL', 'name:like:welcome'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
+  })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
     @Req() req: Request,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: ListQueryDto,
   ): Promise<PaginatedTemplateResponse> {
     const tenant = (req as any).tenant as Tenant
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.templatesService.listTemplates(tenant.id, pageNum, limitNum)
+    const parsedQuery = parseListQuery(query, this.templateListQueryConfig)
+    return this.templatesService.listTemplates(tenant.id, parsedQuery)
   }
 
   /**
