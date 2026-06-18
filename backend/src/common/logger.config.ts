@@ -67,6 +67,7 @@ if (isProduction) {
 }
 
 export const customLogger: LoggerService = WinstonModule.createLogger({
+  level: process.env.LOG_LEVEL || 'debug', // Enable debug logs in production
   transports: transports,
   exitOnError: false,
 })
