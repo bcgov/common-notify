@@ -43,6 +43,8 @@ if (isProduction) {
   const podName = process.env.HOSTNAME || 'unknown'
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
+  console.log(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
+
   transports.push(
     new LokiTransport({
       host: lokiUrl,
