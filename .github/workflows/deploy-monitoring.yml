@@ -1,0 +1,36 @@
+name: Deploy Monitoring Stack
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for monitoring stack'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+        default: 'dev'
+      component:
+        description: 'Component to deploy'
+        required: false
+        type: choice
+        options:
+          - all
+          - loki
+          - grafana
+        default: 'all'
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'

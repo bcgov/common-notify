@@ -1,11 +1,23 @@
-import { Controller, Get, Version, UseGuards, Logger, Query, Req, Request } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Version,
+  UseGuards,
+  Logger,
+  Query,
+  Req,
+  Request,
+  Param,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { ListQueryDto } from '../../common/query/list-query.dto'
 
 @ApiTags('notification_request')
 @Controller('notification_request')
@@ -14,7 +26,10 @@ import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly notificationRequestDetailService: NotificationRequestDetailService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -35,21 +50,43 @@ export class NotificationController {
     description: 'Items per page (max 100)',
   })
   @ApiQuery({
-    name: 'status',
+    name: 'sort',
     required: false,
     type: String,
-    description: 'Filter by notification status',
+    example: '-createdAt,status',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['status:eq:QUEUED', 'createdAt:gte:2026-01-01T00:00:00.000Z'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
-  findAll(
-    @Req() req: Request,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-  ) {
+  findAll(@Req() req: Request, @Query() query: ListQueryDto) {
     const tenant = (req as any).tenant as Tenant
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.notificationService.findAll(tenant.externalId, pageNum, limitNum, status)
+    return this.notificationService.findAll(tenant.externalId, query)
+  }
+
+  @Version('1')
+  @Get('request_details')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
+  @ApiOperation({
+    summary: 'List all notification request detail records for the authenticated tenant',
+  })
+  findAllDeliveries(@Req() req: Request) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
+  }
+
+  @Version('1')
+  @Get(':id/request_details')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  findDeliveries(@Req() req: Request, @Param('id') id: string) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationRequestDetailService.findByRequestId(id, tenant.id)
   }
 }

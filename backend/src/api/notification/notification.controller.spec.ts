@@ -7,6 +7,7 @@ import { vi } from 'vitest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 
 // Mock AuthGuard to bypass authentication and populate request.tenant
 const mockAuthGuard: CanActivate = {
@@ -26,6 +27,11 @@ const mockNotificationService = {
   findAll: vi.fn(),
 }
 
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
+}
+
 describe('NotificationController', () => {
   let service: NotificationService
   let app: INestApplication
@@ -33,7 +39,13 @@ describe('NotificationController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationController],
-      providers: [{ provide: NotificationService, useValue: mockNotificationService }],
+      providers: [
+        { provide: NotificationService, useValue: mockNotificationService },
+        {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
+      ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)
       .useValue(mockAuthGuard)
@@ -102,7 +114,7 @@ describe('NotificationController', () => {
         })
     })
 
-    it('should call findAll with page and limit parameters', async () => {
+    it('should forward list query parameters to the service', async () => {
       const mockNotifications = {
         data: [],
         count: 0,
@@ -113,36 +125,19 @@ describe('NotificationController', () => {
       mockNotificationService.findAll.mockResolvedValue(mockNotifications)
 
       await request(app.getHttpServer())
-        .get('/api/v1/notification_request?page=2&limit=20')
+        .get(
+          '/api/v1/notification_request?page=2&limit=20&sort=-createdAt,status&filter=status:eq:QUEUED&filter=channelCode:in:EMAIL|SMS',
+        )
         .expect(200)
 
       expect(mockNotificationService.findAll).toHaveBeenCalledWith(
         'cstar-tenant-external-id',
-        2,
-        20,
-        undefined,
-      )
-    })
-
-    it('should call findAll with status filter parameter', async () => {
-      const mockNotifications = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockNotifications)
-
-      await request(app.getHttpServer())
-        .get('/api/v1/notification_request?status=completed')
-        .expect(200)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
-        'cstar-tenant-external-id',
-        1,
-        10,
-        'completed',
+        expect.objectContaining({
+          page: '2',
+          limit: '20',
+          sort: '-createdAt,status',
+          filter: ['status:eq:QUEUED', 'channelCode:in:EMAIL|SMS'],
+        }),
       )
     })
   })

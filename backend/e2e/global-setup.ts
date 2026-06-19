@@ -56,72 +56,181 @@ async function globalSetup(_config: FullConfig) {
   }
 
   try {
-    // Construct form data
-    const formData = new URLSearchParams()
-    formData.append('grant_type', 'client_credentials')
-    formData.append('client_id', clientId)
-    formData.append('client_secret', clientSecret)
+    const fetchToken = async (activeClientId: string, activeClientSecret: string) => {
+      const formData = new URLSearchParams()
+      formData.append('grant_type', 'client_credentials')
+      formData.append('client_id', activeClientId)
+      formData.append('client_secret', activeClientSecret)
 
-    // Add scope for Kong environments
-    if (environment === 'local') {
-      formData.append('scope', 'notify')
+      if (environment === 'local') {
+        formData.append('scope', 'notify')
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+      try {
+        const tokenResponse = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData.toString(),
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text()
+          throw new Error(
+            `Failed to fetch token: ${tokenResponse.status} ${tokenResponse.statusText}\n${errorText}`,
+          )
+        }
+
+        const tokenData = (await tokenResponse.json()) as {
+          access_token: string
+          expires_in?: number
+        }
+
+        return {
+          accessToken: tokenData.access_token,
+          expiresIn: tokenData.expires_in || 3600,
+          usedClientId: activeClientId,
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error(`Token fetch timeout: exceeded 30 second limit`)
+        }
+        throw fetchError
+      }
     }
 
-    // Fetch token with timeout to prevent hanging
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const tokenResult = await fetchToken(clientId, clientSecret)
 
-    try {
-      const tokenResponse = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text()
-        throw new Error(
-          `Failed to fetch token: ${tokenResponse.status} ${tokenResponse.statusText}\n${errorText}`,
-        )
-      }
-
-      const tokenData = (await tokenResponse.json()) as {
-        access_token: string
-        expires_in?: number
-      }
-      const accessToken = tokenData.access_token
-      const expiresIn = tokenData.expires_in || 3600
-
-      if (!accessToken) {
-        throw new Error('No access_token in response')
-      }
-
-      // Store token in environment for tests to access
-      process.env.E2E_TEST_AUTH_TOKEN = accessToken
-      process.env.E2E_TEST_TOKEN_EXPIRES_IN = String(expiresIn)
-
-      // Also save token to a file so test workers can access it
-      // (process.env changes in globalSetup don't persist to test workers)
-      const tokenFile = join(__dirname, '.playwright-token')
-      writeFileSync(tokenFile, JSON.stringify({ accessToken, expiresIn }), 'utf-8')
-
-      console.log(` Token fetched successfully`)
-      console.log(`   Token expires in: ${expiresIn}s`)
-      console.log(`   Token (first 20 chars): ${accessToken.substring(0, 20)}...`)
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        throw new Error(`Token fetch timeout: exceeded 30 second limit`)
-      }
-      throw fetchError
+    if (!tokenResult.accessToken) {
+      throw new Error('No access_token in response')
     }
+
+    if (
+      environment === 'local' &&
+      tokenResult.usedClientId !== clientId &&
+      tokenResult.usedClientId !== process.env.E2E_TEST_CLIENT_ID
+    ) {
+      console.log(`   Using fallback local OAuth client: ${tokenResult.usedClientId}`)
+    }
+
+    process.env.E2E_TEST_AUTH_TOKEN = tokenResult.accessToken
+    process.env.E2E_TEST_TOKEN_EXPIRES_IN = String(tokenResult.expiresIn)
+
+    const tokenFile = join(__dirname, '.playwright-token')
+    writeFileSync(
+      tokenFile,
+      JSON.stringify({ accessToken: tokenResult.accessToken, expiresIn: tokenResult.expiresIn }),
+      'utf-8',
+    )
+
+    console.log(` Token fetched successfully`)
+    console.log(`   Token expires in: ${tokenResult.expiresIn}s`)
+    console.log(`   Token (first 20 chars): ${tokenResult.accessToken.substring(0, 20)}...`)
   } catch (error) {
-    console.error('❌ Failed to fetch token:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+
+    if (environment === 'local' && errorMessage.includes('invalid_client')) {
+      const localFallbackClients = [
+        {
+          id: 'LOCAL001-ABC123',
+          secret: 'LOCAL001-SECRET-ABC123XYZ789',
+        },
+        {
+          id: 'LOCAL002-DEF456',
+          secret: 'LOCAL002-SECRET-DEF456XYZ789',
+        },
+        {
+          id: 'LOCAL003-GHI789',
+          secret: 'LOCAL003-SECRET-GHI789XYZ789',
+        },
+      ]
+
+      for (const fallback of localFallbackClients) {
+        if (fallback.id === clientId && fallback.secret === clientSecret) {
+          continue
+        }
+
+        try {
+          console.warn(
+            `⚠️  Primary local OAuth client was rejected, retrying with seeded client ${fallback.id}...`,
+          )
+
+          const formData = new URLSearchParams()
+          formData.append('grant_type', 'client_credentials')
+          formData.append('client_id', fallback.id)
+          formData.append('client_secret', fallback.secret)
+          formData.append('scope', 'notify')
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+          const tokenResponse = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+            signal: controller.signal,
+          })
+
+          clearTimeout(timeoutId)
+
+          if (!tokenResponse.ok) {
+            const fallbackErrorText = await tokenResponse.text()
+            throw new Error(
+              `Failed to fetch token: ${tokenResponse.status} ${tokenResponse.statusText}\n${fallbackErrorText}`,
+            )
+          }
+
+          const tokenData = (await tokenResponse.json()) as {
+            access_token: string
+            expires_in?: number
+          }
+
+          if (!tokenData.access_token) {
+            throw new Error('No access_token in response')
+          }
+
+          process.env.E2E_TEST_AUTH_TOKEN = tokenData.access_token
+          process.env.E2E_TEST_TOKEN_EXPIRES_IN = String(tokenData.expires_in || 3600)
+
+          const tokenFile = join(__dirname, '.playwright-token')
+          writeFileSync(
+            tokenFile,
+            JSON.stringify({
+              accessToken: tokenData.access_token,
+              expiresIn: tokenData.expires_in || 3600,
+            }),
+            'utf-8',
+          )
+
+          console.log(` Token fetched successfully`)
+          console.log(`   Using fallback local OAuth client: ${fallback.id}`)
+          console.log(`   Token expires in: ${tokenData.expires_in || 3600}s`)
+          console.log(`   Token (first 20 chars): ${tokenData.access_token.substring(0, 20)}...`)
+
+          return
+        } catch (fallbackError) {
+          const fallbackMessage =
+            fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+
+          if (!fallbackMessage.includes('invalid_client')) {
+            console.error('Failed to fetch token with fallback client:', fallbackError)
+            throw fallbackError
+          }
+        }
+      }
+    }
+
+    console.error('Failed to fetch token:', error)
     throw error
   }
 }

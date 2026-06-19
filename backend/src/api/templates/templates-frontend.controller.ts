@@ -28,6 +28,9 @@ import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 
 /**
  * Frontend Templates API Controller
@@ -50,6 +53,39 @@ import { PaginatedTemplateResponse } from './schemas/paginated-template-response
 @ApiBearerAuth()
 export class TemplatesFrontendController {
   private readonly logger = new Logger(TemplatesFrontendController.name)
+
+  // Template list queryable fields configuration
+  private readonly templateListQueryConfig: QueryableFieldsConfig = {
+    sortableFields: {
+      name: 'template.name',
+      createdAt: 'template.createdAt',
+      updatedAt: 'template.updatedAt',
+      channelCode: 'template.channelCode',
+    },
+    filterableFields: {
+      name: {
+        column: 'template.name',
+        valueType: 'string',
+        operators: ['eq', 'like'],
+      },
+      body: {
+        column: 'template.body',
+        valueType: 'string',
+        operators: ['like'],
+      },
+      channelCode: {
+        column: 'template.channelCode',
+        valueType: 'string',
+        operators: ['eq', 'in'],
+      },
+      createdAt: {
+        column: 'template.createdAt',
+        valueType: 'date',
+        operators: ['gte', 'lte'],
+      },
+    },
+    defaultSort: [{ field: 'updatedAt', direction: 'DESC' }],
+  }
 
   constructor(
     private readonly templatesService: TemplatesService,
@@ -87,10 +123,9 @@ export class TemplatesFrontendController {
   /**
    * List all templates for the tenant
    *
-   * @param tenant Current tenant from JWT
-   * @param page Page number (1-indexed, default: 1)
-   * @param limit Items per page (default: 10, max: 100)
-   * @returns Paginated list of templates
+   * @param req Request, used to resolve the authenticated tenant context
+   * @param query List query parameters (pagination, sort, filter)
+   * @returns Paginated list of templates with advanced filtering & sorting
    */
   @Version('1')
   @Get()
@@ -100,13 +135,7 @@ export class TemplatesFrontendController {
     CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
     CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
   )
-  @ApiOperation({ summary: 'List all templates for the specified tenant' })
-  @ApiQuery({
-    name: 'tenantId',
-    required: true,
-    type: String,
-    description: 'CSTAR external tenant ID to filter by',
-  })
+  @ApiOperation({ summary: 'List all templates for the authenticated tenant' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -122,28 +151,28 @@ export class TemplatesFrontendController {
     description: 'Items per page (max 100)',
   })
   @ApiQuery({
-    name: 'search',
+    name: 'sort',
     required: false,
     type: String,
-    example: 'welcome',
-    description: 'Filter templates by name (case-insensitive, partial match)',
+    example: '-updatedAt,name',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['channelCode:eq:EMAIL', 'name:like:welcome'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
-    @Query('tenantId') tenantExternalId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
+    @Req() req: Request,
+    @Query() query: ListQueryDto,
   ): Promise<PaginatedTemplateResponse> {
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    const searchString = search ? search.trim().slice(0, 50) : undefined
-    return this.templatesService.listTemplatesByExternalId(
-      tenantExternalId,
-      pageNum,
-      limitNum,
-      searchString,
-    )
+    const tenant = await this.requireTenantContext(req)
+    const parsedQuery = parseListQuery(query, this.templateListQueryConfig)
+    return this.templatesService.listTemplates(tenant.id, parsedQuery)
   }
 
   /**
