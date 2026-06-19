@@ -19,6 +19,8 @@ describe('EmailDeliveryWorker', () => {
   let mockEmailAdapter: IEmailTransport
   let mockRequestDetailService: any
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
+  let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
+  let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
   beforeEach(() => {
     mockEmailAdapter = {
@@ -71,7 +73,13 @@ describe('EmailDeliveryWorker', () => {
         processHandler = handler
         return Promise.resolve()
       }),
-      on: vi.fn(),
+      on: vi.fn().mockImplementation((event, callback) => {
+        if (event === 'completed') {
+          completedCallback = callback
+        } else if (event === 'failed') {
+          failedCallback = callback
+        }
+      }),
     }
 
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
@@ -914,12 +922,7 @@ describe('EmailDeliveryWorker', () => {
             content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
             attachments: [
               {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'hash',
-                storageProvider: 'local',
+                attachmentId: 'attachment-123',
               },
             ],
           },
@@ -946,38 +949,14 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
-  it('should resolve attachmentId references with tenant-scoped lookups before sending', async () => {
-    const content = Buffer.from('hello world')
-    mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
-      {
-        filename: 'hello.txt',
-        content,
-        contentType: 'text/plain',
-        sendingMethod: 'attach',
-      },
-    ])
-
-    await EmailDeliveryWorker.initialize(
-      mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-      mockNotificationService,
-      mockConfigService,
-      mockTemplatesRepository,
-      mockTemplatesService,
-      mockInlineRenderingService,
-      mockAttachmentResolverService as AttachmentResolverService,
-      mockEmailAdapter,
-    )
-
-    await processHandler({
-      data: {
-        notifyId: 'notify-attachments',
-        tenantId: 'tenant-123',
-        channel: NotificationChannel.EMAIL,
-        request: {},
-        payload: {
-          recipients: { to: ['test@example.com'] },
-          content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
-          attachments: [{ attachmentId: 'attachment-123' }],
+    it('should resolve attachmentId references with tenant-scoped lookups before sending', async () => {
+      const content = Buffer.from('hello world')
+      mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
+        {
+          filename: 'hello.txt',
+          content,
+          contentType: 'text/plain',
+          sendingMethod: 'attach',
         },
       ])
 
@@ -993,45 +972,48 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+      await processHandler({
         data: {
-          notifyId: 'notify-attachment-logs',
+          notifyId: 'notify-attachments',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           request: {},
           payload: {
             recipients: { to: ['test@example.com'] },
             content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
-            attachments: [
-              {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'hash',
-                storageProvider: 'local',
-              },
-            ],
+            attachments: [{ attachmentId: 'attachment-123' }],
           },
-          attempt: 0,
+        },
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
         } as any,
-        opts: { attempts: 3 } as any,
-        attemptsMade: 0,
-      }
+      } as Bull.Job<DeliveryJobPayload>)
 
-      await processHandler(job as Bull.Job<DeliveryJobPayload>)
-
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[notify-attachment-logs] Resolving stored email attachments:'),
+      expect(mockAttachmentResolverService.resolveEmailAttachments).toHaveBeenCalledWith(
+        'tenant-123',
+        [{ attachmentId: 'attachment-123' }],
       )
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[notify-attachment-logs] Sending email via ches adapter:'),
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [
+            {
+              filename: 'hello.txt',
+              content,
+              contentType: 'text/plain',
+              sendingMethod: 'attach',
+            },
+          ],
+        }),
       )
     })
 
-    it('should fail delivery when a stored attachment cannot be resolved', async () => {
+    it('should fail delivery when attachment resolution fails', async () => {
       mockAttachmentResolverService.resolveEmailAttachments.mockRejectedValue(
-        new Error('Failed to read stored attachment'),
+        new Error('Failed to download attachment'),
       )
 
       await EmailDeliveryWorker.initialize(
@@ -1046,48 +1028,33 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-  it('should fail delivery when attachment resolution fails', async () => {
-    mockAttachmentResolverService.resolveEmailAttachments.mockRejectedValue(
-      new Error('Failed to download attachment'),
-    )
+      await expect(
+        processHandler({
+          data: {
+            notifyId: 'notify-missing-file',
+            tenantId: 'tenant-123',
+            channel: NotificationChannel.EMAIL,
+            request: {},
+            payload: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+              attachments: [{ attachmentId: 'attachment-404' }],
+            },
+            attempt: 2,
+          } as any,
+          opts: { attempts: 3 } as any,
+          attemptsMade: 2,
+        } as Bull.Job<DeliveryJobPayload>),
+      ).rejects.toThrow('Failed to download attachment')
 
-    await EmailDeliveryWorker.initialize(
-      mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-      mockNotificationService,
-      mockConfigService,
-      mockTemplatesRepository,
-      mockTemplatesService,
-      mockInlineRenderingService,
-      mockAttachmentResolverService as AttachmentResolverService,
-      mockEmailAdapter,
-    )
-
-    await expect(
-      processHandler({
-        data: {
-          notifyId: 'notify-missing-file',
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.EMAIL,
-          request: {},
-          payload: {
-            recipients: { to: ['test@example.com'] },
-            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
-            attachments: [{ attachmentId: 'attachment-404' }],
-          },
-          attempt: 2,
-        } as any,
-        opts: { attempts: 3 } as any,
-        attemptsMade: 2,
-      } as Bull.Job<DeliveryJobPayload>),
-    ).rejects.toThrow('Failed to download attachment')
-
-    expect(mockEmailAdapter.send).not.toHaveBeenCalled()
-    expect(mockNotificationService.update).toHaveBeenCalledWith(
-      'notify-missing-file',
-      'tenant-123',
-      expect.objectContaining({
-        status: NotificationStatus.FAILED,
-      }),
-    )
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-missing-file',
+        'tenant-123',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+        }),
+      )
+    })
   })
 })
