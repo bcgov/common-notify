@@ -102,7 +102,7 @@ backend:
     #-- S3-compatible endpoint
     endpoint: https://commonservices.objectstore.gov.bc.ca
     #-- bucket name; override per environment values file
-    bucket: notify-dev
+    bucket: ""
     #-- region for S3-compatible storage
     region: ca-central-1
     #-- use path-style requests by default for MinIO and ObjectScale compatibility
