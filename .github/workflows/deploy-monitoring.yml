@@ -1,0 +1,247 @@
+name: Deploy Monitoring Stack
+
+on:
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for monitoring stack'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+        default: 'dev'
+      component:
+        description: 'Component to deploy'
+        required: false
+        type: choice
+        options:
+          - all
+          - loki
+          - grafana
+        default: 'all'
+
+  # Auto-deploy on monitoring configuration changes
+  push:
+    branches: [main]
+    paths:
+      - 'monitoring/grafana-stack/**'
+      - '.github/workflows/deploy-monitoring.yml'
+
+concurrency:
+  # Prevent concurrent monitoring deployments
+  group: monitoring-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy-loki:
+    name: Deploy Loki
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.component == 'all' || inputs.component == 'loki') ||
+      github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Loki
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            # Deploy Loki using Helm
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            # Determine environment
+            ENV="${{ inputs.environment || 'dev' }}"
+            NAMESPACE="${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}"
+
+            echo "📦 Deploying Loki to ${NAMESPACE}"
+
+            # Deploy Loki (matching manual deployment)
+            helm upgrade --install loki grafana/loki \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/loki/values.yaml \
+              --set loki.schemaConfig.configs[0].from=2024-01-01 \
+              --set loki.schemaConfig.configs[0].store=tsdb \
+              --set loki.schemaConfig.configs[0].object_store=filesystem \
+              --set loki.schemaConfig.configs[0].schema=v13 \
+              --set loki.schemaConfig.configs[0].index.prefix=loki_index_ \
+              --set loki.schemaConfig.configs[0].index.period=24h \
+              --wait \
+              --timeout 10m
+
+            echo "✅ Loki deployed successfully"
+
+            # Verify Loki is ready
+            oc get pods -n ${NAMESPACE} -l app.kubernetes.io/name=loki
+
+            # Get Loki service endpoint
+            LOKI_SVC=$(oc get svc -n ${NAMESPACE} -l app.kubernetes.io/name=loki -o jsonpath='{.items[0].metadata.name}')
+            echo "📍 Loki endpoint: http://${LOKI_SVC}.${NAMESPACE}.svc.cluster.local:3100"
+
+  deploy-grafana:
+    name: Deploy Grafana
+    needs: [deploy-loki]
+    if: |
+      !cancelled() &&
+      (needs.deploy-loki.result == 'success' || needs.deploy-loki.result == 'skipped') &&
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.component == 'all' || inputs.component == 'grafana') ||
+       github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            # Deploy Grafana using Helm
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            # Determine environment
+            ENV="${{ inputs.environment || 'dev' }}"
+            NAMESPACE="${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}"
+
+            echo "📊 Deploying Grafana to ${NAMESPACE}"
+
+            # Get Loki service name for datasource configuration
+            LOKI_SVC=$(oc get svc -n ${NAMESPACE} -l app.kubernetes.io/name=loki -o jsonpath='{.items[0].metadata.name}' || echo "loki")
+
+            # Deploy Grafana with Loki datasource (matching manual deployment)
+            helm upgrade --install grafana grafana/grafana \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/grafana/values-minimal.yaml \
+              --timeout 1m 2>&1 || echo "Helm install initiated (patching security context next)"
+
+            # Patch deployment for OpenShift SCC compatibility (matching manual deployment)
+            echo "🔧 Patching deployment for OpenShift SCC compatibility..."
+            oc patch deployment grafana -n ${NAMESPACE} --type=json -p='[
+              {"op": "remove", "path": "/spec/template/spec/securityContext/runAsUser"},
+              {"op": "remove", "path": "/spec/template/spec/securityContext/runAsGroup"},
+              {"op": "remove", "path": "/spec/template/spec/securityContext/fsGroup"}
+            ]' || echo "Patch may have already been applied"
+
+            # Wait for deployment
+            echo "⏳ Waiting for Grafana to be ready..."
+            oc wait --for=condition=available --timeout=120s deployment/grafana -n ${NAMESPACE}
+
+            # Create route
+            echo "🌐 Creating route..."
+            oc create route edge grafana --service=grafana --port=service -n ${NAMESPACE} 2>/dev/null || echo "Route already exists"
+
+            echo "✅ Grafana deployed successfully"
+
+            # Verify Grafana is ready
+            oc get pods -n ${NAMESPACE} -l app.kubernetes.io/name=grafana
+
+            # Get Grafana route/URL
+            GRAFANA_ROUTE=$(oc get route grafana -n ${NAMESPACE} -o jsonpath='{.spec.host}' 2>/dev/null || echo "No route found")
+            if [ "$GRAFANA_ROUTE" != "No route found" ]; then
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ Grafana deployed successfully!"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "🌐 Access Information:"
+              echo "   URL: https://${GRAFANA_ROUTE}"
+              echo "   Username: admin"
+
+              # Get password from secret
+              ADMIN_PASSWORD=$(oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath="{.data.admin-password}" | base64 -d 2>/dev/null || echo "Check secret manually")
+              echo "   Password: ${ADMIN_PASSWORD}"
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            else
+              echo "ℹ️  No route configured. Access Grafana via port-forward:"
+              echo "   oc port-forward -n ${NAMESPACE} svc/grafana 3000:80"
+              echo ""
+              echo "🔑 Grafana admin password:"
+              oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath="{.data.admin-password}" | base64 -d
+              echo ""
+            fi
+
+  apply-network-policies:
+    name: Apply Network Policies
+    needs: [deploy-grafana]
+    if: |
+      !cancelled() &&
+      needs.deploy-grafana.result == 'success'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Apply Network Policies
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}"
+
+            echo "🔒 Applying network policies"
+
+            # Apply Loki network policy if exists
+            if [ -f monitoring/grafana-stack/loki/networkpolicy.yaml ]; then
+              oc apply -f monitoring/grafana-stack/loki/networkpolicy.yaml -n ${NAMESPACE}
+              echo "✅ Loki network policy applied"
+            fi
+
+            # Apply Grafana network policy if exists
+            if [ -f monitoring/grafana-stack/grafana/networkpolicy.yaml ]; then
+              oc apply -f monitoring/grafana-stack/grafana/networkpolicy.yaml -n ${NAMESPACE}
+              echo "✅ Grafana network policy applied"
+            fi
+
+  deployment-summary:
+    name: Deployment Summary
+    needs: [deploy-loki, deploy-grafana, apply-network-policies]
+    if: always()
+    runs-on: ubuntu-slim
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 📊 Monitoring Stack Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment || 'DEV' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Component Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Loki | ${{ needs.deploy-loki.result == 'success' && '✅ Deployed' || needs.deploy-loki.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Grafana | ${{ needs.deploy-grafana.result == 'success' && '✅ Deployed' || needs.deploy-grafana.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Network Policies | ${{ needs.apply-network-policies.result == 'success' && '✅ Applied' || needs.apply-network-policies.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Access Grafana UI (check job logs for URL and password)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Navigate to **Explore** → Select **Loki** datasource" >> $GITHUB_STEP_SUMMARY
+          echo "3. Try query: \`{job=\"common-notify-backend\"}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📖 [Monitoring Wiki](https://github.com/bcgov/common-notify/wiki/Monitoring)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for Failures
+        if: |
+          needs.deploy-loki.result == 'failure' ||
+          needs.deploy-grafana.result == 'failure' ||
+          needs.apply-network-policies.result == 'failure'
+        run: |
+          echo "❌ One or more monitoring components failed to deploy"
+          exit 1

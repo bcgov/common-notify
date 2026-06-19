@@ -1,0 +1,35 @@
+spec:
+  template:
+    spec:
+      volumes:
+        - name: promtail-config
+          configMap:
+            name: promtail-frontend-config
+        - name: shared-logs
+          emptyDir: {}
+      containers:
+        - name: common-notify-dev-frontend
+          command:
+            - /bin/sh
+            - -c
+            - exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tee -a /var/log/caddy/access.log
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /var/log/caddy
+        - name: promtail
+          image: grafana/promtail:2.9.3
+          args:
+            - -config.file=/etc/promtail/promtail-config.yaml
+          volumeMounts:
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: shared-logs
+              mountPath: /var/log/caddy
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
