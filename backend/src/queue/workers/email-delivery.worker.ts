@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
@@ -69,6 +70,7 @@ export class EmailDeliveryWorker {
     inlineRenderingService: InlineRenderingService,
     attachmentResolverService: AttachmentResolverService,
     emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -101,6 +103,27 @@ export class EmailDeliveryWorker {
           | NotifyEmailChannel
           | ProcessedNotifyEmailChannel
           | ResolvedEmailDeliveryPayload
+
+        if (
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+          throw new Error('Invalid email payload: subject is missing or invalid')
+        }
+
+        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+          throw new Error('Invalid email payload: body is missing or invalid')
+        }
+
+        if ((job.attemptsMade ?? 0) > 0) {
+          await requestDetailService.resetForRetry(notifyId)
+        }
 
         // Resolve template if templateId is provided in the original request
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
@@ -214,6 +237,7 @@ export class EmailDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
@@ -225,6 +249,9 @@ export class EmailDeliveryWorker {
         )
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
+
+        // Request has made it to the smtp gateway, update request detail records as sent
+        await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -249,6 +276,7 @@ export class EmailDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
@@ -302,7 +330,8 @@ export class EmailDeliveryWorker {
     const result = await emailAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || `${emailAdapter.name}-${Date.now()}`,
+      externalId:
+        result.messageId || result.providerResponse || `${emailAdapter.name}-${Date.now()}`,
       provider: emailAdapter.name,
     }
   }

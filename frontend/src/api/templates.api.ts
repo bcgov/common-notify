@@ -26,7 +26,7 @@ export interface TemplateResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
-  bodyType: TemplateBodyType
+  bodyType?: TemplateBodyType
   engineCode: TemplateEngine
   version: number
   active: boolean
@@ -55,14 +55,12 @@ export interface GetTemplatesResponse {
  * @throws Error if fetch fails
  */
 export async function getTemplates(
-  tenantId: string,
   page: number = 1,
   limit: number = 10,
   search?: string,
 ): Promise<PaginatedTemplateResponse> {
   try {
     const params = generateApiParameters('/api/v1/frontend/templates', {
-      tenantId,
       page: String(page),
       limit: String(limit),
       ...(search ? { search } : {}),

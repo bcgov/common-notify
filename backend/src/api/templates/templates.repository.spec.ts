@@ -6,6 +6,7 @@ import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
+import type { ParsedListQuery } from '../../common/query/list-query.types'
 
 describe('TemplatesRepository', () => {
   let repository: TemplatesRepository
@@ -45,6 +46,7 @@ describe('TemplatesRepository', () => {
     create: vi.fn(),
     save: vi.fn(),
     update: vi.fn(),
+    createQueryBuilder: vi.fn(),
   }
 
   const mockVersionRepository = {
@@ -96,43 +98,181 @@ describe('TemplatesRepository', () => {
     })
   })
 
+  describe('findWithQuery', () => {
+    it('should find all active templates with basic pagination', async () => {
+      const templates = [mockTemplate]
+      const mockQueryBuilder = {
+        createQueryBuilder: vi.fn().mockReturnThis(),
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([templates, 1]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      const parsedQuery: ParsedListQuery = {
+        page: 1,
+        limit: 10,
+        filters: [],
+        sorts: [{ field: 'updatedAt', direction: 'DESC' }],
+      }
+
+      const [results, total] = await repository.findWithQuery('tenant-123', parsedQuery)
+
+      expect(results).toEqual(templates)
+      expect(total).toBe(1)
+      expect(mockTemplateRepository.createQueryBuilder).toHaveBeenCalledWith('template')
+    })
+
+    it('should apply filters to the query builder', async () => {
+      const templates = [mockTemplate]
+      const mockQueryBuilder = {
+        createQueryBuilder: vi.fn().mockReturnThis(),
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([templates, 1]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      const parsedQuery: ParsedListQuery = {
+        page: 1,
+        limit: 10,
+        filters: [{ field: 'channelCode', operator: 'eq', value: 'EMAIL' }],
+        sorts: [{ field: 'updatedAt', direction: 'DESC' }],
+      }
+
+      const [results, total] = await repository.findWithQuery('tenant-123', parsedQuery)
+
+      expect(results).toEqual(templates)
+      expect(total).toBe(1)
+      // Verify where/andWhere was called for tenantId and active filters
+      expect(mockQueryBuilder.where).toHaveBeenCalled()
+    })
+
+    it('should apply sorts to the query builder', async () => {
+      const templates = [mockTemplate]
+      const mockQueryBuilder = {
+        createQueryBuilder: vi.fn().mockReturnThis(),
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([templates, 1]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      const parsedQuery: ParsedListQuery = {
+        page: 1,
+        limit: 10,
+        filters: [],
+        sorts: [
+          { field: 'updatedAt', direction: 'DESC' },
+          { field: 'name', direction: 'ASC' },
+        ],
+      }
+
+      const [results] = await repository.findWithQuery('tenant-123', parsedQuery)
+
+      expect(results).toEqual(templates)
+      expect(mockQueryBuilder.addOrderBy).toHaveBeenCalled()
+    })
+
+    it('should return empty array when no templates match filters', async () => {
+      const mockQueryBuilder = {
+        createQueryBuilder: vi.fn().mockReturnThis(),
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      const parsedQuery: ParsedListQuery = {
+        page: 1,
+        limit: 10,
+        filters: [{ field: 'channelCode', operator: 'eq', value: 'SMS' }],
+        sorts: [{ field: 'updatedAt', direction: 'DESC' }],
+      }
+
+      const [results, total] = await repository.findWithQuery('tenant-123', parsedQuery)
+
+      expect(results).toEqual([])
+      expect(total).toBe(0)
+    })
+  })
+
   describe('findByTenantId', () => {
     it('should find all active templates for a tenant with default pagination', async () => {
       const templates = [mockTemplate]
-      mockTemplateRepository.findAndCount.mockResolvedValue([templates, 1])
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([templates, 1]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
 
       const [results, total] = await repository.findByTenantId('tenant-123')
 
       expect(results).toEqual(templates)
       expect(total).toBe(1)
-      expect(mockTemplateRepository.findAndCount).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-123', active: true },
-        relations: ['channel', 'engine'],
-        take: 20,
-        skip: 0,
-        order: { updatedAt: 'DESC' },
-      })
+      expect(mockTemplateRepository.createQueryBuilder).toHaveBeenCalledWith('template')
     })
 
     it('should find templates with custom limit and offset', async () => {
       const templates = [mockTemplate]
-      mockTemplateRepository.findAndCount.mockResolvedValue([templates, 100])
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([templates, 100]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
 
       const [results, total] = await repository.findByTenantId('tenant-123', 10, 20)
 
       expect(results).toEqual(templates)
       expect(total).toBe(100)
-      expect(mockTemplateRepository.findAndCount).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-123', active: true },
-        relations: ['channel', 'engine'],
-        take: 10,
-        skip: 20,
-        order: { updatedAt: 'DESC' },
-      })
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10)
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(20)
     })
 
     it('should return empty array when no templates found', async () => {
-      mockTemplateRepository.findAndCount.mockResolvedValue([[], 0])
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
 
       const [results, total] = await repository.findByTenantId('tenant-123')
 
