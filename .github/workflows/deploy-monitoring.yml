@@ -66,10 +66,13 @@ jobs:
 
             echo "📦 Deploying Loki to ${NAMESPACE}"
 
-            # Select values file based on environment (minimal storage for test/prod)
+            # Select values file based on environment
             if [ "$ENV" = "dev" ]; then
               LOKI_VALUES="monitoring/grafana-stack/loki/values.yaml"
               echo "Using dev values (3Gi storage, 7 days retention)"
+            elif [ "$ENV" = "prod" ]; then
+              LOKI_VALUES="monitoring/grafana-stack/loki/values-prod.yaml"
+              echo "Using prod values (5Gi storage, 30 days retention)"
             else
               LOKI_VALUES="monitoring/grafana-stack/loki/values-minimal.yaml"
               echo "Using minimal values for ${ENV} (1Gi storage, 3 days retention)"

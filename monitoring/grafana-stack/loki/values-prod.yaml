@@ -1,0 +1,136 @@
+# Production Loki Configuration (30 days retention)
+# For production environment with compliance requirements
+
+loki:
+  auth_enabled: false
+
+  commonConfig:
+    replication_factor: 1
+
+  # OpenShift-compatible pod security context (applied globally)
+  podSecurityContext:
+    fsGroup: null
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+
+  # OpenShift-compatible container security context (applied globally)
+  containerSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+
+  # Retention: 30 days (production compliance)
+  limits_config:
+    retention_period: 720h  # 30 days
+    reject_old_samples: true
+    reject_old_samples_max_age: 720h
+    max_cache_freshness_per_query: 10m
+    split_queries_by_interval: 15m
+
+  querier:
+    max_concurrent: 10
+
+# Schema config at root level (required by newer Loki Helm chart)
+schemaConfig:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+
+deploymentMode: SingleBinary
+
+# Explicitly disable simple scalable components
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+singleBinary:
+  replicas: 1
+
+  persistence:
+    enabled: true
+    storageClass: netapp-file-standard
+    size: 5Gi  # Production storage for 30 days retention
+
+  # Production resources
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  extraEnv:
+    - name: TZ
+      value: America/Vancouver
+
+  # OpenShift-compatible security context (let OpenShift assign UIDs)
+  podSecurityContext:
+    fsGroup: null
+    runAsGroup: null
+    runAsNonRoot: true
+    runAsUser: null
+
+  containerSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+
+# Disable canary to simplify deployment
+lokiCanary:
+  enabled: false
+
+# Disable caching for simpler deployment
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 3100
+
+gateway:
+  enabled: false
+
+test:
+  enabled: false  # Disable test pod to save resources
+
+# OpenShift-specific RBAC configuration
+rbac:
+  create: false  # Disable RBAC creation - use OpenShift defaults
+  pspEnabled: false
+  sccEnabled: false  # Disable SCC creation (requires cluster-admin)
+  namespaced: true  # Use namespace-only RBAC, not cluster-wide
+serviceAccount:
+  create: false  # Use default OpenShift service account
