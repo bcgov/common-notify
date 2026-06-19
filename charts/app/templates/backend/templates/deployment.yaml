@@ -99,6 +99,14 @@ spec:
               value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
             - name: RELEASE_NAME
               value: {{ .Release.Name | quote }}
+            - name: NODE_ENV
+              value: "production"
+            - name: LOKI_URL
+              value: "http://loki.{{ .Release.Namespace }}.svc.cluster.local:3100"
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: INSTANCE_LABEL
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:
