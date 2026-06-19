@@ -10,8 +10,14 @@ import {
 import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
 import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { BulkEmailRequest } from '../notify/schemas/bulk-email-request'
+import {
+  BULK_EMAIL_ADDRESS_HEADER,
+  BULK_EMAIL_MAX_REPORTED_ERRORS,
+} from '../notify/schemas/bulk-email.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -124,6 +130,26 @@ export class NotificationService {
   /**
    * Extract channel code, recipients, and delayed send time from notification payload
    */
+  /**
+   * Extract channel code, recipients, and delayed send time from a bulk email payload. Bulk sends
+   * are always a single EMAIL-channel request, with recipient addresses parsed from `rows` (mirroring
+   * how simple sends store their recipients on the parent request).
+   */
+  private extractBulkChannelAndRecipients(payload: BulkEmailRequest): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    const delayedSendTime = payload.delayedSend ? new Date(payload.delayedSend) : null
+    const addresses = this.parseBulkAddresses(payload.rows)
+    return {
+      channel: 'EMAIL',
+      recipients: addresses.length > 0 ? { email: addresses } : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
   private extractChannelAndRecipients(
     payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
   ): {
@@ -187,8 +213,11 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload
-    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+    // Extract channel, recipients, and delayed send time from payload. Bulk sends (recipients in
+    // `rows`) take a dedicated extractor since they don't carry the email/sms/msgApp channel shape.
+    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.rows)
+      ? this.extractBulkChannelAndRecipients(dto.payload as BulkEmailRequest)
+      : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
@@ -207,6 +236,65 @@ export class NotificationService {
       relations: ['tenant'],
     })
     return fullNotification || saved
+  }
+
+  /**
+   * Locate the (case-insensitive) "email address" column in a bulk-send header row.
+   * Returns -1 if the header is missing the column.
+   */
+  private findBulkEmailColumnIndex(header: string[]): number {
+    return header.findIndex(
+      (col) => typeof col === 'string' && col.trim().toLowerCase() === BULK_EMAIL_ADDRESS_HEADER,
+    )
+  }
+
+  /**
+   * Validate a bulk email request's business rules: the template must exist for the tenant and
+   * every row's email address must be well-formed. Returns a bounded list of error strings
+   * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
+   */
+  async validateBulkRules(tenantId: string, dto: BulkEmailRequest): Promise<string[]> {
+    const errors: string[] = []
+
+    const template = await this.templatesRepository.findById(tenantId, dto.template_id)
+    if (!template) {
+      errors.push(`Template '${dto.template_id}' not found for tenant '${tenantId}'`)
+    } else if (template.channelCode !== 'EMAIL') {
+      errors.push(`Template '${dto.template_id}' is not an EMAIL template`)
+    }
+
+    const header = dto.rows[0] ?? []
+    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
+    if (emailColumnIndex === -1) {
+      errors.push(`Header row must include an "${BULK_EMAIL_ADDRESS_HEADER}" column`)
+      return errors
+    }
+
+    for (let i = 1; i < dto.rows.length; i++) {
+      if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
+        errors.push(
+          `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
+        )
+        break
+      }
+      const address = (dto.rows[i]?.[emailColumnIndex] ?? '').trim()
+      if (!address) {
+        errors.push(`Row ${i}: email address is missing`)
+      } else if (!isEmail(address)) {
+        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+      }
+    }
+
+    return errors
+  }
+
+  /**
+   * Extract the recipient email addresses from validated bulk rows (header row skipped).
+   */
+  parseBulkAddresses(rows: string[][]): string[] {
+    const header = rows[0] ?? []
+    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
+    return rows.slice(1).map((row) => (row[emailColumnIndex] ?? '').trim())
   }
 
   async findAll(

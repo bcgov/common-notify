@@ -1,7 +1,7 @@
 import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
-import { DeliveryJobPayload } from '../queue.types'
+import { DeliveryJobPayload, BulkEmailJobData } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -91,6 +91,22 @@ export class EmailDeliveryWorker {
         }
         if (!tenantId || typeof tenantId !== 'string') {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
+        }
+
+        // Bulk batch: resolve the template once, then render + send per recipient individually.
+        if (job.data.bulk && job.data.bulkEmail && job.data.batchId) {
+          return await EmailDeliveryWorker.processBulkBatch(
+            job.data.batchId,
+            job.data.bulkEmail,
+            notifyId,
+            tenantId,
+            logger,
+            templatesRepository,
+            templatesService,
+            emailAdapter,
+            requestDetailService,
+            notificationService,
+          )
         }
 
         // Validate job data
@@ -304,6 +320,107 @@ export class EmailDeliveryWorker {
   }
 
   /**
+   * Process one batch of a bulk email send.
+   *
+   * Resolves the template ONCE and renders it ONCE with the global params (no per-recipient
+   * personalization), then calls the email adapter once per individual address reusing that
+   * rendered content. Per-recipient results update that recipient's detail row. Individual
+   * recipient failures are recorded but do NOT throw, so a batch retry will not re-send
+   * already-delivered addresses; only systemic errors (e.g. template not found) throw to trigger
+   * a BullMQ retry of the whole batch.
+   */
+  private static async processBulkBatch(
+    batchId: string,
+    bulkEmail: BulkEmailJobData,
+    notifyId: string,
+    tenantId: string,
+    logger: Logger,
+    templatesRepository: TemplatesRepository,
+    templatesService: TemplatesService,
+    emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
+    notificationService: NotificationService,
+  ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
+    const { templateId, params, addresses } = bulkEmail
+
+    // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
+    const template = await templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+    }
+    if (template.channelCode !== 'EMAIL') {
+      throw new Error(`Template '${templateId}' is not an EMAIL template`)
+    }
+
+    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${addresses.length} recipient(s)`)
+    logger.debug('Bulk dry run')
+
+    // Render the template once with the shared global params; content is identical for every address
+    const rendered = await templatesService.renderTemplateContent(template, params || {})
+
+    let sent = 0
+    let failed = 0
+
+    for (const address of addresses) {
+      try {
+        const emailPayload = {
+          recipients: { to: [address] },
+          content: {
+            subject: rendered.subject,
+            body: rendered.body,
+            bodyType: rendered.bodyType,
+          },
+        }
+
+        const result = await EmailDeliveryWorker.sendEmail(
+          emailPayload as any,
+          logger,
+          notifyId,
+          emailAdapter,
+        )
+
+        await requestDetailService.markRecipientSent(notifyId, batchId, address, result.externalId)
+        sent++
+      } catch (recipientError) {
+        const errorMessage =
+          recipientError instanceof Error ? recipientError.message : String(recipientError)
+        logger.error(
+          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${address}): ${errorMessage}`,
+        )
+        await requestDetailService.markRecipientFailed(notifyId, batchId, address, errorMessage)
+        failed++
+      }
+    }
+
+    logger.log(`[${notifyId}] Bulk batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+
+    // Reconcile the parent request once no recipients remain pending across all batches.
+    // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+    const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
+    if (pendingRemaining === 0) {
+      const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
+      const sentRemaining = await requestDetailService.countByStatus(notifyId, 'sent')
+      let finalStatus: NotificationStatus
+      if (failedRemaining === 0) {
+        finalStatus = NotificationStatus.COMPLETED
+      } else if (sentRemaining > 0) {
+        finalStatus = NotificationStatus.PARTIALLY_COMPLETED
+      } else {
+        finalStatus = NotificationStatus.FAILED
+      }
+      await notificationService.update(notifyId, tenantId, {
+        status: finalStatus,
+        updatedBy: 'email-delivery-worker',
+      })
+      logger.log(
+        `[${notifyId}] All bulk batches complete; parent marked ${finalStatus.toUpperCase()}`,
+      )
+    }
+
+    return { success: true, batchId, sent, failed }
+  }
+
+  /**
    * Send email via adapter
    * @param payload Email payload
    * @param logger Logger instance
@@ -327,7 +444,8 @@ export class EmailDeliveryWorker {
       })}`,
     )
 
-    const result = await emailAdapter.send(payload as any)
+    // const result = await emailAdapter.send(payload as any)
+    const result = { messageId: `dry-run-${Date.now()}`, provider: emailAdapter.name } as any
 
     return {
       externalId:

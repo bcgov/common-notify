@@ -10,10 +10,10 @@ import { NotificationService } from '../../api/notification/notification.service
 import { NotificationPubSubService } from '../../api/notification/notification-pubsub.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
+import { BulkEmailRequest } from '../../api/notify/schemas/bulk-email-request'
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
-import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
 /**
  * Context required by the Queueable decorator.
@@ -24,7 +24,6 @@ export interface QueueableContext {
   attachmentValidationService: AttachmentValidationService
   attachmentProcessingService: AttachmentProcessingService
   notificationPubSubService?: NotificationPubSubService
-  notificationRequestDetailService: NotificationRequestDetailService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -38,6 +37,156 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
     tenant !== null &&
     typeof (tenant as Record<string, unknown>).id === 'string'
   )
+}
+
+/**
+ * Detect a bulk email payload (the /notifysimple/bulk route). The global ValidationPipe has already
+ * validated the body against BulkEmailRequest, so the presence of a `rows` array is sufficient.
+ */
+function isBulkEmailRequest(payload: unknown): payload is BulkEmailRequest {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    Array.isArray((payload as Record<string, unknown>).rows)
+  )
+}
+
+/**
+ * Handle a bulk email request: validate, persist the parent request, and enqueue ONE ingestion job
+ * carrying every recipient address plus the global params. The ingestion worker fans this out into
+ * per-batch delivery jobs (and creates the per-recipient detail rows), so this does not call
+ * createPending here.
+ */
+async function handleBulkEmail(
+  ctx: QueueableContext,
+  queue: Bull.Queue,
+  queueName: QueueName,
+  tenantId: string,
+  dto: BulkEmailRequest,
+) {
+  const logger = new Logger(`Queueable[${queueName}][bulk]`)
+
+  const errors = await ctx.notificationService.validateBulkRules(tenantId, dto)
+  if (errors.length > 0) {
+    throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
+  }
+
+  const addresses = ctx.notificationService.parseBulkAddresses(dto.rows)
+
+  // Persist the parent request (PENDING) for durability before queuing
+  const notificationRecord = await ctx.notificationService.create({
+    tenantId,
+    status: NotificationStatus.PENDING,
+    createdBy: tenantId,
+    payload: dto as any,
+  })
+  logger.debug(
+    `Bulk notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${addresses.length})`,
+  )
+
+  // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
+  const updateSvc = ctx.notificationPubSubService
+  if (updateSvc) {
+    updateSvc
+      .publish(tenantId, {
+        id: notificationRecord.id,
+        tenantId: notificationRecord.tenantId,
+        status: notificationRecord.status,
+        createdAt: notificationRecord.createdAt,
+        createdBy: notificationRecord.createdBy ?? undefined,
+        updatedAt: notificationRecord.updatedAt,
+        updatedBy: notificationRecord.updatedBy ?? undefined,
+        tenant: notificationRecord.tenant
+          ? {
+              id: notificationRecord.tenant.id,
+              name: notificationRecord.tenant.name,
+              slug: notificationRecord.tenant.slug,
+            }
+          : undefined,
+      })
+      .catch((err: Error) =>
+        logger.error('Failed to publish SSE event on bulk create', { error: err.message }),
+      )
+  }
+
+  // Determine if this is a delayed send and calculate the delay in milliseconds
+  const delayedSendTimestamp = dto.delayedSend
+  let delayMs = 0
+  if (delayedSendTimestamp) {
+    delayMs = Math.max(0, new Date(delayedSendTimestamp).getTime() - Date.now())
+  }
+  const hasDelayedSend = !!delayedSendTimestamp
+
+  const response = {
+    notifyId: notificationRecord.id,
+    templateId: dto.template_id,
+    status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
+    channels: ['email'],
+    createdAt: notificationRecord.createdAt || new Date(),
+    message: hasDelayedSend
+      ? `Bulk send scheduled for delivery at ${delayedSendTimestamp} with ${addresses.length} recipient(s)`
+      : `Bulk send accepted with ${addresses.length} recipient(s)`,
+  }
+
+  // Fire off queueing asynchronously - don't block the response.
+  // If queuing fails (e.g. Redis down), the record stays PENDING for the retry job.
+  setImmediate(async () => {
+    try {
+      const jobPayload = {
+        notifyId: notificationRecord.id,
+        tenantId,
+        request: { templateId: dto.template_id },
+        requestedAt: new Date().toISOString(),
+        bulk: true,
+        bulkEmail: {
+          name: dto.name,
+          templateId: dto.template_id,
+          params: dto.params,
+          addresses,
+        },
+        ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
+      }
+
+      const queueOptions: any = {
+        jobId: notificationRecord.id,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: false,
+        removeOnFail: false,
+      }
+
+      // Add delay if this is a scheduled send
+      if (delayMs > 0) {
+        queueOptions.delay = delayMs
+      }
+
+      await queue.add(jobPayload, queueOptions)
+
+      logger.log(
+        `Bulk ingestion job enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,
+      )
+
+      // For scheduled sends keep status as SCHEDULED; for immediate sends update to QUEUED
+      try {
+        await ctx.notificationService.update(notificationRecord.id, tenantId, {
+          status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.QUEUED,
+          updatedBy: 'system',
+        })
+      } catch (updateError) {
+        logger.error(`Failed to update status after queuing bulk job: ${notificationRecord.id}`, {
+          tenantId,
+          error: (updateError as Error).message,
+        })
+      }
+    } catch (queueError) {
+      logger.warn(`Failed to enqueue bulk job (will be retried): ${notificationRecord.id}`, {
+        tenantId,
+        error: (queueError as Error).message,
+      })
+    }
+  })
+
+  return response
 }
 
 /**
@@ -113,6 +262,11 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         const tenantId = tenant.id
 
+        // Bulk email send: a different payload/flow that fans out into batches downstream.
+        if (isBulkEmailRequest(payload)) {
+          return await handleBulkEmail(this as QueueableContext, queue, queueName, tenantId, payload)
+        }
+
         // Payload is guaranteed to be valid by global ValidationPipe
         // (guards run before ValidationPipe in NestJS middleware chain)
         const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
@@ -181,12 +335,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           })
           throw dbError
         }
-
-        await (this as QueueableContext).notificationRequestDetailService.createPending(
-          notificationRecord.id,
-          processedPayload,
-          tenantId,
-        )
 
         // Return 202 Accepted immediately without waiting for queue operation
         // Queue operation continues asynchronously in the background
@@ -277,10 +425,6 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
                   status: statusAfterQueuing,
                   updatedBy: 'system',
                 },
-              )
-              await (this as QueueableContext).notificationRequestDetailService.updateStatus(
-                notificationRecord.id,
-                statusAfterQueuing,
               )
             } catch (updateError) {
               logger.error(`Failed to update status after queuing: ${notificationRecord.id}`, {

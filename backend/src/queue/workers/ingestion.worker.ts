@@ -79,6 +79,63 @@ export class IngestionWorker {
           throw new Error('Invalid request: request payload is missing or invalid')
         }
 
+        // Bulk email send: split recipients into fixed-size batches and fan out one
+        // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
+        if (job.data.bulk && job.data.bulkEmail) {
+          const { name, templateId, params, addresses } = job.data.bulkEmail
+          const batchSize = configService?.get<number>('queue.batchSize') || 100
+
+          logger.log(
+            `[${notifyId}] Processing bulk email job: ${addresses.length} recipient(s), batchSize=${batchSize}`,
+          )
+
+          let batchIndex = 0
+          for (let start = 0; start < addresses.length; start += batchSize) {
+            const chunk = addresses.slice(start, start + batchSize)
+            // Format: {notification_request id}-{channel}-{index}; reused as the delivery jobId
+            // so a failed batch is easy to identify and retry.
+            const batchId = `${notifyId}-${NotificationChannel.EMAIL}-${batchIndex}`
+
+            await requestDetailService.createBulkPending(notifyId, batchId, chunk, tenantId)
+
+            const deliveryPayload: DeliveryJobPayload = {
+              notifyId,
+              tenantId,
+              channel: NotificationChannel.EMAIL,
+              request,
+              payload: {} as any,
+              attempt: 0,
+              bulk: true,
+              batchId,
+              bulkEmail: { name, templateId, params, addresses: chunk },
+            }
+
+            await emailQueue.add(deliveryPayload, {
+              jobId: batchId,
+              removeOnComplete: true,
+              removeOnFail: false,
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 2000 },
+            })
+
+            logger.log(
+              `[${notifyId}] Queued bulk batch ${batchIndex} (batchId=${batchId}, recipients=${chunk.length})`,
+            )
+            batchIndex++
+          }
+
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.PROCESSING,
+            updatedBy: 'ingestion-worker',
+          })
+
+          logger.log(`[${notifyId}] Bulk email job fanned out into ${batchIndex} batch(es)`)
+          return { success: true, deliveryJobsQueued: batchIndex }
+        } else {
+          // Create notification request detail entries for non-bulk request
+          await requestDetailService.createPending(notifyId, request, tenantId)
+        }
+
         const channelAttachments = [
           ...(request.email?.attachments ?? []),
           ...(request.sms?.attachments ?? []),
@@ -273,6 +330,8 @@ export class IngestionWorker {
           updatedBy: 'ingestion-worker',
         })
 
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -286,6 +345,7 @@ export class IngestionWorker {
           status: NotificationStatus.FAILED,
           updatedBy: 'ingestion-worker',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED)
 
         // Re-throw to trigger BullMQ retry logic
         throw error

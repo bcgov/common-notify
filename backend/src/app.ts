@@ -23,9 +23,10 @@ export async function bootstrap() {
   // Store ModuleRef globally for decorator access (used by @Queueable)
   ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
-  // Add body parsers for form data
-  app.use(bodyParser.urlencoded({ extended: true }))
-  app.use(bodyParser.json())
+  // Add body parsers for form data. The JSON limit is raised above the 100KB
+  // default so a full-size bulk send (up to BULK_EMAIL_MAX_RECIPIENTS rows) fits.
+  app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
+  app.use(bodyParser.json({ limit: '10mb' }))
 
   app.useGlobalPipes(
     new ValidationPipe({
