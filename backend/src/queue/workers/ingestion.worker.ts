@@ -53,6 +53,7 @@ export class IngestionWorker {
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    requestDetailService: NotificationRequestDetailService,
     configService: ConfigService,
     clamavService?: ClamavService,
     concurrency: number = 1,
@@ -159,6 +160,7 @@ export class IngestionWorker {
                   quarantineDetails,
                   updatedBy: 'ingestion-worker-scanner',
                 })
+                await requestDetailService.updateStatus(notifyId, NotificationStatus.QUARANTINED)
 
                 logger.log(
                   `[${notifyId}] Notification marked as QUARANTINED due to malware detection`,

@@ -19,6 +19,7 @@ import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/token
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import type { ParsedListQuery } from '../../common/query/list-query.types'
 
 /**
  * Service for template business logic
@@ -45,34 +46,18 @@ export class TemplatesService {
   /**
    * List all active templates for a tenant
    * @param tenantId The tenant ID
-   * @param page Page number (1-indexed)
-   * @param limit Items per page (max 100)
+   * @param parsedQuery Parsed list query with pagination, sort, and filter
    */
   async listTemplates(
     tenantId: string,
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
+    parsedQuery: ParsedListQuery,
   ): Promise<PaginatedTemplateResponse> {
-    // Validate pagination limits
-    if (limit > 100) {
-      throw new BadRequestException('Limit must not exceed 100 items per page')
-    }
-    if (limit < 1) {
-      throw new BadRequestException('Limit must be at least 1')
-    }
-    if (page < 1) {
-      throw new BadRequestException('Page must be at least 1')
-    }
+    // Extract pagination info from parsed query
+    const page = parsedQuery.page
+    const limit = parsedQuery.limit
 
-    // Convert page number to offset (1-indexed to 0-indexed)
-    const offset = (page - 1) * limit
-    const [templates, total] = await this.templatesRepository.findByTenantId(
-      tenantId,
-      limit,
-      offset,
-      search,
-    )
+    // Query templates using the parsed query (with filters and sorts applied)
+    const [templates, total] = await this.templatesRepository.findWithQuery(tenantId, parsedQuery)
     return {
       data: templates.map((t) => this.toResponseDto(t)),
       count: total,
@@ -80,28 +65,6 @@ export class TemplatesService {
       limit,
       totalPages: Math.ceil(total / limit),
     }
-  }
-
-  /**
-   * List all active templates for a tenant by external (CSTAR) ID
-   * @param tenantExternalId The tenant external ID
-   * @param page Page number (1-indexed)
-   * @param limit Items per page (max 100)
-   */
-  async listTemplatesByExternalId(
-    tenantExternalId: string,
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-  ): Promise<PaginatedTemplateResponse> {
-    // Look up tenant by external ID and get internal ID
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new NotFoundException(`Tenant with external ID '${tenantExternalId}' not found`)
-    }
-
-    // Use the internal tenant ID to list templates
-    return this.listTemplates(tenant.id, page, limit, search)
   }
 
   /**
@@ -137,6 +100,9 @@ export class TemplatesService {
       throw new ConflictException(`Template name "${createDto.name}" already exists`)
     }
 
+    const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
+    const bodyType = engineCode === TemplateEngine.MJML ? null : (createDto.bodyType ?? 'html')
+
     const template = await this.templatesRepository.create({
       tenantId,
       name: createDto.name,
@@ -144,8 +110,8 @@ export class TemplatesService {
       channelCode: createDto.channelCode,
       subject: createDto.subject,
       body: createDto.body,
-      engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
-      bodyType: createDto.bodyType || 'html',
+      engineCode,
+      bodyType,
       version: 1,
       active: true,
       createdBy: userId,
@@ -205,13 +171,18 @@ export class TemplatesService {
     }
 
     // Update the template
+    const nextEngineCode = updateDto.engineCode || template.engineCode
     template.name = updateDto.name || template.name
     template.description = updateDto.description ?? template.description
     template.channelCode = updateDto.channelCode || template.channelCode
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
-    template.engineCode = updateDto.engineCode || template.engineCode
-    template.bodyType = updateDto.bodyType ?? template.bodyType
+    template.engineCode = nextEngineCode
+    if (nextEngineCode === TemplateEngine.MJML) {
+      template.bodyType = null
+    } else {
+      template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'html'
+    }
     template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)

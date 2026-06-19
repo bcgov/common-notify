@@ -103,8 +103,8 @@ export class Template {
    * Body content type: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
    * Determines rendering behavior during template rendering
    */
-  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html' })
-  bodyType: 'text' | 'markdown' | 'html'
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html', nullable: true })
+  bodyType?: 'text' | 'markdown' | 'html' | null
 
   /**
    * Current version number
