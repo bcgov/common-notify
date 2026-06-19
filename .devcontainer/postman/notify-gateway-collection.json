@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "d9ee190c-7abc-4ab0-aa5f-bc78e7f9dc11",
+    "_postman_id": "24de6636-90ac-4809-95a0-93a94de7c67c",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -217,25 +217,45 @@
           "name": "Notification Request - List",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant-1}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{gateway_url}}/api/v1/frontend/notification_request",
+              "raw": "{{gateway_url}}/api/v1/frontend/notification_request?tenantId={{tenant-1}}&page=1&limit=10&sort=-createdAt,status&filter=status:eq:completed&filter=createdAt:gte:2026-01-01T00:00:00.000Z",
               "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "frontend", "notification_request"],
               "query": [
                 {
-                  "key": "skip",
-                  "value": "0",
-                  "disabled": true
+                  "key": "tenantId",
+                  "value": "{{tenant-1}}"
                 },
                 {
-                  "key": "take",
-                  "value": "10",
-                  "disabled": true
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "-createdAt,status"
+                },
+                {
+                  "key": "filter",
+                  "value": "status:eq:completed"
+                },
+                {
+                  "key": "filter",
+                  "value": "createdAt:gte:2026-01-01T00:00:00.000Z"
                 }
               ]
             },
-            "description": "Retrieve list of notification requests via the API Gateway."
+            "description": "Retrieve list of notification requests via the API Gateway. Optional query params support `sort` (comma-separated fields) and repeatable `filter` values in `field:operator:value` format."
           },
           "response": []
         }
@@ -1663,17 +1683,28 @@
               ]
             },
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify?limit=10",
+              "raw": "http://localhost:3000/api/v1/notification_request?limit=10&sort=createdAt",
               "protocol": "http",
               "host": ["localhost"],
               "port": "3000",
-              "path": ["api", "v1", "notify"],
+              "path": ["api", "v1", "notification_request"],
               "query": [
                 {
                   "key": "limit",
                   "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt"
                 }
               ]
             },
@@ -1751,7 +1782,11 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notify/registerCallback",
@@ -1791,7 +1826,11 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"active\": false\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",

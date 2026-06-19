@@ -200,7 +200,6 @@ export class S3AttachmentStorageService implements AttachmentStorage {
 
     if (
       typeof body === 'object' &&
-      body !== null &&
       'transformToByteArray' in body &&
       typeof (body as { transformToByteArray?: unknown }).transformToByteArray === 'function'
     ) {

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
@@ -53,6 +54,7 @@ export class IngestionWorker {
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    requestDetailService: NotificationRequestDetailService,
     configService: ConfigService,
     clamavService?: ClamavService,
     concurrency: number = 1,
@@ -159,6 +161,7 @@ export class IngestionWorker {
                   quarantineDetails,
                   updatedBy: 'ingestion-worker-scanner',
                 })
+                await requestDetailService.updateStatus(notifyId, NotificationStatus.QUARANTINED)
 
                 logger.log(
                   `[${notifyId}] Notification marked as QUARANTINED due to malware detection`,

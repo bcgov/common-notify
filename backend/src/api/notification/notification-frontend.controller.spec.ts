@@ -1,36 +1,47 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import type { INestApplication, CanActivate, ExecutionContext } from '@nestjs/common'
+import { VersioningType } from '@nestjs/common'
+import request from 'supertest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { NotificationStatus } from './schemas/create-notification-request'
-import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
-import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+
+// Mock guard to bypass authentication and populate request.tenant, mirroring what
+// NotifyFrontendRoleGuard does after validating the x-tenant-id header against CSTAR.
+const mockAuthGuard: CanActivate = {
+  canActivate: (context: ExecutionContext) => {
+    const req = context.switchToHttp().getRequest()
+    req.tenant = {
+      id: 'test-tenant-id',
+      externalId: 'cstar-tenant-external-id',
+      name: 'Test Tenant',
+      slug: 'test-tenant',
+    }
+    return true
+  },
+}
 
 const mockNotificationService = {
   findAll: vi.fn(),
 }
 
+const mockNotificationRequestDetailService = {
+  findAllByTenantId: vi.fn(),
+  findByRequestId: vi.fn(),
+}
+
 const mockNotificationPubSubService = {
-  publish: vi.fn(),
-  subscribe: vi.fn(),
-}
-
-const mockTenantsService = {
-  findByExternalId: vi.fn(),
-  findOne: vi.fn(),
-}
-
-const mockFeatureFlagService = {
-  getFlagsForTenant: vi.fn().mockResolvedValue({
-    sms_notifications: true,
-  }),
+  getObservable: vi.fn(),
 }
 
 describe('NotificationFrontendController', () => {
-  let controller: NotificationFrontendController
+  let app: INestApplication
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,117 +52,85 @@ describe('NotificationFrontendController', () => {
           useValue: mockNotificationService,
         },
         {
+          provide: NotificationRequestDetailService,
+          useValue: mockNotificationRequestDetailService,
+        },
+        {
           provide: NotificationPubSubService,
           useValue: mockNotificationPubSubService,
-        },
-        {
-          provide: TenantsService,
-          useValue: mockTenantsService,
-        },
-        {
-          provide: FeatureFlagService,
-          useValue: mockFeatureFlagService,
         },
       ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)
-      .useValue({})
+      .useValue(mockAuthGuard)
+      .overrideGuard(FeatureFlagGuard)
+      .useValue({ canActivate: () => true })
       .compile()
 
-    controller = module.get<NotificationFrontendController>(NotificationFrontendController)
+    app = module.createNestApplication()
+    app.enableVersioning({
+      type: VersioningType.URI,
+      prefix: 'api/v',
+    })
+    await app.init()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await app.close()
     vi.clearAllMocks()
   })
 
-  describe('findAll', () => {
-    it('should delegate to notificationService.findAll with default parameters', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      }
+  it('should be defined', () => {
+    const controller = app.get(NotificationFrontendController)
+    expect(controller).toBeDefined()
+  })
+
+  describe('GET /api/v1/frontend/notification_request', () => {
+    it('should delegate to notificationService.findAll using the tenant from the request context', async () => {
+      const mockResponse = { data: [], count: 0, page: 1, limit: 10, totalPages: 0 }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-123', undefined, undefined, undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-123', 1, 10, undefined)
-      expect(result).toEqual(mockResponse)
-    })
-
-    it('should parse page parameter as integer', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 2,
-        limit: 10,
-        totalPages: 0,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-456', '2', undefined, undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-456', 2, 10, undefined)
-    })
-
-    it('should parse limit parameter as integer', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 20,
-        totalPages: 0,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-789', undefined, '20', undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-789', 1, 20, undefined)
-    })
-
-    it('should pass status filter to service', async () => {
-      const mockResponse = {
-        data: [{ id: 'notif-1', status: NotificationStatus.COMPLETED }],
-        count: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-111', undefined, undefined, NotificationStatus.COMPLETED)
+      await request(app.getHttpServer()).get('/api/v1/frontend/notification_request').expect(200)
 
       expect(mockNotificationService.findAll).toHaveBeenCalledWith(
-        'tenant-111',
-        1,
-        10,
-        NotificationStatus.COMPLETED,
+        'cstar-tenant-external-id',
+        expect.objectContaining({}),
       )
     })
 
-    it('should handle all parameters together', async () => {
-      const mockResponse = {
-        data: [{ id: 'notif-1', status: NotificationStatus.QUEUED }],
-        count: 5,
-        page: 3,
-        limit: 15,
-        totalPages: 1,
-      }
+    it('should ignore a client-supplied tenantId query parameter and use the authenticated tenant instead', async () => {
+      const mockResponse = { data: [], count: 0, page: 1, limit: 10, totalPages: 0 }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      await controller.findAll('tenant-222', '3', '15', NotificationStatus.QUEUED)
+      await request(app.getHttpServer())
+        .get('/api/v1/frontend/notification_request?tenantId=some-other-tenant')
+        .expect(200)
 
       expect(mockNotificationService.findAll).toHaveBeenCalledWith(
-        'tenant-222',
-        3,
-        15,
-        NotificationStatus.QUEUED,
+        'cstar-tenant-external-id',
+        expect.objectContaining({}),
       )
-      expect(mockResponse.page).toBe(3)
-      expect(mockResponse.limit).toBe(15)
+    })
+
+    it('should forward list query parameters to the service', async () => {
+      const mockResponse = { data: [], count: 0, page: 2, limit: 20, totalPages: 0 }
+      mockNotificationService.findAll.mockResolvedValue(mockResponse)
+
+      await request(app.getHttpServer())
+        .get(
+          '/api/v1/frontend/notification_request?page=2&limit=20&sort=-createdAt,status&filter=status:eq:QUEUED&filter=channelCode:in:EMAIL|SMS',
+        )
+        .expect(200)
+
+      expect(mockNotificationService.findAll).toHaveBeenCalledWith(
+        'cstar-tenant-external-id',
+        expect.objectContaining({
+          page: '2',
+          limit: '20',
+          sort: '-createdAt,status',
+          filter: ['status:eq:QUEUED', 'channelCode:in:EMAIL|SMS'],
+        }),
+      )
     })
 
     it('should return paginated response from service', async () => {
@@ -168,147 +147,31 @@ describe('NotificationFrontendController', () => {
       }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-333', '1', '10', undefined)
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/frontend/notification_request')
+        .expect(200)
 
-      expect(result.data).toEqual(mockNotifications)
-      expect(result.count).toBe(25)
-      expect(result.totalPages).toBe(3)
+      expect(res.body.data).toEqual(mockNotifications)
+      expect(res.body.count).toBe(25)
+      expect(res.body.totalPages).toBe(3)
     })
 
-    it('should handle empty response from service', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 5,
-        limit: 10,
-        totalPages: 0,
-      }
+    it('should return empty data array when no notifications exist', async () => {
+      const mockResponse = { data: [], count: 0, page: 1, limit: 10, totalPages: 0 }
       mockNotificationService.findAll.mockResolvedValue(mockResponse)
 
-      const result = await controller.findAll('tenant-444', '5', '10', undefined)
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/frontend/notification_request')
+        .expect(200)
 
-      expect(result.data).toEqual([])
-      expect(result.count).toBe(0)
+      expect(res.body.data).toEqual([])
+      expect(res.body.count).toBe(0)
     })
 
-    it('should handle service errors', async () => {
-      const error = new Error('Database error')
-      mockNotificationService.findAll.mockRejectedValue(error)
+    it('should propagate service errors as a 500 response', async () => {
+      mockNotificationService.findAll.mockRejectedValue(new Error('Database error'))
 
-      await expect(
-        controller.findAll('tenant-555', undefined, undefined, undefined),
-      ).rejects.toThrow('Database error')
-    })
-
-    it('should handle non-numeric page parameter', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      }
-      // parseInt('invalid', 10) returns NaN
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-666', 'invalid', undefined, undefined)
-
-      // Service should be called with NaN
-      expect(mockNotificationService.findAll).toHaveBeenCalled()
-    })
-
-    it('should handle non-numeric limit parameter', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-777', undefined, 'invalid', undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalled()
-    })
-
-    it('should support zero-based and large page numbers', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 999,
-        limit: 10,
-        totalPages: 100,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-888', '999', undefined, undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-888', 999, 10, undefined)
-    })
-
-    it('should support large limit values', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 100,
-        totalPages: 1,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      await controller.findAll('tenant-999', undefined, '100', undefined)
-
-      expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-999', 1, 100, undefined)
-    })
-
-    it('should handle multiple status values (service handles filtering)', async () => {
-      const mockResponse = {
-        data: [],
-        count: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      const allStatuses = [
-        NotificationStatus.QUEUED,
-        NotificationStatus.PROCESSING,
-        NotificationStatus.COMPLETED,
-        NotificationStatus.FAILED,
-      ]
-
-      for (const status of allStatuses) {
-        await controller.findAll('tenant-aaa', undefined, undefined, status)
-        expect(mockNotificationService.findAll).toHaveBeenCalledWith('tenant-aaa', 1, 10, status)
-      }
-    })
-
-    it('should maintain service response structure integrity', async () => {
-      const mockNotification = {
-        id: 'unique-id',
-        tenantId: 'tenant-id',
-        status: NotificationStatus.COMPLETED,
-        createdAt: new Date(),
-        createdBy: 'user-id',
-        updatedAt: new Date(),
-        updatedBy: 'admin-id',
-      }
-      const mockResponse = {
-        data: [mockNotification],
-        count: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      }
-      mockNotificationService.findAll.mockResolvedValue(mockResponse)
-
-      const result = await controller.findAll(undefined, undefined, undefined)
-
-      expect(result.data[0]).toEqual(mockNotification)
-      expect(result.data[0].id).toBe('unique-id')
-      expect(result.data[0].status).toBe(NotificationStatus.COMPLETED)
+      await request(app.getHttpServer()).get('/api/v1/frontend/notification_request').expect(500)
     })
   })
 })
