@@ -1,4 +1,0 @@
-backend:
-  s3:
-    bucket: notify-dev
-    region: ca-central-1

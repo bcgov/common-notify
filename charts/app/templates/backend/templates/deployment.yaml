@@ -98,7 +98,7 @@ spec:
             - name: S3_ENDPOINT
               value: {{ .Values.backend.s3.endpoint | quote }}
             - name: S3_BUCKET
-              value: {{ .Values.backend.s3.bucket | quote }}
+              value: {{ if contains "-dev" .Release.Namespace }}{{ .Values.backend.s3.buckets.dev | quote }}{{ else if contains "-test" .Release.Namespace }}{{ .Values.backend.s3.buckets.test | quote }}{{ else if contains "-prod" .Release.Namespace }}{{ .Values.backend.s3.buckets.prod | quote }}{{ else }}{{ .Values.backend.s3.buckets.dev | quote }}{{ end }}
             - name: S3_REGION
               value: {{ .Values.backend.s3.region | quote }}
             - name: S3_FORCE_PATH_STYLE
