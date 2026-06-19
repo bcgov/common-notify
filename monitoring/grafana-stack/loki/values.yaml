@@ -130,8 +130,9 @@ test:
 
 # OpenShift-specific RBAC configuration
 rbac:
+  create: false  # Disable RBAC creation - use OpenShift defaults
   pspEnabled: false
   sccEnabled: false  # Disable SCC creation (requires cluster-admin)
   namespaced: true  # Use namespace-only RBAC, not cluster-wide
 serviceAccount:
-  create: true
+  create: false  # Use default OpenShift service account
