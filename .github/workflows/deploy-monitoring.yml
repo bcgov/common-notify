@@ -66,10 +66,19 @@ jobs:
 
             echo "📦 Deploying Loki to ${NAMESPACE}"
 
+            # Select values file based on environment (minimal storage for test/prod)
+            if [ "$ENV" = "dev" ]; then
+              LOKI_VALUES="monitoring/grafana-stack/loki/values.yaml"
+              echo "Using dev values (3Gi storage, 7 days retention)"
+            else
+              LOKI_VALUES="monitoring/grafana-stack/loki/values-minimal.yaml"
+              echo "Using minimal values for ${ENV} (1Gi storage, 3 days retention)"
+            fi
+
             # Deploy Loki (matching manual deployment)
             helm upgrade --install loki grafana/loki \
               --namespace ${NAMESPACE} \
-              --values monitoring/grafana-stack/loki/values.yaml \
+              --values ${LOKI_VALUES} \
               --set loki.schemaConfig.configs[0].from=2024-01-01 \
               --set loki.schemaConfig.configs[0].store=tsdb \
               --set loki.schemaConfig.configs[0].object_store=filesystem \
