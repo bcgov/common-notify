@@ -2,7 +2,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: loki-allow-ingress
-  namespace: f6bc3f-dev
 spec:
   podSelector:
     matchLabels:
