@@ -175,6 +175,7 @@
       <table name="notification_channel_code" numRows="2" remarks="Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS).&#10;This ensures consistency with the NotificationChannel TypeScript enum." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="channel_code" nullable="false" remarks="Channel code (e.g., EMAIL, SMS). Primary key." size="20" type="varchar" typeCode="12">
             <child column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
             <child column="channel_code" foreignKey="fk_template_version_channel" implied="false" onDeleteCascade="false" schema="notify" table="template_version"/>
          </column>
@@ -213,6 +214,7 @@
       </table>
       <table name="notification_request" remarks="Stores all incoming notification requests for auditing and tracking" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the notification request" size="2147483647" type="uuid" typeCode="1111">
+            <child column="notification_request_id" foreignKey="fk_notification_request" implied="false" onDeleteCascade="true" schema="notify" table="notification_request_detail"/>
             <child column="notification_id" foreignKey="webhook_delivery_log_notification_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_delivery_log"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant that submitted the request" size="2147483647" type="uuid" typeCode="1111">
@@ -251,6 +253,48 @@
             <column ascending="true" name="tenant_id"/>
          </index>
       </table>
+      <table name="notification_request_detail" remarks="Tracks individual delivery status for each recipient in a notification request" schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for this delivery attempt" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="notification_request_id" nullable="false" remarks="Reference to the parent notification request" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_notification_request" implied="false" onDeleteCascade="true" schema="notify" table="notification_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="recipient_address" nullable="false" remarks="Address of the recipient (email, phone number, etc)" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'EMAIL'::character varying" digits="0" id="3" name="channel" nullable="false" remarks="Channel used for delivery (email, sms, etc)" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="email_address_type" nullable="true" remarks="Email address role (primary, cc, bcc); null for non-email channels" size="10" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'pending'::character varying" digits="0" id="5" name="status" nullable="false" remarks="Current delivery status (pending, sent, failed, bounced)" size="20" type="varchar" typeCode="12">
+            <parent column="code" foreignKey="fk_delivery_status" implied="false" onDeleteCascade="false" schema="notify" table="notification_status_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="provider_response_id" nullable="true" remarks="Message ID or transaction ID from the provider (GC Notify, etc)" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="provider_response" nullable="true" remarks="Full JSON response from the provider for debugging" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="error_message" nullable="true" remarks="Error message if delivery failed" size="2147483647" type="text" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="9" name="attempt_count" nullable="false" remarks="Number of delivery attempts made" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="last_attempt_at" nullable="true" remarks="Timestamp of the most recent delivery attempt" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="11" name="created_at" nullable="false" remarks="Timestamp when the delivery record was created" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="created_by" nullable="true" remarks="User or system that created the record" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the record was last updated" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="14" name="updated_by" nullable="true" remarks="User or system that last updated the record" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="notification_request_detail_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_notification_request_detail_recipient" unique="false">
+            <column ascending="true" name="recipient_address"/>
+         </index>
+         <index name="idx_notification_request_detail_request_id" unique="false">
+            <column ascending="true" name="notification_request_id"/>
+         </index>
+         <index name="idx_notification_request_detail_status" unique="false">
+            <column ascending="true" name="status"/>
+         </index>
+         <index name="uq_notification_request_detail_recipient" unique="true">
+            <column ascending="true" name="notification_request_id"/>
+            <column ascending="true" name="recipient_address"/>
+            <column ascending="true" name="channel"/>
+         </index>
+         <checkConstraint constraint="((email_address_type)::text = ANY ((ARRAY['primary'::character varying, 'cc'::character varying, 'bcc'::character varying])::text[]))" name="notification_request_detail_email_address_type_check"/>
+      </table>
       <table name="notification_request_history" remarks="Immutable audit log of all changes to notification_request. Each row captures a complete snapshot after INSERT/UPDATE/DELETE. Populated automatically by audit_history() trigger." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="Unique identifier for this history record" size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="Foreign key to notification_request.id that was changed" size="2147483647" type="uuid" typeCode="1111"/>
@@ -281,6 +325,7 @@
       <table name="notification_status_code" remarks="Lookup table for notification request statuses" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="Unique status code identifier" size="20" type="varchar" typeCode="12">
             <child column="status" foreignKey="fk_notification_status" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="status" foreignKey="fk_delivery_status" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the status" size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the record was created" size="35" type="timestamptz" typeCode="93"/>
@@ -347,7 +392,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="11" name="created_at" nullable="false" remarks="Timestamp when the template was created." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="updated_by" nullable="false" remarks="User or process that last updated this template." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the template was last updated." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="14" name="body_type" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="14" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -414,7 +459,7 @@
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="created_by" nullable="false" remarks="User or process that created this version." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="Timestamp when this version was created." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="11" name="body_type" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="11" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_version_pkey" unique="true">
             <column ascending="true" name="id"/>

@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>notification_status_code - default.notify</title>
+        <title>notification_request_detail - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>notification_status_code</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>notification_request_detail</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>Lookup table for notification request statuses</p>
+                            <p>Tracks individual delivery status for each recipient in a notification request</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -122,34 +122,46 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="code">code</span></td>
-                                    <td>varchar</td>
-                                    <td>20</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="id">id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>notify.uuid_generate_v4()</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Unique identifier for this delivery attempt</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="notification_request_id">notification_request_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
                                     <td title=''></td>
                                     <td title=''></td>
                                     <td>null</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="notification_request.status references notification_status_code.code via fk_notification_status"><a href='notification_request.html'>notification_request</a><span class='relatedKey'>.status</span></td>
-                                                <td class="constraint detail">fk_notification_status</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td title="notification_request_detail.status references notification_status_code.code via fk_delivery_status"><a href='notification_request_detail.html'>notification_request_detail</a><span class='relatedKey'>.status</span></td>
-                                                <td class="constraint detail">fk_delivery_status</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="notification_request_detail.notification_request_id references notification_request.id via fk_notification_request"><a href='notification_request.html'>notification_request</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_notification_request</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
                                         </table>
                                     </td>
-                                    <td><p>Unique status code identifier</p></td>
+                                    <td><p>Reference to the parent notification request</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="description">description</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="recipient_address">recipient_address</span></td>
                                     <td>varchar</td>
                                     <td>255</td>
                                     <td title=''></td>
@@ -163,7 +175,153 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Human-readable description of the status</p></td>
+                                    <td><p>Address of the recipient (email, phone number, etc)</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel">channel</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>&#39;EMAIL&#39;::character varying</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="notification_request_detail.channel references notification_channel_code.channel_code via fk_channel_code"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_channel_code</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Channel used for delivery (email, sms, etc)</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="email_address_type">email_address_type</span></td>
+                                    <td>varchar</td>
+                                    <td>10</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Email address role (primary, cc, bcc); null for non-email channels</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="status">status</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>&#39;pending&#39;::character varying</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="notification_request_detail.status references notification_status_code.code via fk_delivery_status"><a href='notification_status_code.html'>notification_status_code</a><span class='relatedKey'>.code</span></td>
+                                                <td class="constraint detail">fk_delivery_status</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Current delivery status (pending, sent, failed, bounced)</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="provider_response_id">provider_response_id</span></td>
+                                    <td>varchar</td>
+                                    <td>255</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Message ID or transaction ID from the provider (GC Notify, etc)</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="provider_response">provider_response</span></td>
+                                    <td>jsonb</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Full JSON response from the provider for debugging</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="error_message">error_message</span></td>
+                                    <td>text</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Error message if delivery failed</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="attempt_count">attempt_count</span></td>
+                                    <td>int4</td>
+                                    <td>10</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>0</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Number of delivery attempts made</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="last_attempt_at">last_attempt_at</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Timestamp of the most recent delivery attempt</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="created_at">created_at</span></td>
@@ -180,7 +338,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp when the record was created</p></td>
+                                    <td><p>Timestamp when the delivery record was created</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="created_by">created_by</span></td>
@@ -233,40 +391,6 @@
                                     </td>
                                     <td><p>User or system that last updated the record</p></td>
                                 </tr>
-                                <tr>
-                                    <td><span id="display_name">display_name</span></td>
-                                    <td>varchar</td>
-                                    <td>100</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>&#39;&#39;::character varying</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Sentence-case display name for UI rendering (e.g., &ldquo;Queued&rdquo;, &ldquo;Processing&rdquo;). Used in dropdowns and forms.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="sort_order">sort_order</span></td>
-                                    <td>int4</td>
-                                    <td>10</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>999</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td></td>
-                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -298,14 +422,70 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> notification_status_code_pkey</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> notification_request_detail_pkey</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>code</td>
+                                    <td>id</td>
+                                </tr>
+                                <tr>
+                                    <td title='Indexed'>idx_notification_request_detail_recipient</td>
+                                    <td>Performance</td>
+                                    <td><span title='Ascending'>Asc</span></td>
+                                    <td>recipient_address</td>
+                                </tr>
+                                <tr>
+                                    <td title='Indexed'>idx_notification_request_detail_request_id</td>
+                                    <td>Performance</td>
+                                    <td><span title='Ascending'>Asc</span></td>
+                                    <td>notification_request_id</td>
+                                </tr>
+                                <tr>
+                                    <td title='Indexed'>idx_notification_request_detail_status</td>
+                                    <td>Performance</td>
+                                    <td><span title='Ascending'>Asc</span></td>
+                                    <td>status</td>
+                                </tr>
+                                <tr>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_notification_request_detail_recipient</td>
+                                    <td>Must be unique</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>notification_request_id + recipient_address + channel</td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div><!-- /.box-body -->
+                    </div>
+                    <div class="box box-primary">
+                        <div class="box-header with-border">
+                            <i class="fa fa-sitemap"></i>
+                            <h3 class="box-title">Check Constraints</h3>
+                            <div class="box-tools pull-right">
+                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="box-body">
+                            <table
+                                    id="check_table"
+                                    class="table table-bordered table-striped dataTable"
+                                    role="grid"
+                                    data-paging="true"
+                                    data-page-length="10"
+                                    data-length-change="false">
+                                <thead align='left'>
+                                <tr>
+                                    <th>Constraint Name</th>
+                                    <th>Constraint</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>notification_request_detail_email_address_type_check</td>
+                                    <td>((email_address_type)::text &#61; ANY ((ARRAY[&#39;primary&#39;::character varying, &#39;cc&#39;::character varying, &#39;bcc&#39;::character varying])::text[]))</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
@@ -326,22 +506,25 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="431,5,672,269">
-<area shape="rect" id="node2" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="5,152,387,456">
-<area shape="rect" id="node3" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="716,53,1009,288">
+<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="337,5,579,269">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,223,293,369">
+<area shape="rect" id="node3" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="13,76,286,193">
+<area shape="rect" id="node4" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="623,133,1028,643">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_status_code.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_request_detail.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="431,155,672,243">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="52,5,340,93">
-<area shape="rect" id="node3" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="5,111,387,415">
-<area shape="rect" id="node4" href="tenant.html" target="_top" title="tenant" alt="" coords="129,432,263,520">
-<area shape="rect" id="node5" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="716,84,1009,172">
-<area shape="rect" id="node6" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="735,205,990,293">
+<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="337,336,579,424">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,163,293,251">
+<area shape="rect" id="node3" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="13,280,286,368">
+<area shape="rect" id="node4" href="tenant.html" target="_top" title="tenant" alt="" coords="83,495,216,583">
+<area shape="rect" id="node5" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="623,111,1028,620">
+<area shape="rect" id="node6" href="template.html" target="_top" title="template" alt="" coords="382,93,534,181">
+<area shape="rect" id="node7" href="template_version.html" target="_top" title="template_version" alt="" coords="716,5,935,93">
+<area shape="rect" id="node8" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="698,637,953,725">
 </map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_status_code.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_request_detail.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>
