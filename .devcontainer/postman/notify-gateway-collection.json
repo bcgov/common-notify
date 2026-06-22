@@ -1303,15 +1303,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Generate `bulk_recipient_count` garbage recipient rows for the bulk send.",
+                  "// Generate `bulk_recipient_count` email recipient rows for the bulk send.",
                   "// Override the count by setting the `bulk_recipient_count` variable (defaults to 20).",
                   "const count = parseInt(pm.variables.get('bulk_recipient_count') || '20', 10);",
                   "const rows = [['email address']];",
                   "for (let i = 0; i < count; i++) {",
-                  "    rows.push(['garbage+' + i + '@x1a2b4example3.com']);",
+                  "    rows.push(['testemail+' + i + '@x1a2b4example3.com']);",
                   "}",
                   "pm.variables.set('bulk_rows', JSON.stringify(rows));",
-                  "console.log('Generated ' + count + ' garbage recipient rows for bulk send');"
+                  "console.log('Generated ' + count + ' email recipient rows for bulk send');"
                 ]
               }
             }
@@ -1349,7 +1349,7 @@
               "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notifysimple", "bulk"]
             },
-            "description": "Send a bulk email batch. The pre-request script auto-generates the `rows` array with `bulk_recipient_count` garbage recipients (default 1000) into the `{{bulk_rows}}` variable.\n\n**Setup:**\n1. Set `bulk_template_id` to a valid EMAIL template UUID for the tenant.\n2. (Optional) Set `bulk_recipient_count` to change how many garbage rows are generated.\n3. The template is rendered once per batch with the global `params` (no per-recipient personalization).\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+            "description": "Send a bulk email batch. The pre-request script auto-generates the `rows` array with `bulk_recipient_count` email recipients (default 1000) into the `{{bulk_rows}}` variable.\n\n**Setup:**\n1. Set `bulk_template_id` to a valid EMAIL template UUID for the tenant.\n2. (Optional) Set `bulk_recipient_count` to change how many email rows are generated.\n3. The template is rendered once per batch with the global `params` (no per-recipient personalization).\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
           },
           "response": []
         },
