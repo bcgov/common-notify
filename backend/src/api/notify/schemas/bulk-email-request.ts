@@ -26,7 +26,7 @@ export class BulkEmailRequest {
     format: 'uuid',
   })
   @IsUUID()
-  template_id: string
+  templateId: string
 
   @ApiPropertyOptional({
     type: 'object',

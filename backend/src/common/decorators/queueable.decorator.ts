@@ -119,7 +119,7 @@ async function handleBulkEmail(
 
   const response = {
     notifyId: notificationRecord.id,
-    templateId: dto.template_id,
+    templateId: dto.templateId,
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
@@ -135,12 +135,12 @@ async function handleBulkEmail(
       const jobPayload = {
         notifyId: notificationRecord.id,
         tenantId,
-        request: { templateId: dto.template_id },
+        request: { templateId: dto.templateId },
         requestedAt: new Date().toISOString(),
         bulk: true,
         bulkEmail: {
           name: dto.name,
-          templateId: dto.template_id,
+          templateId: dto.templateId,
           params: dto.params,
           addresses,
         },
@@ -264,7 +264,13 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         // Bulk email send: a different payload/flow that fans out into batches downstream.
         if (isBulkEmailRequest(payload)) {
-          return await handleBulkEmail(this as QueueableContext, queue, queueName, tenantId, payload)
+          return await handleBulkEmail(
+            this as QueueableContext,
+            queue,
+            queueName,
+            tenantId,
+            payload,
+          )
         }
 
         // Payload is guaranteed to be valid by global ValidationPipe

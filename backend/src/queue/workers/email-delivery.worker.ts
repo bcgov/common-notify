@@ -444,8 +444,7 @@ export class EmailDeliveryWorker {
       })}`,
     )
 
-    // const result = await emailAdapter.send(payload as any)
-    const result = { messageId: `dry-run-${Date.now()}`, provider: emailAdapter.name } as any
+    const result = await emailAdapter.send(payload as any)
 
     return {
       externalId:

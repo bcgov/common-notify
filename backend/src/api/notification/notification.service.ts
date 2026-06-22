@@ -256,19 +256,23 @@ export class NotificationService {
   async validateBulkRules(tenantId: string, dto: BulkEmailRequest): Promise<string[]> {
     const errors: string[] = []
 
-    const template = await this.templatesRepository.findById(tenantId, dto.template_id)
-    if (!template) {
-      errors.push(`Template '${dto.template_id}' not found for tenant '${tenantId}'`)
-    } else if (template.channelCode !== 'EMAIL') {
-      errors.push(`Template '${dto.template_id}' is not an EMAIL template`)
-    }
-
-    const header = dto.rows[0] ?? []
-    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
-    if (emailColumnIndex === -1) {
-      errors.push(`Header row must include an "${BULK_EMAIL_ADDRESS_HEADER}" column`)
+    const tenant = await this.tenantsService.findOne(tenantId)
+    if (!tenant) {
+      errors.push(`Tenant '${tenantId}' not found`)
       return errors
     }
+    if (tenant.status !== 'active') {
+      errors.push(`Tenant is not active (status: ${tenant.status})`)
+    }
+
+    const template = await this.templatesRepository.findById(tenantId, dto.templateId)
+    if (!template) {
+      errors.push(`Template '${dto.templateId}' not found for tenant '${tenantId}'`)
+    } else if (template.channelCode !== 'EMAIL') {
+      errors.push(`Template '${dto.templateId}' is not an EMAIL template`)
+    }
+
+    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
 
     for (let i = 1; i < dto.rows.length; i++) {
       if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {

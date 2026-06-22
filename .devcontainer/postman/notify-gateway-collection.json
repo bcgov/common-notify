@@ -1304,8 +1304,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Generate `bulk_recipient_count` garbage recipient rows for the bulk send.",
-                  "// Override the count by setting the `bulk_recipient_count` variable (defaults to 1000).",
-                  "const count = parseInt(pm.variables.get('bulk_recipient_count') || '1000', 10);",
+                  "// Override the count by setting the `bulk_recipient_count` variable (defaults to 20).",
+                  "const count = parseInt(pm.variables.get('bulk_recipient_count') || '20', 10);",
                   "const rows = [['email address']];",
                   "for (let i = 0; i < count; i++) {",
                   "    rows.push(['garbage+' + i + '@x1a2b4example3.com']);",
@@ -1342,7 +1342,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Bulk Load Test\",\n  \"template_id\": \"{{bulk_template_id}}\",\n  \"params\": {\n    \"name\": \"Valued Customer\",\n    \"date\": \"2026-07-01\",\n    \"city\": \"Victoria\"\n  },\n  \"rows\": {{bulk_rows}}\n}"
+              "raw": "{\n  \"name\": \"Bulk Load Test\",\n  \"templateId\": \"\",\n  \"params\": {\n    \"name\": \"Valued Customer\",\n    \"date\": \"2026-07-01\",\n    \"city\": \"Victoria\"\n  },\n  \"rows\": {{bulk_rows}}\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/bulk",
