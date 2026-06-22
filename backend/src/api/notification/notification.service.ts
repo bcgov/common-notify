@@ -272,6 +272,16 @@ export class NotificationService {
       errors.push(`Template '${dto.templateId}' is not an EMAIL template`)
     }
 
+    if (dto.delayedSend) {
+      const scheduledTime = new Date(dto.delayedSend).getTime()
+      const now = Date.now()
+      if (scheduledTime <= now) {
+        errors.push(`delayedSend must be in the future`)
+      } else if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
+        errors.push(`delayedSend must be within 10 days from now`)
+      }
+    }
+
     const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
 
     for (let i = 1; i < dto.rows.length; i++) {
