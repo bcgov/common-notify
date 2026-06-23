@@ -770,7 +770,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Bulk Send Test Template\",\n  \"description\": \"Simple handlebars template for bulk send testing (name, date, city)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{name}}\",\n  \"bodyType\": \"text\",\n  \"body\": \"Hi {{name}},\\n\\nYour appointment in {{city}} is scheduled for {{date}}.\\n\\nThanks\",\n  \"engineCode\": \"handlebars\"\n}"
+                  "raw": "{\n  \"name\": \"Bulk Send Test Template\",\n  \"description\": \"Simple handlebars template for bulk send testing (name, date, city)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{name}}\",\n  \"bodyType\": \"text\",\n  \"body\": \"Test bulk email\\nName: {{name}}\\nDate: {{date}}\\nCity: {{city}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
@@ -1344,14 +1344,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Bulk Load Test\",\n  \"templateId\": \"\",\n  \"params\": {\n    \"name\": \"Valued Customer\",\n    \"date\": \"2026-07-01\",\n    \"city\": \"Victoria\"\n  },\n  \"rows\": {{bulk_rows}}\n}"
+              "raw": "{\n  \"name\": \"Bulk Load Test\",\n  \"templateId\": \"{{bulk_template_id}}\",\n  \"params\": {\n    \"name\": \"Test User\",\n    \"date\": \"2026-07-01\",\n    \"city\": \"Victoria\"\n  },\n  \"rows\": {{bulk_rows}}\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/bulk",
               "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notifysimple", "bulk"]
             },
-            "description": "Send a bulk email batch. The pre-request script auto-generates the `rows` array with `bulk_recipient_count` email recipients (default 1000) into the `{{bulk_rows}}` variable.\n\n**Setup:**\n1. Set `bulk_template_id` to a valid EMAIL template UUID for the tenant.\n2. (Optional) Set `bulk_recipient_count` to change how many email rows are generated.\n3. The template is rendered once per batch with the global `params` (no per-recipient personalization).\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+            "description": "Send a bulk email batch. The pre-request script generates the `rows` array into the `{{bulk_rows}}` variable.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Bulk\" first — its test script automatically saves the template id into `bulk_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n3. The template is rendered once per batch with the global `params` (no per-recipient personalization).\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
           },
           "response": []
         },
