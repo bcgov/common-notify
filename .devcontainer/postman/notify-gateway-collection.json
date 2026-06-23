@@ -1303,15 +1303,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Generate `bulk_recipient_count` email recipient rows for the bulk send.",
-                  "// Override the count by setting the `bulk_recipient_count` variable (defaults to 20).",
-                  "const count = parseInt(pm.variables.get('bulk_recipient_count') || '20', 10);",
-                  "const rows = [['email address']];",
-                  "for (let i = 0; i < count; i++) {",
-                  "    rows.push(['testemail+' + i + '@x1a2b4example3.com']);",
-                  "}",
+                  "// Generate rows object, logic for generating random emails is disabled",
+                  "// so we don't fire off hundreds of emails to non-existent addresses.",
+                  "// This is mainly used in dry runs or if we use an email testing service",
+                  "const rows = [['email address', 'name']];",
+                  "rows.push([`${pm.variables.get('recipient_email')}`, 'Recipient1'])",
+                  "// const count = parseInt(pm.variables.get('bulk_recipient_count') || '100', 10);",
+                  "// for (let i = 1; i < count; i++) {",
+                  "//     rows.push(['email+' + i + '@example.com', 'test'+i]);",
+                  "// }",
                   "pm.variables.set('bulk_rows', JSON.stringify(rows));",
-                  "console.log('Generated ' + count + ' email recipient rows for bulk send');"
+                  "console.log('Generated ' + (rows.length - 1) + ' email recipient rows for bulk send');"
                 ]
               }
             }
