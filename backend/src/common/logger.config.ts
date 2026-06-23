@@ -36,6 +36,11 @@ const transports: winston.transport[] = [
   }),
 ]
 
+// Debug environment detection
+console.error(`[Logger] NODE_ENV: ${process.env.NODE_ENV}`)
+console.error(`[Logger] KUBERNETES_SERVICE_HOST: ${process.env.KUBERNETES_SERVICE_HOST}`)
+console.error(`[Logger] isProduction: ${isProduction}`)
+
 // Add Loki transport in Kubernetes/production
 if (isProduction) {
   const lokiUrl = process.env.LOKI_URL || 'http://loki.f6bc3f-dev.svc.cluster.local:3100'
@@ -44,7 +49,7 @@ if (isProduction) {
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
   console.error(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
-  console.error(`[Logger] isProduction: ${isProduction}`)
+  console.error(`[Logger] LOKI_URL from env: ${process.env.LOKI_URL}`)
 
   try {
     const lokiTransport = new LokiTransport({
