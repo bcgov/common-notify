@@ -1,7 +1,7 @@
-# Grafana Loki - Log Aggregation (DEV Environment)
+# Grafana Loki - Centralized Log Aggregation
 # Deployment: f6bc3f-tools namespace
-# Purpose: Collect and store application logs from dev/test/prod
-# Resource Profile: Minimal - optimized for dev environment
+# Purpose: Collect and store logs from ALL environments (dev/test/prod)
+# Resource Profile: Centralized - handles logs from multiple environments
 
 loki:
   auth_enabled: false
@@ -32,18 +32,31 @@ loki:
       chunks_directory: /var/loki/chunks
       rules_directory: /var/loki/rules
 
-  # Retention: 7 days (conservative for dev)
+  # Retention: 5 days (limited by 5Gi storage quota in tools namespace)
   limits_config:
-    retention_period: 168h  # 7 days
+    retention_period: 120h  # 5 days
     reject_old_samples: true
-    reject_old_samples_max_age: 168h
+    reject_old_samples_max_age: 120h
     max_cache_freshness_per_query: 10m
     split_queries_by_interval: 15m
 
   querier:
     max_concurrent: 10
 
-# Schema config at root level (required by newer Loki Helm chart)
+  # Schema configuration for Loki storage
+  schemaConfig:
+    configs:
+      - from: 2024-01-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+deploymentMode: SingleBinary
+
+# Schema configuration at root level (required by Helm chart validation)
 schemaConfig:
   configs:
     - from: 2024-01-01
@@ -53,8 +66,6 @@ schemaConfig:
       index:
         prefix: loki_index_
         period: 24h
-
-deploymentMode: SingleBinary
 
 # Explicitly disable simple scalable components
 read:
@@ -70,16 +81,17 @@ singleBinary:
   persistence:
     enabled: true
     storageClass: netapp-file-standard
-    size: 3Gi  # Minimal storage for 7 days retention
+    size: 5Gi  # Use full available quota for centralized logging
 
-  # Minimal resources for dev
+  # Resources for centralized deployment (handles dev+test+prod logs)
+  # Note: CPU request reduced to fit within tools namespace quota (500m)
   resources:
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 1000m
+      memory: 1Gi
     requests:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 400m
+      memory: 512Mi
 
   extraEnv:
     - name: TZ
@@ -111,7 +123,7 @@ monitoring:
 lokiCanary:
   enabled: false
 
-# Disable caching for simpler deployment (dev environment)
+# Disable caching for simpler deployment
 chunksCache:
   enabled: false
 

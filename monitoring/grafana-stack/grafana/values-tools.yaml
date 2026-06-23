@@ -1,7 +1,7 @@
-# Grafana - Visualization & Dashboards (DEV Environment)
+# Grafana - Visualization & Dashboards (Centralized Tools Environment)
 # Deployment: f6bc3f-tools namespace
-# Purpose: Query logs from Loki, display dashboards, alerting
-# Resource Profile: Minimal - optimized for dev environment
+# Purpose: Query logs from Loki, display dashboards for ALL environments (dev/test/prod)
+# Resource Profile: Centralized - handles queries from multiple environments
 
 # Admin credentials from OpenShift Secret
 # The secret is created separately in secret.yaml
@@ -11,46 +11,41 @@ admin:
   passwordKey: admin-password
 
 # Persistence for dashboards
+# Disabled due to storage quota limits in tools namespace (5Gi total, all used by Loki)
 persistence:
-  enabled: false  # Disable persistence for simpler deployment
+  enabled: false
   # storageClassName: netapp-file-standard
   # size: 2Gi
 
-# Minimal resources for dev
+# Resources for centralized deployment
+# Note: CPU request reduced to fit within tools namespace quota (50m remaining after Loki)
 resources:
   limits:
-    cpu: 300m
-    memory: 256Mi
+    cpu: 500m
+    memory: 512Mi
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 50m
+    memory: 256Mi
 
-# Datasources - Pre-configure Loki
+# Datasources - Pre-configure Loki in tools namespace
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
-      # Loki datasource
+      # Loki datasource (centralized in tools namespace)
       - name: Loki
         type: loki
         access: proxy
-        url: http://loki.f6bc3f-dev.svc.cluster.local:3100
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
         isDefault: true
         jsonData:
-          maxLines: 1000
+          maxLines: 5000
           derivedFields:
             # Extract notificationId from logs for easy linking
             - datasourceUid: Loki
               matcherRegex: '"notificationId":"([^"]+)"'
               name: NotificationID
               url: ''
-
-      # Mimir datasource (metrics) - will add after Mimir is deployed
-      - name: Mimir
-        type: prometheus
-        access: proxy
-        url: http://mimir.f6bc3f-dev.svc.cluster.local:9009/prometheus
-        isDefault: false
 
 # Dashboard providers - Load dashboards from ConfigMaps
 dashboardProviders:
@@ -66,7 +61,7 @@ dashboardProviders:
         options:
           path: /var/lib/grafana/dashboards/default
 
-# Pre-load dashboards (we'll create these next)
+# Pre-load dashboards
 dashboards:
   default: {}  # Dashboards will be added via ConfigMaps
 
@@ -86,14 +81,18 @@ grafana.ini:
     mode: console
     level: info
 
+  # Enable multi-tenancy features
+  explore:
+    enabled: true
+
 # Service configuration
 service:
   type: ClusterIP
   port: 80
 
-# Route/Ingress - Disabled for now (use port-forward for testing)
-# route:
-#   enabled: false
+# Ingress/Route - Disabled (using separate Route manifest)
+ingress:
+  enabled: false
 
 # Plugins to install
 plugins:
@@ -105,10 +104,12 @@ podSecurityContext:
   runAsNonRoot: true
   fsGroup: null
   runAsUser: null
+  runAsGroup: null
 
 containerSecurityContext:
   runAsNonRoot: true
   runAsUser: null
+  runAsGroup: null
   allowPrivilegeEscalation: false
   capabilities:
     drop:
@@ -121,6 +122,22 @@ initChownData:
 downloadDashboards:
   enabled: false
 
+# Explicitly override default security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+
 # Environment variables
 env:
   TZ: America/Vancouver
+
+# RBAC - Use OpenShift defaults
+rbac:
+  create: false
+  pspEnabled: false
+  namespaced: true
+
+serviceAccount:
+  create: false  # Use default OpenShift service account
