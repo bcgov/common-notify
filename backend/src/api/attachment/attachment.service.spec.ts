@@ -73,9 +73,9 @@ describe('AttachmentService', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$/,
     )
     expect(mockAttachmentRepository.create).toHaveBeenCalledTimes(1)
-    expect(
-      vi.mocked(mockAttachmentStorage.upload).mock.invocationCallOrder[0],
-    ).toBeLessThan(vi.mocked(mockAttachmentRepository.create).mock.invocationCallOrder[0])
+    expect(vi.mocked(mockAttachmentStorage.upload).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(mockAttachmentRepository.create).mock.invocationCallOrder[0],
+    )
     expect(result.fileExtension).toBe('pdf')
   })
 
@@ -160,10 +160,7 @@ describe('AttachmentService', () => {
     vi.mocked(mockAttachmentRepository.findByIdAndTenantId).mockResolvedValue(attachment)
     vi.mocked(mockAttachmentStorage.download).mockResolvedValue(Buffer.from('hello world'))
 
-    const result = await service.downloadAttachmentByIdAndTenantId(
-      'attachment-123',
-      'tenant-123',
-    )
+    const result = await service.downloadAttachmentByIdAndTenantId('attachment-123', 'tenant-123')
 
     expect(mockAttachmentRepository.findByIdAndTenantId).toHaveBeenCalledWith(
       'attachment-123',

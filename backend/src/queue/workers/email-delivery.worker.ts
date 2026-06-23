@@ -208,7 +208,10 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
-        if (emailPayload.attachments && !EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)) {
+        if (
+          emailPayload.attachments &&
+          !EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)
+        ) {
           throw new Error('Invalid processed email attachment reference payload')
         }
 

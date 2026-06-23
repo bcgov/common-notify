@@ -113,7 +113,11 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         const tenantId = tenant.id
         const uploadedBy =
-          typeof req?.user?.sub === 'string' ? req.user.sub : typeof req?.user?.id === 'string' ? req.user.id : tenantId
+          typeof req?.user?.sub === 'string'
+            ? req.user.sub
+            : typeof req?.user?.id === 'string'
+              ? req.user.id
+              : tenantId
 
         // Payload is guaranteed to be valid by global ValidationPipe
         // (guards run before ValidationPipe in NestJS middleware chain)

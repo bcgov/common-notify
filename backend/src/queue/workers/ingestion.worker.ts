@@ -115,10 +115,11 @@ export class IngestionWorker {
 
           for (const attachment of channelAttachments) {
             try {
-              const downloadedAttachment = await attachmentService.downloadAttachmentByIdAndTenantId(
-                attachment.attachmentId,
-                tenantId,
-              )
+              const downloadedAttachment =
+                await attachmentService.downloadAttachmentByIdAndTenantId(
+                  attachment.attachmentId,
+                  tenantId,
+                )
               const buffer = downloadedAttachment.content
               const attachmentFilename = downloadedAttachment.filename
 

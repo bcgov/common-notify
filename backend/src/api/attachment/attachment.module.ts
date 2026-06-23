@@ -33,6 +33,11 @@ import { AttachmentService } from './attachment.service'
     },
     AttachmentService,
   ],
-  exports: [AttachmentRepository, S3AttachmentStorageService, AttachmentService, ATTACHMENT_STORAGE],
+  exports: [
+    AttachmentRepository,
+    S3AttachmentStorageService,
+    AttachmentService,
+    ATTACHMENT_STORAGE,
+  ],
 })
 export class AttachmentModule {}

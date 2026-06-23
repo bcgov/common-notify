@@ -13,7 +13,6 @@ describe('IngestionWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockRequestDetailService: any
-  let mockNotificationDetailService: any
   let mockConfigService: any
   let mockClamavService: any
   let mockAttachmentService: any
@@ -537,32 +536,32 @@ describe('IngestionWorker', () => {
       new Error('ClamAV is unavailable while fail-closed mode is enabled'),
     )
 
-      await IngestionWorker.initialize(
-        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockRequestDetailService,
-        mockConfigService,
-        mockClamavService,
-        1,
-        mockAttachmentService as AttachmentService,
-      )
+    await IngestionWorker.initialize(
+      mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+      mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+      mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      mockNotificationService,
+      mockRequestDetailService,
+      mockConfigService,
+      mockClamavService,
+      1,
+      mockAttachmentService as AttachmentService,
+    )
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
-        data: {
-          notifyId: 'notify-attachment-retry',
-          tenantId: 'tenant-attachment-retry',
+    const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      data: {
+        notifyId: 'notify-attachment-retry',
+        tenantId: 'tenant-attachment-retry',
         request: {
           email: {
-              recipients: { to: ['test@example.com'] },
-              content: { subject: 'Test', body: 'Test body' },
-              attachments: [
-                {
-                  attachmentId: 'attachment-retry',
-                },
-              ],
-            },
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Test body' },
+            attachments: [
+              {
+                attachmentId: 'attachment-retry',
+              },
+            ],
+          },
         },
         requestedAt: new Date().toISOString(),
       },

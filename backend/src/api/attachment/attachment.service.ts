@@ -90,7 +90,7 @@ export class AttachmentService {
         contentSha256: uploadResult.contentSha256,
         uploadedBy: input.uploadedBy,
       })
-    } catch (error) {
+    } catch {
       await this.rollbackUploadedObject(storageKey, input.tenantId, attachmentId)
       throw new InternalServerErrorException('Failed to create attachment metadata after upload')
     }
