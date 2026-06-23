@@ -284,6 +284,7 @@ export class NotificationService {
 
     const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
 
+    const seen = new Map<string, number>()
     for (let i = 1; i < dto.rows.length; i++) {
       if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
         errors.push(
@@ -296,6 +297,14 @@ export class NotificationService {
         errors.push(`Row ${i}: email address is missing`)
       } else if (!isEmail(address)) {
         errors.push(`Row ${i}: "${address}" is not a valid email address`)
+      } else {
+        const normalised = address.toLowerCase()
+        const firstSeen = seen.get(normalised)
+        if (firstSeen !== undefined) {
+          errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
+        } else {
+          seen.set(normalised, i)
+        }
       }
     }
 
