@@ -353,7 +353,6 @@ export class EmailDeliveryWorker {
     }
 
     logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${addresses.length} recipient(s)`)
-    logger.debug('Bulk dry run')
 
     // Render the template once with the shared global params; content is identical for every address
     const rendered = await templatesService.renderTemplateContent(template, params || {})
