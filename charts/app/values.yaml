@@ -173,3 +173,30 @@ frontend:
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+
+  #-- Promtail sidecar configuration for log shipping to Loki
+  promtail:
+    #-- enable or disable Promtail sidecar
+    enabled: false
+    #-- Promtail Docker image
+    image: grafana/promtail
+    #-- Promtail image tag
+    tag: 2.9.3
+    #-- Loki endpoint URL
+    lokiUrl: http://loki.f6bc3f-tools.svc.cluster.local:3100/loki/api/v1/push
+    #-- Loki tenant ID (optional)
+    tenantId: ~
+    #-- Cluster label
+    cluster: silver
+    #-- Environment label (auto-detected from namespace if not set)
+    environment: ~
+    #-- Job name for logs (auto-generated if not set)
+    jobName: ~
+    #-- Resource requests and limits for Promtail sidecar
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
