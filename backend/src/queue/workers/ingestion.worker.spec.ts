@@ -782,11 +782,10 @@ describe('IngestionWorker', () => {
             attempts: 3,
           }),
         )
-        expect(mockNotificationService.update).toHaveBeenCalledWith(
-          'notify-bulk',
-          'tenant-bulk',
-          { status: 'processing', updatedBy: 'ingestion-worker' },
-        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: 'processing',
+          updatedBy: 'ingestion-worker',
+        })
       })
 
       it('should split recipients into multiple batches when addresses exceed batchSize', async () => {

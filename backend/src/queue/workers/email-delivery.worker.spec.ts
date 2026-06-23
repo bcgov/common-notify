@@ -1148,7 +1148,12 @@ describe('EmailDeliveryWorker', () => {
 
         const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
-        expect(result).toEqual({ success: true, batchId: 'notify-bulk-EMAIL-0', sent: 2, failed: 0 })
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 2,
+          failed: 0,
+        })
         expect(mockEmailAdapter.send).toHaveBeenCalledTimes(2)
         expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
           'notify-bulk',
@@ -1175,11 +1180,10 @@ describe('EmailDeliveryWorker', () => {
 
         await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
-        expect(mockNotificationService.update).toHaveBeenCalledWith(
-          'notify-bulk',
-          'tenant-bulk',
-          { status: NotificationStatus.COMPLETED, updatedBy: 'email-delivery-worker' },
-        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
       })
 
       it('should mark parent PARTIALLY_COMPLETED when some sent and some failed with no pending', async () => {
@@ -1197,18 +1201,22 @@ describe('EmailDeliveryWorker', () => {
 
         const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
-        expect(result).toEqual({ success: true, batchId: 'notify-bulk-EMAIL-0', sent: 1, failed: 1 })
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 1,
+          failed: 1,
+        })
         expect(mockRequestDetailService.markRecipientFailed).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
           'bob@example.com',
           'SMTP timeout',
         )
-        expect(mockNotificationService.update).toHaveBeenCalledWith(
-          'notify-bulk',
-          'tenant-bulk',
-          { status: NotificationStatus.PARTIALLY_COMPLETED, updatedBy: 'email-delivery-worker' },
-        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.PARTIALLY_COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
       })
 
       it('should mark parent FAILED when all recipients fail and no pending remain', async () => {
@@ -1224,12 +1232,16 @@ describe('EmailDeliveryWorker', () => {
 
         const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
-        expect(result).toEqual({ success: true, batchId: 'notify-bulk-EMAIL-0', sent: 0, failed: 2 })
-        expect(mockNotificationService.update).toHaveBeenCalledWith(
-          'notify-bulk',
-          'tenant-bulk',
-          { status: NotificationStatus.FAILED, updatedBy: 'email-delivery-worker' },
-        )
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 0,
+          failed: 2,
+        })
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.FAILED,
+          updatedBy: 'email-delivery-worker',
+        })
       })
 
       it('should not update parent status when other batches are still pending', async () => {

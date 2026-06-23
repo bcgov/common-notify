@@ -355,73 +355,73 @@ describe('Notify Controllers', () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
       })
 
-    describe('POST /api/v1/notifysimple/bulk', () => {
-      const validBulkBody = {
-        name: 'Test Bulk',
-        templateId: '12345678-1234-4234-8234-123456789012',
-        rows: [['email address'], ['alice@example.com'], ['bob@example.com']],
-      }
+      describe('POST /api/v1/notifysimple/bulk', () => {
+        const validBulkBody = {
+          name: 'Test Bulk',
+          templateId: '12345678-1234-4234-8234-123456789012',
+          rows: [['email address'], ['alice@example.com'], ['bob@example.com']],
+        }
 
-      it('should return 202 with status "accepted" for an immediate bulk send', async () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send(validBulkBody)
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.notifyId).toBeDefined()
-            expect(res.body.status).toBe('accepted')
-            expect(res.body.message).toContain('Bulk send accepted with 2 recipient(s)')
-            expect(res.body.channels).toEqual(['email'])
-          })
-      })
+        it('should return 202 with status "accepted" for an immediate bulk send', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send(validBulkBody)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.message).toContain('Bulk send accepted with 2 recipient(s)')
+              expect(res.body.channels).toEqual(['email'])
+            })
+        })
 
-      it('should return 202 with status "scheduled" when delayedSend is provided', async () => {
-        const futureDate = new Date(Date.now() + 3600000).toISOString()
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send({ ...validBulkBody, delayedSend: futureDate })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Bulk send scheduled for delivery at')
-          })
-      })
+        it('should return 202 with status "scheduled" when delayedSend is provided', async () => {
+          const futureDate = new Date(Date.now() + 3600000).toISOString()
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, delayedSend: futureDate })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.status).toBe('scheduled')
+              expect(res.body.message).toContain('Bulk send scheduled for delivery at')
+            })
+        })
 
-      it('should return 422 when validateBulkRules returns errors', async () => {
-        mockNotificationService.validateBulkRules.mockResolvedValueOnce([
-          'Template not found for tenant',
-        ])
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send(validBulkBody)
-          .expect(422)
-          .expect((res) => {
-            expect(res.body.message).toBe('Request validation failed')
-            expect(res.body.errors).toContain('Template not found for tenant')
-          })
-      })
+        it('should return 422 when validateBulkRules returns errors', async () => {
+          mockNotificationService.validateBulkRules.mockResolvedValueOnce([
+            'Template not found for tenant',
+          ])
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send(validBulkBody)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.message).toBe('Request validation failed')
+              expect(res.body.errors).toContain('Template not found for tenant')
+            })
+        })
 
-      it('should return 400 when rows are missing', async () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send({ name: 'Test', templateId: '12345678-1234-1234-1234-123456789012' })
-          .expect(400)
-      })
+        it('should return 400 when rows are missing', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ name: 'Test', templateId: '12345678-1234-1234-1234-123456789012' })
+            .expect(400)
+        })
 
-      it('should return 400 when templateId is not a valid UUID', async () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send({ ...validBulkBody, templateId: 'not-a-uuid' })
-          .expect(400)
-      })
+        it('should return 400 when templateId is not a valid UUID', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, templateId: 'not-a-uuid' })
+            .expect(400)
+        })
 
-      it('should return 400 when rows header is missing the email address column', async () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/notifysimple/bulk')
-          .send({ ...validBulkBody, rows: [['name'], ['Alice']] })
-          .expect(400)
+        it('should return 400 when rows header is missing the email address column', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, rows: [['name'], ['Alice']] })
+            .expect(400)
+        })
       })
-    })
 
       it('should process attachments before persisting and remove raw data from the stored payload', async () => {
         const processedPayload = {
