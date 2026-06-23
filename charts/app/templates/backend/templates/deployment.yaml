@@ -102,7 +102,7 @@ spec:
             - name: NODE_ENV
               value: "production"
             - name: LOKI_URL
-              value: "http://loki.{{ .Release.Namespace }}.svc.cluster.local:3100"
+              value: {{ .Values.backend.loki.url | default "http://loki.f6bc3f-tools.svc.cluster.local:3100" | quote }}
             - name: NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: INSTANCE_LABEL
