@@ -360,12 +360,7 @@ describe('Notify Controllers', () => {
             content: { subject: 'Test', body: 'Hello' },
             attachments: [
               {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'b94d27b9934d3e08a52e52d7da7dabfade4f0f1b6d8d7e8e5a7a5f6d7c8b9a0f',
-                storageProvider: 'local',
+                attachmentId: 'attachment-123',
               },
             ],
           },
@@ -394,9 +389,37 @@ describe('Notify Controllers', () => {
 
         expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledTimes(1)
         expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledTimes(1)
+        expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: expect.objectContaining({
+              attachments: [
+                expect.objectContaining({
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                }),
+              ],
+            }),
+          }),
+          'test-tenant-id',
+          'test-tenant-id',
+        )
         expect(mockNotificationService.create).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: processedPayload,
+          }),
+        )
+        expect(mockNotificationService.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.not.objectContaining({
+              email: expect.objectContaining({
+                attachments: expect.arrayContaining([
+                  expect.objectContaining({
+                    content: expect.anything(),
+                  }),
+                ]),
+              }),
+            }),
           }),
         )
 
@@ -408,6 +431,88 @@ describe('Notify Controllers', () => {
 
         expect(validationOrder).toBeLessThan(processingOrder)
         expect(processingOrder).toBeLessThan(createOrder)
+      })
+
+      it('should enqueue only sanitized attachmentId payloads after processing', async () => {
+        const processedPayload = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+            attachments: [{ attachmentId: 'attachment-123' }],
+          },
+        }
+
+        mockAttachmentProcessingService.processAttachments.mockResolvedValueOnce(
+          processedPayload as any,
+        )
+        mockIngestionQueue.add.mockResolvedValueOnce({ id: 'job-123' })
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(202)
+
+        await vi.waitFor(() => {
+          expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            expect.objectContaining({
+              request: processedPayload,
+            }),
+            expect.any(Object),
+          )
+        })
+
+        expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            request: expect.not.objectContaining({
+              email: expect.objectContaining({
+                attachments: expect.arrayContaining([
+                  expect.objectContaining({
+                    content: expect.anything(),
+                  }),
+                ]),
+              }),
+            }),
+          }),
+          expect.any(Object),
+        )
+      })
+
+      it('should not persist or queue when attachment upload fails during processing', async () => {
+        mockAttachmentProcessingService.processAttachments.mockRejectedValueOnce(
+          new BadRequestException('Attachment upload failed'),
+        )
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(400)
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       })
     })
   })
