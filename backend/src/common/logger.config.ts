@@ -48,8 +48,14 @@ if (isProduction) {
   const podName = process.env.HOSTNAME || 'unknown'
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
+  // Determine environment from namespace
+  const environment = namespace.includes('-dev') ? 'dev' :
+                     namespace.includes('-test') ? 'test' :
+                     namespace.includes('-prod') ? 'prod' : 'unknown'
+
   console.error(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
   console.error(`[Logger] LOKI_URL from env: ${process.env.LOKI_URL}`)
+  console.error(`[Logger] Environment: ${environment}`)
 
   try {
     const lokiTransport = new LokiTransport({
@@ -59,6 +65,7 @@ if (isProduction) {
         namespace: namespace,
         pod: podName,
         app: 'backend',
+        environment: environment,
         app_kubernetes_io_instance: instanceLabel,
       },
       json: true,
