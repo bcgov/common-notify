@@ -24,6 +24,12 @@ describe('IngestionWorker', () => {
       update: vi.fn().mockResolvedValue({}),
     }
 
+    mockRequestDetailService = {
+      createPending: vi.fn().mockResolvedValue(undefined),
+      createBulkPending: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined),
+    }
+
     // Mock config service
     mockConfigService = {
       get: vi.fn().mockImplementation((key: string) => {
@@ -89,6 +95,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -102,6 +109,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -115,6 +123,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -154,6 +163,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -189,6 +199,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -221,6 +232,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -264,6 +276,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -305,6 +318,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -329,6 +343,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -353,6 +368,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -382,6 +398,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -411,6 +428,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -440,6 +458,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -453,6 +472,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -492,6 +512,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -531,6 +552,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -623,7 +645,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
-        mockNotificationDetailService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
         1,
@@ -670,7 +692,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
-        mockNotificationDetailService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -703,6 +725,160 @@ describe('IngestionWorker', () => {
         'Attachment scan failed: Attachment storage service unavailable',
       )
       expect(mockEmailQueue.add).not.toHaveBeenCalled()
+    })
+
+    describe('bulk email fan-out', () => {
+      it('should fan out a bulk job into one batch and update status to PROCESSING', async () => {
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const addresses = ['alice@example.com', 'bob@example.com']
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Test Bulk',
+              templateId: 'template-uuid',
+              params: { key: 'val' },
+              addresses,
+            },
+          },
+        }
+
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          addresses,
+          'tenant-bulk',
+        )
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            bulk: true,
+            batchId: 'notify-bulk-EMAIL-0',
+            bulkEmail: expect.objectContaining({ addresses }),
+          }),
+          expect.objectContaining({
+            jobId: 'notify-bulk-EMAIL-0',
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+          }),
+        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith(
+          'notify-bulk',
+          'tenant-bulk',
+          { status: 'processing', updatedBy: 'ingestion-worker' },
+        )
+      })
+
+      it('should split recipients into multiple batches when addresses exceed batchSize', async () => {
+        mockConfigService.get.mockImplementation((key: string) => {
+          if (key === 'queue.batchSize') return 2
+          return undefined
+        })
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk-multi',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Multi Batch',
+              templateId: 'template-uuid',
+              params: {},
+              addresses: ['a@example.com', 'b@example.com', 'c@example.com'],
+            },
+          },
+        }
+
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        // 3 addresses, batchSize=2 → 2 batches
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(2)
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            batchId: 'notify-bulk-multi-EMAIL-0',
+            bulkEmail: expect.objectContaining({ addresses: ['a@example.com', 'b@example.com'] }),
+          }),
+          expect.anything(),
+        )
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            batchId: 'notify-bulk-multi-EMAIL-1',
+            bulkEmail: expect.objectContaining({ addresses: ['c@example.com'] }),
+          }),
+          expect.anything(),
+        )
+      })
+
+      it('should default to batchSize 100 when not configured', async () => {
+        // mockConfigService.get returns undefined for queue.batchSize → defaults to 100
+        const addresses = Array.from({ length: 150 }, (_, i) => `user${i}@example.com`)
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk-default',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Default Batch Size',
+              templateId: 'template-uuid',
+              params: {},
+              addresses,
+            },
+          },
+        }
+
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        // 150 addresses with default batchSize=100 → 2 batches
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
+      })
     })
   })
 })
