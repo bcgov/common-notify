@@ -22,7 +22,9 @@ export class AttachmentProcessingService {
       email: request.email
         ? await this.processEmailChannel(request.email, tenantId, uploadedBy)
         : undefined,
-      sms: request.sms ? await this.processSmsChannel(request.sms, tenantId, uploadedBy) : undefined,
+      sms: request.sms
+        ? await this.processSmsChannel(request.sms, tenantId, uploadedBy)
+        : undefined,
       msgApp: request.msgApp
         ? await this.processMsgAppChannel(request.msgApp, tenantId, uploadedBy)
         : undefined,
