@@ -28,8 +28,8 @@ export class StructuredLoggerService implements LoggerService {
     this.context = 'Application'
 
     // Determine if we're in production/k8s environment
-    const isProduction = process.env.NODE_ENV === 'production' ||
-                         process.env.KUBERNETES_SERVICE_HOST !== undefined
+    const isProduction =
+      process.env.NODE_ENV === 'production' || process.env.KUBERNETES_SERVICE_HOST !== undefined
 
     // JSON format for production (Loki)
     const jsonFormat = winston.format.combine(
@@ -49,9 +49,7 @@ export class StructuredLoggerService implements LoggerService {
     )
 
     // Configure transports
-    const transports: winston.transport[] = [
-      new winston.transports.Console(),
-    ]
+    const transports: winston.transport[] = [new winston.transports.Console()]
 
     // Add Loki transport in Kubernetes/production
     if (isProduction) {
@@ -76,7 +74,7 @@ export class StructuredLoggerService implements LoggerService {
           onConnectionError: (err) => {
             console.error('Loki connection error:', err)
           },
-        })
+        }),
       )
     }
 
@@ -134,7 +132,17 @@ export class StructuredLoggerService implements LoggerService {
 
       // Add any additional fields
       Object.keys(logContext).forEach((key) => {
-        if (!['notificationId', 'tenantId', 'channel', 'status', 'gcNotifyId', 'duration', 'error'].includes(key)) {
+        if (
+          ![
+            'notificationId',
+            'tenantId',
+            'channel',
+            'status',
+            'gcNotifyId',
+            'duration',
+            'error',
+          ].includes(key)
+        ) {
           logEntry[key] = logContext[key]
         }
       })
@@ -240,12 +248,7 @@ export class StructuredLoggerService implements LoggerService {
   /**
    * Helper: Log GC Notify API call
    */
-  logGcNotifyCall(
-    method: string,
-    endpoint: string,
-    notificationId?: string,
-    tenantId?: string,
-  ) {
+  logGcNotifyCall(method: string, endpoint: string, notificationId?: string, tenantId?: string) {
     this.debug('GC Notify API call', {
       method,
       endpoint,

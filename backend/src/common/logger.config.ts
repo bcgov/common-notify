@@ -4,8 +4,8 @@ import LokiTransport from 'winston-loki'
 import type { LoggerService } from '@nestjs/common'
 
 // Determine if we're in production/k8s environment
-const isProduction = process.env.NODE_ENV === 'production' ||
-                     process.env.KUBERNETES_SERVICE_HOST !== undefined
+const isProduction =
+  process.env.NODE_ENV === 'production' || process.env.KUBERNETES_SERVICE_HOST !== undefined
 
 const globalLoggerFormat: winston.Logform.Format = winston.format.timestamp({
   format: 'YYYY-MM-DD hh:mm:ss.SSS',
@@ -28,11 +28,13 @@ const jsonFormat = winston.format.combine(
 const transports: winston.transport[] = [
   new winston.transports.Console({
     level: 'silly',
-    format: isProduction ? jsonFormat : winston.format.combine(
-      globalLoggerFormat,
-      localLoggerFormat,
-      winston.format.colorize({ level: true }),
-    ),
+    format: isProduction
+      ? jsonFormat
+      : winston.format.combine(
+          globalLoggerFormat,
+          localLoggerFormat,
+          winston.format.colorize({ level: true }),
+        ),
   }),
 ]
 
@@ -49,9 +51,13 @@ if (isProduction) {
   const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
 
   // Determine environment from namespace
-  const environment = namespace.includes('-dev') ? 'dev' :
-                     namespace.includes('-test') ? 'test' :
-                     namespace.includes('-prod') ? 'prod' : 'unknown'
+  const environment = namespace.includes('-dev')
+    ? 'dev'
+    : namespace.includes('-test')
+      ? 'test'
+      : namespace.includes('-prod')
+        ? 'prod'
+        : 'unknown'
 
   console.error(`[Logger] Initializing Loki transport with host: ${lokiUrl}`)
   console.error(`[Logger] LOKI_URL from env: ${process.env.LOKI_URL}`)
