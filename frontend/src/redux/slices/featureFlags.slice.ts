@@ -134,9 +134,13 @@ const featureFlagsSlice = createSlice({
       .addCase(updateFeatureFlag.pending, (state) => {
         state.error = undefined
       })
-      .addCase(updateFeatureFlag.fulfilled, (state) => {
-        // Mark as out of sync to refetch complete list
-        state.synced = false
+      .addCase(updateFeatureFlag.fulfilled, (state, action) => {
+        const { id, enabled } = action.payload
+        const flag = state.flagsList.find((f) => f.id === id)
+        if (flag) {
+          flag.enabled = enabled
+          flag.updatedAt = new Date().toISOString()
+        }
         state.error = undefined
       })
       .addCase(updateFeatureFlag.rejected, (state, action) => {

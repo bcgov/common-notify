@@ -24,7 +24,7 @@ export class NotificationResponse {
 
   @ApiProperty({
     description: 'URI to retrieve the notification',
-    example: '/api/gcnotify/v2/notifications/740e5834-3a29-46b4-9a6f-16142fde533a',
+    example: '/gcnotify/v2/notifications/740e5834-3a29-46b4-9a6f-16142fde533a',
     format: 'uri',
   })
   uri: string

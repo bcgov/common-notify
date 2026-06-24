@@ -71,11 +71,11 @@ describe('GcNotifyApiClient', () => {
           body: 'Welcome John',
           from_email: 'noreply@example.com',
         },
-        uri: '/api/gcnotify/v2/notifications/notif-456',
+        uri: '/gcnotify/v2/notifications/notif-456',
         template: {
           id: 'template-123',
           version: 1,
-          uri: '/api/gcnotify/v2/templates/template-123',
+          uri: '/gcnotify/v2/template/template-123',
         },
       }
 
@@ -88,7 +88,7 @@ describe('GcNotifyApiClient', () => {
       const result = await client.sendEmail(request, 'apikey-123')
 
       expect(result.id).toBe('notif-456')
-      expect(result.content.from_email).toBe('noreply@example.com')
+      expect((result.content as { from_email: string }).from_email).toBe('noreply@example.com')
     })
 
     it('should throw UnauthorizedException on 401', async () => {
@@ -232,11 +232,11 @@ describe('GcNotifyApiClient', () => {
           body: 'Your code is ABC123',
           from_number: '+16175551234',
         },
-        uri: '/api/gcnotify/v2/notifications/notif-sms-456',
+        uri: '/gcnotify/v2/notifications/notif-sms-456',
         template: {
           id: 'sms-template-123',
           version: 1,
-          uri: '/api/gcnotify/v2/templates/sms-template-123',
+          uri: '/gcnotify/v2/template/sms-template-123',
         },
       }
 
@@ -249,7 +249,7 @@ describe('GcNotifyApiClient', () => {
       const result = await client.sendSms(request, 'apikey-123')
 
       expect(result.id).toBe('notif-sms-456')
-      expect(result.content.from_number).toBe('+16175551234')
+      expect((result.content as { from_number: string }).from_number).toBe('+16175551234')
     })
 
     it('should throw UnauthorizedException on 401 for SMS', async () => {

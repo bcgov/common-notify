@@ -151,11 +151,11 @@ export class GcNotifyApiClient {
         body: raw.content.body,
         subject: raw.content.subject,
       },
-      uri: `/api/gcnotify/v2/notifications/${raw.id}`,
+      uri: `/gcnotify/v2/notifications/${raw.id}`,
       template: {
         id: raw.template.id,
         version: raw.template.version,
-        uri: `/api/gcnotify/v2/templates/${raw.template.id}`,
+        uri: `/gcnotify/v2/template/${raw.template.id}`,
       },
       scheduled_for: raw.scheduled_for ?? body.scheduled_for,
     }
@@ -189,11 +189,11 @@ export class GcNotifyApiClient {
         body: raw.content.body,
         from_number: raw.content.from_number,
       },
-      uri: `/api/gcnotify/v2/notifications/${raw.id}`,
+      uri: `/gcnotify/v2/notifications/${raw.id}`,
       template: {
         id: raw.template.id,
         version: raw.template.version,
-        uri: `/api/gcnotify/v2/templates/${raw.template.id}`,
+        uri: `/gcnotify/v2/template/${raw.template.id}`,
       },
       scheduled_for: raw.scheduled_for ?? body.scheduled_for,
     }
@@ -257,7 +257,7 @@ export class GcNotifyApiClient {
       this.mapNotification(n),
     )
     const links: Links = {
-      current: this.rewriteLinksPath(raw.links?.current) ?? '/api/gcnotify/v2/notifications',
+      current: this.rewriteLinksPath(raw.links?.current) ?? '/gcnotify/v2/notifications',
       next: raw.links?.next ? this.rewriteLinksPath(raw.links.next) : undefined,
     }
 
@@ -304,10 +304,10 @@ export class GcNotifyApiClient {
 
   private rewriteLinksPath(link?: string): string | undefined {
     if (!link || typeof link !== 'string') return undefined
-    // Rewrite API links to proxy path /gc-notify/v2/notifications?...
+    // Rewrite API links to our proxy path /gcnotify/v2/notifications?...
     const idx = link.indexOf('?')
     const query = idx >= 0 ? link.slice(idx) : ''
-    return `/api/gcnotify/v2/notifications${query}`
+    return `/gcnotify/v2/notifications${query}`
   }
 
   private mapNotification(raw: Record<string, unknown>): Notification {
@@ -336,7 +336,7 @@ export class GcNotifyApiClient {
       template: {
         id: templateId,
         version: template && typeof template.version === 'number' ? template.version : 1,
-        uri: `/api/gcnotify/v2/templates/${templateId}`,
+        uri: `/gcnotify/v2/template/${templateId}`,
       },
       body: this.toSafeString(raw.body),
       subject: raw.subject != null ? this.toSafeString(raw.subject) : undefined,

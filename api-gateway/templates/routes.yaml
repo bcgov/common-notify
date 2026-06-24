@@ -215,12 +215,18 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  # GC Notify-compatible routes: sub-paths/shapes mirror the real GC Notify v2 API
+  # exactly (https://documentation.notification.canada.ca/en/apispec.html). Kept
+  # under a /gcnotify prefix (no /api) so this traffic stays unambiguous in logs,
+  # metrics, and Kong dashboards - migrating GC Notify integrations only need to
+  # set their baseUrl to {hostname}/gcnotify, a one-line config change, not a code
+  # change.
   - name: ${ROUTE_PREFIX}gcnotify-notifications-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ${PATH_PREFIX}/api/gcnotify/v2/notifications
+      - ${PATH_PREFIX}/gcnotify/v2/notifications
     methods:
       - GET
     strip_path: true
@@ -233,7 +239,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/email
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/email
     methods:
       - POST
     strip_path: true
@@ -246,7 +252,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/sms
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/sms
     methods:
       - POST
     strip_path: true
@@ -259,7 +265,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ${PATH_PREFIX}/api/gcnotify/v2/notifications/bulk
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/bulk
     methods:
       - POST
     strip_path: true
@@ -272,7 +278,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~${PATH_PREFIX}/api/gcnotify/v2/notifications/*
+      # Regex, not a literal prefix - matches a single path segment so it doesn't
+      # shadow the literal /gcnotify/v2/notifications/email|sms|bulk routes above
+      # (Kong matches literal paths before regex paths).
+      - ~${PATH_PREFIX}/gcnotify/v2/notifications/[^/]+
     methods:
       - GET
     strip_path: true
@@ -285,7 +294,7 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ${PATH_PREFIX}/api/gcnotify/v2/templates
+      - ${PATH_PREFIX}/gcnotify/v2/templates
     methods:
       - GET
     strip_path: true
@@ -298,7 +307,102 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~${PATH_PREFIX}/api/gcnotify/v2/template/*
+      - ~${PATH_PREFIX}/gcnotify/v2/template/[^/]+
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # gcnotify-passthrough/v2 routes: same GC Notify-compatible operations as gcnotify/v2
+  # but served to clients that have not yet been onboarded to the Notify tenant system.
+  # ApiKeyGuard (format-only) handles auth in the backend; Kong's key-auth validates the
+  # key's existence. Pure passthrough to real GC Notify; no internal-execution routing.
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-list
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-email
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/email
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-sms
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/sms
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-bulk
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/bulk
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notification-by-id
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/[^/]+
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-templates-list
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/templates
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-template-by-id
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/gcnotify-passthrough/v2/template/[^/]+
     methods:
       - GET
     strip_path: true
@@ -879,6 +983,30 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  # GC Notify clients authenticate with a single credential, sent the same way real
+  # GC Notify expects it: `Authorization: ApiKey-v1 {key}`. They aren't expected to
+  # also send a separate X-API-KEY header. pre-function extracts the key from that
+  # header into X-API-KEY (which key-auth below is configured to validate, same as
+  # every other route in this file) before key-auth's access phase runs - pre-function
+  # plugins run first by Kong's plugin priority ordering. The original Authorization
+  # header is left untouched so passthrough mode can still forward it to real GC
+  # Notify. NOT YET VALIDATED against a live Kong instance - confirm this works
+  # against the BC Gov-managed gateway (plugin availability/ordering) before merging.
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -890,6 +1018,21 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -901,6 +1044,21 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -912,6 +1070,21 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -923,6 +1096,21 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -934,6 +1122,21 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -945,11 +1148,208 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-email
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-email
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-sms
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-sms
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-bulk
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-bulk
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notification-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-notification-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-templates-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-templates-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-template-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-passthrough-template-by-id
     config:
       hide_credentials: true
       key_in_body: false
