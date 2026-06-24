@@ -14,6 +14,7 @@ import { parseListQuery } from '../../common/query/list-query.parser'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { TemplateEngine } from '../../enum/template-engine.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -121,7 +122,7 @@ export class GcNotifyInternalExecutionService {
       NotificationChannel.EMAIL,
     )
     const personalisation = this.toStringPersonalisation(body.personalisation)
-    const rendered = await this.templatesService.renderTemplateContent(template, personalisation)
+    const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromEmail = await this.resolveDefaultSender('gc_notify_default_from_email')
     // No top-level templateId: the delivery worker has two modes — template mode
     // (re-renders at delivery time when request.templateId is set) and pre-rendered
@@ -153,7 +154,7 @@ export class GcNotifyInternalExecutionService {
 
     return {
       id: notificationRecord.id,
-      reference: body.reference,
+      reference: body.reference ?? null,
       content: {
         subject: rendered.subject ?? '',
         body: rendered.body,
@@ -175,7 +176,7 @@ export class GcNotifyInternalExecutionService {
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
     const personalisation = this.toStringPersonalisation(body.personalisation)
-    const rendered = await this.templatesService.renderTemplateContent(template, personalisation)
+    const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromNumber = await this.resolveDefaultSender('gc_notify_default_sms_sender')
 
     const notifyRequest = {
@@ -226,6 +227,21 @@ export class GcNotifyInternalExecutionService {
       })
     }
     return template
+  }
+
+  private async renderWithLegacyGcNotifyEngine(
+    template: Template,
+    personalisation: Record<string, unknown>,
+  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+    // GC Notify routes always use legacy GC Notify placeholder semantics ((key))
+    // and ((key??default)), regardless of the stored template engine.
+    return this.templatesService.renderTemplateContent(
+      {
+        ...template,
+        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+      },
+      personalisation,
+    )
   }
 
   private toStringPersonalisation(
@@ -422,7 +438,7 @@ export class GcNotifyInternalExecutionService {
     if (templateId) {
       const template = await this.templatesRepository.findById(entity.tenantId, templateId)
       if (template) {
-        const rendered = await this.templatesService.renderTemplateContent(template, params)
+        const rendered = await this.renderWithLegacyGcNotifyEngine(template, params)
         body = rendered.body
         subject = rendered.subject
         templateVersion = template.version

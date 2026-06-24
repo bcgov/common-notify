@@ -11,10 +11,12 @@ export class NotificationResponse {
   })
   id: string
 
-  @ApiPropertyOptional({
-    description: 'Reference identifier provided when creating the notification',
+  @ApiProperty({
+    description: 'Reference identifier provided when creating the notification, or null if not set',
+    nullable: true,
+    type: 'string',
   })
-  reference?: string
+  reference: string | null
 
   @ApiProperty({
     description: 'Content of the notification',

@@ -43,7 +43,7 @@ interface GcNotifyPassthroughRequest extends express.Request {
 /**
  * Pure passthrough controller for GC Notify-compatible clients that have not
  * yet been onboarded to the Notify tenant system. Uses ApiKeyGuard (format-only
- * validation; key validity is checked by Kong's key-auth plugin upstream) and
+ * validation; key validity is enforced by upstream GC Notify) and
  * always delegates to GcNotifyApiClient without any internal-execution branching.
  *
  * Clients that have completed tenant onboarding and are ready for internal

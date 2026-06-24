@@ -6,7 +6,7 @@ import { Request } from 'express'
  * the Authorization header is present and uses the `ApiKey-v1 {key}` scheme,
  * then attaches the raw header as `request.gcNotifyAuthHeader` so the controller
  * can forward it unmodified to the real GC Notify API. No DB lookups or tenant
- * resolution — Kong's key-auth plugin handles key validity upstream.
+ * resolution — key validity is enforced by upstream GC Notify.
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {

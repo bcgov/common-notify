@@ -136,7 +136,7 @@ export class GcNotifyApiClient {
 
     const raw = await this.request<{
       id: string
-      reference?: string
+      reference?: string | null
       content: { subject: string; body: string; from_email: string }
       uri: string
       template: { id: string; version: number; uri: string }
@@ -145,7 +145,7 @@ export class GcNotifyApiClient {
 
     return {
       id: raw.id,
-      reference: raw.reference,
+      reference: raw.reference ?? null,
       content: {
         from_email: raw.content.from_email,
         body: raw.content.body,

@@ -10,6 +10,7 @@ import { NotificationRequestDetailService } from '../notification/notification-r
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { TemplateEngine } from '../../enum/template-engine.enum'
 
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve))
 
@@ -131,6 +132,10 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockNotificationService.create).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: TENANT_ID, status: 'pending' }),
       )
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        body.personalisation,
+      )
       expect(mockNotificationRequestDetailService.createPending).toHaveBeenCalled()
 
       await flushMicrotasks()
@@ -186,6 +191,10 @@ describe('GcNotifyInternalExecutionService', () => {
         template: { id: 'tpl-2', version: 1, uri: '/gcnotify/v2/template/tpl-2' },
         scheduled_for: undefined,
       })
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tpl-2', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        body.personalisation,
+      )
     })
   })
 
@@ -223,6 +232,10 @@ describe('GcNotifyInternalExecutionService', () => {
         subject: 'Hello Alice',
         template: { id: 'tpl-1', version: 2, uri: '/gcnotify/v2/template/tpl-1' },
       })
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        { name: 'Alice' },
+      )
     })
   })
 
