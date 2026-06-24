@@ -231,14 +231,6 @@ jobs:
             # Helm upgrade/rollout
             # Extract license plate from namespace (e.g., f6bc3f-dev -> f6bc3f)
             LICENSE_PLATE=$(echo "${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}" | cut -d'-' -f1)
-            VALUES_OVERRIDE=""
-            if [ "${{ inputs.environment }}" == "DEV" ]; then
-              VALUES_OVERRIDE="--values values-dev.yaml"
-            elif [ "${{ inputs.environment }}" == "TEST" ]; then
-              VALUES_OVERRIDE="--values values-test.yaml"
-            elif [ "${{ inputs.environment }}" == "PROD" ]; then
-              VALUES_OVERRIDE="--values values-prod.yaml"
-            fi
 
             helm upgrade \
               --set-string global.registry="image-registry.apps.silver.devops.gov.bc.ca" \
@@ -252,7 +244,6 @@ jobs:
               --install --wait ${{ inputs.atomic && '--atomic' || '' }} ${{ steps.vars.outputs.release }} \
               --timeout ${{ inputs.timeout-minutes }}m \
               --values ${{ inputs.values }} \
-              ${VALUES_OVERRIDE} \
               ./${{ github.event.repository.name }}-${{ steps.pr.outputs.pr || steps.vars.outputs.version }}.tgz
 
             # Helm release history
