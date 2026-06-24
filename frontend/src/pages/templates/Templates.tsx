@@ -7,6 +7,7 @@ import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { setPage, setLimit, setSearch } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
+import UserService, { UserRole } from '@/service/user-service'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 
@@ -123,7 +124,12 @@ const Templates: FC = () => {
           </button>
         </div>
         <div className="col-auto ms-auto">
-          <Button onPress={() => navigate({ to: '/template-create' })}>Create New Template</Button>
+          <Button
+            onPress={() => navigate({ to: '/template-create' })}
+            isDisabled={!UserService.hasRole([UserRole.NOTIFY_OPERATIONS_ADMIN, UserRole.NOTIFY_TEMPLATE_EDITOR])}
+          >
+            Create New Template
+          </Button>
         </div>
       </div>
 

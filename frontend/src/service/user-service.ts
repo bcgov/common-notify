@@ -1,5 +1,7 @@
 import _kc from '../keycloak'
+import { UserRole } from '@/enum/user-role.enum'
 
+export { UserRole }
 export const AUTH_TOKEN = '__auth_token'
 
 /**
@@ -17,6 +19,7 @@ const initKeycloak = (onAuthenticatedCallback: () => void) => {
     .then((authenticated: boolean) => {
       if (authenticated) {
         localStorage.setItem(AUTH_TOKEN, `${_kc.token}`)
+        console.log('[UserService] client_roles:', _kc.tokenParsed?.client_roles)
         onAuthenticatedCallback()
       }
     })
@@ -130,19 +133,11 @@ const getUsername = async () => {
   return parsed?.display_name
 }
 
-/**
- * Determines if a user's role(s) overlap with the role on the private route.  The user's role is determined via jwt.client_roles
- * @param roles
- * @returns True or false, inidicating if the user has the role or not.
- */
-const hasRole = (roles: any) => {
-  const jwt = _kc.tokenParsed
-  const userroles = jwt?.client_roles
-  const includesRoles =
-    typeof roles === 'string'
-      ? userroles?.includes(roles)
-      : roles.some((r: any) => userroles?.includes(r))
-  return includesRoles
+const hasRole = (roles: UserRole | UserRole[]): boolean => {
+  const userroles = _kc.tokenParsed?.client_roles as string[] | undefined
+  return typeof roles === 'string'
+    ? (userroles?.includes(roles) ?? false)
+    : roles.some((r) => userroles?.includes(r))
 }
 
 const UserService = {

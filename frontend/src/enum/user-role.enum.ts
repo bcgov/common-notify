@@ -1,11 +1,6 @@
-/**
- * SSO (Keycloak) Roles
- * Roles defined in Keycloak for authorization in the Notify system
- */
-export enum SsoRole {
+export enum UserRole {
   NOTIFY_ADMIN = 'NOTIFY_ADMIN',
   NOTIFY_OPERATIONS_ADMIN = 'NOTIFY_OPERATIONS_ADMIN',
   NOTIFY_TEMPLATE_EDITOR = 'NOTIFY_TEMPLATE_EDITOR',
   NOTIFY_VIEWER = 'NOTIFY_VIEWER',
-  NOTIFY_USER = 'NOTIFY_USER',
 }

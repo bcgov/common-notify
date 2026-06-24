@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchCstarTenants, fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
+import UserService, { UserRole } from '@/service/user-service'
 import LoadingSpinner from './LoadingSpinner'
 import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
@@ -75,8 +76,16 @@ const Layout: FC<Props> = ({ children }) => {
   }
 
   // Only block on CSTAR error if we don't have a selected tenant
-  // Once tenant is selected in Redux, we don't need CSTAR anymore
-  if (tenantError && !selectedTenant) {
+  // Once tenant is selected in Redux, we don't need CSTAR anymore.
+  // Pure NOTIFY_ADMIN users intentionally skip the CSTAR fetch, so never show this error for them.
+  const isPureAdmin =
+    UserService.hasRole(UserRole.NOTIFY_ADMIN) &&
+    !UserService.hasRole([
+      UserRole.NOTIFY_VIEWER,
+      UserRole.NOTIFY_TEMPLATE_EDITOR,
+      UserRole.NOTIFY_OPERATIONS_ADMIN,
+    ])
+  if (tenantError && !selectedTenant && !isPureAdmin) {
     return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants())} />
   }
 

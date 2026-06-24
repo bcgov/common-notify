@@ -4,7 +4,7 @@ import type { FC } from 'react'
 import { Link } from '@tanstack/react-router'
 import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
-import UserService from '@/service/user-service'
+import UserService, { UserRole } from '@/service/user-service'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
@@ -65,12 +65,17 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+  const isAdmin = UserService.hasRole(UserRole.NOTIFY_ADMIN)
+  const hasCstarRole = UserService.hasRole([
+    UserRole.NOTIFY_OPERATIONS_ADMIN,
+    UserRole.NOTIFY_TEMPLATE_EDITOR,
+    UserRole.NOTIFY_VIEWER,
+  ])
 
   // Determine which menu items to show based on roles
-  // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
   const showDashboard = cstarTenants.length > 0
   const showTemplates = cstarTenants.length > 0
+  const showCstarPages = hasCstarRole
   // Feature Flags requires NOTIFY_ADMIN (SSO)
   const showAdminFeatureFlags = isAdmin
 
@@ -104,7 +109,12 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Dashboard' && showDashboard) ||
             (item.label === 'Templates' && showTemplates) ||
-            (item.label !== 'Dashboard' && item.label !== 'Templates') // Always show non-conditional items
+            (item.label === 'Notification Events' && showCstarPages) ||
+            (item.label === 'Distribution Lists' && showCstarPages) ||
+            (item.label !== 'Dashboard' &&
+              item.label !== 'Templates' &&
+              item.label !== 'Notification Events' &&
+              item.label !== 'Distribution Lists')
 
           return shouldShow ? (
             <Link

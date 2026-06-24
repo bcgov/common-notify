@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
-import UserService from '@/service/user-service'
+import UserService, { UserRole } from '@/service/user-service'
 import '@/scss/components/tenant-selection-modal.scss'
 
 /**
@@ -40,7 +40,7 @@ const TenantSelectionModal: FC = () => {
   )
 
   // Don't show modal for NOTIFY_ADMIN users without tenants - they go directly to feature flags
-  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+  const isAdmin = UserService.hasRole(UserRole.NOTIFY_ADMIN)
   if (tenants.length === 0 && isAdmin) {
     return null
   }
