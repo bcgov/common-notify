@@ -11,6 +11,9 @@ export const Route = createFileRoute('/dashboard')({
         UserRole.NOTIFY_VIEWER,
       ])
     ) {
+      if (UserService.hasRole(UserRole.NOTIFY_ADMIN)) {
+        throw redirect({ to: '/admin/feature-flags' })
+      }
       throw redirect({ to: '/not-authorized' })
     }
   },
