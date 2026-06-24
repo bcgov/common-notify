@@ -4,12 +4,7 @@ import { NotifySmsChannel } from './notify-sms-channel'
 import { NotifyMsgAppChannel } from './notify-msg-app-channel'
 
 export interface StoredNotifyAttachment {
-  filename: string
-  mimeType: string
-  storageKey: string
-  sizeBytes: number
-  contentSha256: string
-  storageProvider: 'local'
+  attachmentId: string
 }
 
 export interface ProcessedNotifyEmailChannel extends Omit<NotifyEmailChannel, 'attachments'> {

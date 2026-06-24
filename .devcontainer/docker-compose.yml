@@ -53,6 +53,38 @@ services:
       timeout: 3s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >
+        mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+        mc mb --ignore-existing local/notify-local
+    depends_on:
+      minio:
+        condition: service_healthy
+
   clamav:
     image: clamav/clamav:latest
     platform: linux/amd64
@@ -90,6 +122,10 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       clamav:
         condition: service_healthy
       kong:
@@ -107,6 +143,12 @@ services:
       REDIS_DB: 0
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: notify-local
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin123
+      S3_FORCE_PATH_STYLE: "true"
       GATEWAY_OAUTH2_TOKEN_URL: http://kong:8000/oauth2/token
     image: *node-image
     ports: ["3001:3000"]
@@ -246,3 +288,6 @@ services:
         condition: service_completed_successfully
       oauth2-mock:
         condition: service_healthy
+
+volumes:
+  minio-data:
