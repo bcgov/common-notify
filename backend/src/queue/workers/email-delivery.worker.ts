@@ -35,17 +35,16 @@ type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
 
-  private static hasStoredAttachmentReferences(
+  private static hasAttachmentReferences(
     attachments: unknown,
   ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
     return (
       Array.isArray(attachments) &&
-      attachments.some(
+      attachments.every(
         (attachment) =>
           attachment &&
           typeof attachment === 'object' &&
-          typeof (attachment as { storageKey?: unknown }).storageKey === 'string' &&
-          typeof (attachment as { storageProvider?: unknown }).storageProvider === 'string',
+          typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
       )
     )
   }
@@ -225,7 +224,14 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
-        if (EmailDeliveryWorker.hasStoredAttachmentReferences(emailPayload.attachments)) {
+        if (
+          emailPayload.attachments &&
+          !EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)
+        ) {
+          throw new Error('Invalid processed email attachment reference payload')
+        }
+
+        if (EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)) {
           if (!attachmentResolverService) {
             throw new Error(
               'AttachmentResolverService is not available to resolve stored email attachments',
@@ -234,11 +240,13 @@ export class EmailDeliveryWorker {
 
           logger.debug(
             `[${notifyId}] Resolving stored email attachments: ${JSON.stringify({
+              tenantId,
               storedAttachmentCount: emailPayload.attachments.length,
             })}`,
           )
 
           const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+            tenantId,
             emailPayload.attachments,
           )
 

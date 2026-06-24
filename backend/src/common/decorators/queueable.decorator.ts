@@ -261,6 +261,12 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         }
 
         const tenantId = tenant.id
+        const uploadedBy =
+          typeof req?.user?.sub === 'string'
+            ? req.user.sub
+            : typeof req?.user?.id === 'string'
+              ? req.user.id
+              : tenantId
 
         // Bulk email send: a different payload/flow that fans out into batches downstream.
         if (isBulkEmailRequest(payload)) {
@@ -283,7 +289,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
 
         const processedPayload: ProcessedNotifySimpleRequest = await (
           this as QueueableContext
-        ).attachmentProcessingService.processAttachments(validatedPayload)
+        ).attachmentProcessingService.processAttachments(validatedPayload, tenantId, uploadedBy)
 
         // Validate business rules (tenant active, recipient counts, content, etc)
         const businessErrors = await (
