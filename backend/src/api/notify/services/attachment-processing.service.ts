@@ -6,36 +6,40 @@ import {
   ProcessedNotifySimpleRequest,
   ProcessedNotifySmsChannel,
 } from '../schemas/stored-notify-attachment'
-import { LocalAttachmentStorageService } from './local-attachment-storage.service'
+import { AttachmentService } from '../../attachment/attachment.service'
 
 @Injectable()
 export class AttachmentProcessingService {
-  constructor(private readonly localAttachmentStorageService: LocalAttachmentStorageService) {}
+  constructor(private readonly attachmentService: AttachmentService) {}
 
-  async processAttachments(request: NotifySimpleRequest): Promise<ProcessedNotifySimpleRequest> {
+  async processAttachments(
+    request: NotifySimpleRequest,
+    tenantId: string,
+    uploadedBy?: string,
+  ): Promise<ProcessedNotifySimpleRequest> {
     return {
       ...request,
-      email: request.email ? await this.processEmailChannel(request.email) : undefined,
-      sms: request.sms ? await this.processSmsChannel(request.sms) : undefined,
-      msgApp: request.msgApp ? await this.processMsgAppChannel(request.msgApp) : undefined,
+      email: request.email
+        ? await this.processEmailChannel(request.email, tenantId, uploadedBy)
+        : undefined,
+      sms: request.sms
+        ? await this.processSmsChannel(request.sms, tenantId, uploadedBy)
+        : undefined,
+      msgApp: request.msgApp
+        ? await this.processMsgAppChannel(request.msgApp, tenantId, uploadedBy)
+        : undefined,
     }
   }
 
   private async processEmailChannel(
     channel: NonNullable<NotifySimpleRequest['email']>,
+    tenantId: string,
+    uploadedBy?: string,
   ): Promise<ProcessedNotifyEmailChannel> {
     return {
       ...channel,
       attachments: channel.attachments
-        ? await Promise.all(
-            channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(
-                attachment.filename,
-                attachment.mimeType,
-                attachment.content,
-              ),
-            ),
-          )
+        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
         : channel.attachments === undefined
           ? undefined
           : [],
@@ -44,19 +48,13 @@ export class AttachmentProcessingService {
 
   private async processSmsChannel(
     channel: NonNullable<NotifySimpleRequest['sms']>,
+    tenantId: string,
+    uploadedBy?: string,
   ): Promise<ProcessedNotifySmsChannel> {
     return {
       ...channel,
       attachments: channel.attachments
-        ? await Promise.all(
-            channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(
-                attachment.filename,
-                attachment.mimeType,
-                attachment.content,
-              ),
-            ),
-          )
+        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
         : channel.attachments === undefined
           ? undefined
           : [],
@@ -65,38 +63,43 @@ export class AttachmentProcessingService {
 
   private async processMsgAppChannel(
     channel: NonNullable<NotifySimpleRequest['msgApp']>,
+    tenantId: string,
+    uploadedBy?: string,
   ): Promise<ProcessedNotifyMsgAppChannel> {
     return {
       ...channel,
       attachments: channel.attachments
-        ? await Promise.all(
-            channel.attachments.map((attachment) =>
-              this.storeDecodedAttachment(
-                attachment.filename,
-                attachment.mimeType,
-                attachment.content,
-              ),
-            ),
-          )
+        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
         : channel.attachments === undefined
           ? undefined
           : [],
     }
   }
 
-  private async storeDecodedAttachment(filename: string, mimeType: string, base64Data: string) {
-    let content: Buffer
+  private async storeDecodedAttachments(
+    attachments: Array<{ filename: string; mimeType: string; content: string }>,
+    tenantId: string,
+    uploadedBy?: string,
+  ) {
+    const decodedAttachments = attachments.map((attachment) => ({
+      tenantId,
+      uploadedBy,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      content: this.decodeAttachmentContent(attachment.content),
+    }))
 
+    const uploadedAttachments = await this.attachmentService.uploadAttachments(decodedAttachments)
+    return uploadedAttachments.map((attachment) => ({
+      attachmentId: attachment.id,
+    }))
+  }
+
+  private decodeAttachmentContent(base64Data: string): Buffer {
     try {
-      content = Buffer.from(base64Data, 'base64')
+      return Buffer.from(base64Data, 'base64')
     } catch {
       throw new InternalServerErrorException('Failed to decode validated attachment data')
     }
-
-    return this.localAttachmentStorageService.storeAttachment({
-      filename,
-      mimeType,
-      content,
-    })
   }
 }

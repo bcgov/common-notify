@@ -95,8 +95,24 @@ spec:
               value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
             - name: CLAMAV_FAIL_CLOSED
               value: {{ .Values.backend.clamav.failClosed | default "false" | quote }}
-            - name: ATTACHMENT_STORAGE_DIR
-              value: {{ .Values.backend.attachments.storageDir | default "/app/attachments" | quote }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.backend.s3.endpoint | quote }}
+            - name: S3_BUCKET
+              value: {{ if contains "-dev" .Release.Namespace }}{{ .Values.backend.s3.buckets.dev | quote }}{{ else if contains "-test" .Release.Namespace }}{{ .Values.backend.s3.buckets.test | quote }}{{ else if contains "-prod" .Release.Namespace }}{{ .Values.backend.s3.buckets.prod | quote }}{{ else }}{{ .Values.backend.s3.buckets.dev | quote }}{{ end }}
+            - name: S3_REGION
+              value: {{ .Values.backend.s3.region | quote }}
+            - name: S3_FORCE_PATH_STYLE
+              value: {{ .Values.backend.s3.forcePathStyle | default true | quote }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.s3.existingSecret | quote }}
+                  key: {{ .Values.backend.s3.accessKeySecretKey | quote }}
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.s3.existingSecret | quote }}
+                  key: {{ .Values.backend.s3.secretKeySecretKey | quote }}
             - name: RELEASE_NAME
               value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
@@ -180,17 +196,6 @@ spec:
             limits:
               cpu: 4
               memory: 8Gi
-          {{- if .Values.backend.attachments.pvc.enabled }}
-          volumeMounts:
-            - name: attachments
-              mountPath: {{ .Values.backend.attachments.storageDir | default "/app/attachments" }}
-          {{- end }}
-      {{- if .Values.backend.attachments.pvc.enabled }}
-      volumes:
-        - name: attachments
-          persistentVolumeClaim:
-            claimName: {{ if .Values.backend.attachments.pvc.shared }}nr-notify-attachments-shared{{ else }}{{ include "backend.fullname" . }}-attachments{{ end }}
-      {{- end }}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

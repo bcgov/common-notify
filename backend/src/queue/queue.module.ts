@@ -28,8 +28,9 @@ import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
 import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
 import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
-import { LocalAttachmentStorageService } from '../api/notify/services/local-attachment-storage.service'
 import { ClamavService } from '../services/clamav.service'
+import { AttachmentModule } from '../api/attachment/attachment.module'
+import { AttachmentService } from '../api/attachment/attachment.service'
 
 /**
  * Queue Module
@@ -51,6 +52,7 @@ import { ClamavService } from '../services/clamav.service'
     TenantsModule,
     TemplatesModule,
     WebhookModule,
+    AttachmentModule,
     forwardRef(() => NotifyModule),
   ],
   providers: [
@@ -224,7 +226,7 @@ export class QueueModule implements OnModuleInit {
     private readonly templatesService?: TemplatesService,
     private readonly inlineRenderingService?: InlineRenderingService,
     private readonly attachmentResolverService?: AttachmentResolverService,
-    private readonly localAttachmentStorageService?: LocalAttachmentStorageService,
+    private readonly attachmentService?: AttachmentService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly notificationRequestDetailService?: NotificationRequestDetailService,
@@ -263,7 +265,7 @@ export class QueueModule implements OnModuleInit {
         this.configService,
         this.clamavService,
         concurrency,
-        this.localAttachmentStorageService,
+        this.attachmentService,
       )
       this.logger.debug('Ingestion worker initialization started')
 
