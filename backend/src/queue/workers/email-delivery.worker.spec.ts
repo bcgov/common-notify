@@ -37,6 +37,9 @@ describe('EmailDeliveryWorker', () => {
       updateStatus: vi.fn().mockResolvedValue(undefined),
       markSent: vi.fn().mockResolvedValue(undefined),
       markFailed: vi.fn().mockResolvedValue(undefined),
+      markRecipientSent: vi.fn().mockResolvedValue(undefined),
+      markRecipientFailed: vi.fn().mockResolvedValue(undefined),
+      countByStatus: vi.fn().mockResolvedValue(0),
     }
 
     // Mock the notification service
@@ -1055,6 +1058,207 @@ describe('EmailDeliveryWorker', () => {
           status: NotificationStatus.FAILED,
         }),
       )
+    })
+
+    describe('processBulkBatch', () => {
+      const bulkTemplate = {
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Test Template',
+      }
+
+      beforeEach(async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(bulkTemplate)
+        mockTemplatesService.renderTemplateContent.mockReturnValue({
+          subject: 'Bulk Subject',
+          body: 'Bulk Body',
+          bodyType: 'html',
+        })
+        vi.mocked(mockEmailAdapter.send).mockResolvedValue({ messageId: 'ext-123' })
+
+        await EmailDeliveryWorker.initialize(
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockConfigService,
+          mockTemplatesRepository,
+          mockTemplatesService,
+          mockInlineRenderingService,
+          mockAttachmentResolverService as AttachmentResolverService,
+          mockEmailAdapter,
+          mockRequestDetailService,
+        )
+      })
+
+      function makeBulkJob(
+        addresses: string[],
+        overrides: Partial<DeliveryJobPayload> = {},
+      ): Partial<Bull.Job<DeliveryJobPayload>> {
+        return {
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            bulk: true,
+            batchId: 'notify-bulk-EMAIL-0',
+            bulkEmail: {
+              name: 'Test Bulk',
+              templateId: 'template-uuid',
+              params: {},
+              addresses,
+            },
+            channel: NotificationChannel.EMAIL,
+            request: {},
+            payload: {} as any,
+            attempt: 0,
+            ...overrides,
+          } as DeliveryJobPayload,
+          opts: { attempts: 3 } as any,
+          attemptsMade: 0,
+        }
+      }
+
+      it('should send to each address and mark recipients as sent', async () => {
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 2,
+          failed: 0,
+        })
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'alice@example.com',
+          'ext-123',
+        )
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'ext-123',
+        )
+      })
+
+      it('should mark parent COMPLETED when all recipients sent and no pending remain', async () => {
+        // pending=0, failed=0, sent=2
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(2)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should mark parent PARTIALLY_COMPLETED when some sent and some failed with no pending', async () => {
+        vi.mocked(mockEmailAdapter.send)
+          .mockResolvedValueOnce({ messageId: 'ext-123' } as any)
+          .mockRejectedValueOnce(new Error('SMTP timeout'))
+
+        // pending=0, failed=1, sent=1
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(1)
+          .mockResolvedValueOnce(1)
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 1,
+          failed: 1,
+        })
+        expect(mockRequestDetailService.markRecipientFailed).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'SMTP timeout',
+        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.PARTIALLY_COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should mark parent FAILED when all recipients fail and no pending remain', async () => {
+        vi.mocked(mockEmailAdapter.send).mockRejectedValue(new Error('SMTP down'))
+
+        // pending=0, failed=2, sent=0
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(2)
+          .mockResolvedValueOnce(0)
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 0,
+          failed: 2,
+        })
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.FAILED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should not update parent status when other batches are still pending', async () => {
+        // pending=1 → other batches still in progress, no final status set
+        mockRequestDetailService.countByStatus.mockResolvedValue(1)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockNotificationService.update).not.toHaveBeenCalled()
+      })
+
+      it('should throw NotFoundException when template is not found (triggers retry)', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(null)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+          "Template 'template-uuid' not found for tenant 'tenant-bulk'",
+        )
+        expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      })
+
+      it('should throw when template channel is not EMAIL (triggers retry)', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({ ...bulkTemplate, channelCode: 'SMS' })
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+          "Template 'template-uuid' is not an EMAIL template",
+        )
+        expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      })
+
+      it('should resolve template once and reuse rendered content for all addresses', async () => {
+        const job = makeBulkJob(['a@example.com', 'b@example.com', 'c@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockTemplatesRepository.findById).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(3)
+      })
     })
   })
 })
