@@ -10,6 +10,7 @@ import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
 import { APP_VERSION } from '@/utils/version'
+import { CstarRole } from '@/enum/cstar-role.enum'
 import Sidebar from './Sidebar'
 
 type Props = {
@@ -28,6 +29,7 @@ const Layout: FC<Props> = ({ children }) => {
   const rolesLoading = useAppSelector((state) => state.user.rolesLoading)
   const rolesError = useAppSelector((state) => state.user.rolesError)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
+  const userCurrent = useAppSelector((state) => state.user.current)
 
   // Track which tenants we've already fetched roles for in this session
   const rolesFetchedRef = useRef<Set<string>>(new Set())
@@ -43,9 +45,14 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
+    // Wait until the user record has been upserted so roles can be stored
+    if (!userCurrent) {
+      return
+    }
+
     rolesFetchedRef.current.add(selectedTenant.id)
     dispatch(fetchCstarRoles({ tenantId: selectedTenant.id }))
-  }, [selectedTenant?.id, dispatch])
+  }, [selectedTenant?.id, userCurrent, dispatch])
 
   useEffect(() => {
     // Enforce tenant-level authorization after roles fetch completes.
@@ -64,6 +71,16 @@ const Layout: FC<Props> = ({ children }) => {
 
     const hasNoRoles = Array.isArray(cstarRoles) && cstarRoles.length === 0
     if (rolesError || hasNoRoles) {
+      navigate({ to: '/not-authorized' })
+      return
+    }
+
+    const canEditTemplates =
+      cstarRoles?.includes(CstarRole.NOTIFY_TEMPLATE_EDITOR) ||
+      cstarRoles?.includes(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+    const isTemplateEditRoute =
+      location.pathname === '/template-create' || location.pathname.startsWith('/template-edit/')
+    if (isTemplateEditRoute && !canEditTemplates) {
       navigate({ to: '/not-authorized' })
     }
   }, [selectedTenant?.id, rolesLoading, rolesError, cstarRoles, location.pathname, navigate])
