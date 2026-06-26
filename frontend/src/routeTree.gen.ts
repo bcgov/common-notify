@@ -17,7 +17,6 @@ import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TemplatesTemplateIdRouteImport } from './routes/templates/$templateId'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 
@@ -61,11 +60,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TemplatesTemplateIdRoute = TemplatesTemplateIdRouteImport.update({
-  id: '/$templateId',
-  path: '/$templateId',
-  getParentRoute: () => TemplatesRoute,
-} as any)
 const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   id: '/template-edit/$templateId',
   path: '/template-edit/$templateId',
@@ -85,10 +79,9 @@ export interface FileRoutesByFullPath {
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -98,10 +91,9 @@ export interface FileRoutesByTo {
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -112,10 +104,9 @@ export interface FileRoutesById {
   '/notification-events': typeof NotificationEventsRoute
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -130,7 +121,6 @@ export interface FileRouteTypes {
     | '/templates'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -143,7 +133,6 @@ export interface FileRouteTypes {
     | '/templates'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   id:
     | '__root__'
     | '/'
@@ -156,7 +145,6 @@ export interface FileRouteTypes {
     | '/templates'
     | '/admin/feature-flags'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -167,7 +155,7 @@ export interface RootRouteChildren {
   NotificationEventsRoute: typeof NotificationEventsRoute
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
-  TemplatesRoute: typeof TemplatesRouteWithChildren
+  TemplatesRoute: typeof TemplatesRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
 }
@@ -230,13 +218,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/templates/$templateId': {
-      id: '/templates/$templateId'
-      path: '/$templateId'
-      fullPath: '/templates/$templateId'
-      preLoaderRoute: typeof TemplatesTemplateIdRouteImport
-      parentRoute: typeof TemplatesRoute
-    }
     '/template-edit/$templateId': {
       id: '/template-edit/$templateId'
       path: '/template-edit/$templateId'
@@ -254,18 +235,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface TemplatesRouteChildren {
-  TemplatesTemplateIdRoute: typeof TemplatesTemplateIdRoute
-}
-
-const TemplatesRouteChildren: TemplatesRouteChildren = {
-  TemplatesTemplateIdRoute: TemplatesTemplateIdRoute,
-}
-
-const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
-  TemplatesRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
@@ -274,7 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationEventsRoute: NotificationEventsRoute,
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
-  TemplatesRoute: TemplatesRouteWithChildren,
+  TemplatesRoute: TemplatesRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
 }

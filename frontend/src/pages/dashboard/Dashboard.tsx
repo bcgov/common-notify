@@ -14,12 +14,9 @@ const Dashboard: FC = () => {
       <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
 
       <Row className="mb-5">
-        <Col md={7}>
+        <Col md={12}>
           <NotificationTemplatesSection />
           <NotificationEventsSection />
-        </Col>
-        <Col md={5}>
-          <TestNotificationForm />
         </Col>
       </Row>
 

@@ -23,10 +23,8 @@ export interface CstarRolesInfo {
   hasTenantRole: boolean
   /** True when the user holds the given role in the selected tenant. */
   hasRole: (role: CstarRole) => boolean
-  /** True when the user holds any of the given roles in the selected tenant. */
-  hasAnyRole: (...roles: CstarRole[]) => boolean
   /** True when the user may create/edit templates in the selected tenant. */
-  canEditTemplates: boolean
+  canEdit: boolean
 }
 
 /** Highest privilege first; drives {@link CstarRolesInfo.primaryRole}. */
@@ -42,18 +40,15 @@ export function useCstarRoles(): CstarRolesInfo {
   return useMemo(() => {
     const roles = (cstarRoles ?? []) as CstarRole[]
     const hasRole = (role: CstarRole) => roles.includes(role)
-    const hasAnyRole = (...candidates: CstarRole[]) => candidates.some((role) => roles.includes(role))
+    const hasAnyRole = (...candidates: CstarRole[]) =>
+      candidates.some((role) => roles.includes(role))
 
     return {
       roles,
       primaryRole: ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null,
       hasTenantRole: roles.length > 0,
       hasRole,
-      hasAnyRole,
-      canEditTemplates: hasAnyRole(
-        CstarRole.NOTIFY_TEMPLATE_EDITOR,
-        CstarRole.NOTIFY_OPERATIONS_ADMIN,
-      ),
+      canEdit: hasAnyRole(CstarRole.NOTIFY_TEMPLATE_EDITOR, CstarRole.NOTIFY_OPERATIONS_ADMIN),
     }
   }, [cstarRoles])
 }

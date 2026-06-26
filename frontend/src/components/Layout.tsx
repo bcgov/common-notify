@@ -10,7 +10,7 @@ import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
 import { APP_VERSION } from '@/utils/version'
-import { CstarRole } from '@/enum/cstar-role.enum'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
 import Sidebar from './Sidebar'
 
 type Props = {
@@ -30,6 +30,7 @@ const Layout: FC<Props> = ({ children }) => {
   const rolesError = useAppSelector((state) => state.user.rolesError)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
   const userCurrent = useAppSelector((state) => state.user.current)
+  const { canEdit } = useCstarRoles()
 
   // Track which tenants we've already fetched roles for in this session
   const rolesFetchedRef = useRef<Set<string>>(new Set())
@@ -75,15 +76,21 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
-    const canEditTemplates =
-      cstarRoles?.includes(CstarRole.NOTIFY_TEMPLATE_EDITOR) ||
-      cstarRoles?.includes(CstarRole.NOTIFY_OPERATIONS_ADMIN)
-    const isTemplateEditRoute =
-      location.pathname === '/template-create' || location.pathname.startsWith('/template-edit/')
-    if (isTemplateEditRoute && !canEditTemplates) {
-      navigate({ to: '/not-authorized' })
+    // Viewers may open a template in read-only mode (/template-edit/:id), but
+    // only editors/admins may create one (/template-create).
+    const isTemplateCreateRoute = location.pathname === '/template-create'
+    if (isTemplateCreateRoute && !canEdit) {
+      navigate({ to: '/templates' })
     }
-  }, [selectedTenant?.id, rolesLoading, rolesError, cstarRoles, location.pathname, navigate])
+  }, [
+    selectedTenant?.id,
+    rolesLoading,
+    rolesError,
+    cstarRoles,
+    canEdit,
+    location.pathname,
+    navigate,
+  ])
 
   // Block rendering while we're fetching roles for the selected tenant
   // This ensures authorization checks have the correct roles loaded
