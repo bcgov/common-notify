@@ -76,6 +76,17 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /notification events/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /distribution lists/i })).toBeInTheDocument()
+  })
+
+  it('hides Settings for users without the NOTIFY_OPERATIONS_ADMIN role', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'])
+
+    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Settings for NOTIFY_OPERATIONS_ADMIN users', () => {
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
+
     expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
   })
 
@@ -88,14 +99,26 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /distribution lists/i })).not.toBeInTheDocument()
   })
 
-  it('shows Settings for NOTIFY_ADMIN even without a tenant role', async () => {
+  it('hides Settings for NOTIFY_ADMIN users who are not operations admins', async () => {
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(true)
 
     renderSidebar()
 
-    expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the Feature Flags admin link for NOTIFY_OPERATIONS_ADMIN users', async () => {
+    const user = userEvent.setup()
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
+
+    const adminButton = screen.getByRole('button', { name: /admin/i })
+    expect(adminButton).toBeInTheDocument()
+
+    await user.click(adminButton)
+
+    expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {
