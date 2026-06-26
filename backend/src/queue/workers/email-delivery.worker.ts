@@ -1,14 +1,22 @@
 import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
-import { DeliveryJobPayload } from '../queue.types'
+import { DeliveryJobPayload, BulkEmailJobData } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
+import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
+import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
+import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
+
+type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
+  attachments?: SendEmailOptions['attachments']
+}
 
 /**
  * Email Delivery Worker
@@ -26,6 +34,20 @@ import { IEmailTransport } from '../../adapters'
  */
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
+
+  private static hasAttachmentReferences(
+    attachments: unknown,
+  ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.every(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
+      )
+    )
+  }
 
   /**
    * Initialize the email delivery worker on a queue
@@ -45,7 +67,9 @@ export class EmailDeliveryWorker {
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
+    attachmentResolverService: AttachmentResolverService,
     emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
@@ -68,13 +92,53 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
+        // Bulk batch: resolve the template once, then render + send per recipient individually.
+        if (job.data.bulk && job.data.bulkEmail && job.data.batchId) {
+          return await EmailDeliveryWorker.processBulkBatch(
+            job.data.batchId,
+            job.data.bulkEmail,
+            notifyId,
+            tenantId,
+            logger,
+            templatesRepository,
+            templatesService,
+            emailAdapter,
+            requestDetailService,
+            notificationService,
+          )
+        }
+
         // Validate job data
         if (!payload || typeof payload !== 'object') {
           throw new Error('Invalid delivery job: email payload is missing or invalid')
         }
 
         // Cast payload to email channel type for type safety
-        let emailPayload = payload as NotifyEmailChannel
+        let emailPayload = payload as
+          | NotifyEmailChannel
+          | ProcessedNotifyEmailChannel
+          | ResolvedEmailDeliveryPayload
+
+        if (
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+          throw new Error('Invalid email payload: subject is missing or invalid')
+        }
+
+        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+          throw new Error('Invalid email payload: body is missing or invalid')
+        }
+
+        if ((job.attemptsMade ?? 0) > 0) {
+          await requestDetailService.resetForRetry(notifyId)
+        }
 
         // Resolve template if templateId is provided in the original request
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
@@ -160,11 +224,44 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
+        if (
+          emailPayload.attachments &&
+          !EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)
+        ) {
+          throw new Error('Invalid processed email attachment reference payload')
+        }
+
+        if (EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)) {
+          if (!attachmentResolverService) {
+            throw new Error(
+              'AttachmentResolverService is not available to resolve stored email attachments',
+            )
+          }
+
+          logger.debug(
+            `[${notifyId}] Resolving stored email attachments: ${JSON.stringify({
+              tenantId,
+              storedAttachmentCount: emailPayload.attachments.length,
+            })}`,
+          )
+
+          const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+            tenantId,
+            emailPayload.attachments,
+          )
+
+          emailPayload = {
+            ...emailPayload,
+            attachments: resolvedAttachments as SendEmailOptions['attachments'],
+          } as ResolvedEmailDeliveryPayload
+        }
+
         // Update status to SENDING (only after all validations pass)
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
@@ -176,6 +273,9 @@ export class EmailDeliveryWorker {
         )
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
+
+        // Request has made it to the smtp gateway, update request detail records as sent
+        await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -200,6 +300,7 @@ export class EmailDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
@@ -227,6 +328,106 @@ export class EmailDeliveryWorker {
   }
 
   /**
+   * Process one batch of a bulk email send.
+   *
+   * Resolves the template ONCE and renders it ONCE with the global params (no per-recipient
+   * personalization), then calls the email adapter once per individual address reusing that
+   * rendered content. Per-recipient results update that recipient's detail row. Individual
+   * recipient failures are recorded but do NOT throw, so a batch retry will not re-send
+   * already-delivered addresses; only systemic errors (e.g. template not found) throw to trigger
+   * a BullMQ retry of the whole batch.
+   */
+  private static async processBulkBatch(
+    batchId: string,
+    bulkEmail: BulkEmailJobData,
+    notifyId: string,
+    tenantId: string,
+    logger: Logger,
+    templatesRepository: TemplatesRepository,
+    templatesService: TemplatesService,
+    emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
+    notificationService: NotificationService,
+  ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
+    const { templateId, params, addresses } = bulkEmail
+
+    // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
+    const template = await templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+    }
+    if (template.channelCode !== 'EMAIL') {
+      throw new Error(`Template '${templateId}' is not an EMAIL template`)
+    }
+
+    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${addresses.length} recipient(s)`)
+
+    // Render the template once with the shared global params; content is identical for every address
+    const rendered = await templatesService.renderTemplateContent(template, params || {})
+
+    let sent = 0
+    let failed = 0
+
+    for (const address of addresses) {
+      try {
+        const emailPayload = {
+          recipients: { to: [address] },
+          content: {
+            subject: rendered.subject,
+            body: rendered.body,
+            bodyType: rendered.bodyType,
+          },
+        }
+
+        const result = await EmailDeliveryWorker.sendEmail(
+          emailPayload as any,
+          logger,
+          notifyId,
+          emailAdapter,
+        )
+
+        await requestDetailService.markRecipientSent(notifyId, batchId, address, result.externalId)
+        sent++
+      } catch (recipientError) {
+        const errorMessage =
+          recipientError instanceof Error ? recipientError.message : String(recipientError)
+        logger.error(
+          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${address}): ${errorMessage}`,
+        )
+        await requestDetailService.markRecipientFailed(notifyId, batchId, address, errorMessage)
+        failed++
+      }
+    }
+
+    logger.log(`[${notifyId}] Bulk batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+
+    // Reconcile the parent request once no recipients remain pending across all batches.
+    // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+    const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
+    if (pendingRemaining === 0) {
+      const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
+      const sentRemaining = await requestDetailService.countByStatus(notifyId, 'sent')
+      let finalStatus: NotificationStatus
+      if (failedRemaining === 0) {
+        finalStatus = NotificationStatus.COMPLETED
+      } else if (sentRemaining > 0) {
+        finalStatus = NotificationStatus.PARTIALLY_COMPLETED
+      } else {
+        finalStatus = NotificationStatus.FAILED
+      }
+      await notificationService.update(notifyId, tenantId, {
+        status: finalStatus,
+        updatedBy: 'email-delivery-worker',
+      })
+      logger.log(
+        `[${notifyId}] All bulk batches complete; parent marked ${finalStatus.toUpperCase()}`,
+      )
+    }
+
+    return { success: true, batchId, sent, failed }
+  }
+
+  /**
    * Send email via adapter
    * @param payload Email payload
    * @param logger Logger instance
@@ -235,17 +436,26 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: NotifyEmailChannel,
+    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel | ResolvedEmailDeliveryPayload,
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(`[${notifyId}] Sending email via ${emailAdapter.name} adapter`)
+    const attachmentCount = Array.isArray((payload as { attachments?: unknown[] }).attachments)
+      ? ((payload as { attachments?: unknown[] }).attachments?.length ?? 0)
+      : 0
+
+    logger.debug(
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter: ${JSON.stringify({
+        attachmentCount,
+      })}`,
+    )
 
     const result = await emailAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || `${emailAdapter.name}-${Date.now()}`,
+      externalId:
+        result.messageId || result.providerResponse || `${emailAdapter.name}-${Date.now()}`,
       provider: emailAdapter.name,
     }
   }

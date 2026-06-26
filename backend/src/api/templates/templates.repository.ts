@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
+import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
 /**
  * Repository for template data access
@@ -28,20 +30,90 @@ export class TemplatesRepository {
   }
 
   /**
+   * Find all active templates for a tenant with advanced query support
+   * Supports sorting, filtering, and pagination via ParsedListQuery
+   */
+  async findWithQuery(
+    tenantId: string,
+    parsedQuery: ParsedListQuery,
+  ): Promise<[Template[], number]> {
+    // Define queryable fields configuration for templates
+    const templateQueryConfig: QueryableFieldsConfig = {
+      sortableFields: {
+        name: 'template.name',
+        createdAt: 'template.createdAt',
+        updatedAt: 'template.updatedAt',
+        channelCode: 'template.channelCode',
+      },
+      filterableFields: {
+        name: {
+          column: 'template.name',
+          valueType: 'string',
+          operators: ['eq', 'like'],
+        },
+        body: {
+          column: 'template.body',
+          valueType: 'string',
+          operators: ['like'],
+        },
+        channelCode: {
+          column: 'template.channelCode',
+          valueType: 'string',
+          operators: ['eq', 'in'],
+        },
+        createdAt: {
+          column: 'template.createdAt',
+          valueType: 'date',
+          operators: ['gte', 'lte'],
+        },
+      },
+      defaultSort: [{ field: 'updatedAt', direction: 'DESC' }],
+    }
+
+    // Build query with filters and sorts applied
+    const queryBuilder = this.templateRepository
+      .createQueryBuilder('template')
+      .leftJoinAndSelect('template.channel', 'channel')
+      .leftJoinAndSelect('template.engine', 'engine')
+      .where('template.tenantId = :tenantId', { tenantId })
+      .andWhere('template.active = :active', { active: true })
+
+    // Apply parsed query (filters, sorts, pagination)
+    applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, templateQueryConfig)
+
+    return queryBuilder.getManyAndCount()
+  }
+
+  /**
    * Find all active templates for a tenant
+   * @deprecated Use findWithQuery() instead, which supports advanced filtering and sorting
    */
   async findByTenantId(
     tenantId: string,
     limit: number = 20,
     offset: number = 0,
+    search?: string,
   ): Promise<[Template[], number]> {
-    return this.templateRepository.findAndCount({
-      where: { tenantId, active: true },
-      relations: ['channel', 'engine'],
-      take: limit,
-      skip: offset,
-      order: { createdAt: 'DESC' },
-    })
+    // This method is deprecated but kept for backward compatibility
+    // For search, we need to apply OR logic, which the builder doesn't support natively
+    // Fall back to the old method for backward compatibility
+    const queryBuilder = this.templateRepository
+      .createQueryBuilder('template')
+      .leftJoinAndSelect('template.channel', 'channel')
+      .leftJoinAndSelect('template.engine', 'engine')
+      .where('template.tenantId = :tenantId', { tenantId })
+      .andWhere('template.active = :active', { active: true })
+
+    if (search) {
+      const sanitizedSearch = search.replace(/[%_\\]/g, '\\$&')
+      queryBuilder.andWhere(`(template.name ILIKE :search OR template.body ILIKE :search)`, {
+        search: `%${sanitizedSearch}%`,
+      })
+    }
+
+    queryBuilder.orderBy('template.updatedAt', 'DESC').take(limit).skip(offset)
+
+    return queryBuilder.getManyAndCount()
   }
 
   /**

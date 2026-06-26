@@ -16,6 +16,7 @@ const mockRepository = {
   find: vi.fn(),
   findOne: vi.fn(),
   findAndCount: vi.fn(),
+  createQueryBuilder: vi.fn(),
   remove: vi.fn(),
   update: vi.fn(),
 }
@@ -37,10 +38,22 @@ const mockNotificationPubSubService = {
   publish: vi.fn(),
 }
 
+const createMockQueryBuilder = () => ({
+  leftJoinAndSelect: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  andWhere: vi.fn().mockReturnThis(),
+  addOrderBy: vi.fn().mockReturnThis(),
+  skip: vi.fn().mockReturnThis(),
+  take: vi.fn().mockReturnThis(),
+  getManyAndCount: vi.fn(),
+})
+
 describe('NotificationService', () => {
   let service: NotificationService
 
   beforeEach(async () => {
+    mockRepository.createQueryBuilder.mockReturnValue(createMockQueryBuilder())
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationService,
@@ -89,7 +102,6 @@ describe('NotificationService', () => {
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
-        payload: undefined,
       }
       mockRepository.create.mockReturnValue(mockNotification)
       mockRepository.save.mockResolvedValue(mockNotification)
@@ -100,12 +112,11 @@ describe('NotificationService', () => {
         tenantId: dto.tenantId,
         status: NotificationStatus.QUEUED,
         createdBy: dto.createdBy,
+        payload: undefined,
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
-        payload: undefined,
       })
-      expect(mockRepository.save).toHaveBeenCalledWith(mockNotification)
       expect(result).toEqual(mockNotification)
     })
 
@@ -123,22 +134,22 @@ describe('NotificationService', () => {
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
-        payload: undefined,
       }
       mockRepository.create.mockReturnValue(mockNotification)
       mockRepository.save.mockResolvedValue(mockNotification)
 
-      await service.create(dto)
+      const result = await service.create(dto)
 
       expect(mockRepository.create).toHaveBeenCalledWith({
         tenantId: dto.tenantId,
         status: NotificationStatus.PROCESSING,
         createdBy: dto.createdBy,
+        payload: undefined,
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
-        payload: undefined,
       })
+      expect(result).toEqual(mockNotification)
     })
   })
 
@@ -150,65 +161,81 @@ describe('NotificationService', () => {
       slug: 'test-tenant',
     }
 
-    it('should return paginated notifications', async () => {
+    it('should return paginated notifications using the default sort', async () => {
       mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       const mockNotifications = [
         { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
         { id: 'notif-2', tenantId: 'tenant-uuid', status: NotificationStatus.QUEUED },
       ]
-      mockRepository.findAndCount.mockResolvedValue([mockNotifications, 2])
 
-      const result = await service.findAll('cstar-external-id', 1, 10)
+      const queryBuilder = createMockQueryBuilder()
+      mockRepository.createQueryBuilder.mockReturnValue(queryBuilder)
+      queryBuilder.getManyAndCount.mockResolvedValue([mockNotifications, 2])
 
-      expect(mockTenantsService.findByExternalId).toHaveBeenCalledWith('cstar-external-id')
-      expect(mockRepository.findAndCount).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-uuid' },
-        relations: ['tenant'],
-        skip: 0,
-        take: 10,
-        order: { createdAt: 'DESC' },
+      const result = await service.findAll('cstar-external-id', { page: 1, limit: 10 })
+
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('notification')
+      expect(queryBuilder.where).toHaveBeenCalledWith('notification.tenantId = :tenantId', {
+        tenantId: 'tenant-uuid',
       })
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('notification.createdAt', 'DESC')
+      expect(queryBuilder.skip).toHaveBeenCalledWith(0)
+      expect(queryBuilder.take).toHaveBeenCalledWith(10)
+      expect(queryBuilder.getManyAndCount).toHaveBeenCalled()
       expect(result.count).toBe(2)
       expect(result.page).toBe(1)
       expect(result.limit).toBe(10)
       expect(result.totalPages).toBe(1)
     })
 
-    it('should return empty data array when no notifications exist', async () => {
-      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
-      mockRepository.findAndCount.mockResolvedValue([[], 0])
-
-      const result = await service.findAll('cstar-external-id', 1, 10)
-
-      expect(result.data).toEqual([])
-      expect(result.count).toBe(0)
-    })
-
-    it('should filter by status when provided', async () => {
+    it('should apply sort and filter query parameters', async () => {
       mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
       const mockNotifications = [
         { id: 'notif-1', tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
       ]
-      mockRepository.findAndCount.mockResolvedValue([mockNotifications, 1])
 
-      await service.findAll('cstar-external-id', 1, 10, NotificationStatus.COMPLETED)
+      const queryBuilder = createMockQueryBuilder()
+      mockRepository.createQueryBuilder.mockReturnValue(queryBuilder)
+      queryBuilder.getManyAndCount.mockResolvedValue([mockNotifications, 1])
 
-      expect(mockRepository.findAndCount).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-uuid', status: NotificationStatus.COMPLETED },
-        relations: ['tenant'],
-        skip: 0,
-        take: 10,
-        order: { createdAt: 'DESC' },
+      await service.findAll('cstar-external-id', {
+        page: 2,
+        limit: 5,
+        sort: '-createdAt,status',
+        filter: ['status:eq:COMPLETED', 'channelCode:in:EMAIL|SMS'],
       })
+
+      expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
+        1,
+        'LOWER(notification.status) = :filter_0',
+        {
+          filter_0: 'completed',
+        },
+      )
+      expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
+        2,
+        'LOWER(notification.channelCode) IN (:...filter_1)',
+        { filter_1: ['email', 'sms'] },
+      )
+      expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(1, 'notification.createdAt', 'DESC')
+      expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(2, 'notification.status', 'ASC')
+      expect(queryBuilder.skip).toHaveBeenCalledWith(5)
+      expect(queryBuilder.take).toHaveBeenCalledWith(5)
     })
 
-    it('should calculate totalPages correctly', async () => {
-      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
-      mockRepository.findAndCount.mockResolvedValue([[], 25])
+    it('should return empty data when tenant is not found', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(null)
 
-      const result = await service.findAll('cstar-external-id', 1, 10)
+      const result = await service.findAll('missing-tenant', { page: 1, limit: 10 })
 
-      expect(result.totalPages).toBe(3)
+      expect(result).toEqual({
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      })
+      expect(mockRepository.createQueryBuilder).not.toHaveBeenCalled()
     })
   })
 

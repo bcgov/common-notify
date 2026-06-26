@@ -16,8 +16,9 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import * as express from 'express'
-import { TenantGuard } from '../../common/guards/tenant.guard'
-import { GetTenant } from '../../common/decorators/get-tenant.decorator'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
@@ -25,13 +26,17 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 
 /**
  * Templates API Controller
  * Provides REST endpoints for template management
  *
  * Routes:
- * - GET /templates - List all templates for the tenant
+ * - GET /templates - List all templates for the tenant (supports advanced filtering & sorting)
  * - POST /templates - Create a new template
  * - GET /templates/:templateId - Get a specific template
  * - PATCH /templates/:templateId - Update a template
@@ -40,10 +45,43 @@ import { UpdateTemplateDto } from './schemas/update-template.dto'
  */
 @ApiTags('templates')
 @Controller('templates')
-@UseGuards(TenantGuard)
+@UseGuards(NotifyServiceGuard)
 @ApiBearerAuth()
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name)
+
+  // Template list queryable fields configuration
+  private readonly templateListQueryConfig: QueryableFieldsConfig = {
+    sortableFields: {
+      name: 'template.name',
+      createdAt: 'template.createdAt',
+      updatedAt: 'template.updatedAt',
+      channelCode: 'template.channelCode',
+    },
+    filterableFields: {
+      name: {
+        column: 'template.name',
+        valueType: 'string',
+        operators: ['eq', 'like'],
+      },
+      body: {
+        column: 'template.body',
+        valueType: 'string',
+        operators: ['like'],
+      },
+      channelCode: {
+        column: 'template.channelCode',
+        valueType: 'string',
+        operators: ['eq', 'in'],
+      },
+      createdAt: {
+        column: 'template.createdAt',
+        valueType: 'date',
+        operators: ['gte', 'lte'],
+      },
+    },
+    defaultSort: [{ field: 'updatedAt', direction: 'DESC' }],
+  }
 
   constructor(private readonly templatesService: TemplatesService) {}
 
@@ -51,9 +89,8 @@ export class TemplatesController {
    * List all templates for the tenant
    *
    * @param tenant Current tenant from JWT
-   * @param page Page number (1-indexed, default: 1)
-   * @param limit Items per page (default: 10, max: 100)
-   * @returns Paginated list of templates
+   * @param query List query parameters (pagination, sort, filter)
+   * @returns Paginated list of templates with advanced filtering & sorting
    */
   @Version('1')
   @Get()
@@ -73,15 +110,29 @@ export class TemplatesController {
     example: 10,
     description: 'Items per page (max 100)',
   })
-  @ApiOkResponse({ type: [TemplateResponseDto] })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    example: '-updatedAt,name',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['channelCode:eq:EMAIL', 'name:like:welcome'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
+  })
+  @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
-    @GetTenant() tenant: Tenant,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ): Promise<TemplateResponseDto[]> {
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.templatesService.listTemplates(tenant.id, pageNum, limitNum)
+    @Req() req: Request,
+    @Query() query: ListQueryDto,
+  ): Promise<PaginatedTemplateResponse> {
+    const tenant = (req as any).tenant as Tenant
+    const parsedQuery = parseListQuery(query, this.templateListQueryConfig)
+    return this.templatesService.listTemplates(tenant.id, parsedQuery)
   }
 
   /**
@@ -95,9 +146,10 @@ export class TemplatesController {
   @Get(':templateId')
   @HttpCode(200)
   async getTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
@@ -111,11 +163,12 @@ export class TemplatesController {
   @Version('1')
   @Post()
   @HttpCode(201)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async createTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
   }
@@ -132,12 +185,13 @@ export class TemplatesController {
   @Version('1')
   @Patch(':templateId')
   @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async updateTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
-    @Req() req?: express.Request,
   ): Promise<TemplateResponseDto> {
+    const tenant = (req as any).tenant as Tenant
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
   }
@@ -152,10 +206,12 @@ export class TemplatesController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async deleteTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
+    const tenant = (req as any).tenant as Tenant
     await this.templatesService.deleteTemplate(tenant.id, templateId)
   }
 
@@ -172,10 +228,11 @@ export class TemplatesController {
   @Post(':templateId/preview')
   @HttpCode(200)
   async previewTemplate(
-    @GetTenant() tenant: Tenant,
+    @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
     @Body() previewDto: PreviewTemplateDto,
   ): Promise<any> {
+    const tenant = (req as any).tenant as Tenant
     return this.templatesService.previewTemplate(tenant.id, templateId, previewDto)
   }
 }

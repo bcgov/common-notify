@@ -2,12 +2,11 @@ import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationStatus } from '@/enum/notification-status.enum'
+import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import UserService from '@/service/user-service'
 
 export interface ListNotificationsOptions {
-  tenantId?: string
   page?: number
   limit?: number
   status?: NotificationStatus | 'all'
@@ -23,7 +22,6 @@ export const notificationApi = {
     try {
       const params = generateApiParameters('/api/v1/frontend/notification_request')
       const queryParams = {
-        ...(options.tenantId ? { tenantId: options.tenantId } : {}),
         ...(options.page ? { page: options.page } : {}),
         ...(options.limit ? { limit: options.limit } : {}),
         ...(options.status && options.status !== 'all' ? { status: options.status } : {}),
@@ -50,28 +48,50 @@ export const notificationApi = {
   },
 
   /**
-   * Opens a persistent SSE connection that streams notification_request updates for the
-   * authenticated tenant. Calls onMessage for each notification event received.
+   * Fetch individual delivery records for a notification request.
+   * GET /api/v1/frontend/notification_request/:id/request_details
+   */
+  async listRequestDetails(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+    const params = generateApiParameters(
+      `/api/v1/frontend/notification_request/request_details/${notificationRequestId}`,
+    )
+    return get<NotificationRequestDetail[]>(params)
+  },
+
+  /**
+   * Fetch all delivery records for the authenticated tenant.
+   * GET /api/v1/frontend/notification_request/request_details
+   */
+  async listAllRequestDetails(): Promise<NotificationRequestDetail[]> {
+    const params = generateApiParameters('/api/v1/frontend/notification_request/request_details')
+    return get<NotificationRequestDetail[]>(params)
+  },
+
+  /**
+   * Opens a persistent SSE connection that streams refresh signals for the
+   * authenticated tenant. Calls onMessage whenever a change event is received,
+   * allowing the caller to refetch the current page of data.
    *
    * Returns an AbortController — call abort() to close the connection.
    */
   connectNotificationStream(
-    onMessage: (dto: NotificationRequest) => void,
+    onMessage: () => void,
     onError?: (err: unknown) => void,
     tenantId?: string,
   ): AbortController {
     const controller = new AbortController()
-    const baseUrl = generateApiParameters('/api/v1/frontend/notification_request/events').url
-
-    // Build URL with tenantId query parameter
-    const url = tenantId ? `${baseUrl}?tenantId=${encodeURIComponent(tenantId)}` : baseUrl
+    const url = generateApiParameters('/api/v1/frontend/notification_request/events').url
 
     // Use the new async getToken() method which automatically refreshes when needed
     const fetchWithFreshToken = async (input: RequestInfo | URL, init?: RequestInit) => {
       const token = await UserService.getToken()
       return fetch(input, {
         ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+        headers: {
+          ...(init?.headers ?? {}),
+          Authorization: `Bearer ${token}`,
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
       })
     }
 
@@ -79,13 +99,8 @@ export const notificationApi = {
       fetch: fetchWithFreshToken,
       signal: controller.signal,
       onmessage(event: EventSourceMessage) {
-        if (event.event === 'keepalive' || !event.data) return
-        try {
-          const dto = JSON.parse(event.data) as NotificationRequest
-          onMessage(dto)
-        } catch (err) {
-          console.error('Failed to parse SSE notification event', err)
-        }
+        if (event.event === 'keepalive') return
+        onMessage()
       },
       onerror(err: Error) {
         onError?.(err)

@@ -9,9 +9,13 @@ import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
+import { WebhookDeliveryWorker } from './workers/webhook-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
+import { WebhookTriggerService } from './services/webhook-trigger.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
+import { NotificationRequestDetail } from '../api/notification/entities/notification-request-detail.entity'
 import { NotificationService } from '../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
 import { TemplatesService } from '../api/templates/templates.service'
@@ -20,6 +24,13 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { NotifyModule } from '../api/notify/notify.module'
+import { WebhookModule } from '../api/webhook/webhook.module'
+import { WebhookService } from '../api/webhook/webhook.service'
+import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
+import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
+import { ClamavService } from '../services/clamav.service'
+import { AttachmentModule } from '../api/attachment/attachment.module'
+import { AttachmentService } from '../api/attachment/attachment.service'
 
 /**
  * Queue Module
@@ -30,21 +41,26 @@ import { NotifyModule } from '../api/notify/notify.module'
  * Queues: - Ingestion: For processing incoming notifications and orchestrating delivery
  *         - Email Delivery: For handling email sending jobs
  *         - SMS Delivery: For handling SMS sending jobs
+ *         - Webhook Delivery: For dispatching HTTP POST callbacks to registered tenant URLs
  *
  * Also provides scheduled retry job for PENDING notifications that couldn't be queued
  * due to temporary Redis unavailability.
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotificationRequest]),
+    TypeOrmModule.forFeature([NotificationRequest, NotificationRequestDetail]),
     TenantsModule,
     TemplatesModule,
+    WebhookModule,
+    AttachmentModule,
     forwardRef(() => NotifyModule),
   ],
   providers: [
     PendingNotificationRetryService,
     NotificationService,
+    NotificationRequestDetailService,
     NotificationPubSubService,
+    ClamavService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -72,6 +88,7 @@ import { NotifyModule } from '../api/notify/notify.module'
     // @Inject(QueueName.INGESTION) ingestionQueue: Bull.Queue
     // @Inject(QueueName.EMAIL_DELIVERY) emailQueue: Bull.Queue
     // @Inject(QueueName.SMS_DELIVERY) smsQueue: Bull.Queue
+    // @Inject(QueueName.WEBHOOK_DELIVERY) webhookQueue: Bull.Queue
     {
       provide: QueueName.INGESTION,
       useFactory: (configService: ConfigService) => {
@@ -156,12 +173,41 @@ import { NotifyModule } from '../api/notify/notify.module'
       },
       inject: [ConfigService],
     },
+    {
+      provide: QueueName.WEBHOOK_DELIVERY,
+      useFactory: (configService: ConfigService) => {
+        const redisConfig = configService.get('redis')
+
+        // If no redis config (e.g., in tests), return null to skip queue initialization
+        if (!redisConfig) {
+          return null
+        }
+
+        const redisOptions: any = {
+          host: redisConfig.host,
+          port: redisConfig.port,
+          db: redisConfig.db,
+          enableReadyCheck: false,
+          maxRetriesPerRequest: null,
+        }
+        if (redisConfig.password) {
+          redisOptions.password = redisConfig.password
+        }
+
+        return new Bull(QueueName.WEBHOOK_DELIVERY, {
+          redis: redisOptions,
+        })
+      },
+      inject: [ConfigService],
+    },
+    WebhookTriggerService,
   ],
   exports: [
     ProviderToken.REDIS_CLIENT,
     QueueName.INGESTION,
     QueueName.EMAIL_DELIVERY,
     QueueName.SMS_DELIVERY,
+    QueueName.WEBHOOK_DELIVERY,
   ],
 })
 export class QueueModule implements OnModuleInit {
@@ -171,6 +217,7 @@ export class QueueModule implements OnModuleInit {
     @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
     @Inject(QueueName.EMAIL_DELIVERY) private emailQueue?: Bull.Queue,
     @Inject(QueueName.SMS_DELIVERY) private smsQueue?: Bull.Queue,
+    @Inject(QueueName.WEBHOOK_DELIVERY) private webhookQueue?: Bull.Queue,
     @InjectRepository(NotificationRequest)
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
@@ -178,8 +225,14 @@ export class QueueModule implements OnModuleInit {
     private readonly templatesRepository?: TemplatesRepository,
     private readonly templatesService?: TemplatesService,
     private readonly inlineRenderingService?: InlineRenderingService,
+    private readonly attachmentResolverService?: AttachmentResolverService,
+    private readonly attachmentService?: AttachmentService,
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
+    private readonly notificationRequestDetailService?: NotificationRequestDetailService,
+    private readonly clamavService?: ClamavService,
+    private readonly webhookService?: WebhookService,
+    private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
   ) {}
 
   async onModuleInit() {
@@ -208,8 +261,11 @@ export class QueueModule implements OnModuleInit {
         this.emailQueue,
         this.smsQueue,
         this.notificationService,
+        this.notificationRequestDetailService,
         this.configService,
+        this.clamavService,
         concurrency,
+        this.attachmentService,
       )
       this.logger.debug('Ingestion worker initialization started')
 
@@ -226,7 +282,9 @@ export class QueueModule implements OnModuleInit {
         this.templatesRepository,
         this.templatesService,
         this.inlineRenderingService,
+        this.attachmentResolverService,
         this.emailAdapter,
+        this.notificationRequestDetailService,
         emailConcurrency,
       )
       this.logger.log('Email delivery worker initialization started')
@@ -245,9 +303,23 @@ export class QueueModule implements OnModuleInit {
         this.templatesService,
         this.inlineRenderingService,
         this.smsAdapter,
+        this.notificationRequestDetailService,
         smsConcurrency,
       )
       this.logger.log('SMS delivery worker initialization started')
+
+      // Initialize webhook delivery worker — handles HTTP POST callbacks
+      if (this.webhookQueue && this.webhookService && this.webhookDeliveryLogRepository) {
+        const webhookConcurrency =
+          this.configService?.get<number>('queue.webhookDeliveryWorkerConcurrency') || 2
+        WebhookDeliveryWorker.initialize(
+          this.webhookQueue,
+          this.webhookService,
+          this.webhookDeliveryLogRepository,
+          webhookConcurrency,
+        )
+        this.logger.log('Webhook delivery worker initialization started')
+      }
 
       this.logger.log('Queue workers initialized successfully')
     } catch (error) {

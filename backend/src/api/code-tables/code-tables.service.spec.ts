@@ -6,12 +6,14 @@ import { CodeTablesService } from './code-tables.service'
 import { NotificationStatusCode } from '../notification/entities/notification-status-code.entity'
 import { NotificationChannelCode } from '../notification/entities/notification-channel-code.entity'
 import { NotificationEventTypeCode } from '../notification/entities/notification-event-type-code.entity'
+import { FeatureFlagCode } from '../feature-flag/entities/feature-flag-code.entity'
 
 describe('CodeTablesService', () => {
   let service: CodeTablesService
   let statusCodeRepo: Repository<NotificationStatusCode>
   let channelCodeRepo: Repository<NotificationChannelCode>
   let eventTypeCodeRepo: Repository<NotificationEventTypeCode>
+  let featureFlagCodeRepo: Repository<FeatureFlagCode>
 
   const mockStatusCodes: NotificationStatusCode[] = [
     {
@@ -22,6 +24,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       code: 'failed',
@@ -31,6 +34,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
     },
     {
       code: 'pending',
@@ -40,6 +44,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 30,
     },
   ]
 
@@ -52,6 +57,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       channelCode: 'SMS',
@@ -61,6 +67,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
     },
   ]
 
@@ -74,6 +81,7 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 10,
     },
     {
       eventTypeCode: 'INVOICE_SENT',
@@ -84,6 +92,30 @@ describe('CodeTablesService', () => {
       createdBy: 'system',
       updatedAt: new Date(),
       updatedBy: null,
+      sort_order: 20,
+    },
+  ]
+
+  const mockFeatureFlagCodes: FeatureFlagCode[] = [
+    {
+      code: 'dashboard',
+      displayName: 'Dashboard',
+      description: 'Enable dashboard feature',
+      createdAt: new Date(),
+      createdBy: 'system',
+      updatedAt: new Date(),
+      updatedBy: null,
+      sort_order: 999,
+    },
+    {
+      code: 'sms_notifications',
+      displayName: 'SMS Notifications',
+      description: 'Enable SMS notification sending',
+      createdAt: new Date(),
+      createdBy: 'system',
+      updatedAt: new Date(),
+      updatedBy: null,
+      sort_order: 10,
     },
   ]
 
@@ -109,6 +141,12 @@ describe('CodeTablesService', () => {
             find: vi.fn(),
           },
         },
+        {
+          provide: getRepositoryToken(FeatureFlagCode),
+          useValue: {
+            find: vi.fn(),
+          },
+        },
       ],
     }).compile()
 
@@ -116,22 +154,27 @@ describe('CodeTablesService', () => {
     statusCodeRepo = module.get(getRepositoryToken(NotificationStatusCode))
     channelCodeRepo = module.get(getRepositoryToken(NotificationChannelCode))
     eventTypeCodeRepo = module.get(getRepositoryToken(NotificationEventTypeCode))
+    featureFlagCodeRepo = module.get(getRepositoryToken(FeatureFlagCode))
   })
 
   describe('getStatuses', () => {
-    it('should return all status codes transformed to CodeTableItem format', async () => {
+    it('should return all status codes transformed to CodeTableDto format', async () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
 
       const result = await service.getStatuses()
 
       expect(result).toHaveLength(3)
       expect(result[0]).toEqual({
-        id: 'sent',
-        label: 'Sent',
+        code: 'sent',
+        displayName: 'Sent',
         description: 'Notification sent successfully',
+        createdAt: mockStatusCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockStatusCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(statusCodeRepo.find).toHaveBeenCalledWith({
-        order: { code: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 
@@ -152,19 +195,23 @@ describe('CodeTablesService', () => {
   })
 
   describe('getChannels', () => {
-    it('should return all channel codes transformed to CodeTableItem format', async () => {
+    it('should return all channel codes transformed to CodeTableDto format', async () => {
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
 
       const result = await service.getChannels()
 
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
-        id: 'EMAIL',
-        label: 'Email',
+        code: 'EMAIL',
+        displayName: 'Email',
         description: 'Email notification channel',
+        createdAt: mockChannelCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockChannelCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(channelCodeRepo.find).toHaveBeenCalledWith({
-        order: { channelCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 
@@ -185,19 +232,23 @@ describe('CodeTablesService', () => {
   })
 
   describe('getEventTypes', () => {
-    it('should return all event type codes transformed to CodeTableItem format', async () => {
+    it('should return all event type codes transformed to CodeTableDto format', async () => {
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
 
       const result = await service.getEventTypes()
 
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
-        id: 'PASSWORD_RESET',
-        label: 'Password Reset',
+        code: 'PASSWORD_RESET',
+        displayName: 'Password Reset',
         description: 'Password reset notification',
+        createdAt: mockEventTypeCodes[0].createdAt,
+        createdBy: 'system',
+        updatedAt: mockEventTypeCodes[0].updatedAt,
+        updatedBy: null,
       })
       expect(eventTypeCodeRepo.find).toHaveBeenCalledWith({
-        order: { eventTypeCode: 'ASC' },
+        order: { sort_order: 'ASC' },
       })
     })
 
@@ -222,6 +273,7 @@ describe('CodeTablesService', () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(featureFlagCodeRepo.find as any).mockResolvedValueOnce(mockFeatureFlagCodes)
 
       const result = await service.getAllCodeTables()
 
@@ -232,6 +284,7 @@ describe('CodeTablesService', () => {
         statuses: expect.any(Array),
         channels: expect.any(Array),
         eventTypes: expect.any(Array),
+        featureFlags: expect.any(Array),
       })
     })
 
@@ -239,12 +292,14 @@ describe('CodeTablesService', () => {
       ;(statusCodeRepo.find as any).mockResolvedValueOnce(mockStatusCodes)
       ;(channelCodeRepo.find as any).mockResolvedValueOnce(mockChannelCodes)
       ;(eventTypeCodeRepo.find as any).mockResolvedValueOnce(mockEventTypeCodes)
+      ;(featureFlagCodeRepo.find as any).mockResolvedValueOnce(mockFeatureFlagCodes)
 
       await service.getAllCodeTables()
 
       expect(statusCodeRepo.find).toHaveBeenCalled()
       expect(channelCodeRepo.find).toHaveBeenCalled()
       expect(eventTypeCodeRepo.find).toHaveBeenCalled()
+      expect(featureFlagCodeRepo.find).toHaveBeenCalled()
     })
 
     it('should handle partial failures', async () => {

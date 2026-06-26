@@ -1,11 +1,12 @@
 import { Controller, Get, Version, UseGuards, Logger } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
-import { CodeTablesService, CodeTableItemDto, CodeTablesResponseDto } from './code-tables.service'
-import { AuthJwtGuard } from '../../auth/guards/auth.jwt-guard'
+import { CodeTablesService } from './code-tables.service'
+import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
+import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 
 @ApiTags('code-tables')
 @Controller('code-tables')
-@UseGuards(AuthJwtGuard)
+@UseGuards(JwtGuard)
 @ApiBearerAuth()
 export class CodeTablesController {
   private readonly logger = new Logger(CodeTablesController.name)
@@ -37,8 +38,8 @@ export class CodeTablesController {
     summary: 'Get notification status codes',
     description: 'Returns all valid notification status codes (sent, failed, pending, etc.)',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getStatuses(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getStatuses(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getStatuses()
   }
 
@@ -51,8 +52,8 @@ export class CodeTablesController {
     summary: 'Get notification channel codes',
     description: 'Returns all valid notification channels (EMAIL, SMS, etc.)',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getChannels(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getChannels(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getChannels()
   }
 
@@ -66,8 +67,23 @@ export class CodeTablesController {
     description:
       'Returns all valid event types (PASSWORD_RESET, INVOICE_SENT, etc.) that can trigger notifications',
   })
-  @ApiOkResponse({ isArray: true, type: CodeTableItemDto })
-  async getEventTypes(): Promise<CodeTableItemDto[]> {
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getEventTypes(): Promise<CodeTableDto[]> {
     return this.codeTablesService.getEventTypes()
+  }
+
+  /**
+   * Get feature flag codes
+   */
+  @Version('1')
+  @Get('feature-flags')
+  @ApiOperation({
+    summary: 'Get feature flag codes',
+    description:
+      'Returns all valid feature flag codes (sms_notifications, sse_notifications, etc.) for feature gating',
+  })
+  @ApiOkResponse({ isArray: true, type: CodeTableDto })
+  async getFeatureCodes(): Promise<CodeTableDto[]> {
+    return this.codeTablesService.getFeatureCodes()
   }
 }

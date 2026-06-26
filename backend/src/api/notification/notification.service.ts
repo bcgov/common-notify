@@ -10,10 +10,53 @@ import {
 import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
 import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { BulkEmailRequest } from '../notify/schemas/bulk-email-request'
+import {
+  BULK_EMAIL_ADDRESS_HEADER,
+  BULK_EMAIL_MAX_REPORTED_ERRORS,
+} from '../notify/schemas/bulk-email.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
+
+const notificationListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {
+    createdAt: 'notification.createdAt',
+    updatedAt: 'notification.updatedAt',
+    status: 'notification.status',
+    channelCode: 'notification.channelCode',
+  },
+  filterableFields: {
+    status: {
+      column: 'notification.status',
+      valueType: 'string',
+      operators: ['eq', 'ne', 'in'],
+    },
+    channelCode: {
+      column: 'notification.channelCode',
+      valueType: 'string',
+      operators: ['eq', 'in', 'isnull'],
+    },
+    createdAt: {
+      column: 'notification.createdAt',
+      valueType: 'date',
+      operators: ['gte', 'lte'],
+    },
+    createdBy: {
+      column: 'notification.createdBy',
+      valueType: 'string',
+      operators: ['eq', 'like', 'isnull'],
+    },
+  },
+  defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
+}
 
 @Injectable()
 export class NotificationService {
@@ -87,7 +130,29 @@ export class NotificationService {
   /**
    * Extract channel code, recipients, and delayed send time from notification payload
    */
-  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+  /**
+   * Extract channel code, recipients, and delayed send time from a bulk email payload. Bulk sends
+   * are always a single EMAIL-channel request, with recipient addresses parsed from `rows` (mirroring
+   * how simple sends store their recipients on the parent request).
+   */
+  private extractBulkChannelAndRecipients(payload: BulkEmailRequest): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    const delayedSendTime = payload.delayedSend ? new Date(payload.delayedSend) : null
+    const addresses = this.parseBulkAddresses(payload.rows)
+    return {
+      channel: 'EMAIL',
+      recipients: addresses.length > 0 ? { email: addresses } : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
+  private extractChannelAndRecipients(
+    payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
+  ): {
     channel: string | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
@@ -148,8 +213,11 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload
-    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+    // Extract channel, recipients, and delayed send time from payload. Bulk sends (recipients in
+    // `rows`) take a dedicated extractor since they don't carry the email/sms/msgApp channel shape.
+    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.rows)
+      ? this.extractBulkChannelAndRecipients(dto.payload as BulkEmailRequest)
+      : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
@@ -170,59 +238,123 @@ export class NotificationService {
     return fullNotification || saved
   }
 
+  /**
+   * Locate the (case-insensitive) "email address" column in a bulk-send header row.
+   * Returns -1 if the header is missing the column.
+   */
+  private findBulkEmailColumnIndex(header: string[]): number {
+    return header.findIndex(
+      (col) => typeof col === 'string' && col.trim().toLowerCase() === BULK_EMAIL_ADDRESS_HEADER,
+    )
+  }
+
+  /**
+   * Validate a bulk email request's business rules: the template must exist for the tenant and
+   * every row's email address must be well-formed. Returns a bounded list of error strings
+   * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
+   */
+  async validateBulkRules(tenantId: string, dto: BulkEmailRequest): Promise<string[]> {
+    const errors: string[] = []
+
+    const tenant = await this.tenantsService.findOne(tenantId)
+    if (!tenant) {
+      errors.push(`Tenant '${tenantId}' not found`)
+      return errors
+    }
+    if (tenant.status !== 'active') {
+      errors.push(`Tenant is not active (status: ${tenant.status})`)
+    }
+
+    const template = await this.templatesRepository.findById(tenantId, dto.templateId)
+    if (!template) {
+      errors.push(`Template '${dto.templateId}' not found for tenant '${tenantId}'`)
+    } else if (template.channelCode !== 'EMAIL') {
+      errors.push(`Template '${dto.templateId}' is not an EMAIL template`)
+    }
+
+    if (dto.delayedSend) {
+      const scheduledTime = new Date(dto.delayedSend).getTime()
+      const now = Date.now()
+      if (scheduledTime <= now) {
+        errors.push(`delayedSend must be in the future`)
+      } else if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
+        errors.push(`delayedSend must be within 10 days from now`)
+      }
+    }
+
+    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
+
+    const seen = new Map<string, number>()
+    for (let i = 1; i < dto.rows.length; i++) {
+      if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
+        errors.push(
+          `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
+        )
+        break
+      }
+      const address = (dto.rows[i]?.[emailColumnIndex] ?? '').trim()
+      if (!address) {
+        errors.push(`Row ${i}: email address is missing`)
+      } else if (!isEmail(address)) {
+        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+      } else {
+        const normalised = address.toLowerCase()
+        const firstSeen = seen.get(normalised)
+        if (firstSeen !== undefined) {
+          errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
+        } else {
+          seen.set(normalised, i)
+        }
+      }
+    }
+
+    return errors
+  }
+
+  /**
+   * Extract the recipient email addresses from validated bulk rows (header row skipped).
+   */
+  parseBulkAddresses(rows: string[][]): string[] {
+    const header = rows[0] ?? []
+    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
+    return rows.slice(1).map((row) => (row[emailColumnIndex] ?? '').trim())
+  }
+
   async findAll(
     tenantExternalId: string,
-    page: number = 1,
-    limit: number = 10,
-    status?: string,
+    query: ListQueryDto,
   ): Promise<PaginatedNotificationResponse> {
-    // Ensure page and limit are valid
-    const pageNum = Math.max(1, page)
-    const limitNum = Math.min(Math.max(1, limit), 100) // Cap at 100 to prevent abuse
+    const parsedQuery = parseListQuery(query, notificationListQueryConfig)
 
-    const skip = (pageNum - 1) * limitNum
-
-    // Build where clause - include status filter and tenantId
-    const where: any = {}
-
-    // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {
-      // Return empty result if tenant not found
       this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
       return {
         data: [],
         count: 0,
-        page: pageNum,
-        limit: limitNum,
+        page: parsedQuery.page,
+        limit: parsedQuery.limit,
         totalPages: 0,
       }
     }
     this.logger.debug(
       `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
     )
-    where.tenantId = tenant.id
+    const queryBuilder = this.notificationRepository
+      .createQueryBuilder('notification')
+      .leftJoinAndSelect('notification.tenant', 'tenant')
+      .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
 
-    if (status && status !== 'all') {
-      where.status = status
-    }
+    applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
+    const [notifications, total] = await queryBuilder.getManyAndCount()
 
-    // Get both the data and total count
-    const [notifications, total] = await this.notificationRepository.findAndCount({
-      where,
-      relations: ['tenant'],
-      skip,
-      take: limitNum,
-      order: { createdAt: 'DESC' },
-    })
-
-    const totalPages = Math.ceil(total / limitNum)
+    const totalPages = Math.ceil(total / parsedQuery.limit)
 
     return {
       data: notifications.map((n) => this.mapToDto(n)),
       count: total,
-      page: pageNum,
-      limit: limitNum,
+      page: parsedQuery.page,
+      limit: parsedQuery.limit,
       totalPages,
     }
   }
@@ -256,13 +388,14 @@ export class NotificationService {
     if (dto.status !== undefined) updateData.status = dto.status
     if (dto.updatedBy !== undefined) updateData.updatedBy = dto.updatedBy
     if (dto.errorReason !== undefined) updateData.errorReason = dto.errorReason
+    if (dto.quarantineDetails !== undefined) updateData.quarantineDetails = dto.quarantineDetails
 
     // Use query builder for explicit update (status field is part of FK constraint so TypeORM won't track it normally)
     await this.notificationRepository.update({ id, tenantId }, updateData)
 
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
-    this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    this.logger.log(`Updated notification request: ${id} (status=${dto.status})`)
     // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
@@ -282,7 +415,10 @@ export class NotificationService {
    * @param request The NotifySimpleRequest to validate
    * @returns Array of validation error messages (empty if valid)
    */
-  async validateBusinessRules(tenantId: string, request: NotifySimpleRequest): Promise<string[]> {
+  async validateBusinessRules(
+    tenantId: string,
+    request: NotifySimpleRequest | ProcessedNotifySimpleRequest,
+  ): Promise<string[]> {
     const errors: string[] = []
 
     // Verify tenant exists and is active
@@ -425,5 +561,89 @@ export class NotificationService {
     }
 
     return errors
+  }
+
+  /**
+   * Cancels or reschedules a notification.
+   *
+   * Cancellation is allowed for notifications in pending, accepted, or scheduled status.
+   * The status is changed to 'cancelled' and the audit fields are updated.
+   *
+   * Rescheduling updates the delayedSendTime field for notifications in pending, accepted,
+   * or scheduled status. The scheduledTime must be in the future.
+   *
+   * @param notificationId UUID of the notification to cancel or reschedule
+   * @param tenantId UUID of the tenant that owns the notification
+   * @param updatedBy User ID making the change (for audit trail)
+   * @param action Action to perform ('cancel') - optional, if not present then scheduledTime must be provided
+   * @param scheduledTime New scheduled time (ISO8601 format) - optional, if not present then action must be 'cancel'
+   * @returns Updated NotificationRequest entity
+   * @throws NotFoundException if notification not found
+   * @throws BadRequestException if notification status doesn't allow modification or scheduledTime is invalid
+   */
+  async cancelOrRescheduleNotification(
+    notificationId: string,
+    tenantId: string,
+    updatedBy: string,
+    action?: 'cancel',
+    scheduledTime?: string,
+  ): Promise<NotificationRequest> {
+    // Fetch the notification
+    const notification = await this.findOne(notificationId, tenantId)
+
+    // Only allow cancellation/rescheduling for notifications in these statuses
+    const allowedStatuses = ['pending', 'accepted', 'scheduled']
+    if (!allowedStatuses.includes(notification.status)) {
+      throw new Error(
+        `Cannot modify notification with status '${notification.status}'. Allowed statuses: ${allowedStatuses.join(', ')}`,
+      )
+    }
+
+    // Perform action
+    if (action === 'cancel') {
+      // Update status to cancelled
+      await this.notificationRepository.update(
+        { id: notificationId, tenantId },
+        {
+          status: 'cancelled',
+          updatedBy,
+          // updatedAt is automatically set by @UpdateDateColumn
+        },
+      )
+      this.logger.log(`Cancelled notification request: ${notificationId}`, { tenantId })
+    } else if (scheduledTime) {
+      // Validate and reschedule
+      const newScheduledTime = new Date(scheduledTime)
+      if (isNaN(newScheduledTime.getTime())) {
+        throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
+      }
+
+      if (newScheduledTime <= new Date()) {
+        throw new Error(`scheduledTime must be in the future`)
+      }
+
+      await this.notificationRepository.update(
+        { id: notificationId, tenantId },
+        {
+          delayedSendTime: newScheduledTime,
+          updatedBy,
+          // updatedAt is automatically set by @UpdateDateColumn
+        },
+      )
+      this.logger.log(`Rescheduled notification request: ${notificationId}`, {
+        tenantId,
+        newScheduledTime,
+      })
+    } else {
+      throw new Error(`Either 'action' or 'scheduledTime' must be provided`)
+    }
+
+    // Fetch and return updated record
+    const updated = await this.findOne(notificationId, tenantId)
+
+    // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
+    await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
+
+    return updated
   }
 }

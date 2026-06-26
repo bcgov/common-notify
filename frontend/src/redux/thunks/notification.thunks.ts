@@ -2,7 +2,6 @@ import { createAsyncThunk } from '@reduxjs/toolkit'
 import { notificationApi } from '@/api'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 import type { RootState, AppDispatch } from '../store'
-import { upsertNotification } from '../slices/notification.slice'
 
 export const fetchNotifications = createAsyncThunk<
   PaginatedNotificationResponse,
@@ -11,10 +10,8 @@ export const fetchNotifications = createAsyncThunk<
 >('notification/fetchAll', async (_, { getState, rejectWithValue }) => {
   try {
     const state = getState()
-    const selectedTenant = state.tenant.selectedTenant
     const { statusFilter, page, limit } = state.notification
     return await notificationApi.listNotifications({
-      tenantId: selectedTenant?.id,
       page,
       limit,
       status: statusFilter,
@@ -24,10 +21,10 @@ export const fetchNotifications = createAsyncThunk<
   }
 })
 
-/** Connects to the notification SSE stream and dispatches upsertNotification for each event. */
+/** Connects to the notification SSE stream and refetches the current page on each event. */
 export function connectNotificationSSE(dispatch: AppDispatch, tenantId?: string): AbortController {
   return notificationApi.connectNotificationStream(
-    (dto) => dispatch(upsertNotification(dto)),
+    () => dispatch(fetchNotifications()),
     (err) => console.error('SSE connection error', err),
     tenantId,
   )

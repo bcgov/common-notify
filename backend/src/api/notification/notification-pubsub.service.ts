@@ -46,7 +46,11 @@ export class NotificationPubSubService implements OnModuleDestroy {
       const subject = this.subjects.get(tenantId)
       if (!subject) return
       try {
-        subject.next(JSON.parse(message) as NotificationRequestDto)
+        const dto = JSON.parse(message) as NotificationRequestDto
+        this.logger.debug(
+          `Notification status changed for tenant ${tenantId}: id=${dto.id} status=${dto.status}`,
+        )
+        subject.next(dto)
       } catch (err) {
         this.logger.error(`Failed to parse notification update for tenant ${tenantId}`, err)
       }

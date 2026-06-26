@@ -25,7 +25,7 @@ describe('tenant slice', () => {
     const tenant = buildTenant('tenant-1', 'Tenant One')
     const state = tenantReducer(
       undefined,
-      fetchCstarTenants.fulfilled([tenant], 'request-id', 'user-1'),
+      fetchCstarTenants.fulfilled([tenant], 'request-id', undefined),
     )
 
     expect(state.selectedTenant).toEqual(tenant)
@@ -38,7 +38,7 @@ describe('tenant slice', () => {
       fetchCstarTenants.fulfilled(
         [buildTenant('tenant-1', 'Tenant One'), buildTenant('tenant-2', 'Tenant Two')],
         'request-id',
-        'user-1',
+        undefined,
       ),
     )
 
@@ -53,7 +53,7 @@ describe('tenant slice', () => {
     )
     const state = tenantReducer(
       selectedState,
-      fetchCstarTenants.fulfilled([], 'request-id', 'user-1'),
+      fetchCstarTenants.fulfilled([], 'request-id', undefined),
     )
 
     expect(state.selectedTenant).toBeNull()
@@ -65,7 +65,7 @@ describe('tenant slice', () => {
     const selectedState = tenantReducer(undefined, selectTenant(tenant))
     const state = tenantReducer(
       selectedState,
-      fetchCstarTenants.rejected(new Error('boom'), 'request-id', 'user-1', 'Failed to fetch'),
+      fetchCstarTenants.rejected(new Error('boom'), 'request-id', undefined, 'Failed to fetch'),
     )
 
     // Should keep the selected tenant even if CSTAR fails

@@ -10,6 +10,7 @@ import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
+import { JwtGuard } from './common/guards/auth.jwt-guard'
 
 /**
  *
@@ -22,9 +23,10 @@ export async function bootstrap() {
   // Store ModuleRef globally for decorator access (used by @Queueable)
   ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
-  // Add body parsers for form data
-  app.use(bodyParser.urlencoded({ extended: true }))
-  app.use(bodyParser.json())
+  // Add body parsers for form data. The JSON limit is raised above the 100KB
+  // default so a full-size bulk send (up to BULK_EMAIL_MAX_RECIPIENTS rows) fits.
+  app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
+  app.use(bodyParser.json({ limit: '10mb' }))
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -35,6 +37,10 @@ export async function bootstrap() {
   )
 
   app.useGlobalFilters(new ValidationExceptionFilter())
+
+  // Apply JwtGuard globally - all routes require JWT unless marked with @Public()
+  const jwtGuard = app.get(JwtGuard)
+  app.useGlobalGuards(jwtGuard)
 
   app.use(helmet())
   app.enableCors()

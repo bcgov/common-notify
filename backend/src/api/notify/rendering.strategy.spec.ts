@@ -252,7 +252,7 @@ describe('Rendering Strategy', () => {
       })
 
       it('should handle all different renderer types', () => {
-        const renderers = ['handlebars', 'mustache', 'legacy-gc-notify'] as const
+        const renderers = ['handlebars', 'mustache', 'legacy-gc-notify', 'mjml'] as const
 
         for (const renderer of renderers) {
           const channel: NotifyEmailChannel = {

@@ -30,7 +30,7 @@ jobs:
         package: [backend, frontend, migrations]
     timeout-minutes: 10
     steps:
-      - uses: bcgov/action-builder-ghcr@fe69125408b878f9edb6cd1a3df7c4bf451c963d # v4.3.0
+      - uses: bcgov/action-builder-ghcr@cb2629351c87dd1c2130073e4ebb7233a9653a63 # v4.4.1
         with:
           package: ${{ matrix.package }}
           tags: ${{ github.event.number }}
@@ -46,7 +46,7 @@ jobs:
         package: [backend, frontend, migrations]
     steps:
       - name: Import image to OpenShift ImageStream
-        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
@@ -64,39 +64,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch current production configs from main branch
-        run: |
-          # Save current PR branch configs
-          mkdir -p /tmp/pr-configs
-          cp -r api-gateway /tmp/pr-configs/
-
-          # Fetch main branch to get production configs
-          git fetch origin main
-          git checkout origin/main -- api-gateway/
-
-          # Generate production configs (DEV+TEST+PROD) from main branch
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          api-gateway/scripts/generate-gateway-for-stage.sh prod
-
-          # Save production configs
-          cp api-gateway/generated/gw-active-services.yaml /tmp/prod-configs.yaml
-
       - name: Generate PR config from PR branch
         run: |
-          # Restore PR branch configs
-          rm -rf api-gateway
-          cp -r /tmp/pr-configs/api-gateway .
-
           # Generate PR config only from PR branch code
+          # PR shares tag ns.gw-fe8c5.dev with DEV (path-based routing)
+          # DEV service already exists from merge workflow - only apply PR service
           chmod +x api-gateway/scripts/generate-gateway-config.sh
           api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-          # Combine: Production configs (main) + PR config (PR branch)
-          cp /tmp/prod-configs.yaml api-gateway/generated/gw-combined-pr.yaml
-          echo "---" >> api-gateway/generated/gw-combined-pr.yaml
-          cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-combined-pr.yaml
-
-      - name: Apply PR config without touching production
+      - name: Apply PR config (path-based routing)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -112,9 +88,30 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply: Production configs (from main) + New PR config (from PR branch)
-          echo "✅ Applying PR config with CURRENT production configs (DEV/TEST/PROD unchanged)"
-          gwa apply -i api-gateway/generated/gw-combined-pr.yaml
+          # Apply PR config only
+          # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
+          # DEV service already exists from merge workflow
+          # This adds PR routes without affecting DEV routes (different paths)
+          echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
+
+          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+
+          # Check results
+          if grep -q "Published" /tmp/gwa-output.txt; then
+            PUBLISHED_COUNT=$(grep -oP '\d+(?=/\d+ Published)' /tmp/gwa-output.txt || echo "0")
+            echo "✅ Published $PUBLISHED_COUNT gateway service(s)"
+
+            if [ "$PUBLISHED_COUNT" -gt 0 ]; then
+              echo "✅ PR gateway config published successfully"
+              echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
+              exit 0
+            fi
+          fi
+
+          # If we got here, nothing was published
+          echo "❌ Gateway config failed to publish"
+          cat /tmp/gwa-output.txt
+          exit 1
 
   deploys:
     name: Deploys (${{ github.event.number }})
@@ -125,7 +122,7 @@ jobs:
       oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
-      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true
+      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true --set backend.clamav.enabled=false --set backend.clamav.host=common-notify-dev-clamav
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')

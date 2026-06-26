@@ -4,13 +4,14 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 
 /**
  * Used on the Dashboard page
  */
 export const NotificationTemplatesSection: FC = () => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const templates = useAppSelector((state) => state.templates.items)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
@@ -21,9 +22,11 @@ export const NotificationTemplatesSection: FC = () => {
   return (
     <section className="mb-4">
       <PageSubHeading title="Notification Templates" />
-      <Button variant="primary">Create New Template</Button>
+      <Button variant="primary" onPress={() => navigate({ to: '/template-create' })}>
+        Create New Template
+      </Button>
       <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
-        {templates.map((template) => (
+        {templates.slice(0, 2).map((template) => (
           <li key={template.id}>
             <Link
               to="/template-edit/$templateId"

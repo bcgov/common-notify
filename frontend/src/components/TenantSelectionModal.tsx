@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { AlertDialog, Button, Modal, Select } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
+import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import UserService from '@/service/user-service'
 import '@/scss/components/tenant-selection-modal.scss'
@@ -17,10 +18,11 @@ import '@/scss/components/tenant-selection-modal.scss'
  * 1. Modal appears on app load if multiple tenants exist
  * 2. User selects a tenant from the list
  * 3. Modal closes and app loads with selected tenant context
+ * 4. Fetch user's CSTAR roles for that tenant
  */
 
 const CSTAR_TENANT_SETUP_URL =
-  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || 'https://cstar-dev.apps.silver.devops.gov.bc.ca'
+  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca'
 
 const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
@@ -31,14 +33,22 @@ const TenantSelectionModal: FC = () => {
   const tenantItems = useMemo(
     () =>
       tenants.map((tenant) => ({
-        id: tenant.id,
+        id: String(tenant.id),
         label: tenant.name,
       })),
     [tenants],
   )
 
+  // Don't show modal for NOTIFY_ADMIN users without tenants - they go directly to feature flags
+  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+  if (tenants.length === 0 && isAdmin) {
+    return null
+  }
+
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
+    // Fetch user's roles in the selected tenant and wait for it to complete
+    dispatch(fetchCstarRoles({ tenantId: tenant.id }))
   }
 
   const handleCancelSelection = () => {

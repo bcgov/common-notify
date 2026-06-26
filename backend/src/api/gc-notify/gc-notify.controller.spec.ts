@@ -6,7 +6,6 @@ import { GcNotifyApiClient } from './gc-notify-api.client'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
 import { CreateSmsNotificationRequest } from './schemas/create-sms-notification-request'
 import { PostBulkRequest } from './schemas/post-bulk-request'
-import { TenantGuard } from 'src/common/guards/tenant.guard'
 import type * as express from 'express'
 
 describe('GcNotifyController', () => {
@@ -20,10 +19,6 @@ describe('GcNotifyController', () => {
     getNotificationById: vi.fn(),
     getTemplates: vi.fn(),
     getTemplate: vi.fn(),
-  }
-
-  const mockTenantGuard = {
-    canActivate: vi.fn().mockReturnValue(true),
   }
 
   const makeReq = (apiKey?: string): express.Request => {
@@ -44,10 +39,7 @@ describe('GcNotifyController', () => {
           useValue: mockGcNotifyApiClient,
         },
       ],
-    })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
-      .compile()
+    }).compile()
 
     controller = module.get<GcNotifyController>(GcNotifyController)
   })

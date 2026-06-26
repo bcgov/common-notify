@@ -40,8 +40,9 @@ export default () => {
     // Keycloak / JWT authentication
     auth: {
       jwksUri: process.env.JWKS_URI,
-      jwtIssuer: process.env.JWT_ISSUER,
-      keycloakClientId: process.env.KEYCLOAK_CLIENT_ID,
+      frontendKeycloakIssuer: process.env.FRONTEND_KEYCLOAK_ISSUER,
+      apiGatewayKeycloakIssuer: process.env.API_GATEWAY_KEYCLOAK_ISSUER,
+      notifyClientId: process.env.NOTIFY_CLIENT_ID,
     },
 
     // CHES (Common Hosted Email Service)
@@ -58,6 +59,20 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Kong Admin API (for API key management)
+    kong: {
+      adminUrl: process.env.KONG_ADMIN_URL,
+      adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
+      adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
+      adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
+    // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
+    // Used to fetch user roles for role-based access control
+    cstar: {
+      baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+    },
+
     // Twilio SMS Service
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,
@@ -71,11 +86,32 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
+    // S3-compatible object storage
+    s3: {
+      endpoint: process.env.S3_ENDPOINT,
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      accessKey: process.env.S3_ACCESS_KEY,
+      secretKey: process.env.S3_SECRET_KEY,
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+    },
+
+    // ClamAV
+    clamav: {
+      host: process.env.CLAMAV_HOST || 'localhost',
+      port: parseInt(process.env.CLAMAV_PORT || '3310', 10),
+      timeout: parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
+      enabled: process.env.CLAMAV_ENABLED !== 'false',
+      failClosed: process.env.CLAMAV_FAIL_CLOSED === 'true',
+    },
+
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      // Number of recipients per bulk-send delivery batch
+      batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
       emailDeliveryWorkerConcurrency: parseInt(
-        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '2',
+        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',
         10,
       ),
       smsDeliveryWorkerConcurrency: parseInt(
@@ -85,6 +121,11 @@ export default () => {
       jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
       pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
+    },
+
+    // Encryption
+    encryption: {
+      key: process.env.WEBHOOK_ENCRYPTION_KEY,
     },
   }
 }

@@ -5,12 +5,14 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { vi } from 'vitest'
-import { TenantGuard } from '../../common/guards/tenant.guard'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { CanActivate, ExecutionContext } from '@nestjs/common'
+import * as listQueryParser from '../../common/query/list-query.parser'
 
 describe('TemplatesController', () => {
   let controller: TemplatesController
@@ -21,14 +23,16 @@ describe('TemplatesController', () => {
     slug: 'test-tenant',
     externalId: 'ext-123',
     status: 'active',
+    statusCode: { code: 'active', name: 'Active' } as any,
     createdAt: new Date(),
+    createdBy: 'admin',
     updatedAt: new Date(),
+    updatedBy: 'admin',
     isDeleted: false,
   }
 
   const mockTemplate: TemplateResponseDto = {
     id: 'template-123',
-    tenantId: 'tenant-123',
     name: 'Welcome Email',
     description: 'Welcome template',
     channelCode: NotificationChannel.EMAIL,
@@ -53,10 +57,20 @@ describe('TemplatesController', () => {
     previewTemplate: vi.fn(),
   }
 
-  // Mock TenantGuard to bypass authentication
-  const mockTenantGuard: CanActivate = {
-    canActivate: (_context: ExecutionContext) => true,
+  // Mock AuthGuard to bypass authentication
+  const mockAuthGuard: CanActivate = {
+    canActivate: (context: ExecutionContext) => {
+      const request = context.switchToHttp().getRequest()
+      request.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
+      return true
+    },
   }
+
+  // Helper to create a mock request with tenant
+  const createMockRequest = () =>
+    ({
+      tenant: mockTenant,
+    }) as any
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -68,8 +82,8 @@ describe('TemplatesController', () => {
         },
       ],
     })
-      .overrideGuard(TenantGuard)
-      .useValue(mockTenantGuard)
+      .overrideGuard(NotifyServiceGuard)
+      .useValue(mockAuthGuard)
       .compile()
 
     controller = module.get<TemplatesController>(TemplatesController)
@@ -78,70 +92,172 @@ describe('TemplatesController', () => {
   })
 
   describe('listTemplates', () => {
-    it('should return a list of templates with default pagination', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
-
-      const result = await controller.listTemplates(mockTenant)
-
-      expect(result).toEqual(templates)
-      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 1, 10)
+    beforeEach(() => {
+      vi.spyOn(listQueryParser, 'parseListQuery').mockImplementation((query, _config) => ({
+        page: query.page || 1,
+        limit: query.limit || 10,
+        filters: Array.isArray(query.filter)
+          ? query.filter.map((f: string) => {
+              const [field, operator, value] = f.split(':')
+              return { field, operator, value }
+            })
+          : [],
+        sorts: query.sort
+          ? query.sort.split(',').map((s: string) => {
+              const isDesc = s.startsWith('-')
+              const field = isDesc ? s.slice(1) : s
+              return { field, direction: isDesc ? 'DESC' : 'ASC' }
+            })
+          : [{ field: 'updatedAt', direction: 'DESC' }],
+      }))
     })
 
-    it('should return templates with custom page and limit', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
-
-      const result = await controller.listTemplates(mockTenant, '2', '20')
-
-      expect(result).toEqual(templates)
-      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith('tenant-123', 2, 20)
+    afterEach(() => {
+      vi.restoreAllMocks()
     })
 
-    it('should handle invalid page number (non-numeric)', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
+    it('should return a paginated list of templates with default pagination', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(mockTenant, 'invalid', '10')
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
-      // parseInt will return NaN for 'invalid', which should default to 1
+      expect(result).toEqual(mockResponse)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',
-        expect.any(Number),
-        10,
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+        }),
       )
     })
 
-    it('should handle invalid limit (non-numeric)', async () => {
-      const templates = [mockTemplate]
-      mockTemplatesService.listTemplates.mockResolvedValue(templates)
+    it('should return templates with custom page and limit', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 2,
+        limit: 20,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(mockTenant, '1', 'invalid')
+      const req = createMockRequest()
+      const query = { page: 2, limit: 20 }
+      const result = await controller.listTemplates(req, query as any)
 
+      expect(result).toEqual(mockResponse)
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         'tenant-123',
-        1,
-        expect.any(Number),
+        expect.objectContaining({
+          page: 2,
+          limit: 20,
+        }),
+      )
+    })
+
+    it('should accept sort parameter and parse it', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10, sort: '-updatedAt,name' }
+      const result = await controller.listTemplates(req, query as any)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
+        'tenant-123',
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+          sorts: expect.arrayContaining([
+            expect.objectContaining({ field: 'updatedAt', direction: 'DESC' }),
+            expect.objectContaining({ field: 'name', direction: 'ASC' }),
+          ]),
+        }),
+      )
+    })
+
+    it('should accept filter parameters and parse them', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = {
+        page: 1,
+        limit: 10,
+        filter: ['channelCode:eq:EMAIL', 'name:like:welcome'],
+      }
+      const result = await controller.listTemplates(req, query as any)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
+        'tenant-123',
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+          filters: expect.arrayContaining([
+            expect.objectContaining({ field: 'channelCode', operator: 'eq', value: 'EMAIL' }),
+            expect.objectContaining({ field: 'name', operator: 'like', value: 'welcome' }),
+          ]),
+        }),
       )
     })
 
     it('should return empty array when no templates exist', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([])
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [],
+        count: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      const result = await controller.listTemplates(mockTenant)
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
     })
 
     it('should pass tenant ID to service', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
 
-      await controller.listTemplates(mockTenant)
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      await controller.listTemplates(req, query as any)
 
       expect(mockTemplatesService.listTemplates).toHaveBeenCalledWith(
         mockTenant.id,
-        expect.any(Number),
-        expect.any(Number),
+        expect.any(Object),
       )
     })
   })
@@ -150,7 +266,7 @@ describe('TemplatesController', () => {
     it('should return a specific template by ID', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.getTemplate(mockTenant, 'template-123')
+      const result = await controller.getTemplate(createMockRequest(), 'template-123')
 
       expect(result).toEqual(mockTemplate)
       expect(mockTemplatesService.getTemplate).toHaveBeenCalledWith('tenant-123', 'template-123')
@@ -159,7 +275,7 @@ describe('TemplatesController', () => {
     it('should call service with tenant ID and template ID', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.getTemplate(mockTenant, 'template-456')
+      await controller.getTemplate(createMockRequest(), 'template-456')
 
       expect(mockTemplatesService.getTemplate).toHaveBeenCalledWith('tenant-123', 'template-456')
     })
@@ -167,7 +283,7 @@ describe('TemplatesController', () => {
     it('should throw error when template not found', async () => {
       mockTemplatesService.getTemplate.mockRejectedValue(new Error('Template not found'))
 
-      await expect(controller.getTemplate(mockTenant, 'non-existent')).rejects.toThrow(
+      await expect(controller.getTemplate(createMockRequest(), 'non-existent')).rejects.toThrow(
         'Template not found',
       )
     })
@@ -187,7 +303,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, createDto)
+      const result = await controller.createTemplate(createMockRequest(), createDto)
 
       expect(result).toEqual(mockTemplate)
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
@@ -208,7 +324,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.createTemplate(mockTenant, createDto)
+      await controller.createTemplate(createMockRequest(), createDto)
 
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
       expect(mockTemplatesService.createTemplate).toHaveBeenCalledWith(
@@ -226,13 +342,9 @@ describe('TemplatesController', () => {
         engineCode: TemplateEngine.HANDLEBARS,
       }
 
-      const mockRequest = {
-        user: { sub: 'user-123', email: 'user@example.com' },
-      } as any
-
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.createTemplate(mockTenant, createDto, mockRequest)
+      await controller.createTemplate(createMockRequest(), createDto)
 
       expect(mockTemplatesService.createTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -251,7 +363,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, createDto)
+      const result = await controller.createTemplate(createMockRequest(), createDto)
 
       expect(result.id).toBe('template-123')
       expect(result.name).toBe('Welcome Email')
@@ -267,7 +379,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.updateTemplate(mockTenant, 'template-123', updateDto)
+      const result = await controller.updateTemplate(createMockRequest(), 'template-123', updateDto)
 
       expect(result).toEqual(mockTemplate)
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
@@ -286,7 +398,7 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.updateTemplate(mockTenant, 'template-456', updateDto)
+      await controller.updateTemplate(createMockRequest(), 'template-456', updateDto)
 
       // When no request is provided, JwtUserExtractor.extractUser returns 'system'
       expect(mockTemplatesService.updateTemplate).toHaveBeenCalledWith(
@@ -302,13 +414,9 @@ describe('TemplatesController', () => {
         body: 'New body',
       }
 
-      const mockRequest = {
-        user: { sub: 'user-456' },
-      } as any
-
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.updateTemplate(mockTenant, 'template-123', updateDto, mockRequest)
+      await controller.updateTemplate(createMockRequest(), 'template-123', updateDto)
 
       expect(mockTemplatesService.updateTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -326,7 +434,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.updateTemplate.mockRejectedValue(new Error('Template not found'))
 
       await expect(
-        controller.updateTemplate(mockTenant, 'non-existent', updateDto),
+        controller.updateTemplate(createMockRequest(), 'non-existent', updateDto),
       ).rejects.toThrow('Template not found')
     })
   })
@@ -335,7 +443,7 @@ describe('TemplatesController', () => {
     it('should delete a template by ID', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
       expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-123')
@@ -344,7 +452,7 @@ describe('TemplatesController', () => {
     it('should call service with correct tenant and template IDs', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      await controller.deleteTemplate(mockTenant, 'template-456')
+      await controller.deleteTemplate(createMockRequest(), 'template-456')
 
       expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-456')
     })
@@ -352,7 +460,7 @@ describe('TemplatesController', () => {
     it('should return 204 No Content status', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
     })
@@ -360,7 +468,7 @@ describe('TemplatesController', () => {
     it('should throw error when template not found', async () => {
       mockTemplatesService.deleteTemplate.mockRejectedValue(new Error('Template not found'))
 
-      await expect(controller.deleteTemplate(mockTenant, 'non-existent')).rejects.toThrow(
+      await expect(controller.deleteTemplate(createMockRequest(), 'non-existent')).rejects.toThrow(
         'Template not found',
       )
     })
@@ -382,7 +490,11 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.previewTemplate.mockResolvedValue(previewResult)
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result).toEqual(previewResult)
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
@@ -404,7 +516,7 @@ describe('TemplatesController', () => {
         body: 'Test body',
       })
 
-      await controller.previewTemplate(mockTenant, 'template-456', previewDto)
+      await controller.previewTemplate(createMockRequest(), 'template-456', previewDto)
 
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
         'tenant-123',
@@ -413,9 +525,9 @@ describe('TemplatesController', () => {
       )
     })
 
-    it('should handle preview with empty personalisation', async () => {
+    it('should handle preview with empty params', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {},
+        params: {},
       }
 
       mockTemplatesService.previewTemplate.mockResolvedValue({
@@ -423,7 +535,11 @@ describe('TemplatesController', () => {
         body: 'Static body',
       })
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result).toBeDefined()
       expect(mockTemplatesService.previewTemplate).toHaveBeenCalledWith(
@@ -435,7 +551,7 @@ describe('TemplatesController', () => {
 
     it('should return rendered email with subject and body', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {
+        params: {
           firstName: 'Jane',
           lastName: 'Doe',
         },
@@ -449,7 +565,11 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.previewTemplate.mockResolvedValue(previewResult)
 
-      const result = await controller.previewTemplate(mockTenant, 'template-123', previewDto)
+      const result = await controller.previewTemplate(
+        createMockRequest(),
+        'template-123',
+        previewDto,
+      )
 
       expect(result.subject).toBe('Welcome Jane')
       expect(result.body).toBe('Hello Jane Doe!')
@@ -458,36 +578,69 @@ describe('TemplatesController', () => {
 
     it('should throw error when template not found', async () => {
       const previewDto: PreviewTemplateDto = {
-        personalisation: {},
+        params: {},
       }
 
       mockTemplatesService.previewTemplate.mockRejectedValue(new Error('Template not found'))
 
       await expect(
-        controller.previewTemplate(mockTenant, 'non-existent', previewDto),
+        controller.previewTemplate(createMockRequest(), 'non-existent', previewDto),
       ).rejects.toThrow('Template not found')
     })
   })
 
   describe('Controller Guards and Decorators', () => {
-    it('should require TenantGuard for accessing templates', () => {
-      // TenantGuard is applied at class level via @UseGuards(TenantGuard)
+    it('should require AuthGuard for accessing templates', () => {
+      // AuthGuard is applied at class level via @UseGuards(AuthGuard)
       // The @GetTenant() decorator provides the tenant from the request
       expect(controller).toBeDefined()
     })
 
     it('should require authorization via ApiBearerAuth', () => {
       // ApiBearerAuth is for Swagger documentation
-      // The actual auth is handled by TenantGuard
+      // The actual auth is handled by AuthGuard with X-Tenant-ID header validation
       expect(controller).toBeDefined()
     })
   })
 
   describe('HTTP Status Codes', () => {
-    it('should return 200 for listTemplates', async () => {
-      mockTemplatesService.listTemplates.mockResolvedValue([mockTemplate])
+    beforeEach(() => {
+      vi.spyOn(listQueryParser, 'parseListQuery').mockImplementation((query, _config) => ({
+        page: query.page || 1,
+        limit: query.limit || 10,
+        filters: Array.isArray(query.filter)
+          ? query.filter.map((f: string) => {
+              const [field, operator, value] = f.split(':')
+              return { field, operator, value }
+            })
+          : [],
+        sorts: query.sort
+          ? query.sort.split(',').map((s: string) => {
+              const isDesc = s.startsWith('-')
+              const field = isDesc ? s.slice(1) : s
+              return { field, direction: isDesc ? 'DESC' : 'ASC' }
+            })
+          : [{ field: 'updatedAt', direction: 'DESC' }],
+      }))
+    })
 
-      const result = await controller.listTemplates(mockTenant)
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('should return 200 for listTemplates', async () => {
+      const mockResponse: PaginatedTemplateResponse = {
+        data: [mockTemplate],
+        count: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }
+      mockTemplatesService.listTemplates.mockResolvedValue(mockResponse)
+
+      const req = createMockRequest()
+      const query = { page: 1, limit: 10 }
+      const result = await controller.listTemplates(req, query as any)
 
       expect(result).toBeDefined()
       // Status code 200 is implicit for @Get() without @HttpCode override
@@ -496,7 +649,7 @@ describe('TemplatesController', () => {
     it('should return 200 for getTemplate', async () => {
       mockTemplatesService.getTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.getTemplate(mockTenant, 'template-123')
+      const result = await controller.getTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeDefined()
     })
@@ -504,7 +657,7 @@ describe('TemplatesController', () => {
     it('should return 201 for createTemplate', async () => {
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      const result = await controller.createTemplate(mockTenant, {} as CreateTemplateDto)
+      const result = await controller.createTemplate(createMockRequest(), {} as CreateTemplateDto)
 
       expect(result).toBeDefined()
       // Status code 201 is set via @HttpCode(201) decorator
@@ -514,7 +667,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
       const result = await controller.updateTemplate(
-        mockTenant,
+        createMockRequest(),
         'template-123',
         {} as UpdateTemplateDto,
       )
@@ -526,7 +679,7 @@ describe('TemplatesController', () => {
     it('should return 204 for deleteTemplate', async () => {
       mockTemplatesService.deleteTemplate.mockResolvedValue(undefined)
 
-      const result = await controller.deleteTemplate(mockTenant, 'template-123')
+      const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
       // Status code 204 is set via @HttpCode(204) decorator
@@ -536,7 +689,7 @@ describe('TemplatesController', () => {
       mockTemplatesService.previewTemplate.mockResolvedValue({ body: 'rendered' })
 
       const result = await controller.previewTemplate(
-        mockTenant,
+        createMockRequest(),
         'template-123',
         {} as PreviewTemplateDto,
       )

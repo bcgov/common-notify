@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
@@ -45,6 +46,7 @@ export class SmsDeliveryWorker {
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
     smsAdapter: ISmsTransport,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)
@@ -72,7 +74,10 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
-        // Resolve template if templateId is provided in the original request
+        if ((job.attemptsMade ?? 0) > 0) {
+          await requestDetailService.resetForRetry(notifyId)
+        }
+
         let resolvedPayload = payload
         if (request?.templateId) {
           logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
@@ -155,6 +160,7 @@ export class SmsDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send SMS using the injected adapter
@@ -166,6 +172,9 @@ export class SmsDeliveryWorker {
         )
 
         logger.debug(`[${notifyId}] SMS sent successfully: ${JSON.stringify(result)}`)
+
+        // Request has made it to the sms gateway, update request detail records as sent
+        await requestDetailService.markSent(notifyId, result.externalId)
 
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
@@ -190,6 +199,7 @@ export class SmsDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
@@ -235,7 +245,7 @@ export class SmsDeliveryWorker {
     const result = await smsAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || `${smsAdapter.name}-${Date.now()}`,
+      externalId: result.messageId || result.providerResponse || `${smsAdapter.name}-${Date.now()}`,
       provider: smsAdapter.name,
     }
   }

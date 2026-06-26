@@ -4,7 +4,11 @@ import { ConfigService } from '@nestjs/config'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { NotificationService } from '../../api/notification/notification.service'
+import { ClamavService } from '../../services/clamav.service'
+import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
+import { AttachmentService } from '../../api/attachment/attachment.service'
 
 /**
  * Ingestion Worker
@@ -21,14 +25,28 @@ import { NotificationService } from '../../api/notification/notification.service
 export class IngestionWorker {
   private readonly logger = new Logger(IngestionWorker.name)
 
+  private static hasAttachmentReferences(
+    attachments: unknown,
+  ): attachments is Array<{ attachmentId: string }> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.every(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
+      )
+    )
+  }
+
   /**
    * Initialize the ingestion worker on a queue
    * @param ingestionQueue The BullMQ queue instance for ingestion jobs
    * @param emailQueue Queue for email delivery jobs
    * @param smsQueue Queue for SMS delivery jobs
    * @param notificationService Service for database updates
-   * @param notifyService Service for template resolution
    * @param configService Configuration service for queue settings
+   * @param clamavService Service for malware scanning
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
   static async initialize(
@@ -36,8 +54,11 @@ export class IngestionWorker {
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
+    requestDetailService: NotificationRequestDetailService,
     configService: ConfigService,
+    clamavService?: ClamavService,
     concurrency: number = 1,
+    attachmentService?: AttachmentService,
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -69,6 +90,159 @@ export class IngestionWorker {
         // Validate request structure
         if (!request || typeof request !== 'object') {
           throw new Error('Invalid request: request payload is missing or invalid')
+        }
+
+        // Bulk email send: split recipients into fixed-size batches and fan out one
+        // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
+        if (job.data.bulk && job.data.bulkEmail) {
+          const { name, templateId, params, addresses } = job.data.bulkEmail
+          const batchSize = configService?.get<number>('queue.batchSize') || 100
+
+          logger.log(
+            `[${notifyId}] Processing bulk email job: ${addresses.length} recipient(s), batchSize=${batchSize}`,
+          )
+
+          let batchIndex = 0
+          for (let start = 0; start < addresses.length; start += batchSize) {
+            const chunk = addresses.slice(start, start + batchSize)
+            // Format: {notification_request id}-{channel}-{index}; reused as the delivery jobId
+            // so a failed batch is easy to identify and retry.
+            const batchId = `${notifyId}-${NotificationChannel.EMAIL}-${batchIndex}`
+
+            await requestDetailService.createBulkPending(notifyId, batchId, chunk, tenantId)
+
+            const deliveryPayload: DeliveryJobPayload = {
+              notifyId,
+              tenantId,
+              channel: NotificationChannel.EMAIL,
+              request,
+              payload: {} as any,
+              attempt: 0,
+              bulk: true,
+              batchId,
+              bulkEmail: { name, templateId, params, addresses: chunk },
+            }
+
+            await emailQueue.add(deliveryPayload, {
+              jobId: batchId,
+              removeOnComplete: true,
+              removeOnFail: false,
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 2000 },
+            })
+
+            logger.log(
+              `[${notifyId}] Queued bulk batch ${batchIndex} (batchId=${batchId}, recipients=${chunk.length})`,
+            )
+            batchIndex++
+          }
+
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.PROCESSING,
+            updatedBy: 'ingestion-worker',
+          })
+
+          logger.log(`[${notifyId}] Bulk email job fanned out into ${batchIndex} batch(es)`)
+          return { success: true, deliveryJobsQueued: batchIndex }
+        } else {
+          // Create notification request detail entries for non-bulk request
+          await requestDetailService.createPending(notifyId, request, tenantId)
+        }
+
+        const channelAttachments = [
+          ...(request.email?.attachments ?? []),
+          ...(request.sms?.attachments ?? []),
+          ...(request.msgApp?.attachments ?? []),
+        ]
+
+        if (channelAttachments.length > 0) {
+          if (!clamavService) {
+            throw new Error('Attachment scan service unavailable')
+          }
+          if (!IngestionWorker.hasAttachmentReferences(channelAttachments)) {
+            throw new Error('Invalid processed attachment reference payload')
+          }
+          if (!attachmentService) {
+            throw new Error('Attachment service unavailable')
+          }
+
+          logger.log(
+            `[${notifyId}] Scanning ${channelAttachments.length} attachment(s) for malware`,
+          )
+
+          for (const attachment of channelAttachments) {
+            try {
+              const downloadedAttachment =
+                await attachmentService.downloadAttachmentByIdAndTenantId(
+                  attachment.attachmentId,
+                  tenantId,
+                )
+              const buffer = downloadedAttachment.content
+              const attachmentFilename = downloadedAttachment.filename
+
+              logger.debug(
+                `[${notifyId}] Scanning attachment: ${JSON.stringify({
+                  tenantId,
+                  attachmentId: attachment.attachmentId,
+                  filename: attachmentFilename,
+                  sizeBytes: buffer.length,
+                })}`,
+              )
+
+              // Scan buffer for malware using CLAMD protocol
+              const scanResult = await clamavService.scanBuffer(buffer, attachmentFilename)
+
+              if (scanResult.isInfected) {
+                // Malware detected - quarantine the notification
+                logger.warn(
+                  `[${notifyId}] SECURITY: Malware detected in attachment: ${JSON.stringify({
+                    tenantId,
+                    attachmentId: attachment.attachmentId,
+                    filename: attachmentFilename,
+                    viruses: scanResult.quarantineInfo?.viruses || [],
+                  })}`,
+                )
+
+                // Create quarantine details from scan result
+                const quarantineDetails: QuarantineDetails = {
+                  viruses: scanResult.quarantineInfo?.viruses || [],
+                  filename: attachmentFilename,
+                  scannedAt: scanResult.quarantineInfo?.scannedAt
+                    ? scanResult.quarantineInfo.scannedAt.toISOString()
+                    : new Date().toISOString(),
+                  reason: 'Malware detected during attachment scanning',
+                }
+
+                // Update notification to QUARANTINED status
+                await notificationService.update(notifyId, tenantId, {
+                  status: NotificationStatus.QUARANTINED,
+                  quarantineDetails,
+                  updatedBy: 'ingestion-worker-scanner',
+                })
+                await requestDetailService.updateStatus(notifyId, NotificationStatus.QUARANTINED)
+
+                logger.log(
+                  `[${notifyId}] Notification marked as QUARANTINED due to malware detection`,
+                )
+
+                // Stop processing - do not queue delivery jobs
+                return { success: false, reason: 'Quarantined due to malware detection' }
+              }
+
+              logger.debug(
+                `[${notifyId}] Attachment ${attachmentFilename || 'unnamed'} passed malware scan`,
+              )
+            } catch (scanError) {
+              const errorMsg = scanError instanceof Error ? scanError.message : String(scanError)
+              logger.error(
+                `[${notifyId}] Attachment scan error: ${errorMsg}. Strict mode: retrying job.`,
+              )
+              // Strict mode: throw error to trigger BullMQ retry if ClamAV is unavailable
+              throw new Error(`Attachment scan failed: ${errorMsg}`)
+            }
+          }
+
+          logger.log(`[${notifyId}] All attachments passed malware scanning`)
         }
 
         // Determine channels and fan-out to delivery queues
@@ -156,6 +330,8 @@ export class IngestionWorker {
           updatedBy: 'ingestion-worker',
         })
 
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -169,6 +345,7 @@ export class IngestionWorker {
           status: NotificationStatus.FAILED,
           updatedBy: 'ingestion-worker',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED)
 
         // Re-throw to trigger BullMQ retry logic
         throw error

@@ -35,6 +35,32 @@ describe('TemplatesService', () => {
     body: '# Welcome {{userName}}\n\nThis is **bold** text with [link](https://example.com)',
   }
 
+  const mockMjmlTemplate: Template = {
+    ...mockTemplate,
+    subject: 'Welcome {{userName}}',
+    body: `
+      <mjml>
+        <mj-body>
+          <mj-section>
+            <mj-column>
+              <mj-text>Hello {{userName}}</mj-text>
+            </mj-column>
+          </mj-section>
+        </mj-body>
+      </mjml>
+    `,
+    engineCode: TemplateEngine.MJML,
+    bodyType: null,
+  }
+
+  const mockMjmlSmsTemplate: Template = {
+    ...mockTemplate,
+    channelCode: NotificationChannel.SMS,
+    subject: undefined,
+    body: 'Your code is {{code}}',
+    engineCode: TemplateEngine.MJML,
+  }
+
   const mockRepository = {
     create: vi.fn(),
     update: vi.fn(),
@@ -81,6 +107,16 @@ describe('TemplatesService', () => {
 
       expect(result.subject).toBe('Welcome to MyApp!')
       expect(result.body).toBe('Hello John, welcome!')
+      expect(result.bodyType).toBe('html')
+    })
+
+    it('should fall back to html when stored MJML bodyType is null', async () => {
+      const result = await service.renderTemplateContent(mockMjmlTemplate, {
+        userName: 'John',
+      })
+
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toContain('<!doctype html>')
       expect(result.bodyType).toBe('html')
     })
 
@@ -182,6 +218,26 @@ describe('TemplatesService', () => {
       expect(result).toHaveProperty('subject')
       expect(result).toHaveProperty('body')
     })
+
+    it('should render stored MJML email templates to HTML', async () => {
+      const result = await service.renderTemplateContent(mockMjmlTemplate, {
+        userName: 'John',
+      })
+
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toContain('<!doctype html>')
+      expect(result.body).toContain('Hello John')
+      expect(result.bodyType).toBe('html')
+    })
+
+    it('should render stored MJML SMS templates as plain text through renderEmail path', async () => {
+      const result = await service.renderTemplateContent(mockMjmlSmsTemplate, {
+        code: '123456',
+      })
+
+      expect(result.body).toBe('Your code is 123456')
+      expect(result.bodyType).toBe('html')
+    })
   })
 
   describe('createTemplate', () => {
@@ -242,6 +298,39 @@ describe('TemplatesService', () => {
         }),
       )
     })
+
+    it('should store null bodyType for MJML when not provided', async () => {
+      const createDto = {
+        name: 'MJML Template',
+        description: 'Test',
+        channelCode: NotificationChannel.EMAIL,
+        subject: 'Subject',
+        body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello</mj-text></mj-column></mj-section></mj-body></mjml>',
+        engineCode: TemplateEngine.MJML,
+      }
+
+      mockRepository.create.mockResolvedValue({
+        ...mockTemplate,
+        ...createDto,
+        bodyType: null,
+      })
+      mockRepository.createVersion.mockResolvedValue({})
+
+      await service.createTemplate('tenant-123', createDto, 'user-123')
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          engineCode: TemplateEngine.MJML,
+          bodyType: null,
+        }),
+      )
+
+      expect(mockRepository.createVersion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bodyType: null,
+        }),
+      )
+    })
   })
 
   describe('updateTemplate', () => {
@@ -281,6 +370,28 @@ describe('TemplatesService', () => {
       expect(mockRepository.update).toHaveBeenCalledWith(
         expect.objectContaining({
           bodyType: 'markdown',
+        }),
+      )
+    })
+
+    it('should clear bodyType when template engine changes to MJML', async () => {
+      const updateDto = {
+        engineCode: TemplateEngine.MJML,
+      }
+
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.update.mockResolvedValue({
+        ...mockTemplate,
+        ...updateDto,
+        bodyType: null,
+      })
+
+      await service.updateTemplate('tenant-123', 'template-123', updateDto, 'user-123')
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          engineCode: TemplateEngine.MJML,
+          bodyType: null,
         }),
       )
     })

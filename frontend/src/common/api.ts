@@ -36,21 +36,22 @@ const registerRequestInterceptor = () => {
   // Add X-Tenant-ID header to all requests if a tenant is selected
   axios.interceptors.request.use(
     (config) => {
-      const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
-      if (selectedTenantJson) {
-        try {
-          const selectedTenant = JSON.parse(selectedTenantJson)
-          if (selectedTenant?.id) {
-            config.headers['X-Tenant-ID'] = selectedTenant.id
-            console.log(
-              `[API Interceptor] Set X-Tenant-ID header to: ${selectedTenant.id} for ${config.method?.toUpperCase()} ${config.url}`,
-            )
+      // Only set X-Tenant-ID from localStorage if not already set in the request
+      // This allows specific requests to override the default tenant
+      if (!config.headers['X-Tenant-ID']) {
+        const selectedTenantJson = localStorage.getItem('notify_selected_tenant')
+        if (selectedTenantJson) {
+          try {
+            const selectedTenant = JSON.parse(selectedTenantJson)
+            if (selectedTenant?.id) {
+              config.headers['X-Tenant-ID'] = selectedTenant.id
+            }
+          } catch {
+            console.error('[API Interceptor] Failed to parse selected tenant from localStorage')
           }
-        } catch {
-          console.error('[API Interceptor] Failed to parse selected tenant from localStorage')
+        } else {
+          console.warn('[API Interceptor] No selected tenant in localStorage')
         }
-      } else {
-        console.warn('[API Interceptor] No selected tenant in localStorage')
       }
       return config
     },
@@ -65,27 +66,40 @@ if (!responseInterceptorRegistered) {
   axios.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-      const { response } = error
+      const { response, config } = error
       if (response && response.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
         // This could be either:
         // 1. Expired token - redirect to Keycloak to refresh
         // 2. Missing tenant context - show error to user
+        // 3. Admin endpoint user lacks permission - fail silently
 
         const responseData = (response.data as any) || {}
         const errorMessage = responseData.message || ''
+        const url = config?.url || ''
 
-        // If error message mentions tenant, don't redirect - show error instead
-        if (errorMessage.includes('tenant') || errorMessage.includes('Tenant')) {
-          showErrorToast(`Authorization failed: ${errorMessage}`)
+        // Don't redirect for admin endpoints, let them fail silently.  We don't care if non-adin users can't list all tenants since they don't need (and shouldn't see) a list of tenants
+        if (url.includes('/admin/tenants')) {
           return Promise.reject(error)
         }
 
-        // Otherwise, assume token expired and redirect to Keycloak
-        UserService.doLogin()
+        // If error message mentions tenant, show error
+        if (errorMessage.includes('tenant') || errorMessage.includes('Tenant')) {
+          // But don't show if we're already on the not-authorized page
+          if (!window.location.pathname.includes('/not-authorized')) {
+            showErrorToast(`Authorization failed: ${errorMessage}`)
+          }
+          return Promise.reject(error)
+        }
+
+        // For other 401 errors, let the error propagate (token refresh is handled elsewhere)
+        return Promise.reject(error)
       } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
-        showErrorToast('You do not have permission to access this resource')
+        // But don't show if we're already on the not-authorized page
+        if (!window.location.pathname.includes('/not-authorized')) {
+          showErrorToast('You do not have permission to access this resource')
+        }
       }
       return Promise.reject(error)
     },

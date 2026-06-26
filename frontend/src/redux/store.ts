@@ -9,6 +9,9 @@ import notificationReducer from './slices/notification.slice'
 import codeTablesReducer from './slices/codeTables.slice'
 import tenantReducer from './slices/tenant.slice'
 import templatesReducer from './slices/templates.slice'
+import featureFlagsReducer from './slices/featureFlags.slice'
+import adminTenantsReducer from './slices/adminTenants.slice'
+import apiKeysReducer from './slices/apiKeys.slice'
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +25,9 @@ export const store = configureStore({
     codeTables: codeTablesReducer,
     tenant: tenantReducer,
     templates: templatesReducer,
+    featureFlags: featureFlagsReducer,
+    adminTenants: adminTenantsReducer,
+    apiKeys: apiKeysReducer,
   },
 })
 

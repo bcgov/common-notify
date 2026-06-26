@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Inject,
+} from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -8,10 +14,12 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import type { ParsedListQuery } from '../../common/query/list-query.types'
 
 /**
  * Service for template business logic
@@ -38,50 +46,25 @@ export class TemplatesService {
   /**
    * List all active templates for a tenant
    * @param tenantId The tenant ID
-   * @param page Page number (1-indexed)
-   * @param limit Items per page (max 100)
+   * @param parsedQuery Parsed list query with pagination, sort, and filter
    */
   async listTemplates(
     tenantId: string,
-    page: number = 1,
-    limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
-    // Validate pagination limits
-    if (limit > 100) {
-      throw new BadRequestException('Limit must not exceed 100 items per page')
-    }
-    if (limit < 1) {
-      throw new BadRequestException('Limit must be at least 1')
-    }
-    if (page < 1) {
-      throw new BadRequestException('Page must be at least 1')
-    }
+    parsedQuery: ParsedListQuery,
+  ): Promise<PaginatedTemplateResponse> {
+    // Extract pagination info from parsed query
+    const page = parsedQuery.page
+    const limit = parsedQuery.limit
 
-    // Convert page number to offset (1-indexed to 0-indexed)
-    const offset = (page - 1) * limit
-    const [templates] = await this.templatesRepository.findByTenantId(tenantId, limit, offset)
-    return templates.map((t) => this.toResponseDto(t))
-  }
-
-  /**
-   * List all active templates for a tenant by external (CSTAR) ID
-   * @param tenantExternalId The tenant external ID
-   * @param page Page number (1-indexed)
-   * @param limit Items per page (max 100)
-   */
-  async listTemplatesByExternalId(
-    tenantExternalId: string,
-    page: number = 1,
-    limit: number = 10,
-  ): Promise<TemplateResponseDto[]> {
-    // Look up tenant by external ID and get internal ID
-    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
-    if (!tenant) {
-      throw new NotFoundException(`Tenant with external ID '${tenantExternalId}' not found`)
+    // Query templates using the parsed query (with filters and sorts applied)
+    const [templates, total] = await this.templatesRepository.findWithQuery(tenantId, parsedQuery)
+    return {
+      data: templates.map((t) => this.toResponseDto(t)),
+      count: total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     }
-
-    // Use the internal tenant ID to list templates
-    return this.listTemplates(tenant.id, page, limit)
   }
 
   /**
@@ -114,8 +97,11 @@ export class TemplatesService {
     // Check if template name already exists for this tenant
     const existing = await this.templatesRepository.findByName(tenantId, createDto.name)
     if (existing) {
-      throw new BadRequestException(`Template name "${createDto.name}" already exists`)
+      throw new ConflictException(`Template name "${createDto.name}" already exists`)
     }
+
+    const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
+    const bodyType = engineCode === TemplateEngine.MJML ? null : (createDto.bodyType ?? 'html')
 
     const template = await this.templatesRepository.create({
       tenantId,
@@ -124,8 +110,8 @@ export class TemplatesService {
       channelCode: createDto.channelCode,
       subject: createDto.subject,
       body: createDto.body,
-      engineCode: createDto.engineCode || TemplateEngine.HANDLEBARS,
-      bodyType: createDto.bodyType || 'html',
+      engineCode,
+      bodyType,
       version: 1,
       active: true,
       createdBy: userId,
@@ -180,18 +166,23 @@ export class TemplatesService {
     if (updateDto.name && updateDto.name !== template.name) {
       const existing = await this.templatesRepository.findByName(tenantId, updateDto.name)
       if (existing) {
-        throw new BadRequestException(`Template name "${updateDto.name}" already exists`)
+        throw new ConflictException(`Template name "${updateDto.name}" already exists`)
       }
     }
 
     // Update the template
+    const nextEngineCode = updateDto.engineCode || template.engineCode
     template.name = updateDto.name || template.name
     template.description = updateDto.description ?? template.description
     template.channelCode = updateDto.channelCode || template.channelCode
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
-    template.engineCode = updateDto.engineCode || template.engineCode
-    template.bodyType = updateDto.bodyType ?? template.bodyType
+    template.engineCode = nextEngineCode
+    if (nextEngineCode === TemplateEngine.MJML) {
+      template.bodyType = null
+    } else {
+      template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'html'
+    }
     template.updatedBy = userId
 
     const updated = await this.templatesRepository.update(template)
@@ -312,6 +303,8 @@ export class TemplatesService {
         return 'handlebars'
       case TemplateEngine.MUSTACHE:
         return 'mustache'
+      case TemplateEngine.MJML:
+        return 'mjml'
       default:
         return 'handlebars' // default fallback
     }
@@ -356,6 +349,7 @@ export class TemplatesService {
       channelCode: template.channelCode,
       subject: template.subject,
       body: template.body,
+      bodyType: template.bodyType,
       engineCode: template.engineCode,
       version: template.version,
       active: template.active,

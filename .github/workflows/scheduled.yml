@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Clean up Helm Releases
-        uses: bcgov/action-oc-runner@d2fc921aaa9d70684c186dbb7754e6985d44d86f # v1.4.1
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_token: ${{ secrets.oc_token }}
@@ -42,7 +42,12 @@ jobs:
             [ -z "${RELEASES}" ]|| for r in ${RELEASES[@]}; do
 
               # Get last update and convert the date
-              UPDATED=$(date "+%s" -d <<< echo $(helm status $r -o json | jq -r .info.last_deployed))
+              LAST_DEPLOYED=$(helm status $r -o json 2>/dev/null | jq -r .info.last_deployed || echo "")
+              if [ -z "$LAST_DEPLOYED" ]; then
+                echo "Warning: Could not get last deployed date for $r, skipping"
+                continue
+              fi
+              UPDATED=$(date "+%s" -d "$LAST_DEPLOYED" || echo "0")
 
               # Compare to cutoff and delete as necessary
               if [[ ${UPDATED} < ${BEFORE} ]]; then
@@ -60,7 +65,10 @@ jobs:
     permissions:
       contents: write
       pages: write
-    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@ca6579bdadf383a2513397081f963889b92823a4 # v1.1.0
+    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@a11ad3d1b9288fb40757c4314a62eb86ff227931 # v1.2.1
+    with:
+      flyway_schema: notify
+      schemaspy_schema: notify
 
   # Run sequentially to reduce chances of rate limiting
   zap:

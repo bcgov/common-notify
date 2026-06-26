@@ -73,18 +73,48 @@ spec:
             - name: GC_NOTIFY_BASE_URL
               value: https://api.notification.canada.ca
             - name: REDIS_HOST
-              value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Chart.Name) }}
+              value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Release.Name) }}
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.config.redisSecret | default (printf "%s-redis" .Chart.Name) }}
+                  name: {{ .Values.global.config.redisSecret | default (printf "%s-redis" .Release.Name) }}
                   key: redis-password
             - name: REDIS_DB
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            - name: CLAMAV_HOST
+              value: {{ .Values.backend.clamav.host | default (printf "%s-clamav" .Release.Name) | quote }}
+            - name: CLAMAV_PORT
+              value: {{ .Values.backend.clamav.port | default 3310 | quote }}
+            - name: CLAMAV_TIMEOUT
+              value: {{ .Values.backend.clamav.timeout | default 30000 | quote }}
+            - name: CLAMAV_ENABLED
+              value: {{ .Values.backend.clamav.enabled | default "true" | quote }}
+            - name: CLAMAV_FAIL_CLOSED
+              value: {{ .Values.backend.clamav.failClosed | default "false" | quote }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.backend.s3.endpoint | quote }}
+            - name: S3_BUCKET
+              value: {{ if contains "-dev" .Release.Namespace }}{{ .Values.backend.s3.buckets.dev | quote }}{{ else if contains "-test" .Release.Namespace }}{{ .Values.backend.s3.buckets.test | quote }}{{ else if contains "-prod" .Release.Namespace }}{{ .Values.backend.s3.buckets.prod | quote }}{{ else }}{{ .Values.backend.s3.buckets.dev | quote }}{{ end }}
+            - name: S3_REGION
+              value: {{ .Values.backend.s3.region | quote }}
+            - name: S3_FORCE_PATH_STYLE
+              value: {{ .Values.backend.s3.forcePathStyle | default true | quote }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.s3.existingSecret | quote }}
+                  key: {{ .Values.backend.s3.accessKeySecretKey | quote }}
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.s3.existingSecret | quote }}
+                  key: {{ .Values.backend.s3.secretKeySecretKey | quote }}
+            - name: RELEASE_NAME
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:
@@ -105,6 +135,26 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: TWILIO_FROM_NUMBER
+            - name: FRONTEND_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: FRONTEND_KEYCLOAK_ISSUER
+            - name: API_GATEWAY_KEYCLOAK_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: API_GATEWAY_KEYCLOAK_ISSUER
+            - name: NOTIFY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: NOTIFY_CLIENT_ID
+            - name: CSTAR_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: CSTAR_API_URL
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}

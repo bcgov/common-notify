@@ -16,15 +16,18 @@ import {
   ApiOkResponse,
   ApiBearerAuth,
   ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
 import { TenantDto } from './schemas/tenant.dto'
-import { JwtGuard } from '../../../common/guards/jwt.guard'
+import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
+import { Roles } from '../../../common/decorators/roles.decorator'
+import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
-@UseGuards(JwtGuard)
+@UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
@@ -40,6 +43,7 @@ export class TenantsController {
    * The API key is returned ONCE and must be stored by the caller.
    */
   @Post()
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Create a new tenant',
     description: 'Creates a new tenant. Requires JWT authentication.',
@@ -59,14 +63,20 @@ export class TenantsController {
   }
   /**
    * List all tenants
+   * Requires NOTIFY_ADMIN role
    */
   @Get()
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get all tenants',
+    description: 'Returns all tenants in the notify database. Requires NOTIFY_ADMIN role.',
   })
   @ApiOkResponse({
     isArray: true,
     type: TenantDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'User does not have NOTIFY_ADMIN role',
   })
   async findAll() {
     return this.tenantsService.findAll()
@@ -76,6 +86,7 @@ export class TenantsController {
    * Get a specific tenant
    */
   @Get(':id')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get a tenant by ID',
   })
@@ -94,6 +105,7 @@ export class TenantsController {
    * Delete a tenant
    */
   @Delete(':id')
+  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @HttpCode(204)
   @ApiOperation({
     summary: 'Delete a tenant',
