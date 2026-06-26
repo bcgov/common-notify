@@ -20,8 +20,8 @@ const NotAuthorized: FC<NotAuthorizedProps> = ({ cstarUrl }) => {
       <h2>Access to Tenant Not Available</h2>
       <p>You don&apos;t currently have access to Notify for this tenant.</p>
       <p>
-        Access to Notify is managed through CSTAR. To proceed, you must be assigned to
-        the selected tenant with one of the following roles:
+        Access to Notify is managed through CSTAR. To proceed, you must be assigned to the selected
+        tenant with one of the following roles:
       </p>
       <ul>
         {notifyRoles.map((role) => (
