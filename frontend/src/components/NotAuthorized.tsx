@@ -31,7 +31,6 @@ const NotAuthorized: FC<NotAuthorizedProps> = ({ cstarUrl }) => {
       <p>Please contact your administrator or appropriate access authority to request access.</p>
       {cstarUrl && (
         <>
-          <p className="mt-3">You can manage your service access in CSTAR.</p>
           <Button id="cstarBtn" onClick={handleCstarClick}>
             Open CSTAR
           </Button>
