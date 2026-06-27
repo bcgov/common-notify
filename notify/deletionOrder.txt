@@ -9,6 +9,7 @@ notification_request_detail
 user_identity
 feature_flag
 client_tenant_mapping
+attachment
 api_key_consumer
 webhook_config
 template

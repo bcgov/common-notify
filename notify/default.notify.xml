@@ -21,6 +21,35 @@
             <column ascending="true" name="credential_identifier"/>
          </index>
       </table>
+      <table name="attachment" remarks="" schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="attachment_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="file_name" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="file_extension" nullable="false" remarks="" size="50" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="mime_type" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="size_bytes" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="storage_key" nullable="false" remarks="" size="1024" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="content_sha256" nullable="false" remarks="" size="64" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="uploaded_by" nullable="true" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="9" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="attachment_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="attachment_storage_key_key" unique="true">
+            <column ascending="true" name="storage_key"/>
+         </index>
+         <index name="idx_attachment_tenant_id" unique="false">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="idx_attachment_tenant_id_id" unique="false">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="id"/>
+         </index>
+      </table>
       <table name="client_tenant_mapping" remarks="Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for this mapping record." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="client_id" nullable="false" remarks="API Gateway client ID (issued via API Portal). Not a foreign key as the API Gateway is external." size="255" type="varchar" typeCode="12"/>
@@ -275,9 +304,13 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="created_by" nullable="true" remarks="User or system that created the record" size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the record was last updated" size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="14" name="updated_by" nullable="true" remarks="User or system that last updated the record" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="15" name="batch_id" nullable="true" remarks="Groups recipients of a bulk send into a single delivery batch, formatted as {notification_request id}-{channel}-{index}; null for non-bulk requests" size="255" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="notification_request_detail_pkey" unique="true">
             <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_notification_request_detail_batch_id" unique="false">
+            <column ascending="true" name="batch_id"/>
          </index>
          <index name="idx_notification_request_detail_recipient" unique="false">
             <column ascending="true" name="recipient_address"/>
@@ -485,6 +518,7 @@
       <table name="tenant" remarks="Represents an organization or service using BC Notify. All data in the system is scoped under a tenant." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the tenant." size="2147483647" type="uuid" typeCode="1111">
             <child column="tenant_id" foreignKey="fk_api_key_consumer_tenant" implied="false" onDeleteCascade="false" schema="notify" table="api_key_consumer"/>
+            <child column="tenant_id" foreignKey="attachment_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="attachment"/>
             <child column="tenant_id" foreignKey="client_tenant_mapping_tenant_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="client_tenant_mapping"/>
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>

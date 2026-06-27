@@ -11,6 +11,7 @@ notification_request
 template
 webhook_config
 api_key_consumer
+attachment
 client_tenant_mapping
 feature_flag
 user_identity
