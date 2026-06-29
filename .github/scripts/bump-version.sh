@@ -5,8 +5,8 @@ set -e
 # Usage: ./bump-version.sh [major|minor|patch|auto]
 #
 # Auto mode (default): Analyzes commits since last tag
-#   - feat: commits -> minor bump
-#   - fix: commits -> patch bump
+#   - feat: commits -> minor bump (automatic)
+#   - fix: commits -> patch bump (automatic)
 #   - BREAKING CHANGE or major: -> requires manual major bump
 
 BUMP_TYPE="${1:-auto}"
