@@ -725,19 +725,19 @@
               "response": []
             },
             {
-              "name": "Notify - Create Template - Simple Bulk",
+              "name": "Notify - Create Template - Simple Email Merge",
               "event": [
                 {
                   "listen": "test",
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "// Save the created template id so the bulk send route can reference it.",
+                      "// Save the created template id so the email merge send route can reference it.",
                       "if (pm.response.code === 201) {",
                       "    const json = pm.response.json();",
                       "    if (json && json.id) {",
-                      "        pm.environment.set('bulk_template_id', json.id);",
-                      "        console.log('Saved bulk_template_id =', json.id);",
+                      "        pm.environment.set('email_merge_template_id', json.id);",
+                      "        console.log('Saved email_merge_template_id =', json.id);",
                       "    }",
                       "}"
                     ]
@@ -770,14 +770,14 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Bulk Send Test Template\",\n  \"description\": \"Simple handlebars template for bulk send testing (name, date, city)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{name}}\",\n  \"bodyType\": \"text\",\n  \"body\": \"Test bulk email\\nName: {{name}}\\nDate: {{date}}\\nCity: {{city}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
+                  "raw": "{\n  \"name\": \"Email Merge Test Template\",\n  \"description\": \"Handlebars template for email merge testing with per-recipient params (firstName, lastName) and global param (eventName)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{firstName}}\",\n  \"bodyType\": \"text\",\n  \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
                   "host": ["{{gateway_url}}"],
                   "path": ["api", "v1", "templates"]
                 },
-                "description": "Create a simple Handlebars EMAIL template using the `name`, `date`, and `city` params. The test script saves the returned template id into the `bulk_template_id` environment variable so the \"Notify - Simple Send Bulk\" request can use it."
+                "description": "Create a Handlebars EMAIL template using per-recipient params (`firstName`, `lastName`) and the global param (`eventName`). The test script saves the returned template id into the `email_merge_template_id` environment variable so the \"Notify - Simple Send Email Merge\" request can use it."
               },
               "response": []
             },
@@ -1296,28 +1296,7 @@
           "response": []
         },
         {
-          "name": "Notify - Simple Send Bulk",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Generate rows object, logic for generating random emails is disabled",
-                  "// so we don't fire off hundreds of emails to non-existent addresses.",
-                  "// This is mainly used in dry runs or if we use an email testing service",
-                  "const rows = [['email address', 'name']];",
-                  "rows.push([`${pm.variables.get('recipient_email')}`, 'Recipient1'])",
-                  "// const count = parseInt(pm.variables.get('bulk_recipient_count') || '100', 10);",
-                  "// for (let i = 1; i < count; i++) {",
-                  "//     rows.push(['email+' + i + '@example.com', 'test'+i]);",
-                  "// }",
-                  "pm.variables.set('bulk_rows', JSON.stringify(rows));",
-                  "console.log('Generated ' + (rows.length - 1) + ' email recipient rows for bulk send');"
-                ]
-              }
-            }
-          ],
+          "name": "Notify - Simple Send Email Merge",
           "request": {
             "auth": {
               "type": "bearer",
@@ -1344,14 +1323,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Bulk Load Test\",\n  \"templateId\": \"{{bulk_template_id}}\",\n  \"params\": {\n    \"name\": \"Test User\",\n    \"date\": \"2026-07-01\",\n    \"city\": \"Victoria\"\n  },\n  \"rows\": {{bulk_rows}}\n}"
+              "raw": "{\n  \"name\": \"Email Merge Test\",\n  \"templateId\": \"{{email_merge_template_id}}\",\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  },\n  \"mergeArray\": [\n    [\"to\", \"firstName\", \"lastName\"],\n    [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n    [\"test@example.com\", \"Bob\", \"Jones\"]\n  ]\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/bulk",
               "host": ["{{gateway_url}}"],
               "path": ["api", "v1", "notifysimple", "bulk"]
             },
-            "description": "Send a bulk email batch. The pre-request script generates the `rows` array into the `{{bulk_rows}}` variable.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Bulk\" first — its test script automatically saves the template id into `bulk_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n3. The template is rendered once per batch with the global `params` (no per-recipient personalization).\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+            "description": "Send a mail-merge email. The `mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
           },
           "response": []
         },
