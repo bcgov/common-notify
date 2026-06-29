@@ -156,9 +156,9 @@ export class GcNotifyInternalExecutionService {
       id: notificationRecord.id,
       reference: body.reference ?? null,
       content: {
-        subject: rendered.subject ?? '',
-        body: rendered.body,
         from_email: fromEmail,
+        body: rendered.body,
+        subject: rendered.subject ?? '',
       },
       uri: `/gcnotify/v2/notifications/${notificationRecord.id}`,
       template: {

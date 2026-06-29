@@ -120,9 +120,9 @@ describe('GcNotifyInternalExecutionService', () => {
         id: 'notif-1',
         reference: 'ref-1',
         content: {
-          subject: 'Hello Alice',
-          body: 'Welcome Alice',
           from_email: 'not-configured@example.com',
+          body: 'Welcome Alice',
+          subject: 'Hello Alice',
         },
         uri: '/gcnotify/v2/notifications/notif-1',
         template: { id: 'tpl-1', version: 3, uri: '/gcnotify/v2/template/tpl-1' },
