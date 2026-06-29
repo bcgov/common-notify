@@ -4,8 +4,6 @@
 
 ***[ Swagger API Spec](https://citz-do.atlassian.net/wiki/spaces/CCP/pages/657719331/Notification+API+definition)***
 
-<!-- Test: CCP-4541 - This change should not trigger builds -->
-
 ## What it does
 
 The Notify service is a **multi-channel, multi-tenanted, notification service**. It comprises a user
@@ -805,16 +803,169 @@ POST to /notifysimple/email?preview=true
 
 
 
-## Services 
+## 5. Services 
 
-Services are call-outs to external systems for things like templates, recipients or documents - performed at run-time while processing a notification. Like notification event types and other defaults they are configured in the admin UI once, then activated by notification requests. 
+Services are call-outs to external systems for things like templates, recipients or documents - performed at run-time while processing a notification. 
 
-A notification service component is usually configured with the URL of the service, the authentication key or token for the service, any service-specific parameters and any mapping between service parameters and notification parameters (both inbound and outbound). Then at runtime, when the service is called, the list of cascading notification params is mapped to service parameters and the service is called with these parameters in the payload. On return, the return payload is mapped to notification variables (things like "to", "cc", "bcc", attachments, "content" ) which get passed onto the next stage of notification.
+Notification services can do things like :
 
-### Subscriptions ###
-### Templates ###
-### Attachments ###
-### Webhooks ###
+- Dynamically fill in the recipients for email or SMS from external subscription services
+- Automatically create and attach mail-merge documents from templating services
+- Render complex templated content from templating services
+
+Services need to be added to the tenant by the tenant admin in the Notification UI by selecting one of the services which are available from the services catalog. On selection, the tenant admin will be prompted for some details to configure the service for the tenancy. There are mandatory parameters, like the API key for the service which is typically obtained from the  service itself. For some services there may be additional configuration to further filter the returned data (perhaps remote tenant ID, channel or service for example). In all cases, the admin user is prompted for the applicable data. And in many cases there are mandatory run-time parameters which must nbe supplied in the notification payload "params" field, which further filter the returned data. These mandatory parameters are clearly signalled AND MUST BE INCLUDED AS ONE OF THE FIELDS IN "PARAMS" RUNTIME PAYLOAD. 
+
+For example, if the service configuration indicates to the tenant admin that a field "accountNumber" is a mandatory field, the runtime notification post data MUST contain a key-value pair in the cascading "params" structure (remember "params" can exist in the notification request at the root level AND at the service level - they are merged to create a cascading "params" structure) with "accountNumber" as an element. If this is not the case, a run-time error for the notification will be raised. 
+
+Once the service is configured for the tenant, it can be used in the notification request as described in the following service types. 
+
+
+### MessagingApp
+
+Messaging application services refer to 3rd party messaging applications like Teams, Rocketchat and so on. Their initial configuration requires :
+
+- Authentication 
+- Tenant identifier - in this case the native tenant identifier of the messaging application
+-  Stream or channel mandatory runtime variable name. 
+-  
+Once configured, this messaging application may be used as the third of the supported channels, **email**, **SMS** and **msgApp**.  It may be added to a notification-event type or passed in as the "msgAppServiceId" element in a notification request payload. 
+
+#### 5.1 Send a notification to a teams messaging app.
+
+**Admin UI** 
+
+- Add the "Teams" message app from the registry
+- Configure the "Teams" app - add the API key, add a default channel.
+
+**API** 
+
+Get the Teams MsgApp ID 
+
+GET ```/service/msgapps?query=name%3Dteams```
+
+Returns 
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "mandatoryParams": {
+    "channelId" : "guid"
+  },
+  "optionalParams": {
+    "important" : "boolean"
+  },
+  "defaults" : {
+    "channelId" : "ASSDF2342"
+  }
+}
+```
+
+> [!NOTE]
+> - The return from GET /service/msgApps/\<msgId\> provides a list of runtime parameter names and their types, together with defaults and any values. 
+> - These are either mandatory (in which case a runtime "params" array must have an element of this name, else the call will use the "defaults" value if present, or fail) or optional (which is at the discretion of the caller to use in the "params" array)
+
+POST to /notifysimple 
+
+**Payload**
+
+```json
+{
+  "msgApp": {
+    "recipients" : {
+       "MsgAppServiceId": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    }
+    "content" : {
+      "subject": "New post from Notify",
+      "body": "This is a simple example of posting to a Teams channel with ID {{channelId}} and name {{channelName}}",
+      "bodyType": "text"  
+    }
+    "params": {
+        "channelId" : "id1234",
+        "channelName": "Tech talk"
+    }
+  }
+}
+```
+### Subscriptions
+
+Subscription services are used solely to get a list of recipients for email and SMS. At this stage subscriptions are not envisaged for 3rd party messaging apps , because they invariably manage their own subscriptions. As with other services, they need to be added by a tenant Admin in the UI before they can be used in notification requests. 
+
+#### 5.2 Send a notification to email and SMS users subscribed to a regional alert service
+
+**Admin UI** 
+
+- Add the "AlertMe" subscription service from the registry
+- Configure the "AlertMe" service - add the API key, and a default region.
+
+**API** 
+
+Get the AlertMe subscription service instance ID 
+
+GET ```/service/subscription?query=name%3DalertMe```
+
+Returns 
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "mandatoryParams": {
+    "region" : "string"
+  },
+  "optionalParams": {
+    "level" : "string",
+    "type" : "string"
+  },
+  "defaults" : {
+    "region" : "Victoria"
+  }
+}
+```
+
+> [!NOTE]
+> - The return from GET /service/sunbscriptions/\<subscrId\> provides a list of runtime parameter names and their types, together with defaults and any values. 
+> - These are either mandatory (in which case a runtime "params" array must have an element of this name, else the call will use the "defaults" value if present, or fail) or optional (which is at the discretion of the caller to use in the "params" array)
+
+POST to /notifysimple 
+
+**Payload**
+
+```json
+{
+  "params" : {
+    "region" : "nanaimo",
+    "type" : "fire",
+    "level" : "severe"
+  },
+  "email": {
+    "recipients" : { 
+      "to": ["{{3fa85f64-5717-4562-b3fc-2c963f66afa6}}"],
+      "cc": ["copyto@example.com"],
+    },
+    "content" : {
+      "subject": "Alert email",
+      "body": "This is an an alert of type {{type}} for region {{region}}",
+      "bodyType": "text"
+    }
+  },
+  "sms": {
+    "recipients" : {
+      "to": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    },
+    "content" : {
+      "body": "SMS alert - {{type}} for region {{region}}",
+      "bodyType": "text"  }
+  }
+}
+```
+> [!NOTE]
+> - The subscription service guid is used as a quasi-parameter within the recipients structure, interpreted by the notification system to mean a service call
+> - At runtime, the notification system calls the subscription service described by the GUID with the passed in "params". The return from the subscription service contains a section for emails, divided into "to", "cc" and "bcc" and for SMS
+> - In this example, the subscription service is requested to return all email and sms users in the Nanaimo area who have subscribed to severe fire alerts.
+> - Based on the position of the guid in the request, the notification system substitutes the appropriate values from the subscription service return into the "to", "cc" and "bcc" sections of the email and the "to" section of the sms, before passing it onto the final stage for sending.
+
+### Templates
+### Attachments
+### Webhooks
 
 
 

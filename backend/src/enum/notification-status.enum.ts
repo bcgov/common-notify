@@ -10,6 +10,7 @@
  * processing: Ingestion worker processing channels
  * sending: Delivery worker actively sending
  * completed: Successfully sent
+ * partially_completed: Bulk send where some recipients succeeded and some failed
  * failed: Permanently failed (max retries exceeded)
  * accepted: Notification request has been accepted but not yet queued
  * scheduled: Notification request has been accepted and scheduled for future processing
@@ -21,6 +22,7 @@ export enum NotificationStatus {
   PROCESSING = 'processing',
   SENDING = 'sending',
   COMPLETED = 'completed',
+  PARTIALLY_COMPLETED = 'partially_completed',
   FAILED = 'failed',
   ACCEPTED = 'accepted',
   SCHEDULED = 'scheduled',

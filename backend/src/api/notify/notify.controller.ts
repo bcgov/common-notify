@@ -25,6 +25,7 @@ import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
+import { BulkEmailRequest } from './schemas/bulk-email-request'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import {
   CancelNotificationDto,
@@ -70,6 +71,18 @@ export class NotifySimpleController {
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
+  }
+
+  @Version('1')
+  @Post('bulk')
+  @HttpCode(202)
+  @Queueable(QueueName.INGESTION)
+  bulkSendEmail(
+    @Req() _req: any,
+    @Body() _body: BulkEmailRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Detection, validation, and queuing of the bulk payload are handled by the @Queueable decorator
+    return undefined as any
   }
 
   @Version('1')
