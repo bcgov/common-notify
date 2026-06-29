@@ -20,7 +20,9 @@ describe('ApiKeyGuard', () => {
   })
 
   it('throws when the scheme is not ApiKey-v1', () => {
-    expect(() => guard.canActivate(buildContext('Bearer some-token'))).toThrow(UnauthorizedException)
+    expect(() => guard.canActivate(buildContext('Bearer some-token'))).toThrow(
+      UnauthorizedException,
+    )
   })
 
   it('throws when the key portion is empty', () => {

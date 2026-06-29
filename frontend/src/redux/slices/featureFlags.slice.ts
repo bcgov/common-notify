@@ -141,6 +141,7 @@ const featureFlagsSlice = createSlice({
           flag.enabled = enabled
           flag.updatedAt = new Date().toISOString()
         }
+        state.synced = false
         state.error = undefined
       })
       .addCase(updateFeatureFlag.rejected, (state, action) => {
