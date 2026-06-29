@@ -66,7 +66,10 @@ const mockNotificationService = {
   update: vi.fn().mockResolvedValue(undefined),
   validateBusinessRules: vi.fn().mockResolvedValue([]),
   validateBulkRules: vi.fn().mockResolvedValue([]),
-  parseBulkAddresses: vi.fn().mockReturnValue(['alice@example.com', 'bob@example.com']),
+  parseBulkRecipients: vi.fn().mockReturnValue([
+    { address: 'alice@example.com', params: {} },
+    { address: 'bob@example.com', params: {} },
+  ]),
 }
 
 const mockAttachmentValidationService = {
@@ -359,7 +362,7 @@ describe('Notify Controllers', () => {
         const validBulkBody = {
           name: 'Test Bulk',
           templateId: '12345678-1234-4234-8234-123456789012',
-          rows: [['email address'], ['alice@example.com'], ['bob@example.com']],
+          mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
         }
 
         it('should return 202 with status "accepted" for an immediate bulk send', async () => {
@@ -415,10 +418,10 @@ describe('Notify Controllers', () => {
             .expect(400)
         })
 
-        it('should return 400 when rows header is missing the email address column', async () => {
+        it('should return 400 when mergeArray header is missing the "to" column', async () => {
           return request(app.getHttpServer())
             .post('/api/v1/notifysimple/bulk')
-            .send({ ...validBulkBody, rows: [['name'], ['Alice']] })
+            .send({ ...validBulkBody, mergeArray: [['name'], ['Alice']] })
             .expect(400)
         })
       })

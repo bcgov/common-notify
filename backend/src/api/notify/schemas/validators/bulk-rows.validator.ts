@@ -7,12 +7,12 @@ import {
 import { BULK_EMAIL_ADDRESS_HEADER } from '../bulk-email.constants'
 
 /**
- * Validator constraint for the bulk-send `rows` structure.
+ * Validator constraint for the bulk-send `mergeArray` structure.
  *
  * Structural rules (per-row email format is checked separately by
- * NotifyService.validateBulkRows, which returns row-indexed 422 errors):
- * - rows is an array of arrays
- * - the first (header) row contains an "email address" column (case-insensitive)
+ * NotifyService.validateBulkRules, which returns row-indexed 422 errors):
+ * - mergeArray is an array of arrays
+ * - the first (header) row contains a "to" column (case-insensitive)
  * - every data row has the same number of columns as the header
  */
 @ValidatorConstraint({ name: 'isValidBulkRows', async: false })
@@ -50,9 +50,9 @@ export class BulkRowsConstraint implements ValidatorConstraintInterface {
 }
 
 /**
- * Property-level decorator validating the bulk-send `rows` structure.
+ * Property-level decorator validating the bulk-send `mergeArray` structure.
  *
- * Usage: apply to the `rows` property of the bulk request DTO.
+ * Usage: apply to the `mergeArray` property of the bulk request DTO.
  */
 export function IsValidBulkRows(validationOptions?: ValidationOptions) {
   return function (target: object, propertyName: string) {

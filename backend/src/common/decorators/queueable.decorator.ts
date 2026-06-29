@@ -41,13 +41,13 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
 
 /**
  * Detect a bulk email payload (the /notifysimple/bulk route). The global ValidationPipe has already
- * validated the body against BulkEmailRequest, so the presence of a `rows` array is sufficient.
+ * validated the body against BulkEmailRequest, so the presence of a `mergeArray` is sufficient.
  */
 function isBulkEmailRequest(payload: unknown): payload is BulkEmailRequest {
   return (
     typeof payload === 'object' &&
     payload !== null &&
-    Array.isArray((payload as Record<string, unknown>).rows)
+    Array.isArray((payload as Record<string, unknown>).mergeArray)
   )
 }
 
@@ -71,7 +71,7 @@ async function handleBulkEmail(
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }
 
-  const addresses = ctx.notificationService.parseBulkAddresses(dto.rows)
+  const recipients = ctx.notificationService.parseBulkRecipients(dto.mergeArray)
 
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
@@ -81,7 +81,7 @@ async function handleBulkEmail(
     payload: dto as any,
   })
   logger.debug(
-    `Bulk notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${addresses.length})`,
+    `Bulk notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
@@ -124,8 +124,8 @@ async function handleBulkEmail(
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
     message: hasDelayedSend
-      ? `Bulk send scheduled for delivery at ${delayedSendTimestamp} with ${addresses.length} recipient(s)`
-      : `Bulk send accepted with ${addresses.length} recipient(s)`,
+      ? `Bulk send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
+      : `Bulk send accepted with ${recipients.length} recipient(s)`,
   }
 
   // Fire off queueing asynchronously - don't block the response.
@@ -142,7 +142,7 @@ async function handleBulkEmail(
           name: dto.name,
           templateId: dto.templateId,
           params: dto.params,
-          addresses,
+          recipients,
         },
         ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
       }

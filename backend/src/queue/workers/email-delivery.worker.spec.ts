@@ -1103,7 +1103,7 @@ describe('EmailDeliveryWorker', () => {
               name: 'Test Bulk',
               templateId: 'template-uuid',
               params: {},
-              addresses,
+              recipients: addresses.map((address) => ({ address, params: {} })),
             },
             channel: NotificationChannel.EMAIL,
             request: {},
@@ -1250,13 +1250,13 @@ describe('EmailDeliveryWorker', () => {
         expect(mockEmailAdapter.send).not.toHaveBeenCalled()
       })
 
-      it('should resolve template once and reuse rendered content for all addresses', async () => {
+      it('should resolve template once and render content per recipient', async () => {
         const job = makeBulkJob(['a@example.com', 'b@example.com', 'c@example.com'])
 
         await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
         expect(mockTemplatesRepository.findById).toHaveBeenCalledTimes(1)
-        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(3)
         expect(mockEmailAdapter.send).toHaveBeenCalledTimes(3)
       })
     })

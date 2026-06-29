@@ -132,8 +132,8 @@ export class NotificationService {
    */
   /**
    * Extract channel code, recipients, and delayed send time from a bulk email payload. Bulk sends
-   * are always a single EMAIL-channel request, with recipient addresses parsed from `rows` (mirroring
-   * how simple sends store their recipients on the parent request).
+   * are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
+   * (mirroring how simple sends store their recipients on the parent request).
    */
   private extractBulkChannelAndRecipients(payload: BulkEmailRequest): {
     channel: string | null
@@ -141,7 +141,8 @@ export class NotificationService {
     delayedSendTime: Date | null
   } {
     const delayedSendTime = payload.delayedSend ? new Date(payload.delayedSend) : null
-    const addresses = this.parseBulkAddresses(payload.rows)
+    const parsed = this.parseBulkRecipients(payload.mergeArray)
+    const addresses = parsed.map((r) => r.address)
     return {
       channel: 'EMAIL',
       recipients: addresses.length > 0 ? { email: addresses } : null,
@@ -215,7 +216,7 @@ export class NotificationService {
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
     // Extract channel, recipients, and delayed send time from payload. Bulk sends (recipients in
     // `rows`) take a dedicated extractor since they don't carry the email/sms/msgApp channel shape.
-    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.rows)
+    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.mergeArray)
       ? this.extractBulkChannelAndRecipients(dto.payload as BulkEmailRequest)
       : this.extractChannelAndRecipients(dto.payload)
 
@@ -282,17 +283,17 @@ export class NotificationService {
       }
     }
 
-    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
+    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.mergeArray[0] ?? [])
 
     const seen = new Map<string, number>()
-    for (let i = 1; i < dto.rows.length; i++) {
+    for (let i = 1; i < dto.mergeArray.length; i++) {
       if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
         errors.push(
           `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
         )
         break
       }
-      const address = (dto.rows[i]?.[emailColumnIndex] ?? '').trim()
+      const address = (dto.mergeArray[i]?.[emailColumnIndex] ?? '').trim()
       if (!address) {
         errors.push(`Row ${i}: email address is missing`)
       } else if (!isEmail(address)) {
@@ -312,12 +313,25 @@ export class NotificationService {
   }
 
   /**
-   * Extract the recipient email addresses from validated bulk rows (header row skipped).
+   * Parse the mergeArray into per-recipient data. Returns one entry per data row containing
+   * the recipient address (from the "to" column) and any extra columns as template params.
+   * Per-recipient params take precedence over global params when rendering.
    */
-  parseBulkAddresses(rows: string[][]): string[] {
-    const header = rows[0] ?? []
+  parseBulkRecipients(
+    mergeArray: string[][],
+  ): Array<{ address: string; params: Record<string, unknown> }> {
+    const header = mergeArray[0] ?? []
     const emailColumnIndex = this.findBulkEmailColumnIndex(header)
-    return rows.slice(1).map((row) => (row[emailColumnIndex] ?? '').trim())
+    return mergeArray.slice(1).map((row) => {
+      const address = (row[emailColumnIndex] ?? '').trim()
+      const params: Record<string, unknown> = {}
+      for (let i = 0; i < header.length; i++) {
+        if (i === emailColumnIndex) continue
+        const key = (header[i] ?? '').trim()
+        if (key) params[key] = row[i] ?? ''
+      }
+      return { address, params }
+    })
   }
 
   async findAll(

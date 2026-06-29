@@ -349,7 +349,7 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { templateId, params, addresses } = bulkEmail
+    const { templateId, params, recipients } = bulkEmail
 
     // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
     const template = await templatesRepository.findById(tenantId, templateId)
@@ -360,18 +360,19 @@ export class EmailDeliveryWorker {
       throw new Error(`Template '${templateId}' is not an EMAIL template`)
     }
 
-    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${addresses.length} recipient(s)`)
-
-    // Render the template once with the shared global params; content is identical for every address
-    const rendered = await templatesService.renderTemplateContent(template, params || {})
+    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${recipients.length} recipient(s)`)
 
     let sent = 0
     let failed = 0
 
-    for (const address of addresses) {
+    for (const recipient of recipients) {
       try {
+        // Merge global params with per-recipient params; per-recipient takes precedence
+        const mergedParams = { ...(params || {}), ...recipient.params }
+        const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+
         const emailPayload = {
-          recipients: { to: [address] },
+          recipients: { to: [recipient.address] },
           content: {
             subject: rendered.subject,
             body: rendered.body,
@@ -386,15 +387,25 @@ export class EmailDeliveryWorker {
           emailAdapter,
         )
 
-        await requestDetailService.markRecipientSent(notifyId, batchId, address, result.externalId)
+        await requestDetailService.markRecipientSent(
+          notifyId,
+          batchId,
+          recipient.address,
+          result.externalId,
+        )
         sent++
       } catch (recipientError) {
         const errorMessage =
           recipientError instanceof Error ? recipientError.message : String(recipientError)
         logger.error(
-          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${address}): ${errorMessage}`,
+          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${recipient.address}): ${errorMessage}`,
         )
-        await requestDetailService.markRecipientFailed(notifyId, batchId, address, errorMessage)
+        await requestDetailService.markRecipientFailed(
+          notifyId,
+          batchId,
+          recipient.address,
+          errorMessage,
+        )
         failed++
       }
     }

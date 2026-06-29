@@ -5,7 +5,7 @@ export const BULK_EMAIL_MAX_RECIPIENTS = 50000
 export const BULK_EMAIL_MAX_ROWS = BULK_EMAIL_MAX_RECIPIENTS + 1
 
 /** Header column (case-insensitive) that must contain each recipient's email address. */
-export const BULK_EMAIL_ADDRESS_HEADER = 'email address'
+export const BULK_EMAIL_ADDRESS_HEADER = 'to'
 
 /** Cap on the number of per-row email errors returned so a malformed file does not produce an unbounded response. */
 export const BULK_EMAIL_MAX_REPORTED_ERRORS = 100

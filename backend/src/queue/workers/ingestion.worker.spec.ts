@@ -757,7 +757,10 @@ describe('IngestionWorker', () => {
           mockClamavService,
         )
 
-        const addresses = ['alice@example.com', 'bob@example.com']
+        const recipients = [
+          { address: 'alice@example.com', params: {} },
+          { address: 'bob@example.com', params: {} },
+        ]
         const job: Partial<Bull.Job<IngestionJobPayload>> = {
           data: {
             notifyId: 'notify-bulk',
@@ -769,7 +772,7 @@ describe('IngestionWorker', () => {
               name: 'Test Bulk',
               templateId: 'template-uuid',
               params: { key: 'val' },
-              addresses,
+              recipients,
             },
           },
         }
@@ -781,7 +784,7 @@ describe('IngestionWorker', () => {
         expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
-          addresses,
+          ['alice@example.com', 'bob@example.com'],
           'tenant-bulk',
         )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
@@ -791,7 +794,7 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             bulk: true,
             batchId: 'notify-bulk-EMAIL-0',
-            bulkEmail: expect.objectContaining({ addresses }),
+            bulkEmail: expect.objectContaining({ recipients }),
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
@@ -833,7 +836,11 @@ describe('IngestionWorker', () => {
               name: 'Multi Batch',
               templateId: 'template-uuid',
               params: {},
-              addresses: ['a@example.com', 'b@example.com', 'c@example.com'],
+              recipients: [
+                { address: 'a@example.com', params: {} },
+                { address: 'b@example.com', params: {} },
+                { address: 'c@example.com', params: {} },
+              ],
             },
           },
         }
@@ -847,14 +854,21 @@ describe('IngestionWorker', () => {
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
             batchId: 'notify-bulk-multi-EMAIL-0',
-            bulkEmail: expect.objectContaining({ addresses: ['a@example.com', 'b@example.com'] }),
+            bulkEmail: expect.objectContaining({
+              recipients: [
+                { address: 'a@example.com', params: {} },
+                { address: 'b@example.com', params: {} },
+              ],
+            }),
           }),
           expect.anything(),
         )
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
             batchId: 'notify-bulk-multi-EMAIL-1',
-            bulkEmail: expect.objectContaining({ addresses: ['c@example.com'] }),
+            bulkEmail: expect.objectContaining({
+              recipients: [{ address: 'c@example.com', params: {} }],
+            }),
           }),
           expect.anything(),
         )
@@ -862,7 +876,10 @@ describe('IngestionWorker', () => {
 
       it('should default to batchSize 100 when not configured', async () => {
         // mockConfigService.get returns undefined for queue.batchSize → defaults to 100
-        const addresses = Array.from({ length: 150 }, (_, i) => `user${i}@example.com`)
+        const recipients = Array.from({ length: 150 }, (_, i) => ({
+          address: `user${i}@example.com`,
+          params: {},
+        }))
 
         await IngestionWorker.initialize(
           mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
@@ -885,7 +902,7 @@ describe('IngestionWorker', () => {
               name: 'Default Batch Size',
               templateId: 'template-uuid',
               params: {},
-              addresses,
+              recipients,
             },
           },
         }

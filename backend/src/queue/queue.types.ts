@@ -43,15 +43,15 @@ export interface NotificationRequest {
 
 /**
  * Bulk email payload carried by ingestion and delivery jobs for the /notifysimple/bulk flow.
- * On the ingestion job `addresses` holds every recipient; on a delivery job it holds only
+ * On the ingestion job `recipients` holds every recipient; on a delivery job it holds only
  * the recipients of a single batch (identified by `batchId`). `params` are global params
- * applied to every batch when rendering the template (no per-recipient personalization).
+ * applied when rendering the template; per-recipient `params` override them on a per-key basis.
  */
 export interface BulkEmailJobData {
   name: string
   templateId: string
   params?: Record<string, unknown>
-  addresses: string[]
+  recipients: Array<{ address: string; params: Record<string, unknown> }>
 }
 
 /**

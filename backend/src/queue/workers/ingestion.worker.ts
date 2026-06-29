@@ -95,21 +95,26 @@ export class IngestionWorker {
         // Bulk email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
         if (job.data.bulk && job.data.bulkEmail) {
-          const { name, templateId, params, addresses } = job.data.bulkEmail
+          const { name, templateId, params, recipients } = job.data.bulkEmail
           const batchSize = configService?.get<number>('queue.batchSize') || 100
 
           logger.log(
-            `[${notifyId}] Processing bulk email job: ${addresses.length} recipient(s), batchSize=${batchSize}`,
+            `[${notifyId}] Processing bulk email job: ${recipients.length} recipient(s), batchSize=${batchSize}`,
           )
 
           let batchIndex = 0
-          for (let start = 0; start < addresses.length; start += batchSize) {
-            const chunk = addresses.slice(start, start + batchSize)
+          for (let start = 0; start < recipients.length; start += batchSize) {
+            const chunk = recipients.slice(start, start + batchSize)
             // Format: {notification_request id}-{channel}-{index}; reused as the delivery jobId
             // so a failed batch is easy to identify and retry.
             const batchId = `${notifyId}-${NotificationChannel.EMAIL}-${batchIndex}`
 
-            await requestDetailService.createBulkPending(notifyId, batchId, chunk, tenantId)
+            await requestDetailService.createBulkPending(
+              notifyId,
+              batchId,
+              chunk.map((r) => r.address),
+              tenantId,
+            )
 
             const deliveryPayload: DeliveryJobPayload = {
               notifyId,
@@ -120,7 +125,7 @@ export class IngestionWorker {
               attempt: 0,
               bulk: true,
               batchId,
-              bulkEmail: { name, templateId, params, addresses: chunk },
+              bulkEmail: { name, templateId, params, recipients: chunk },
             }
 
             await emailQueue.add(deliveryPayload, {

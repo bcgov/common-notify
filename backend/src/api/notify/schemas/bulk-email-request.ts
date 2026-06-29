@@ -48,18 +48,18 @@ export class BulkEmailRequest {
 
   @ApiProperty({
     description:
-      'Array of arrays. First row is the header (must include an "email address" column); each following row is one recipient. Extra columns become per-recipient template params.',
+      'Array of arrays. First row is the header (must include a "to" column for recipient address); each following row is one recipient. Extra columns become per-recipient template params that override any global params.',
     example: [
-      ['email address', 'name'],
-      ['alice@example.com', 'Alice'],
-      ['bob@example.com', 'Bob'],
+      ['to', 'firstname', 'lastname'],
+      ['alice@example.com', 'Alice', 'Smith'],
+      ['bob@example.com', 'Bob', 'Jones'],
     ],
   })
   @IsArray()
   @ArrayMinSize(2, {
-    message: 'rows must have at least a header row and one recipient row',
+    message: 'mergeArray must have at least a header row and one recipient row',
   })
   @ArrayMaxSize(BULK_EMAIL_MAX_ROWS)
   @IsValidBulkRows()
-  rows: string[][]
+  mergeArray: string[][]
 }
