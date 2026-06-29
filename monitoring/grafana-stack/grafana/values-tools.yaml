@@ -61,9 +61,25 @@ dashboardProviders:
         options:
           path: /var/lib/grafana/dashboards/default
 
-# Pre-load dashboards
+# Pre-load dashboards from ConfigMaps
+# ConfigMaps must be created separately with dashboard JSON files
 dashboards:
-  default: {}  # Dashboards will be added via ConfigMaps
+  default:
+    dev-environment:
+      gnetId: null
+      datasource: Loki
+      json: |
+        # Content will come from ConfigMap
+    test-environment:
+      gnetId: null
+      datasource: Loki
+      json: |
+        # Content will come from ConfigMap
+    prod-environment:
+      gnetId: null
+      datasource: Loki
+      json: |
+        # Content will come from ConfigMap
 
 # Grafana configuration
 grafana.ini:
