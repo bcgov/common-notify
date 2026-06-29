@@ -86,9 +86,14 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
-    // Attachment Storage
-    attachments: {
-      storageDir: process.env.ATTACHMENT_STORAGE_DIR || '/tmp/common-notify/attachments',
+    // S3-compatible object storage
+    s3: {
+      endpoint: process.env.S3_ENDPOINT,
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      accessKey: process.env.S3_ACCESS_KEY,
+      secretKey: process.env.S3_SECRET_KEY,
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
     },
 
     // ClamAV
@@ -103,8 +108,10 @@ export default () => {
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      // Number of recipients per bulk-send delivery batch
+      batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
       emailDeliveryWorkerConcurrency: parseInt(
-        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '2',
+        process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',
         10,
       ),
       smsDeliveryWorkerConcurrency: parseInt(

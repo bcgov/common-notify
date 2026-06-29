@@ -4,6 +4,7 @@ import { CodeTablesModule } from './code-tables/code-tables.module'
 import { TemplatesModule } from './templates/templates.module'
 import { AuthModule } from './auth/auth.module'
 import { ApiKeysModule } from './api-keys/api-keys.module'
+import { AttachmentModule } from './attachment/attachment.module'
 
 /**
  * API Module
@@ -20,7 +21,21 @@ import { ApiKeysModule } from './api-keys/api-keys.module'
  * - StatusModule: Message tracking
  */
 @Module({
-  imports: [NotifyModule, CodeTablesModule, TemplatesModule, AuthModule, ApiKeysModule],
-  exports: [NotifyModule, CodeTablesModule, TemplatesModule, AuthModule, ApiKeysModule],
+  imports: [
+    NotifyModule,
+    CodeTablesModule,
+    TemplatesModule,
+    AuthModule,
+    ApiKeysModule,
+    AttachmentModule,
+  ],
+  exports: [
+    NotifyModule,
+    CodeTablesModule,
+    TemplatesModule,
+    AuthModule,
+    ApiKeysModule,
+    AttachmentModule,
+  ],
 })
 export class ApiModule {}

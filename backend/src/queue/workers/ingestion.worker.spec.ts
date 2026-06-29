@@ -4,6 +4,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { IngestionWorker } from './ingestion.worker'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { NotificationStatus } from '../../enum/notification-status.enum'
+import { AttachmentService } from '../../api/attachment/attachment.service'
 
 describe('IngestionWorker', () => {
   let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
@@ -11,46 +13,47 @@ describe('IngestionWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockRequestDetailService: any
-  let mockNotificationDetailService: any
   let mockConfigService: any
   let mockClamavService: any
-  let mockLocalAttachmentStorageService: any
+  let mockAttachmentService: any
   let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
   let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
 
   beforeEach(() => {
-    // Mock the notification service
     mockNotificationService = {
       update: vi.fn().mockResolvedValue({}),
     }
 
-    // Mock config service
+    mockRequestDetailService = {
+      createPending: vi.fn().mockResolvedValue(undefined),
+      createBulkPending: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined),
+    }
+
     mockConfigService = {
-      get: vi.fn().mockImplementation((key: string) => {
-        const config: Record<string, any> = {
-          'queue.jobRetries': 3,
-          'queue.jobBackoffDelay': 2000,
-        }
-        return config[key]
-      }),
+      get: vi.fn(),
     }
 
     mockClamavService = {
       scanBuffer: vi.fn().mockResolvedValue({
         isInfected: false,
-        viruses: [],
-        scannedAt: new Date(),
+        quarantineInfo: undefined,
       }),
     }
 
-    mockLocalAttachmentStorageService = {
-      readAttachment: vi.fn().mockResolvedValue(Buffer.from('stored attachment content')),
+    mockAttachmentService = {
+      downloadAttachmentByIdAndTenantId: vi.fn().mockResolvedValue({
+        attachmentId: 'attachment-123',
+        filename: 'stored.pdf',
+        fileExtension: 'pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 25,
+        content: Buffer.from('stored attachment content'),
+      } as any),
     }
 
-    // Mock the queues
     mockIngestionQueue = {
       process: vi.fn().mockImplementation((...args) => {
-        // Handle both: process(handler) and process(concurrency, handler)
         const handler = typeof args[0] === 'function' ? args[0] : args[1]
         processHandler = handler
         return Promise.resolve()
@@ -59,7 +62,6 @@ describe('IngestionWorker', () => {
         if (event === 'failed') {
           failedCallback = callback
         }
-        // Don't capture 'completed' event - only tracking failures in tests
       }),
     }
 
@@ -71,7 +73,6 @@ describe('IngestionWorker', () => {
       add: vi.fn().mockResolvedValue({ id: 'sms-job-1' }),
     }
 
-    // Mock Logger
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
@@ -89,6 +90,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -102,6 +104,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -115,11 +118,12 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const result = await processHandler({
         data: {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
@@ -131,9 +135,7 @@ describe('IngestionWorker', () => {
           },
           requestedAt: new Date().toISOString(),
         },
-      }
-
-      const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+      } as Bull.Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
@@ -154,6 +156,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -189,6 +192,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -221,6 +225,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -264,6 +269,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -287,8 +293,6 @@ describe('IngestionWorker', () => {
 
       await processHandler(job as Bull.Job<IngestionJobPayload>)
 
-      // The notificationService.update should be called to update status to PROCESSING
-      // This happens when the scheduled time arrives and the job is now being processed
       expect(mockNotificationService.update).toHaveBeenCalledWith(
         'notify-scheduled',
         'tenant-scheduled',
@@ -305,6 +309,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -329,6 +334,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -353,6 +359,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -382,6 +389,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -411,6 +419,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -440,6 +449,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -453,6 +463,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -492,6 +503,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -531,6 +543,7 @@ describe('IngestionWorker', () => {
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
@@ -578,9 +591,10 @@ describe('IngestionWorker', () => {
         mockRequestDetailService,
         mockConfigService,
         mockClamavService,
+        1,
+        mockAttachmentService as AttachmentService,
       )
 
-      const attachmentContent = Buffer.from('clean attachment').toString('base64')
       const job: Partial<Bull.Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-attachment-retry',
@@ -591,9 +605,7 @@ describe('IngestionWorker', () => {
               content: { subject: 'Test', body: 'Test body' },
               attachments: [
                 {
-                  filename: 'receipt.pdf',
-                  mimeType: 'application/pdf',
-                  content: attachmentContent,
+                  attachmentId: 'attachment-retry',
                 },
               ],
             },
@@ -617,20 +629,20 @@ describe('IngestionWorker', () => {
       expect(mockEmailQueue.add).not.toHaveBeenCalled()
     })
 
-    it('should scan stored attachments produced by attachment processing', async () => {
+    it('should scan stored attachment references using attachmentId and tenantId', async () => {
       await IngestionWorker.initialize(
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
-        mockNotificationDetailService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
         1,
-        mockLocalAttachmentStorageService,
+        mockAttachmentService as AttachmentService,
       )
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const result = await processHandler({
         data: {
           notifyId: 'notify-stored-attachment',
           tenantId: 'tenant-stored-attachment',
@@ -638,71 +650,252 @@ describe('IngestionWorker', () => {
             email: {
               recipients: { to: ['test@example.com'] },
               content: { subject: 'Test', body: 'Test body' },
-              attachments: [
-                {
-                  filename: 'stored.pdf',
-                  mimeType: 'application/pdf',
-                  storageKey: 'aa/aabbcc.bin',
-                  sizeBytes: 'stored attachment content'.length,
-                  contentSha256: 'abc123',
-                  storageProvider: 'local',
-                },
-              ],
+              attachments: [{ attachmentId: 'attachment-123' }],
             },
           },
           requestedAt: new Date().toISOString(),
         },
-      }
-
-      const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+      } as any as Bull.Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
-      expect(mockLocalAttachmentStorageService.readAttachment).toHaveBeenCalledWith(
-        'aa/aabbcc.bin',
-        'abc123',
+      expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).toHaveBeenCalledWith(
+        'attachment-123',
+        'tenant-stored-attachment',
       )
-      expect(mockClamavService.scanBuffer).toHaveBeenCalledWith(expect.any(Buffer), 'stored.pdf')
+      expect(mockClamavService.scanBuffer).toHaveBeenCalledWith(
+        Buffer.from('stored attachment content'),
+        'stored.pdf',
+      )
     })
 
-    it('should fail when stored attachments cannot be read for scanning', async () => {
+    it('should fail closed when attachment download fails during scanning', async () => {
+      mockAttachmentService.downloadAttachmentByIdAndTenantId.mockRejectedValue(
+        new Error('Attachment not found'),
+      )
+
       await IngestionWorker.initialize(
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
-        mockNotificationDetailService,
+        mockRequestDetailService,
+        mockConfigService,
+        mockClamavService,
+        1,
+        mockAttachmentService as AttachmentService,
+      )
+
+      await expect(
+        processHandler({
+          data: {
+            notifyId: 'notify-stored-attachment-fail',
+            tenantId: 'tenant-stored-attachment-fail',
+            request: {
+              email: {
+                recipients: { to: ['test@example.com'] },
+                content: { subject: 'Test', body: 'Test body' },
+                attachments: [{ attachmentId: 'attachment-404' }],
+              },
+            },
+            requestedAt: new Date().toISOString(),
+          },
+        } as any as Bull.Job<IngestionJobPayload>),
+      ).rejects.toThrow('Attachment scan failed: Attachment not found')
+
+      expect(mockEmailQueue.add).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-stored-attachment-fail',
+        'tenant-stored-attachment-fail',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+          updatedBy: 'ingestion-worker',
+        }),
+      )
+    })
+
+    it('should fail when processed attachments are not attachmentId references', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockRequestDetailService,
         mockConfigService,
         mockClamavService,
       )
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
-        data: {
-          notifyId: 'notify-stored-attachment-no-storage',
-          tenantId: 'tenant-stored-attachment-no-storage',
-          request: {
-            email: {
-              recipients: { to: ['test@example.com'] },
-              content: { subject: 'Test', body: 'Test body' },
-              attachments: [
-                {
-                  filename: 'stored.pdf',
-                  mimeType: 'application/pdf',
-                  storageKey: 'aa/aabbcc.bin',
-                  sizeBytes: 10,
-                  contentSha256: 'abc123',
-                  storageProvider: 'local',
-                },
-              ],
+      await expect(
+        processHandler({
+          data: {
+            notifyId: 'notify-invalid-attachments',
+            tenantId: 'tenant-invalid-attachments',
+            request: {
+              email: {
+                recipients: { to: ['test@example.com'] },
+                content: { subject: 'Test', body: 'Test body' },
+                attachments: [{ filename: 'receipt.pdf', content: 'abc' }],
+              },
+            },
+            requestedAt: new Date().toISOString(),
+          },
+        } as any as Bull.Job<IngestionJobPayload>),
+      ).rejects.toThrow('Invalid processed attachment reference payload')
+
+      expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).not.toHaveBeenCalled()
+      expect(mockEmailQueue.add).not.toHaveBeenCalled()
+    })
+
+    describe('bulk email fan-out', () => {
+      it('should fan out a bulk job into one batch and update status to PROCESSING', async () => {
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const addresses = ['alice@example.com', 'bob@example.com']
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Test Bulk',
+              templateId: 'template-uuid',
+              params: { key: 'val' },
+              addresses,
             },
           },
-          requestedAt: new Date().toISOString(),
-        },
-      }
+        }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
-        'Attachment scan failed: Attachment storage service unavailable',
-      )
-      expect(mockEmailQueue.add).not.toHaveBeenCalled()
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          addresses,
+          'tenant-bulk',
+        )
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            bulk: true,
+            batchId: 'notify-bulk-EMAIL-0',
+            bulkEmail: expect.objectContaining({ addresses }),
+          }),
+          expect.objectContaining({
+            jobId: 'notify-bulk-EMAIL-0',
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+          }),
+        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: 'processing',
+          updatedBy: 'ingestion-worker',
+        })
+      })
+
+      it('should split recipients into multiple batches when addresses exceed batchSize', async () => {
+        mockConfigService.get.mockImplementation((key: string) => {
+          if (key === 'queue.batchSize') return 2
+          return undefined
+        })
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk-multi',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Multi Batch',
+              templateId: 'template-uuid',
+              params: {},
+              addresses: ['a@example.com', 'b@example.com', 'c@example.com'],
+            },
+          },
+        }
+
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        // 3 addresses, batchSize=2 → 2 batches
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
+        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(2)
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            batchId: 'notify-bulk-multi-EMAIL-0',
+            bulkEmail: expect.objectContaining({ addresses: ['a@example.com', 'b@example.com'] }),
+          }),
+          expect.anything(),
+        )
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            batchId: 'notify-bulk-multi-EMAIL-1',
+            bulkEmail: expect.objectContaining({ addresses: ['c@example.com'] }),
+          }),
+          expect.anything(),
+        )
+      })
+
+      it('should default to batchSize 100 when not configured', async () => {
+        // mockConfigService.get returns undefined for queue.batchSize → defaults to 100
+        const addresses = Array.from({ length: 150 }, (_, i) => `user${i}@example.com`)
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+          data: {
+            notifyId: 'notify-bulk-default',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            bulk: true,
+            bulkEmail: {
+              name: 'Default Batch Size',
+              templateId: 'template-uuid',
+              params: {},
+              addresses,
+            },
+          },
+        }
+
+        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+        // 150 addresses with default batchSize=100 → 2 batches
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
+      })
     })
   })
 })

@@ -23,11 +23,10 @@ describe('EmailDeliveryWorker', () => {
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
 
   beforeEach(() => {
-    // Mock the email adapter
     mockEmailAdapter = {
       name: 'ches',
       send: vi.fn().mockResolvedValue({
-        messageId: `ches-${Date.now()}`,
+        messageId: 'ches-123',
       }),
     }
 
@@ -38,6 +37,9 @@ describe('EmailDeliveryWorker', () => {
       updateStatus: vi.fn().mockResolvedValue(undefined),
       markSent: vi.fn().mockResolvedValue(undefined),
       markFailed: vi.fn().mockResolvedValue(undefined),
+      markRecipientSent: vi.fn().mockResolvedValue(undefined),
+      markRecipientFailed: vi.fn().mockResolvedValue(undefined),
+      countByStatus: vi.fn().mockResolvedValue(0),
     }
 
     // Mock the notification service
@@ -48,47 +50,28 @@ describe('EmailDeliveryWorker', () => {
       }),
     }
 
-    // Mock the config service
     mockConfigService = {
-      get: vi.fn((key: string) => {
-        const config: Record<string, any> = {
-          'queue.jobRetries': 3,
-          'queue.jobBackoffDelay': 2000,
-        }
-        return config[key]
-      }),
+      get: vi.fn(),
     }
 
-    // Mock the templates repository
     mockTemplatesRepository = {
       findById: vi.fn().mockResolvedValue(null),
     }
 
-    // Mock the templates service
     mockTemplatesService = {
-      renderTemplateContent: vi.fn().mockReturnValue({
-        subject: 'Rendered Subject',
-        body: 'Rendered Body',
-      }),
+      renderTemplateContent: vi.fn(),
     }
 
-    // Mock the inline rendering service
     mockInlineRenderingService = {
-      renderContent: vi.fn().mockResolvedValue({
-        subject: 'Rendered Subject',
-        body: 'Rendered Body',
-        bodyType: 'html',
-      }),
+      renderEmail: vi.fn(),
     }
 
     mockAttachmentResolverService = {
       resolveEmailAttachments: vi.fn().mockResolvedValue(undefined),
     }
 
-    // Mock the email queue
     mockEmailQueue = {
       process: vi.fn().mockImplementation((...args) => {
-        // Handle: process(concurrency, handler)
         const handler = typeof args[0] === 'function' ? args[0] : args[1]
         processHandler = handler
         return Promise.resolve()
@@ -102,7 +85,6 @@ describe('EmailDeliveryWorker', () => {
       }),
     }
 
-    // Mock Logger
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {})
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
@@ -943,12 +925,7 @@ describe('EmailDeliveryWorker', () => {
             content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
             attachments: [
               {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'hash',
-                storageProvider: 'local',
+                attachmentId: 'attachment-123',
               },
             ],
           },
@@ -975,8 +952,7 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
-    it('should log attachment counts when stored attachments are resolved and sent', async () => {
-      const debugSpy = vi.spyOn(Logger.prototype, 'debug')
+    it('should resolve attachmentId references with tenant-scoped lookups before sending', async () => {
       const content = Buffer.from('hello world')
       mockAttachmentResolverService.resolveEmailAttachments.mockResolvedValue([
         {
@@ -999,45 +975,48 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+      await processHandler({
         data: {
-          notifyId: 'notify-attachment-logs',
+          notifyId: 'notify-attachments',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           request: {},
           payload: {
             recipients: { to: ['test@example.com'] },
             content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
-            attachments: [
-              {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'hash',
-                storageProvider: 'local',
-              },
-            ],
+            attachments: [{ attachmentId: 'attachment-123' }],
           },
-          attempt: 0,
+        },
+        opts: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
         } as any,
-        opts: { attempts: 3 } as any,
-        attemptsMade: 0,
-      }
+      } as Bull.Job<DeliveryJobPayload>)
 
-      await processHandler(job as Bull.Job<DeliveryJobPayload>)
-
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[notify-attachment-logs] Resolving stored email attachments:'),
+      expect(mockAttachmentResolverService.resolveEmailAttachments).toHaveBeenCalledWith(
+        'tenant-123',
+        [{ attachmentId: 'attachment-123' }],
       )
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[notify-attachment-logs] Sending email via ches adapter:'),
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [
+            {
+              filename: 'hello.txt',
+              content,
+              contentType: 'text/plain',
+              sendingMethod: 'attach',
+            },
+          ],
+        }),
       )
     })
 
-    it('should fail delivery when a stored attachment cannot be resolved', async () => {
+    it('should fail delivery when attachment resolution fails', async () => {
       mockAttachmentResolverService.resolveEmailAttachments.mockRejectedValue(
-        new Error('Failed to read stored attachment'),
+        new Error('Failed to download attachment'),
       )
 
       await EmailDeliveryWorker.initialize(
@@ -1052,36 +1031,234 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
-        data: {
-          notifyId: 'notify-missing-file',
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.EMAIL,
-          request: {},
-          payload: {
-            recipients: { to: ['test@example.com'] },
-            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
-            attachments: [
-              {
-                filename: 'missing.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/missing.bin',
-                sizeBytes: 11,
-                contentSha256: 'hash',
-                storageProvider: 'local',
-              },
-            ],
-          },
-          attempt: 2,
-        } as any,
-        opts: { attempts: 3 } as any,
-        attemptsMade: 2,
+      await expect(
+        processHandler({
+          data: {
+            notifyId: 'notify-missing-file',
+            tenantId: 'tenant-123',
+            channel: NotificationChannel.EMAIL,
+            request: {},
+            payload: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+              attachments: [{ attachmentId: 'attachment-404' }],
+            },
+            attempt: 2,
+          } as any,
+          opts: { attempts: 3 } as any,
+          attemptsMade: 2,
+        } as Bull.Job<DeliveryJobPayload>),
+      ).rejects.toThrow('Failed to download attachment')
+
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-missing-file',
+        'tenant-123',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+        }),
+      )
+    })
+
+    describe('processBulkBatch', () => {
+      const bulkTemplate = {
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Test Template',
       }
 
-      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
-        'Failed to read stored attachment',
-      )
-      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      beforeEach(async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(bulkTemplate)
+        mockTemplatesService.renderTemplateContent.mockReturnValue({
+          subject: 'Bulk Subject',
+          body: 'Bulk Body',
+          bodyType: 'html',
+        })
+        vi.mocked(mockEmailAdapter.send).mockResolvedValue({ messageId: 'ext-123' })
+
+        await EmailDeliveryWorker.initialize(
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockConfigService,
+          mockTemplatesRepository,
+          mockTemplatesService,
+          mockInlineRenderingService,
+          mockAttachmentResolverService as AttachmentResolverService,
+          mockEmailAdapter,
+          mockRequestDetailService,
+        )
+      })
+
+      function makeBulkJob(
+        addresses: string[],
+        overrides: Partial<DeliveryJobPayload> = {},
+      ): Partial<Bull.Job<DeliveryJobPayload>> {
+        return {
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            bulk: true,
+            batchId: 'notify-bulk-EMAIL-0',
+            bulkEmail: {
+              name: 'Test Bulk',
+              templateId: 'template-uuid',
+              params: {},
+              addresses,
+            },
+            channel: NotificationChannel.EMAIL,
+            request: {},
+            payload: {} as any,
+            attempt: 0,
+            ...overrides,
+          } as DeliveryJobPayload,
+          opts: { attempts: 3 } as any,
+          attemptsMade: 0,
+        }
+      }
+
+      it('should send to each address and mark recipients as sent', async () => {
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 2,
+          failed: 0,
+        })
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'alice@example.com',
+          'ext-123',
+        )
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'ext-123',
+        )
+      })
+
+      it('should mark parent COMPLETED when all recipients sent and no pending remain', async () => {
+        // pending=0, failed=0, sent=2
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(2)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should mark parent PARTIALLY_COMPLETED when some sent and some failed with no pending', async () => {
+        vi.mocked(mockEmailAdapter.send)
+          .mockResolvedValueOnce({ messageId: 'ext-123' } as any)
+          .mockRejectedValueOnce(new Error('SMTP timeout'))
+
+        // pending=0, failed=1, sent=1
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(1)
+          .mockResolvedValueOnce(1)
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 1,
+          failed: 1,
+        })
+        expect(mockRequestDetailService.markRecipientFailed).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'SMTP timeout',
+        )
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.PARTIALLY_COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should mark parent FAILED when all recipients fail and no pending remain', async () => {
+        vi.mocked(mockEmailAdapter.send).mockRejectedValue(new Error('SMTP down'))
+
+        // pending=0, failed=2, sent=0
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(2)
+          .mockResolvedValueOnce(0)
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toEqual({
+          success: true,
+          batchId: 'notify-bulk-EMAIL-0',
+          sent: 0,
+          failed: 2,
+        })
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.FAILED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('should not update parent status when other batches are still pending', async () => {
+        // pending=1 → other batches still in progress, no final status set
+        mockRequestDetailService.countByStatus.mockResolvedValue(1)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockNotificationService.update).not.toHaveBeenCalled()
+      })
+
+      it('should throw NotFoundException when template is not found (triggers retry)', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(null)
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+          "Template 'template-uuid' not found for tenant 'tenant-bulk'",
+        )
+        expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      })
+
+      it('should throw when template channel is not EMAIL (triggers retry)', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({ ...bulkTemplate, channelCode: 'SMS' })
+
+        const job = makeBulkJob(['alice@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+          "Template 'template-uuid' is not an EMAIL template",
+        )
+        expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      })
+
+      it('should resolve template once and reuse rendered content for all addresses', async () => {
+        const job = makeBulkJob(['a@example.com', 'b@example.com', 'c@example.com'])
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockTemplatesRepository.findById).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(3)
+      })
     })
   })
 })

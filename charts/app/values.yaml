@@ -117,6 +117,25 @@ backend:
   loki:
     #-- Loki endpoint URL for winston-loki transport
     url: ~
+  #-- S3-compatible attachment storage configuration for ObjectScale/MinIO
+  s3:
+    #-- S3-compatible endpoint
+    endpoint: https://commonservices.objectstore.gov.bc.ca
+    #-- bucket names per environment
+    buckets:
+      dev: notify-dev
+      test: notify-test
+      prod: notify-prod
+    #-- region for S3-compatible storage
+    region: ca-central-1
+    #-- use path-style requests by default for MinIO and ObjectScale compatibility
+    forcePathStyle: true
+    #-- existing secret containing S3 credentials
+    existingSecret: objectstorage-secrets
+    #-- key in existingSecret for access key ID
+    accessKeySecretKey: AccessKeyID
+    #-- key in existingSecret for secret access key
+    secretKeySecretKey: AccessSecretKey
 
 frontend:
   # -- enable or disable a component deployment.

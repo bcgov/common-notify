@@ -65,6 +65,8 @@ const mockNotificationService = {
   create: vi.fn().mockResolvedValue({ id: 'mock-notification-id' }),
   update: vi.fn().mockResolvedValue(undefined),
   validateBusinessRules: vi.fn().mockResolvedValue([]),
+  validateBulkRules: vi.fn().mockResolvedValue([]),
+  parseBulkAddresses: vi.fn().mockReturnValue(['alice@example.com', 'bob@example.com']),
 }
 
 const mockAttachmentValidationService = {
@@ -353,6 +355,74 @@ describe('Notify Controllers', () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
       })
 
+      describe('POST /api/v1/notifysimple/bulk', () => {
+        const validBulkBody = {
+          name: 'Test Bulk',
+          templateId: '12345678-1234-4234-8234-123456789012',
+          rows: [['email address'], ['alice@example.com'], ['bob@example.com']],
+        }
+
+        it('should return 202 with status "accepted" for an immediate bulk send', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send(validBulkBody)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.message).toContain('Bulk send accepted with 2 recipient(s)')
+              expect(res.body.channels).toEqual(['email'])
+            })
+        })
+
+        it('should return 202 with status "scheduled" when delayedSend is provided', async () => {
+          const futureDate = new Date(Date.now() + 3600000).toISOString()
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, delayedSend: futureDate })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.status).toBe('scheduled')
+              expect(res.body.message).toContain('Bulk send scheduled for delivery at')
+            })
+        })
+
+        it('should return 422 when validateBulkRules returns errors', async () => {
+          mockNotificationService.validateBulkRules.mockResolvedValueOnce([
+            'Template not found for tenant',
+          ])
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send(validBulkBody)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.message).toBe('Request validation failed')
+              expect(res.body.errors).toContain('Template not found for tenant')
+            })
+        })
+
+        it('should return 400 when rows are missing', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ name: 'Test', templateId: '12345678-1234-1234-1234-123456789012' })
+            .expect(400)
+        })
+
+        it('should return 400 when templateId is not a valid UUID', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, templateId: 'not-a-uuid' })
+            .expect(400)
+        })
+
+        it('should return 400 when rows header is missing the email address column', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/bulk')
+            .send({ ...validBulkBody, rows: [['name'], ['Alice']] })
+            .expect(400)
+        })
+      })
+
       it('should process attachments before persisting and remove raw data from the stored payload', async () => {
         const processedPayload = {
           email: {
@@ -360,12 +430,7 @@ describe('Notify Controllers', () => {
             content: { subject: 'Test', body: 'Hello' },
             attachments: [
               {
-                filename: 'hello.txt',
-                mimeType: 'text/plain',
-                storageKey: 'ab/abcdef.bin',
-                sizeBytes: 11,
-                contentSha256: 'b94d27b9934d3e08a52e52d7da7dabfade4f0f1b6d8d7e8e5a7a5f6d7c8b9a0f',
-                storageProvider: 'local',
+                attachmentId: 'attachment-123',
               },
             ],
           },
@@ -394,9 +459,37 @@ describe('Notify Controllers', () => {
 
         expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledTimes(1)
         expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledTimes(1)
+        expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: expect.objectContaining({
+              attachments: [
+                expect.objectContaining({
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                }),
+              ],
+            }),
+          }),
+          'test-tenant-id',
+          'test-tenant-id',
+        )
         expect(mockNotificationService.create).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: processedPayload,
+          }),
+        )
+        expect(mockNotificationService.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.not.objectContaining({
+              email: expect.objectContaining({
+                attachments: expect.arrayContaining([
+                  expect.objectContaining({
+                    content: expect.anything(),
+                  }),
+                ]),
+              }),
+            }),
           }),
         )
 
@@ -408,6 +501,88 @@ describe('Notify Controllers', () => {
 
         expect(validationOrder).toBeLessThan(processingOrder)
         expect(processingOrder).toBeLessThan(createOrder)
+      })
+
+      it('should enqueue only sanitized attachmentId payloads after processing', async () => {
+        const processedPayload = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+            attachments: [{ attachmentId: 'attachment-123' }],
+          },
+        }
+
+        mockAttachmentProcessingService.processAttachments.mockResolvedValueOnce(
+          processedPayload as any,
+        )
+        mockIngestionQueue.add.mockResolvedValueOnce({ id: 'job-123' })
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(202)
+
+        await vi.waitFor(() => {
+          expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            expect.objectContaining({
+              request: processedPayload,
+            }),
+            expect.any(Object),
+          )
+        })
+
+        expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+          expect.objectContaining({
+            request: expect.not.objectContaining({
+              email: expect.objectContaining({
+                attachments: expect.arrayContaining([
+                  expect.objectContaining({
+                    content: expect.anything(),
+                  }),
+                ]),
+              }),
+            }),
+          }),
+          expect.any(Object),
+        )
+      })
+
+      it('should not persist or queue when attachment upload fails during processing', async () => {
+        mockAttachmentProcessingService.processAttachments.mockRejectedValueOnce(
+          new BadRequestException('Attachment upload failed'),
+        )
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+              attachments: [
+                {
+                  filename: 'hello.txt',
+                  mimeType: 'text/plain',
+                  content: 'SGVsbG8gd29ybGQ=',
+                },
+              ],
+            },
+          })
+          .expect(400)
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       })
     })
   })

@@ -17,6 +17,9 @@ export class NotificationRequestDetail {
   @Column({ name: 'notification_request_id' })
   notificationRequestId: string
 
+  @Column({ name: 'batch_id', length: 255, nullable: true })
+  batchId?: string
+
   @ManyToOne(() => NotificationRequest, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'notification_request_id' })
   notificationRequest: NotificationRequest

@@ -295,13 +295,6 @@ jobs:
             echo "✓ Tag v$NEW_VERSION does not exist"
           fi
 
-      - name: Commit Version Bump
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          git add frontend/package.json
-          git commit -m "chore(release): bump version to ${{ steps.bump_version.outputs.version }} [skip ci]"
-          git push origin main
-
       - name: Create Git Tag
         if: steps.check_tag.outputs.exists == 'false'
         run: |

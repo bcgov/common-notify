@@ -24,6 +24,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1070.0",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/common": "^11.0.6",
     "@nestjs/config": "^4.0.0",
