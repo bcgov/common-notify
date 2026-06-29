@@ -10,8 +10,14 @@ import {
 import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
 import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { BulkEmailRequest } from '../notify/schemas/bulk-email-request'
+import {
+  BULK_EMAIL_ADDRESS_HEADER,
+  BULK_EMAIL_MAX_REPORTED_ERRORS,
+} from '../notify/schemas/bulk-email.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -124,6 +130,26 @@ export class NotificationService {
   /**
    * Extract channel code, recipients, and delayed send time from notification payload
    */
+  /**
+   * Extract channel code, recipients, and delayed send time from a bulk email payload. Bulk sends
+   * are always a single EMAIL-channel request, with recipient addresses parsed from `rows` (mirroring
+   * how simple sends store their recipients on the parent request).
+   */
+  private extractBulkChannelAndRecipients(payload: BulkEmailRequest): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    const delayedSendTime = payload.delayedSend ? new Date(payload.delayedSend) : null
+    const addresses = this.parseBulkAddresses(payload.rows)
+    return {
+      channel: 'EMAIL',
+      recipients: addresses.length > 0 ? { email: addresses } : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
   private extractChannelAndRecipients(
     payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
   ): {
@@ -187,8 +213,11 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload
-    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+    // Extract channel, recipients, and delayed send time from payload. Bulk sends (recipients in
+    // `rows`) take a dedicated extractor since they don't carry the email/sms/msgApp channel shape.
+    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.rows)
+      ? this.extractBulkChannelAndRecipients(dto.payload as BulkEmailRequest)
+      : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
@@ -207,6 +236,88 @@ export class NotificationService {
       relations: ['tenant'],
     })
     return fullNotification || saved
+  }
+
+  /**
+   * Locate the (case-insensitive) "email address" column in a bulk-send header row.
+   * Returns -1 if the header is missing the column.
+   */
+  private findBulkEmailColumnIndex(header: string[]): number {
+    return header.findIndex(
+      (col) => typeof col === 'string' && col.trim().toLowerCase() === BULK_EMAIL_ADDRESS_HEADER,
+    )
+  }
+
+  /**
+   * Validate a bulk email request's business rules: the template must exist for the tenant and
+   * every row's email address must be well-formed. Returns a bounded list of error strings
+   * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
+   */
+  async validateBulkRules(tenantId: string, dto: BulkEmailRequest): Promise<string[]> {
+    const errors: string[] = []
+
+    const tenant = await this.tenantsService.findOne(tenantId)
+    if (!tenant) {
+      errors.push(`Tenant '${tenantId}' not found`)
+      return errors
+    }
+    if (tenant.status !== 'active') {
+      errors.push(`Tenant is not active (status: ${tenant.status})`)
+    }
+
+    const template = await this.templatesRepository.findById(tenantId, dto.templateId)
+    if (!template) {
+      errors.push(`Template '${dto.templateId}' not found for tenant '${tenantId}'`)
+    } else if (template.channelCode !== 'EMAIL') {
+      errors.push(`Template '${dto.templateId}' is not an EMAIL template`)
+    }
+
+    if (dto.delayedSend) {
+      const scheduledTime = new Date(dto.delayedSend).getTime()
+      const now = Date.now()
+      if (scheduledTime <= now) {
+        errors.push(`delayedSend must be in the future`)
+      } else if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
+        errors.push(`delayedSend must be within 10 days from now`)
+      }
+    }
+
+    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.rows[0] ?? [])
+
+    const seen = new Map<string, number>()
+    for (let i = 1; i < dto.rows.length; i++) {
+      if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
+        errors.push(
+          `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
+        )
+        break
+      }
+      const address = (dto.rows[i]?.[emailColumnIndex] ?? '').trim()
+      if (!address) {
+        errors.push(`Row ${i}: email address is missing`)
+      } else if (!isEmail(address)) {
+        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+      } else {
+        const normalised = address.toLowerCase()
+        const firstSeen = seen.get(normalised)
+        if (firstSeen !== undefined) {
+          errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
+        } else {
+          seen.set(normalised, i)
+        }
+      }
+    }
+
+    return errors
+  }
+
+  /**
+   * Extract the recipient email addresses from validated bulk rows (header row skipped).
+   */
+  parseBulkAddresses(rows: string[][]): string[] {
+    const header = rows[0] ?? []
+    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
+    return rows.slice(1).map((row) => (row[emailColumnIndex] ?? '').trim())
   }
 
   async findAll(

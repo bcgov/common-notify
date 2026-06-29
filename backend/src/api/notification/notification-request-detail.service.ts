@@ -57,6 +57,77 @@ export class NotificationRequestDetailService {
   }
 
   /**
+   * Create pending request detail records for one batch of a bulk email send.
+   * Each record is tagged with the shared batchId so a delivery worker can scope updates to its batch.
+   */
+  async createBulkPending(
+    notificationRequestId: string,
+    batchId: string,
+    addresses: string[],
+    createdBy?: string,
+  ): Promise<void> {
+    if (addresses.length === 0) return
+    const now = new Date()
+    const entities = addresses.map((address) =>
+      this.detailRepository.create({
+        notificationRequestId,
+        batchId,
+        recipientAddress: address,
+        channel: 'EMAIL',
+        emailAddressType: 'primary',
+        status: 'pending',
+        attemptCount: 1,
+        lastAttemptAt: now,
+        createdBy,
+        updatedBy: createdBy,
+      }),
+    )
+    await this.detailRepository.save(entities)
+  }
+
+  /**
+   * Mark a single recipient's detail record (within a batch) as sent.
+   */
+  async markRecipientSent(
+    notificationRequestId: string,
+    batchId: string,
+    recipientAddress: string,
+    providerResponseId?: string,
+  ): Promise<void> {
+    await this.detailRepository.update(
+      { notificationRequestId, batchId, recipientAddress },
+      {
+        status: 'sent',
+        lastAttemptAt: new Date(),
+        updatedBy: 'system',
+        ...(providerResponseId && { providerResponseId }),
+      },
+    )
+  }
+
+  /**
+   * Mark a single recipient's detail record (within a batch) as failed.
+   */
+  async markRecipientFailed(
+    notificationRequestId: string,
+    batchId: string,
+    recipientAddress: string,
+    errorMessage: string,
+  ): Promise<void> {
+    await this.detailRepository.update(
+      { notificationRequestId, batchId, recipientAddress },
+      { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
+    )
+  }
+
+  /**
+   * Count detail records for a request in a given status (used to reconcile the parent request).
+   */
+  async countByStatus(notificationRequestId: string, status: string): Promise<number> {
+    return this.detailRepository.count({ where: { notificationRequestId, status } })
+  }
+
+  /**
    * Mark all request detail records for a request as sent.
    */
   async markSent(notificationRequestId: string, providerResponseId?: string): Promise<void> {
