@@ -82,9 +82,10 @@ sidecar:
     labelValue: "1"
     folder: /tmp/dashboards
     defaultFolderName: "Common Notify"
-    searchNamespace: ALL
+    searchNamespace: f6bc3f-tools
     provider:
       foldersFromFilesStructure: false
+    resource: configmap
 
 # Grafana configuration
 grafana.ini:
