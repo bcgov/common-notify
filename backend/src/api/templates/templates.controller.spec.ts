@@ -39,7 +39,7 @@ describe('TemplatesController', () => {
     subject: 'Welcome {{name}}',
     body: 'Hello {{name}}!',
     engineCode: TemplateEngine.HANDLEBARS,
-    bodyType: 'html',
+    bodyType: 'markdown',
     version: 1,
     active: true,
     createdBy: 'user-123',
@@ -298,7 +298,7 @@ describe('TemplatesController', () => {
         subject: 'Subject',
         body: 'Body',
         engineCode: TemplateEngine.HANDLEBARS,
-        bodyType: 'html',
+        bodyType: 'markdown',
       }
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
@@ -560,7 +560,7 @@ describe('TemplatesController', () => {
       const previewResult = {
         subject: 'Welcome Jane',
         body: 'Hello Jane Doe!',
-        bodyType: 'html',
+        bodyType: 'markdown',
       }
 
       mockTemplatesService.previewTemplate.mockResolvedValue(previewResult)
@@ -573,7 +573,7 @@ describe('TemplatesController', () => {
 
       expect(result.subject).toBe('Welcome Jane')
       expect(result.body).toBe('Hello Jane Doe!')
-      expect(result.bodyType).toBe('html')
+      expect(result.bodyType).toBe('markdown')
     })
 
     it('should throw error when template not found', async () => {
