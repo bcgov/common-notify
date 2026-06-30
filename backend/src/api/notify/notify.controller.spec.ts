@@ -358,35 +358,57 @@ describe('Notify Controllers', () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
       })
 
-      describe('POST /api/v1/notifysimple/bulk', () => {
-        const validBulkBody = {
-          name: 'Test Bulk',
+      describe('POST /api/v1/notifysimple/email (mail-merge)', () => {
+        // A mail-merge is a bare email channel whose recipients use mergeArray, posted to /email.
+        const validMergeBody = {
           templateId: '12345678-1234-4234-8234-123456789012',
-          mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+          recipients: {
+            mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+          },
         }
 
-        it('should return 202 with status "accepted" for an immediate bulk send', async () => {
+        it('should return 202 with status "accepted" for an immediate merge (templateId)', async () => {
           return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send(validBulkBody)
+            .post('/api/v1/notifysimple/email')
+            .send(validMergeBody)
             .expect(202)
             .expect((res) => {
               expect(res.body.notifyId).toBeDefined()
               expect(res.body.status).toBe('accepted')
-              expect(res.body.message).toContain('Bulk send accepted with 2 recipient(s)')
+              expect(res.body.message).toContain('Email merge send accepted with 2 recipient(s)')
               expect(res.body.channels).toEqual(['email'])
+            })
+        })
+
+        it('should accept an inline-content merge (no templateId)', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              recipients: {
+                mergeArray: [
+                  ['to', 'firstname'],
+                  ['alice@example.com', 'Alice'],
+                  ['bob@example.com', 'Bob'],
+                ],
+              },
+              content: { subject: 'Hi', body: 'Dear {{firstname}}', bodyType: 'text' },
+            })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.message).toContain('Email merge send accepted with 2 recipient(s)')
             })
         })
 
         it('should return 202 with status "scheduled" when delayedSend is provided', async () => {
           const futureDate = new Date(Date.now() + 3600000).toISOString()
           return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send({ ...validBulkBody, delayedSend: futureDate })
+            .post('/api/v1/notifysimple/email')
+            .send({ ...validMergeBody, delayedSend: futureDate })
             .expect(202)
             .expect((res) => {
               expect(res.body.status).toBe('scheduled')
-              expect(res.body.message).toContain('Bulk send scheduled for delivery at')
+              expect(res.body.message).toContain('Email merge send scheduled for delivery at')
             })
         })
 
@@ -395,8 +417,8 @@ describe('Notify Controllers', () => {
             'Template not found for tenant',
           ])
           return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send(validBulkBody)
+            .post('/api/v1/notifysimple/email')
+            .send(validMergeBody)
             .expect(422)
             .expect((res) => {
               expect(res.body.message).toBe('Request validation failed')
@@ -404,24 +426,30 @@ describe('Notify Controllers', () => {
             })
         })
 
-        it('should return 400 when rows are missing', async () => {
-          return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send({ name: 'Test', templateId: '12345678-1234-1234-1234-123456789012' })
-            .expect(400)
-        })
-
         it('should return 400 when templateId is not a valid UUID', async () => {
           return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send({ ...validBulkBody, templateId: 'not-a-uuid' })
+            .post('/api/v1/notifysimple/email')
+            .send({ ...validMergeBody, templateId: 'not-a-uuid' })
             .expect(400)
         })
 
         it('should return 400 when mergeArray header is missing the "to" column', async () => {
           return request(app.getHttpServer())
-            .post('/api/v1/notifysimple/bulk')
-            .send({ ...validBulkBody, mergeArray: [['name'], ['Alice']] })
+            .post('/api/v1/notifysimple/email')
+            .send({ ...validMergeBody, recipients: { mergeArray: [['name'], ['Alice']] } })
+            .expect(400)
+        })
+
+        it('should return 400 when both to and mergeArray are provided', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              ...validMergeBody,
+              recipients: {
+                to: ['alice@example.com'],
+                mergeArray: [['to'], ['bob@example.com']],
+              },
+            })
             .expect(400)
         })
       })

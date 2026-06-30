@@ -42,14 +42,21 @@ export interface NotificationRequest {
 }
 
 /**
- * Bulk email payload carried by ingestion and delivery jobs for the /notifysimple/bulk flow.
+ * Bulk email (mail-merge) payload carried by ingestion and delivery jobs for the
+ * /notifysimple/email merge flow (a request whose email recipients use `mergeArray`).
  * On the ingestion job `recipients` holds every recipient; on a delivery job it holds only
- * the recipients of a single batch (identified by `batchId`). `params` are global params
- * applied when rendering the template; per-recipient `params` override them on a per-key basis.
+ * the recipients of a single batch (identified by `batchId`). Content is rendered from either a
+ * server `templateId` or inline `content`. `params` are global params applied when rendering;
+ * per-recipient `params` override them on a per-key basis.
  */
 export interface BulkEmailJobData {
-  name: string
-  templateId: string
+  templateId?: string
+  content?: {
+    subject?: string
+    body?: string
+    bodyType?: 'text' | 'markdown' | 'html'
+    renderer?: 'handlebars' | 'mustache' | 'legacy_gc_notify' | 'mjml'
+  }
   params?: Record<string, unknown>
   recipients: Array<{ address: string; params: Record<string, unknown> }>
 }

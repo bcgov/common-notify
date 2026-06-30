@@ -9,8 +9,8 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationPubSubService } from '../../api/notification/notification-pubsub.service'
 import { QueueName } from '../../enum/queue-name.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
-import { BulkEmailRequest } from '../../api/notify/schemas/bulk-email-request'
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
@@ -28,6 +28,14 @@ export interface QueueableContext {
 }
 
 /**
+ * Map a NotificationChannel to the NotifySimpleRequest property key used to wrap a bare
+ * single-channel route body.
+ */
+function channelKey(channel: NotificationChannel): 'email' | 'sms' {
+  return channel === NotificationChannel.SMS ? 'sms' : 'email'
+}
+
+/**
  * Type guard to validate tenant context
  * Ensures tenant has a valid string ID
  */
@@ -40,38 +48,42 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
 }
 
 /**
- * Detect a bulk email payload (the /notifysimple/bulk route). The global ValidationPipe has already
- * validated the body against BulkEmailRequest, so the presence of a `mergeArray` is sufficient.
+ * Detect a mail-merge email payload: an email channel whose recipients use `mergeArray`. The global
+ * ValidationPipe has already validated the body, so the presence of `email.recipients.mergeArray` is
+ * sufficient to route the request through the bulk fan-out flow.
  */
-function isBulkEmailRequest(payload: unknown): payload is BulkEmailRequest {
-  return (
-    typeof payload === 'object' &&
-    payload !== null &&
-    Array.isArray((payload as Record<string, unknown>).mergeArray)
-  )
+function isEmailMergeRequest(payload: unknown): payload is NotifySimpleRequest {
+  const email = (payload as NotifySimpleRequest | undefined)?.email
+  return Array.isArray(email?.recipients?.mergeArray)
 }
 
 /**
- * Handle a bulk email request: validate, persist the parent request, and enqueue ONE ingestion job
+ * Handle an email merge request: validate, persist the parent request, and enqueue ONE ingestion job
  * carrying every recipient address plus the global params. The ingestion worker fans this out into
  * per-batch delivery jobs (and creates the per-recipient detail rows), so this does not call
  * createPending here.
  */
-async function handleBulkEmail(
+async function handleEmailMerge(
   ctx: QueueableContext,
   queue: Bull.Queue,
   queueName: QueueName,
   tenantId: string,
-  dto: BulkEmailRequest,
+  dto: NotifySimpleRequest,
 ) {
-  const logger = new Logger(`Queueable[${queueName}][bulk]`)
+  const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
 
-  const errors = await ctx.notificationService.validateBulkRules(tenantId, dto)
+  const email = dto.email!
+  const mergeArray = email.recipients.mergeArray!
+  const delayedSendTimestamp = email.delayedSend
+  // Global params cascade: request-level params augmented/overridden by channel-level params
+  const globalParams = { ...dto.params, ...email.params }
+
+  const errors = await ctx.notificationService.validateEmailMergeRules(tenantId, dto)
   if (errors.length > 0) {
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }
 
-  const recipients = ctx.notificationService.parseBulkRecipients(dto.mergeArray)
+  const recipients = ctx.notificationService.parseBulkRecipients(mergeArray)
 
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
@@ -81,7 +93,7 @@ async function handleBulkEmail(
     payload: dto as any,
   })
   logger.debug(
-    `Bulk notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
+    `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
@@ -105,12 +117,11 @@ async function handleBulkEmail(
           : undefined,
       })
       .catch((err: Error) =>
-        logger.error('Failed to publish SSE event on bulk create', { error: err.message }),
+        logger.error('Failed to publish SSE event on email merge create', { error: err.message }),
       )
   }
 
   // Determine if this is a delayed send and calculate the delay in milliseconds
-  const delayedSendTimestamp = dto.delayedSend
   let delayMs = 0
   if (delayedSendTimestamp) {
     delayMs = Math.max(0, new Date(delayedSendTimestamp).getTime() - Date.now())
@@ -119,13 +130,13 @@ async function handleBulkEmail(
 
   const response = {
     notifyId: notificationRecord.id,
-    templateId: dto.templateId,
+    templateId: email.templateId,
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
     message: hasDelayedSend
-      ? `Bulk send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
-      : `Bulk send accepted with ${recipients.length} recipient(s)`,
+      ? `Email merge send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
+      : `Email merge send accepted with ${recipients.length} recipient(s)`,
   }
 
   // Fire off queueing asynchronously - don't block the response.
@@ -135,13 +146,13 @@ async function handleBulkEmail(
       const jobPayload = {
         notifyId: notificationRecord.id,
         tenantId,
-        request: { templateId: dto.templateId },
+        request: { templateId: email.templateId },
         requestedAt: new Date().toISOString(),
         bulk: true,
         bulkEmail: {
-          name: dto.name,
-          templateId: dto.templateId,
-          params: dto.params,
+          templateId: email.templateId,
+          content: email.content,
+          params: globalParams,
           recipients,
         },
         ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
@@ -203,13 +214,23 @@ async function handleBulkEmail(
  * the notification remains in PENDING status and will be retried by a scheduled job.
  *
  * @param queueName - Queue to add job to (from QueueName enum)
+ * @param channel - When set, the route body is a bare single-channel payload (e.g. the
+ *   /notifysimple/email route posts a NotifyEmailChannel). The decorator wraps it into a
+ *   NotifySimpleRequest (`{ [channel]: body }`) so the rest of the pipeline is unchanged.
  */
-export function Queueable(queueName: QueueName = QueueName.INGESTION) {
+export function Queueable(
+  queueName: QueueName = QueueName.INGESTION,
+  channel?: NotificationChannel,
+) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const logger = new Logger(`Queueable[${queueName}]`)
 
-    descriptor.value = async function (this: QueueableContext, req?: any, payload?: unknown) {
+    descriptor.value = async function (this: QueueableContext, req?: any, body?: unknown) {
       try {
+        // For single-channel routes the body is a bare channel; wrap it into a NotifySimpleRequest
+        // so detection and downstream processing operate on the standard shape.
+        const payload: unknown =
+          channel && body && typeof body === 'object' ? { [channelKey(channel)]: body } : body
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
           throw new InternalServerErrorException('Decorator context is invalid')
@@ -268,9 +289,9 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
               ? req.user.id
               : tenantId
 
-        // Bulk email send: a different payload/flow that fans out into batches downstream.
-        if (isBulkEmailRequest(payload)) {
-          return await handleBulkEmail(
+        // Email merge send: a different payload/flow that fans out into batches downstream.
+        if (isEmailMergeRequest(payload)) {
+          return await handleEmailMerge(
             this as QueueableContext,
             queue,
             queueName,

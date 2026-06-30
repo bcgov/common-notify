@@ -168,5 +168,16 @@ describe('TemplateOrContentValidator', () => {
       expect(result.valid).toBe(false)
       expect(result.error).toContain('Request must provide either templateId OR content')
     })
+
+    it('should accept request with a channel-level templateId (no top-level templateId or content)', () => {
+      const request = new NotifySimpleRequest()
+      request.email = new NotifyEmailChannel()
+      request.email.recipients = { to: ['test@example.com'] }
+      request.email.templateId = '550e8400-e29b-41d4-a716-446655440000'
+      // No top-level templateId, no inline content
+
+      const result = TemplateOrContentValidator.validate(request)
+      expect(result.valid).toBe(true)
+    })
   })
 })

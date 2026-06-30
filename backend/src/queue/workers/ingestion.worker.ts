@@ -95,7 +95,7 @@ export class IngestionWorker {
         // Bulk email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
         if (job.data.bulk && job.data.bulkEmail) {
-          const { name, templateId, params, recipients } = job.data.bulkEmail
+          const { templateId, content, params, recipients } = job.data.bulkEmail
           const batchSize = configService?.get<number>('queue.batchSize') || 100
 
           logger.log(
@@ -125,7 +125,7 @@ export class IngestionWorker {
               attempt: 0,
               bulk: true,
               batchId,
-              bulkEmail: { name, templateId, params, recipients: chunk },
+              bulkEmail: { templateId, content, params, recipients: chunk },
             }
 
             await emailQueue.add(deliveryPayload, {

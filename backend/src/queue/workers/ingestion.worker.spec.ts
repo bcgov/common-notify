@@ -769,7 +769,6 @@ describe('IngestionWorker', () => {
             requestedAt: new Date().toISOString(),
             bulk: true,
             bulkEmail: {
-              name: 'Test Bulk',
               templateId: 'template-uuid',
               params: { key: 'val' },
               recipients,
@@ -833,7 +832,6 @@ describe('IngestionWorker', () => {
             requestedAt: new Date().toISOString(),
             bulk: true,
             bulkEmail: {
-              name: 'Multi Batch',
               templateId: 'template-uuid',
               params: {},
               recipients: [
@@ -899,7 +897,6 @@ describe('IngestionWorker', () => {
             requestedAt: new Date().toISOString(),
             bulk: true,
             bulkEmail: {
-              name: 'Default Batch Size',
               templateId: 'template-uuid',
               params: {},
               recipients,

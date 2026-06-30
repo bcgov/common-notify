@@ -102,6 +102,7 @@ export class EmailDeliveryWorker {
             logger,
             templatesRepository,
             templatesService,
+            inlineRenderingService,
             emailAdapter,
             requestDetailService,
             notificationService,
@@ -345,20 +346,33 @@ export class EmailDeliveryWorker {
     logger: Logger,
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { templateId, params, recipients } = bulkEmail
+    const { templateId, content, params, recipients } = bulkEmail
+
+    // A bulk send renders from either a server template or inline content (systemic error if neither).
+    if (!templateId && !(content && (content.subject || content.body))) {
+      throw new Error('Bulk email requires either a templateId or inline content')
+    }
 
     // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
-    const template = await templatesRepository.findById(tenantId, templateId)
-    if (!template) {
-      throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+    const template = templateId ? await templatesRepository.findById(tenantId, templateId) : null
+    if (templateId) {
+      if (!template) {
+        throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+      }
+      if (template.channelCode !== 'EMAIL') {
+        throw new Error(`Template '${templateId}' is not an EMAIL template`)
+      }
     }
-    if (template.channelCode !== 'EMAIL') {
-      throw new Error(`Template '${templateId}' is not an EMAIL template`)
-    }
+
+    // Inline content uses handlebars by default so mail-merge variables are substituted per recipient.
+    const inlineContent = content
+      ? { ...content, renderer: content.renderer ?? ('handlebars' as const) }
+      : null
 
     logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${recipients.length} recipient(s)`)
 
@@ -369,15 +383,25 @@ export class EmailDeliveryWorker {
       try {
         // Merge global params with per-recipient params; per-recipient takes precedence
         const mergedParams = { ...(params || {}), ...recipient.params }
-        const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+
+        let subject: string | undefined
+        let body: string
+        let bodyType: 'text' | 'markdown' | 'html' | undefined
+        if (template) {
+          const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = rendered.bodyType
+        } else {
+          const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = inlineContent!.bodyType
+        }
 
         const emailPayload = {
           recipients: { to: [recipient.address] },
-          content: {
-            subject: rendered.subject,
-            body: rendered.body,
-            bodyType: rendered.bodyType,
-          },
+          content: { subject, body, bodyType },
         }
 
         const result = await EmailDeliveryWorker.sendEmail(

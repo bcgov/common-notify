@@ -1100,7 +1100,6 @@ describe('EmailDeliveryWorker', () => {
             bulk: true,
             batchId: 'notify-bulk-EMAIL-0',
             bulkEmail: {
-              name: 'Test Bulk',
               templateId: 'template-uuid',
               params: {},
               recipients: addresses.map((address) => ({ address, params: {} })),
@@ -1140,6 +1139,32 @@ describe('EmailDeliveryWorker', () => {
           'bob@example.com',
           'ext-123',
         )
+      })
+
+      it('should render inline content per recipient when no templateId is given', async () => {
+        mockInlineRenderingService.renderEmail.mockResolvedValue({
+          subject: 'Hi',
+          body: 'Dear Alice',
+        })
+
+        const job = makeBulkJob(['alice@example.com'], {
+          bulkEmail: {
+            content: { subject: 'Hi', body: 'Dear {{firstname}}', bodyType: 'text' },
+            params: {},
+            recipients: [{ address: 'alice@example.com', params: { firstname: 'Alice' } }],
+          },
+        } as Partial<DeliveryJobPayload>)
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
+        // Template path not used; inline renderer is invoked with merged params (handlebars default)
+        expect(mockTemplatesService.renderTemplateContent).not.toHaveBeenCalled()
+        expect(mockInlineRenderingService.renderEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ renderer: 'handlebars', body: 'Dear {{firstname}}' }),
+          { firstname: 'Alice' },
+        )
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
       })
 
       it('should mark parent COMPLETED when all recipients sent and no pending remain', async () => {

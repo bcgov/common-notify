@@ -1335,6 +1335,45 @@
           "response": []
         },
         {
+          "name": "Notify - Simple Send Email Merge (Inline Content)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": {\n    \"mergeArray\": [\n      [\"to\", \"firstName\", \"lastName\"],\n      [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n      [\"test@example.com\", \"Bob\", \"Jones\"]\n    ]\n  },\n  \"content\": {\n    \"subject\": \"Hello {{firstName}}\",\n    \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n    \"bodyType\": \"text\",\n    \"renderer\": \"handlebars\"\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple/email",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple", "email"]
+            },
+            "description": "Same mail-merge as \"Notify - Simple Send Email Merge\", but supplies the template inline via `content` instead of referencing `templateId`. The `recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` (here `firstName`, `lastName`) become per-recipient params, while `params` holds global params (`eventName`). The inline `content` mirrors the \"Email Merge Test Template\" (subject `Hello {{firstName}}`, Handlebars body, `bodyType` text).\n\n**Setup:** Set `recipient_email` to the target email address. No template creation step is required.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+          },
+          "response": []
+        },
+        {
           "name": "Notify - Simple Send Email Attachment",
           "request": {
             "auth": {

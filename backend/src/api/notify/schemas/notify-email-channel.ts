@@ -3,14 +3,19 @@ import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyAttachment } from './notify-attachment'
 import { NotifyEmailRecipients } from './notify-email-recipients'
 import { NotifyContent } from './notify-content'
 
 @ValidateTemplateOrRenderer()
 export class NotifyEmailChannel {
-  @ApiProperty({ type: NotifyEmailRecipients, description: 'Email recipients with to, cc, bcc' })
+  @ApiProperty({
+    type: NotifyEmailRecipients,
+    description: 'Email recipients: to/cc/bcc or a mergeArray for mail-merge',
+  })
   @ValidateNested()
+  @ValidateRecipientsOrMerge()
   @Type(() => NotifyEmailRecipients)
   recipients: NotifyEmailRecipients
 

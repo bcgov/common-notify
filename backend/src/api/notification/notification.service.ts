@@ -13,11 +13,7 @@ import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
-import { BulkEmailRequest } from '../notify/schemas/bulk-email-request'
-import {
-  BULK_EMAIL_ADDRESS_HEADER,
-  BULK_EMAIL_MAX_REPORTED_ERRORS,
-} from '../notify/schemas/bulk-email.constants'
+import { BULK_EMAIL_MAX_REPORTED_ERRORS } from '../notify/schemas/bulk-email.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -135,13 +131,14 @@ export class NotificationService {
    * are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
    * (mirroring how simple sends store their recipients on the parent request).
    */
-  private extractBulkChannelAndRecipients(payload: BulkEmailRequest): {
+  private extractBulkChannelAndRecipients(payload: NotifySimpleRequest): {
     channel: string | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
   } {
-    const delayedSendTime = payload.delayedSend ? new Date(payload.delayedSend) : null
-    const parsed = this.parseBulkRecipients(payload.mergeArray)
+    const email = payload.email
+    const delayedSendTime = email?.delayedSend ? new Date(email.delayedSend) : null
+    const parsed = this.parseBulkRecipients(email?.recipients?.mergeArray ?? [])
     const addresses = parsed.map((r) => r.address)
     return {
       channel: 'EMAIL',
@@ -214,10 +211,13 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload. Bulk sends (recipients in
-    // `rows`) take a dedicated extractor since they don't carry the email/sms/msgApp channel shape.
-    const { channel, recipients, delayedSendTime } = Array.isArray(dto.payload?.mergeArray)
-      ? this.extractBulkChannelAndRecipients(dto.payload as BulkEmailRequest)
+    // Extract channel, recipients, and delayed send time from payload. Mail-merge sends (email
+    // recipients given as `mergeArray`) take a dedicated extractor since the addressees live in the
+    // merge rows rather than to/cc/bcc.
+    const { channel, recipients, delayedSendTime } = Array.isArray(
+      dto.payload?.email?.recipients?.mergeArray,
+    )
+      ? this.extractBulkChannelAndRecipients(dto.payload as NotifySimpleRequest)
       : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
@@ -240,22 +240,17 @@ export class NotificationService {
   }
 
   /**
-   * Locate the (case-insensitive) "email address" column in a bulk-send header row.
-   * Returns -1 if the header is missing the column.
-   */
-  private findBulkEmailColumnIndex(header: string[]): number {
-    return header.findIndex(
-      (col) => typeof col === 'string' && col.trim().toLowerCase() === BULK_EMAIL_ADDRESS_HEADER,
-    )
-  }
-
-  /**
    * Validate a bulk email request's business rules: the template must exist for the tenant and
    * every row's email address must be well-formed. Returns a bounded list of error strings
    * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
    */
-  async validateBulkRules(tenantId: string, dto: BulkEmailRequest): Promise<string[]> {
+  async validateEmailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
     const errors: string[] = []
+
+    const email = dto.email
+    const mergeArray = email?.recipients?.mergeArray ?? []
+    const templateId = email?.templateId
+    const hasInlineContent = !!(email?.content && (email.content.subject || email.content.body))
 
     const tenant = await this.tenantsService.findOne(tenantId)
     if (!tenant) {
@@ -266,15 +261,20 @@ export class NotificationService {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
-    const template = await this.templatesRepository.findById(tenantId, dto.templateId)
-    if (!template) {
-      errors.push(`Template '${dto.templateId}' not found for tenant '${tenantId}'`)
-    } else if (template.channelCode !== 'EMAIL') {
-      errors.push(`Template '${dto.templateId}' is not an EMAIL template`)
+    // A merge renders from either a server template or inline content.
+    if (templateId) {
+      const template = await this.templatesRepository.findById(tenantId, templateId)
+      if (!template) {
+        errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)
+      } else if (template.channelCode !== 'EMAIL') {
+        errors.push(`Template '${templateId}' is not an EMAIL template`)
+      }
+    } else if (!hasInlineContent) {
+      errors.push('Request must provide either a templateId or inline content (subject/body)')
     }
 
-    if (dto.delayedSend) {
-      const scheduledTime = new Date(dto.delayedSend).getTime()
+    if (email?.delayedSend) {
+      const scheduledTime = new Date(email.delayedSend).getTime()
       const now = Date.now()
       if (scheduledTime <= now) {
         errors.push(`delayedSend must be in the future`)
@@ -283,17 +283,21 @@ export class NotificationService {
       }
     }
 
-    const emailColumnIndex = this.findBulkEmailColumnIndex(dto.mergeArray[0] ?? [])
+    const header = mergeArray[0] ?? []
+    if ((header[0] ?? '').trim().toLowerCase() !== 'to') {
+      errors.push(`The first column of the header row must be "to"`)
+      return errors
+    }
 
     const seen = new Map<string, number>()
-    for (let i = 1; i < dto.mergeArray.length; i++) {
+    for (let i = 1; i < mergeArray.length; i++) {
       if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
         errors.push(
           `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
         )
         break
       }
-      const address = (dto.mergeArray[i]?.[emailColumnIndex] ?? '').trim()
+      const address = (mergeArray[i]?.[0] ?? '').trim()
       if (!address) {
         errors.push(`Row ${i}: email address is missing`)
       } else if (!isEmail(address)) {
@@ -321,12 +325,10 @@ export class NotificationService {
     mergeArray: string[][],
   ): Array<{ address: string; params: Record<string, unknown> }> {
     const header = mergeArray[0] ?? []
-    const emailColumnIndex = this.findBulkEmailColumnIndex(header)
     return mergeArray.slice(1).map((row) => {
-      const address = (row[emailColumnIndex] ?? '').trim()
+      const address = (row[0] ?? '').trim()
       const params: Record<string, unknown> = {}
-      for (let i = 0; i < header.length; i++) {
-        if (i === emailColumnIndex) continue
+      for (let i = 1; i < header.length; i++) {
         const key = (header[i] ?? '').trim()
         if (key) params[key] = row[i] ?? ''
       }

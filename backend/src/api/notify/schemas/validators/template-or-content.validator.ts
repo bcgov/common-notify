@@ -17,11 +17,11 @@ import { NotifySimpleRequest } from '../notify-simple-request'
  */
 @ValidatorConstraint({ name: 'isValidTemplateOrContent', async: false })
 export class TemplateOrContentConstraint implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
+  validate(value: any): boolean {
     const request = value as NotifySimpleRequest
 
-    // Check if templateId is provided
-    const hasTemplateId = !!request.templateId
+    // Request-wide templateId (applies to all channels that don't carry their own)
+    const hasTopTemplateId = !!request.templateId
 
     // Check if content is provided in email channel
     const emailHasContent =
@@ -37,13 +37,19 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
 
     const hasContent = emailHasContent || smsHasContent || msgAppHasContent
 
-    // If template is provided, content must NOT be provided
-    if (hasTemplateId && hasContent) {
+    // A channel may carry its own templateId; this satisfies the "render from something" requirement.
+    // (Channel-level templateId vs inline content conflicts are caught per-channel by
+    // ValidateChannelTemplateOrContent.)
+    const hasChannelTemplateId =
+      !!request.email?.templateId || !!request.sms?.templateId || !!request.msgApp?.templateId
+
+    // A request-wide template and inline content are mutually exclusive (ambiguous combination)
+    if (hasTopTemplateId && hasContent) {
       return false
     }
 
-    // If template is NOT provided, content MUST be provided
-    if (!hasTemplateId && !hasContent) {
+    // Must render from something: a request-wide template, a channel template, or inline content
+    if (!hasTopTemplateId && !hasChannelTemplateId && !hasContent) {
       return false
     }
 
