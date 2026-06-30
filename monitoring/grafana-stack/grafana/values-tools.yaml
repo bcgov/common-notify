@@ -46,6 +46,14 @@ datasources:
               matcherRegex: '"notificationId":"([^"]+)"'
               name: NotificationID
               url: ''
+      # Loki Alerting (Ruler API)
+      - name: Loki Alerting
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        jsonData:
+          manageAlerts: true
+          alertmanagerUid: alertmanager
 
 # Dashboard providers - Load dashboards from ConfigMaps
 dashboardProviders:
@@ -61,25 +69,10 @@ dashboardProviders:
         options:
           path: /var/lib/grafana/dashboards/default
 
-# Pre-load dashboards from ConfigMaps
-# ConfigMaps must be created separately with dashboard JSON files
+# Pre-load dashboards
+# Dashboards are loaded from JSON files in the monitoring/dashboards directory
 dashboards:
-  default:
-    dev-environment:
-      gnetId: null
-      datasource: Loki
-      json: |
-        # Content will come from ConfigMap
-    test-environment:
-      gnetId: null
-      datasource: Loki
-      json: |
-        # Content will come from ConfigMap
-    prod-environment:
-      gnetId: null
-      datasource: Loki
-      json: |
-        # Content will come from ConfigMap
+  default: {}
 
 # Grafana configuration
 grafana.ini:

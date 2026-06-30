@@ -32,6 +32,20 @@ loki:
       chunks_directory: /var/loki/chunks
       rules_directory: /var/loki/rules
 
+  # Enable ruler for alerting
+  rulerConfig:
+    enable_api: true
+    enable_alertmanager_v2: true
+    alertmanager_url: http://localhost:9093  # Update with actual Alertmanager URL when available
+    storage:
+      type: local
+      local:
+        directory: /var/loki/rules
+    rule_path: /tmp/loki/rules-temp
+    ring:
+      kvstore:
+        store: inmemory
+
   # Retention: 5 days (limited by 5Gi storage quota in tools namespace)
   limits_config:
     retention_period: 120h  # 5 days
@@ -96,6 +110,17 @@ singleBinary:
   extraEnv:
     - name: TZ
       value: America/Vancouver
+
+  # Mount alert rules from ConfigMap
+  extraVolumes:
+    - name: alert-rules
+      configMap:
+        name: loki-alert-rules
+
+  extraVolumeMounts:
+    - name: alert-rules
+      mountPath: /var/loki/rules/common-notify
+      readOnly: true
 
   # OpenShift-compatible security context (let OpenShift assign UIDs)
   podSecurityContext:
