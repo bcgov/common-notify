@@ -74,6 +74,18 @@ dashboardProviders:
 dashboards:
   default: {}
 
+# Sidecar for auto-loading dashboards from ConfigMaps
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folder: /tmp/dashboards
+    defaultFolderName: "Common Notify"
+    searchNamespace: ALL
+    provider:
+      foldersFromFilesStructure: false
+
 # Grafana configuration
 grafana.ini:
   server:
