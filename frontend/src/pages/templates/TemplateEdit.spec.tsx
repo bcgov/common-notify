@@ -135,7 +135,7 @@ const template = {
   name: 'Welcome Template',
   channelCode: 'EMAIL',
   engineCode: 'handlebars',
-  bodyType: 'html',
+  bodyType: 'markdown',
   subject: 'Hello {{name}}',
   body: 'Hello {{name}}',
   version: 1,
@@ -153,12 +153,8 @@ describe('TemplateEdit', () => {
     updateTemplateMock.mockResolvedValue({})
   })
 
-  it('hides body type when the loaded template engine is MJML', async () => {
-    getTemplateByIdMock.mockResolvedValue({
-      ...template,
-      engineCode: 'mjml',
-      bodyType: undefined,
-    })
+  it('does not show body type choices', async () => {
+    getTemplateByIdMock.mockResolvedValue(template)
 
     render(<TemplateEdit templateId="template-123" />)
 
@@ -195,6 +191,31 @@ describe('TemplateEdit', () => {
       engineCode: 'mjml',
       subject: 'Hello {{name}}',
       body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{name}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+    })
+  })
+
+  it('does not send bodyType when saving a non-MJML template', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Welcome Template')).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByLabelText('Template body (required)'), {
+      target: { value: '# Updated {{name}}' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateTemplateMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(updateTemplateMock).toHaveBeenCalledWith('template-123', {
+      name: 'Welcome Template',
+      engineCode: 'handlebars',
+      subject: 'Hello {{name}}',
+      body: '# Updated {{name}}',
     })
   })
 })

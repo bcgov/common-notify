@@ -7,7 +7,6 @@ import {
   updateTemplate,
   NotificationChannel,
   TemplateEngine,
-  TemplateBodyType,
 } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -27,18 +26,15 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     name: '',
     channelCode: NotificationChannel.EMAIL as string,
     engineCode: TemplateEngine.HANDLEBARS as string,
-    bodyType: '' as string,
     subject: '',
     body: '',
   })
   const [formErrors, setFormErrors] = useState({
     name: '',
     engineCode: '',
-    bodyType: '',
     subject: '',
     body: '',
   })
-  const isMjml = formData.engineCode === TemplateEngine.MJML
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -50,7 +46,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           name: data.name,
           channelCode: data.channelCode,
           engineCode: data.engineCode,
-          bodyType: data.bodyType || '',
           subject: data.subject || '',
           body: data.body || '',
         })
@@ -70,15 +65,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   }
 
   const validate = (): boolean => {
-    const errors = { name: '', engineCode: '', bodyType: '', subject: '', body: '' }
+    const errors = { name: '', engineCode: '', subject: '', body: '' }
     if (!formData.name.trim()) {
       errors.name = ' '
     }
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
-    }
-    if (!isMjml && !formData.bodyType) {
-      errors.bodyType = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
       errors.subject = ' '
@@ -100,9 +92,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
         engineCode: formData.engineCode as TemplateEngine,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
-        ...(!isMjml && formData.bodyType
-          ? { bodyType: formData.bodyType as TemplateBodyType }
-          : {}),
       })
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
@@ -193,9 +182,8 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 setFormData((prev) => ({
                   ...prev,
                   engineCode: value,
-                  bodyType: value === TemplateEngine.MJML ? '' : prev.bodyType,
                 }))
-                setFormErrors((prev) => ({ ...prev, engineCode: '', bodyType: '' }))
+                setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
@@ -214,34 +202,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               </Radio>
             </RadioGroup>
           </div>
-
-          {!isMjml && (
-            <div className="mb-4 error-after-label">
-              <RadioGroup
-                label={
-                  (
-                    <>
-                      <strong>Body type</strong> (required)
-                    </>
-                  ) as any
-                }
-                value={formData.bodyType}
-                onChange={(value) => {
-                  setFormData((prev) => ({ ...prev, bodyType: value }))
-                  setFormErrors((prev) => ({ ...prev, bodyType: '' }))
-                }}
-                isInvalid={!!formErrors.bodyType}
-                errorMessage={formErrors.bodyType}
-              >
-                <Radio key="html" value={TemplateBodyType.HTML}>
-                  HTML
-                </Radio>
-                <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
-                  Markdown
-                </Radio>
-              </RadioGroup>
-            </div>
-          )}
 
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="mb-4 desc-above">
