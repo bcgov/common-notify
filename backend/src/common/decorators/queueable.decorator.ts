@@ -57,6 +57,20 @@ async function recordAcceptedUsage(
 }
 
 /**
+ * Enforce the API key's daily/annual limits BEFORE a send is accepted. Throws HTTP 429 if any
+ * channel would exceed its limit. Unlike usage recording this is NOT swallowed — a rejected
+ * request must fail. Skipped when there is no bound API key or the service is absent (fail-open).
+ */
+async function enforceLimits(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  entries: Array<{ channel: string; count: number }>,
+): Promise<void> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+  await ctx.apiKeyUsageService.assertWithinLimits(apiKeyConsumerId, entries)
+}
+
+/**
  * Type guard to validate tenant context
  * Ensures tenant has a valid string ID
  */
@@ -102,6 +116,11 @@ async function handleBulkEmail(
   }
 
   const addresses = ctx.notificationService.parseBulkAddresses(dto.rows)
+
+  // Enforce daily/annual EMAIL limits BEFORE accepting the bulk request (throws HTTP 429).
+  await enforceLimits(ctx, apiKeyConsumerId, [
+    { channel: NotificationChannel.EMAIL, count: addresses.length },
+  ])
 
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
@@ -338,6 +357,22 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
           })
         }
 
+        // Primary (to) recipient count per channel — used for both limit enforcement and usage.
+        const usageEntries = [
+          {
+            channel: NotificationChannel.EMAIL,
+            count: processedPayload.email?.recipients?.to?.length ?? 0,
+          },
+          {
+            channel: NotificationChannel.SMS,
+            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+          },
+        ]
+
+        // Enforce daily/annual limits BEFORE accepting. Throws HTTP 429 if the request would
+        // exceed a limit, rejecting the whole request before any record is created.
+        await enforceLimits(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
+
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         // This is synchronous and required to succeed.
         let notificationRecord
@@ -394,17 +429,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         if (processedPayload.msgApp) channels.push('msgApp')
 
         // Attribute accepted notifications against the API key's usage limits (non-fatal).
-        // Counts primary (to) recipients per channel.
-        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, [
-          {
-            channel: NotificationChannel.EMAIL,
-            count: processedPayload.email?.recipients?.to?.length ?? 0,
-          },
-          {
-            channel: NotificationChannel.SMS,
-            count: processedPayload.sms?.recipients?.to?.length ?? 0,
-          },
-        ])
+        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =

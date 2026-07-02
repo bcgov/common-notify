@@ -135,7 +135,10 @@ describe('Notify Controllers', () => {
         { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: WebhookService, useValue: mockWebhookService },
-        { provide: ApiKeyUsageService, useValue: { recordUsage: vi.fn() } },
+        {
+          provide: ApiKeyUsageService,
+          useValue: { recordUsage: vi.fn(), assertWithinLimits: vi.fn() },
+        },
       ],
     })
       .overrideGuard(NotifyServiceGuard)

@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage } from '@/redux/thunks/apiKeyUsage.thunks'
+import { setAdminPage, setAdminLimit, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
 import Card from '@/components/Card'
@@ -94,24 +95,30 @@ const columns: TableColumn<AdminTenantUsageRow>[] = [
 
 const AdminUsage: FC = () => {
   const dispatch = useAppDispatch()
-  const { adminRows, adminLoading } = useAppSelector((state) => state.apiKeyUsage)
+  const { adminRows, adminLoading, adminPage, adminLimit, adminCount, adminSearch } =
+    useAppSelector((state) => state.apiKeyUsage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState(adminSearch)
 
+  // Server-side: refetch whenever the page, page size, or committed search changes.
   useEffect(() => {
     if (isAdmin) {
       dispatch(fetchAllTenantsUsage())
     }
-  }, [isAdmin, dispatch])
+  }, [isAdmin, adminPage, adminLimit, adminSearch, dispatch])
 
   if (!isAdmin) {
     return <NotAuthorized />
   }
 
-  const query = search.trim().toLowerCase()
-  const rows = query
-    ? adminRows.filter((row) => row.tenantName.toLowerCase().includes(query))
-    : adminRows
+  function handleSearch() {
+    // setAdminSearch resets to page 1; the effect above triggers the refetch.
+    dispatch(setAdminSearch(searchInput.trim()))
+  }
+
+  function handleLimitChange(newLimit: number) {
+    dispatch(setAdminLimit(newLimit))
+  }
 
   return (
     <div>
@@ -127,20 +134,32 @@ const AdminUsage: FC = () => {
               type="search"
               className="form-control"
               style={{ width: '300px' }}
-              placeholder="Filter by tenant name…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Filter by tenant name"
+              placeholder="Search by tenant name…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              aria-label="Search by tenant name"
             />
+          </div>
+          <div className="col-auto">
+            <button className="btn btn-outline-secondary" type="button" onClick={handleSearch}>
+              Search
+            </button>
           </div>
         </div>
 
         <DataTable
           columns={columns}
-          data={rows}
+          data={adminRows}
           keyExtractor={(row) => `${row.tenantId}-${row.channel}`}
           isLoading={adminLoading}
           emptyMessage="No tenant usage data found."
+          currentPage={adminPage}
+          pageSize={adminLimit}
+          totalCount={adminCount}
+          onPageChange={(nextPage) => dispatch(setAdminPage(nextPage))}
+          onPageSizeChange={handleLimitChange}
+          pageSizeOptions={[15, 30]}
           label="All tenants notification usage"
         />
       </Card>

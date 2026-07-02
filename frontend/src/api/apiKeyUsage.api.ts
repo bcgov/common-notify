@@ -53,6 +53,14 @@ export interface AdminTenantUsageRow {
   usedThisYear: number
 }
 
+export interface PaginatedAdminUsageResponse {
+  data: AdminTenantUsageRow[]
+  count: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 /**
  * Get current usage vs configured limits for the selected tenant.
  */
@@ -93,13 +101,22 @@ export async function updateApiKeyThreshold(
 }
 
 /**
- * Get usage vs limits for every tenant (one row per tenant × channel).
- * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
+ * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
+ * optionally filtered by tenant name. Pagination is by tenant. Requires NOTIFY_ADMIN.
+ * Backed by /api/v1/frontend/admin/api-key-usage.
  */
-export async function getAllTenantsUsage(): Promise<AdminTenantUsageRow[]> {
+export async function getAllTenantsUsage(
+  page: number = 1,
+  limit: number = 15,
+  search?: string,
+): Promise<PaginatedAdminUsageResponse> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage')
-    return await get<AdminTenantUsageRow[]>(params)
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage', {
+      page: String(page),
+      limit: String(limit),
+      ...(search ? { search } : {}),
+    })
+    return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
@@ -11,6 +11,7 @@ import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import {
   AdminTenantUsageRowDto,
   ChannelUsageDto,
+  PaginatedAdminUsageResponseDto,
   TenantUsageResponseDto,
   UsageHistoryEntryDto,
 } from './dto/tenant-usage-response.dto'
@@ -220,7 +221,57 @@ export class ApiKeyUsageService {
    * Usage vs limits for every tenant, one row per (tenant, channel). For the
    * NOTIFY_ADMIN all-tenants view. Values are aggregated across each tenant's API keys.
    */
-  async getAllTenantsUsage(): Promise<AdminTenantUsageRowDto[]> {
+  async getAllTenantsUsage(options: {
+    page?: number
+    limit?: number
+    search?: string
+  }): Promise<PaginatedAdminUsageResponseDto> {
+    const page = Math.max(1, options.page ?? 1)
+    const limit = Math.min(100, Math.max(1, options.limit ?? 15))
+    const search = options.search?.trim()
+    const offset = (page - 1) * limit
+
+    // Count distinct tenants (that have configured limits) matching the search.
+    const countQb = this.apiKeyLimitRepository
+      .createQueryBuilder('l')
+      .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
+      .innerJoin(Tenant, 't', 't.id = c.tenant_id')
+      .select('COUNT(DISTINCT t.id)', 'count')
+    if (search) countQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    const countRaw = await countQb.getRawOne<{ count: string }>()
+    const count = Number(countRaw?.count ?? 0)
+    const totalPages = Math.ceil(count / limit)
+
+    if (count === 0) {
+      return { data: [], count: 0, page, limit, totalPages: 0 }
+    }
+
+    // The page of tenants, ordered by name. Pagination is by TENANT so a tenant's
+    // per-channel rows always stay together on the same page.
+    const tenantQb = this.apiKeyLimitRepository
+      .createQueryBuilder('l')
+      .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
+      .innerJoin(Tenant, 't', 't.id = c.tenant_id')
+      .select('t.id', 'tenantId')
+      .addSelect('t.name', 'tenantName')
+      .groupBy('t.id')
+      .addGroupBy('t.name')
+      .orderBy('t.name', 'ASC')
+      .offset(offset)
+      .limit(limit)
+    if (search) tenantQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    const tenantRows = await tenantQb.getRawMany<{ tenantId: string; tenantName: string }>()
+
+    const data = await this.buildUsageRows(tenantRows.map((t) => t.tenantId))
+    return { data, count, page, limit, totalPages }
+  }
+
+  /**
+   * Build usage-vs-limits rows (one per tenant, channel) for the given tenant ids.
+   * Values are aggregated across each tenant's API keys.
+   */
+  private async buildUsageRows(tenantIds: string[]): Promise<AdminTenantUsageRowDto[]> {
+    if (tenantIds.length === 0) return []
     const fiscalYearStart = await this.getFiscalYearStart()
 
     // Limits per (tenant, channel), summed across the tenant's keys.
@@ -240,6 +291,7 @@ export class ApiKeyUsageService {
       .addSelect('SUM(l.daily_limit)', 'dailyLimit')
       .addSelect('SUM(l.annual_limit)', 'annualLimit')
       .addSelect('MIN(a.warn_threshold_percent)', 'warnThresholdPercent')
+      .where('t.id IN (:...tenantIds)', { tenantIds })
       .groupBy('t.id')
       .addGroupBy('t.name')
       .addGroupBy('l.channel_code')
@@ -261,7 +313,8 @@ export class ApiKeyUsageService {
       .addSelect('u.channel_code', 'channelCode')
       .addSelect('u.period_type_code', 'periodTypeCode')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where(
+      .where('c.tenant_id IN (:...tenantIds)', { tenantIds })
+      .andWhere(
         `(
           (u.period_type_code = :minute AND u.period_start >= date_trunc('minute', now())) OR
           (u.period_type_code = :day AND u.period_start >= date_trunc('day', now())) OR
@@ -315,8 +368,7 @@ export class ApiKeyUsageService {
         }
       })
       .sort(
-        (a, b) =>
-          a.tenantName.localeCompare(b.tenantName) || a.channel.localeCompare(b.channel),
+        (a, b) => a.tenantName.localeCompare(b.tenantName) || a.channel.localeCompare(b.channel),
       )
   }
 
@@ -348,6 +400,95 @@ export class ApiKeyUsageService {
         updated_at = now()
       `,
       [apiKeyConsumerId, channel, count, fiscalYearStart],
+    )
+  }
+
+  /**
+   * Enforce daily and annual limits before accepting a send. Throws HTTP 429 if any channel
+   * in the request would exceed its limit for this API key (used + count > limit); the whole
+   * request is rejected. Per-minute rate limiting is handled at the gateway, not here.
+   *
+   * Fail-open when a channel has no configured limit row (nothing to enforce against).
+   *
+   * Note: this is a check-then-act against the counters, so under heavy concurrency a small
+   * overshoot is possible. Acceptable for now; can be made atomic later if needed.
+   */
+  async assertWithinLimits(
+    apiKeyConsumerId: string,
+    entries: Array<{ channel: string; count: number }>,
+  ): Promise<void> {
+    if (!apiKeyConsumerId) return
+    const channels = entries.filter((e) => e.count > 0).map((e) => e.channel)
+    if (channels.length === 0) return
+
+    const limits = await this.apiKeyLimitRepository.find({
+      where: { apiKeyConsumerId, channelCode: In(channels) },
+    })
+    const limitByChannel = new Map(limits.map((limit) => [limit.channelCode, limit]))
+
+    const fiscalYearStart = await this.getFiscalYearStart()
+
+    const usageRows = await this.apiKeyUsageRepository
+      .createQueryBuilder('u')
+      .select('u.channel_code', 'channelCode')
+      .addSelect('u.period_type_code', 'periodTypeCode')
+      .addSelect('SUM(u.sent_count)', 'total')
+      .where('u.api_key_consumer_id = :apiKeyConsumerId', { apiKeyConsumerId })
+      .andWhere('u.channel_code IN (:...channels)', { channels })
+      .andWhere(
+        `(
+          (u.period_type_code = :day AND u.period_start >= date_trunc('day', now())) OR
+          (u.period_type_code = :year AND u.period_start >= :fiscalYearStart)
+        )`,
+        { day: UsagePeriodType.DAY, year: UsagePeriodType.YEAR, fiscalYearStart },
+      )
+      .groupBy('u.channel_code')
+      .addGroupBy('u.period_type_code')
+      .getRawMany<{ channelCode: string; periodTypeCode: string; total: string }>()
+
+    const usedByChannel = new Map<string, { day: number; year: number }>()
+    for (const row of usageRows) {
+      const entry = usedByChannel.get(row.channelCode) ?? { day: 0, year: 0 }
+      const total = Number(row.total)
+      if (row.periodTypeCode === UsagePeriodType.DAY) entry.day = total
+      else if (row.periodTypeCode === UsagePeriodType.YEAR) entry.year = total
+      usedByChannel.set(row.channelCode, entry)
+    }
+
+    for (const { channel, count } of entries) {
+      if (count <= 0) continue
+      const limit = limitByChannel.get(channel)
+      if (!limit) continue // fail-open: no configured limit for this channel
+
+      const used = usedByChannel.get(channel) ?? { day: 0, year: 0 }
+
+      if (used.day + count > limit.dailyLimit) {
+        throw this.limitExceeded(channel, 'daily', limit.dailyLimit, used.day, count)
+      }
+      if (used.year + count > limit.annualLimit) {
+        throw this.limitExceeded(channel, 'annual', limit.annualLimit, used.year, count)
+      }
+    }
+  }
+
+  private limitExceeded(
+    channel: string,
+    period: 'daily' | 'annual',
+    limit: number,
+    used: number,
+    requested: number,
+  ): HttpException {
+    const remaining = Math.max(0, limit - used)
+    return new HttpException(
+      {
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        error: 'Too Many Requests',
+        message:
+          `${channel} ${period} notification limit reached. ` +
+          `Limit ${limit}, used ${used}, requested ${requested} (${remaining} remaining). ` +
+          `Try again after the ${period} window resets.`,
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
     )
   }
 

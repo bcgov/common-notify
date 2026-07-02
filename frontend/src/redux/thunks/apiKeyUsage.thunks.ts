@@ -9,7 +9,7 @@ import type {
   TenantUsageResponse,
   UsageHistoryEntry,
   UpdateThresholdRequest,
-  AdminTenantUsageRow,
+  PaginatedAdminUsageResponse,
 } from '@/api/apiKeyUsage.api'
 import type { RootState } from '../store'
 
@@ -44,12 +44,13 @@ export const fetchApiKeyUsageHistory = createAsyncThunk<
 })
 
 export const fetchAllTenantsUsage = createAsyncThunk<
-  AdminTenantUsageRow[],
+  PaginatedAdminUsageResponse,
   void,
-  { rejectValue: string }
->('apiKeyUsage/fetchAllTenants', async (_, { rejectWithValue }) => {
+  { state: RootState; rejectValue: string }
+>('apiKeyUsage/fetchAllTenants', async (_, { getState, rejectWithValue }) => {
   try {
-    return await getAllTenantsUsage()
+    const { adminPage, adminLimit, adminSearch } = getState().apiKeyUsage
+    return await getAllTenantsUsage(adminPage, adminLimit, adminSearch || undefined)
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load tenant usage')
   }

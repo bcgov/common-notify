@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import type { PayloadAction } from '@reduxjs/toolkit'
 import type {
   TenantUsageResponse,
   UsageHistoryEntry,
@@ -21,10 +22,15 @@ interface ApiKeyUsageState {
   historyError: string | null
   updatingChannel: string | null
   updateError: string | null
-  // Admin (all tenants) view
+  // Admin (all tenants) view — server-side paginated + searched (by tenant)
   adminRows: AdminTenantUsageRow[]
   adminLoading: boolean
   adminError: string | null
+  adminPage: number
+  adminLimit: number
+  adminSearch: string
+  adminCount: number
+  adminTotalPages: number
 }
 
 const initialState: ApiKeyUsageState = {
@@ -40,12 +46,29 @@ const initialState: ApiKeyUsageState = {
   adminRows: [],
   adminLoading: false,
   adminError: null,
+  adminPage: 1,
+  adminLimit: 15,
+  adminSearch: '',
+  adminCount: 0,
+  adminTotalPages: 0,
 }
 
 export const apiKeyUsageSlice = createSlice({
   name: 'apiKeyUsage',
   initialState,
-  reducers: {},
+  reducers: {
+    setAdminPage(state, action: PayloadAction<number>) {
+      state.adminPage = Math.max(1, action.payload)
+    },
+    setAdminLimit(state, action: PayloadAction<number>) {
+      state.adminLimit = action.payload
+      state.adminPage = 1
+    },
+    setAdminSearch(state, action: PayloadAction<string>) {
+      state.adminSearch = action.payload
+      state.adminPage = 1
+    },
+  },
   extraReducers: (builder) => {
     builder
       // Fetch usage
@@ -75,13 +98,17 @@ export const apiKeyUsageSlice = createSlice({
         state.historyLoading = false
         state.historyError = action.payload ?? 'Failed to load usage history'
       })
-      // Fetch all tenants usage (admin)
+      // Fetch all tenants usage (admin, paginated)
       .addCase(fetchAllTenantsUsage.pending, (state) => {
         state.adminLoading = true
         state.adminError = null
       })
       .addCase(fetchAllTenantsUsage.fulfilled, (state, action) => {
-        state.adminRows = action.payload
+        state.adminRows = action.payload.data
+        state.adminCount = action.payload.count
+        state.adminPage = action.payload.page
+        state.adminLimit = action.payload.limit
+        state.adminTotalPages = action.payload.totalPages
         state.adminLoading = false
       })
       .addCase(fetchAllTenantsUsage.rejected, (state, action) => {
@@ -103,5 +130,7 @@ export const apiKeyUsageSlice = createSlice({
       })
   },
 })
+
+export const { setAdminPage, setAdminLimit, setAdminSearch } = apiKeyUsageSlice.actions
 
 export default apiKeyUsageSlice.reducer

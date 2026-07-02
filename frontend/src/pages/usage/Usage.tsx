@@ -95,17 +95,6 @@ const Usage: FC = () => {
       render: (_, row) => <span className="fw-semibold">{formatChannel(row.channel)}</span>,
     },
     {
-      key: 'rateLimitPerMinute',
-      label: 'Per minute',
-      render: (_, row) => (
-        <UsageCell
-          used={row.usedThisMinute}
-          limit={row.rateLimitPerMinute}
-          thresholdPercent={row.warnThresholdPercent}
-        />
-      ),
-    },
-    {
       key: 'dailyLimit',
       label: 'Daily',
       render: (_, row) => (
@@ -214,7 +203,7 @@ const Usage: FC = () => {
       <PageHeading title="Notification Usage & Limits" />
 
       <Card
-        title={selectedTenant ? selectedTenant.name : 'Current usage'}
+        title={'Current usage'}
         subtitle="Usage against your configured notification limits"
         className="mb-4"
       >
