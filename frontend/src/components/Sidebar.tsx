@@ -8,13 +8,10 @@ import UserService from '@/service/user-service'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -27,24 +24,9 @@ const navItems = [
     icon: <HomeOutlinedIcon />,
   },
   {
-    label: 'Notification Events',
-    to: '/notification-events',
-    icon: <WorkspacesOutlinedIcon />,
-  },
-  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
-  },
-  {
-    label: 'Distribution Lists',
-    to: '/distribution-lists',
-    icon: <GroupsOutlinedIcon />,
-  },
-  {
-    label: 'Settings',
-    to: '/settings',
-    icon: <SettingsOutlinedIcon />,
   },
 ]
 
