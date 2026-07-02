@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "24de6636-90ac-4809-95a0-93a94de7c67c",
+    "_postman_id": "bff5f43b-379b-4d49-a089-25b122d95490",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "9083839"
+    "_exporter_id": "56292162"
   },
   "item": [
     {
@@ -506,6 +506,12 @@
                   {
                     "key": "Authorization",
                     "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -519,12 +525,11 @@
                   }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/sms",
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/sms",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "notifications",
@@ -564,12 +569,11 @@
                   }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/bulk",
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/bulk",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "notifications",
@@ -591,16 +595,21 @@
                   {
                     "key": "Authorization",
                     "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications",
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "notifications"
@@ -669,16 +678,21 @@
                   {
                     "key": "Authorization",
                     "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/templates",
+                  "raw": "{{gateway_url}}/gcnotify/v2/templates",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "templates"
@@ -931,12 +945,11 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications",
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "notifications"
@@ -1009,12 +1022,11 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/templates",
+                  "raw": "{{gateway_url}}/gcnotify/v2/templates",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
                     "gcnotify",
                     "v2",
                     "templates"
