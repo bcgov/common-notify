@@ -361,7 +361,7 @@ describe('Notify Controllers', () => {
       describe('POST /api/v1/notifysimple/email (mail-merge)', () => {
         // A mail-merge is a bare email channel whose recipients use mergeArray, posted to /email.
         const validMergeBody = {
-          templateId: '12345678-1234-4234-8234-123456789012',
+          content: { templateId: '12345678-1234-4234-8234-123456789012' },
           recipients: {
             mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
           },
@@ -429,7 +429,7 @@ describe('Notify Controllers', () => {
         it('should return 400 when templateId is not a valid UUID', async () => {
           return request(app.getHttpServer())
             .post('/api/v1/notifysimple/email')
-            .send({ ...validMergeBody, templateId: 'not-a-uuid' })
+            .send({ ...validMergeBody, content: { templateId: 'not-a-uuid' } })
             .expect(400)
         })
 

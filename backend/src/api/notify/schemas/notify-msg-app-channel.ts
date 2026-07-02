@@ -45,10 +45,5 @@ export class NotifyMsgAppChannel {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  templateId?: string
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
   identityId?: string
 }

@@ -141,15 +141,16 @@ export class EmailDeliveryWorker {
           await requestDetailService.resetForRetry(notifyId)
         }
 
-        // Resolve template if templateId is provided in the original request
+        // Resolve template if the email content carries a templateId.
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
-        if (request?.templateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+        const emailTemplateId = emailPayload.content?.templateId
+        if (emailTemplateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
-            const template = await templatesRepository.findById(tenantId, request.templateId)
+            const template = await templatesRepository.findById(tenantId, emailTemplateId)
             if (!template) {
               throw new NotFoundException(
-                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+                `Template '${emailTemplateId}' not found for tenant '${tenantId}'`,
               )
             }
 

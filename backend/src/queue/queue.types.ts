@@ -81,7 +81,7 @@ export interface DeliveryJobPayload {
   notifyId: string // Database notification_request.id
   tenantId: string
   channel: NotificationChannel
-  request: NotifyRequest // Original request (may contain templateId)
+  request: NotifyRequest // Original request (channels may carry a content.templateId)
   payload: DeliveryPayload // Channel-specific payload
   attempt: number
   bulk?: boolean // When true, this is one batch of a bulk email send

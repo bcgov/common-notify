@@ -130,7 +130,7 @@ async function handleEmailMerge(
 
   const response = {
     notifyId: notificationRecord.id,
-    templateId: email.templateId,
+    templateId: email.content?.templateId,
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
@@ -146,11 +146,11 @@ async function handleEmailMerge(
       const jobPayload = {
         notifyId: notificationRecord.id,
         tenantId,
-        request: { templateId: email.templateId },
+        request: { templateId: email.content?.templateId },
         requestedAt: new Date().toISOString(),
         bulk: true,
         bulkEmail: {
-          templateId: email.templateId,
+          templateId: email.content?.templateId,
           content: email.content,
           params: globalParams,
           recipients,

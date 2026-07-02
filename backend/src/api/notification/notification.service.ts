@@ -249,7 +249,7 @@ export class NotificationService {
 
     const email = dto.email
     const mergeArray = email?.recipients?.mergeArray ?? []
-    const templateId = email?.templateId
+    const templateId = email?.content?.templateId
     const hasInlineContent = !!(email?.content && (email.content.subject || email.content.body))
 
     const tenant = await this.tenantsService.findOne(tenantId)
@@ -448,30 +448,22 @@ export class NotificationService {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
-    // Validate template if templateId is provided
-    if (request.templateId) {
+    // Validate each channel's template. templateId lives in the channel's content, so each channel
+    // is validated against its own expected channel code.
+    const validateChannelTemplate = async (
+      templateId: string,
+      expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
+    ): Promise<void> => {
       try {
-        const template = await this.templatesRepository.findById(tenantId, request.templateId)
+        const template = await this.templatesRepository.findById(tenantId, templateId)
         if (!template) {
           errors.push(
-            `Template '${request.templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
+            `Template '${templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
           )
-        } else {
-          // Verify template has required channel codes for requested channels
-          const requestedChannels = []
-          if (request.email?.recipients) requestedChannels.push('EMAIL')
-          if (request.sms?.recipients) requestedChannels.push('SMS')
-          if (request.msgApp?.recipients) requestedChannels.push('MSGAPP')
-
-          const templateChannelCode = template.channelCode
-
-          for (const channel of requestedChannels) {
-            if (templateChannelCode !== channel) {
-              errors.push(
-                `Template '${request.templateId}' has channel code '${templateChannelCode}' but requested channel is '${channel}'.`,
-              )
-            }
-          }
+        } else if (template.channelCode !== expectedChannelCode) {
+          errors.push(
+            `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
+          )
         }
       } catch (error) {
         errors.push(
@@ -479,6 +471,14 @@ export class NotificationService {
         )
       }
     }
+
+    const emailTemplateId = request.email?.content?.templateId
+    const smsTemplateId = request.sms?.content?.templateId
+    const msgAppTemplateId = request.msgApp?.content?.templateId
+
+    if (emailTemplateId) await validateChannelTemplate(emailTemplateId, 'EMAIL')
+    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS')
+    if (msgAppTemplateId) await validateChannelTemplate(msgAppTemplateId, 'MSGAPP')
 
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.to?.length ?? 0
@@ -499,7 +499,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides subject/body)
-      if (!request.templateId) {
+      if (!emailTemplateId) {
         if (!request.email.content?.subject?.trim()) {
           errors.push('Email subject cannot be empty')
         }
@@ -537,7 +537,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides body)
-      if (!request.templateId) {
+      if (!smsTemplateId) {
         if (!request.sms.content?.body?.trim()) {
           errors.push('SMS body cannot be empty')
         }
@@ -560,7 +560,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides body)
-      if (!request.templateId) {
+      if (!msgAppTemplateId) {
         if (!request.msgApp.content?.body?.trim()) {
           errors.push('MsgApp body cannot be empty')
         }

@@ -97,8 +97,8 @@ describe('NotifyService', () => {
 
     it('should not render when templateId is specified (template-based rendering)', async () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-123',
         recipients: { to: ['test@example.com'] },
+        content: { templateId: 'template-123' },
       }
 
       const result = await service.renderEmailIfInline(channel)
@@ -204,9 +204,9 @@ describe('NotifyService', () => {
 
     it('should return null when templateId exists even with content', async () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-456',
         recipients: { to: ['test@example.com'] },
         content: {
+          templateId: 'template-456',
           subject: 'Subject',
           body: 'Body',
         },
@@ -246,8 +246,8 @@ describe('NotifyService', () => {
 
     it('should not render when templateId is specified', async () => {
       const channel: NotifySmsChannel = {
-        templateId: 'sms-template-123',
         recipients: { to: ['+12025551234'] },
+        content: { templateId: 'sms-template-123' },
       }
 
       const result = await service.renderSmsIfInline(channel)
@@ -304,9 +304,9 @@ describe('NotifyService', () => {
 
     it('should return null when templateId exists even with content', async () => {
       const channel: NotifySmsChannel = {
-        templateId: 'sms-template-789',
         recipients: { to: ['+12025551234'] },
         content: {
+          templateId: 'sms-template-789',
           body: 'Body',
         },
       }
@@ -345,8 +345,8 @@ describe('NotifyService', () => {
 
     it('should not render when templateId is specified', async () => {
       const channel: NotifyMsgAppChannel = {
-        templateId: 'msgapp-template-123',
         recipients: { to: ['user-456'] },
+        content: { templateId: 'msgapp-template-123' },
       }
 
       const result = await service.renderMsgAppIfInline(channel)
@@ -356,9 +356,9 @@ describe('NotifyService', () => {
     })
 
     it('should not render when content is missing', async () => {
-      const channel: NotifyMsgAppChannel = {
+      const channel = {
         recipients: { to: ['user-789'] },
-      }
+      } as NotifyMsgAppChannel
 
       const result = await service.renderMsgAppIfInline(channel)
 
@@ -403,9 +403,9 @@ describe('NotifyService', () => {
 
     it('should return null when templateId exists even with content', async () => {
       const channel: NotifyMsgAppChannel = {
-        templateId: 'msgapp-template-999',
         recipients: { to: ['user-123'] },
         content: {
+          templateId: 'msgapp-template-999',
           body: 'Body',
         },
       }
@@ -420,19 +420,16 @@ describe('NotifyService', () => {
   describe('rendering consistency', () => {
     it('should not call any rendering service methods when all channels have templates', async () => {
       const emailChannel: NotifyEmailChannel = {
-        templateId: 'email-template',
         recipients: { to: ['test@example.com'] },
-        content: { subject: 'Ignored', body: 'Ignored' },
+        content: { templateId: 'email-template', subject: 'Ignored', body: 'Ignored' },
       }
       const smsChannel: NotifySmsChannel = {
-        templateId: 'sms-template',
         recipients: { to: ['+12025551234'] },
-        content: { body: 'Ignored' },
+        content: { templateId: 'sms-template', body: 'Ignored' },
       }
       const msgAppChannel: NotifyMsgAppChannel = {
-        templateId: 'msgapp-template',
         recipients: { to: ['user-123'] },
-        content: { body: 'Ignored' },
+        content: { templateId: 'msgapp-template', body: 'Ignored' },
       }
 
       await service.renderEmailIfInline(emailChannel)
