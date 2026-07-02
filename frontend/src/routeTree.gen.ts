@@ -11,10 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as NotificationEventsRouteImport } from './routes/notification-events'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
-import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
@@ -30,24 +27,9 @@ const TemplateCreateRoute = TemplateCreateRouteImport.update({
   path: '/template-create',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationEventsRoute = NotificationEventsRouteImport.update({
-  id: '/notification-events',
-  path: '/notification-events',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
   id: '/not-authorized',
   path: '/not-authorized',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DistributionListsRoute = DistributionListsRouteImport.update({
-  id: '/distribution-lists',
-  path: '/distribution-lists',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -74,10 +56,7 @@ const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -86,10 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -99,10 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
@@ -113,10 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
     | '/admin/feature-flags'
@@ -125,10 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
     | '/admin/feature-flags'
@@ -137,10 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
     | '/admin/feature-flags'
@@ -150,10 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  DistributionListsRoute: typeof DistributionListsRoute
   NotAuthorizedRoute: typeof NotAuthorizedRoute
-  NotificationEventsRoute: typeof NotificationEventsRoute
-  SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
@@ -176,32 +137,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplateCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notification-events': {
-      id: '/notification-events'
-      path: '/notification-events'
-      fullPath: '/notification-events'
-      preLoaderRoute: typeof NotificationEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/not-authorized': {
       id: '/not-authorized'
       path: '/not-authorized'
       fullPath: '/not-authorized'
       preLoaderRoute: typeof NotAuthorizedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/distribution-lists': {
-      id: '/distribution-lists'
-      path: '/distribution-lists'
-      fullPath: '/distribution-lists'
-      preLoaderRoute: typeof DistributionListsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -238,10 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  DistributionListsRoute: DistributionListsRoute,
   NotAuthorizedRoute: NotAuthorizedRoute,
-  NotificationEventsRoute: NotificationEventsRoute,
-  SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,

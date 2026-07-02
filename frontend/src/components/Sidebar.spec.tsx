@@ -73,21 +73,7 @@ describe('Sidebar', () => {
     renderSidebar(null, ['NOTIFY_VIEWER'])
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /notification events/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /distribution lists/i })).toBeInTheDocument()
-  })
-
-  it('hides Settings for users without the NOTIFY_OPERATIONS_ADMIN role', () => {
-    renderSidebar(null, ['NOTIFY_VIEWER'])
-
-    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
-  })
-
-  it('shows Settings for NOTIFY_OPERATIONS_ADMIN users', () => {
-    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
-
-    expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
   })
 
   it('hides tenant pages when user has no CSTAR roles', () => {
