@@ -20,7 +20,7 @@ describe('TemplatesRepository', () => {
     subject: 'Welcome to {{siteName}}!',
     body: 'Hello {{userName}}, welcome!',
     engineCode: TemplateEngine.HANDLEBARS,
-    bodyType: 'html',
+    bodyType: 'markdown',
     version: 1,
     active: true,
     createdBy: 'user-123',
@@ -35,7 +35,7 @@ describe('TemplatesRepository', () => {
     version: 1,
     subject: 'Welcome to {{siteName}}!',
     body: 'Hello {{userName}}, welcome!',
-    bodyType: 'html',
+    bodyType: 'markdown',
     createdBy: 'user-123',
     createdAt: new Date(),
   } as TemplateVersion
@@ -470,7 +470,7 @@ describe('TemplatesRepository', () => {
         version: 2,
         subject: 'Subject',
         body: 'Body',
-        bodyType: 'html',
+        bodyType: 'markdown',
       }
 
       mockVersionRepository.create.mockReturnValue(mockTemplateVersion)
