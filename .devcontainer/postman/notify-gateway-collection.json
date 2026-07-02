@@ -1296,6 +1296,45 @@
           "response": []
         },
         {
+          "name": "Notify - Email Merge",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": {\n    \"mergeArray\": [\n      [\"to\", \"firstName\", \"lastName\"],\n      [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n      [\"test@example.com\", \"Bob\", \"Jones\"]\n    ]\n  },\n  \"content\": {\n    \"templateId\": \"{{email_merge_template_id}}\"\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple/email",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "v1", "notifysimple", "email"]
+            },
+            "description": "Send a mail-merge email. The `recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+          },
+          "response": []
+        },
+        {
           "name": "Notify - Simple Send Email Merge",
           "request": {
             "auth": {
@@ -1323,14 +1362,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Email Merge Test\",\n  \"templateId\": \"{{email_merge_template_id}}\",\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  },\n  \"mergeArray\": [\n    [\"to\", \"firstName\", \"lastName\"],\n    [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n    [\"test@example.com\", \"Bob\", \"Jones\"]\n  ]\n}"
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\n      \"mergeArray\": [\n        [\"to\", \"firstName\", \"lastName\"],\n        [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n        [\"test@example.com\", \"Bob\", \"Jones\"]\n      ]\n    },\n    \"content\": {\n      \"templateId\": \"{{email_merge_template_id}}\"\n    }\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
             },
             "url": {
-              "raw": "{{gateway_url}}/api/v1/notifysimple/bulk",
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
               "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "bulk"]
+              "path": ["api", "v1", "notifysimple"]
             },
-            "description": "Send a mail-merge email. The `mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+            "description": "Same mail-merge as \"Notify - Email Merge\", but sent through the base multi-channel route (`/api/v1/notifysimple`) like the other Simple Send routes — the mail-merge payload is wrapped in the `email` object. The `email.recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
           },
           "response": []
         },
