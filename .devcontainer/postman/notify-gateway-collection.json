@@ -824,13 +824,12 @@
                   }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/email",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/email",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "notifications",
                     "email"
@@ -869,13 +868,12 @@
                   }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/sms",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/sms",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "notifications",
                     "sms"
@@ -914,13 +912,12 @@
                   }
                 },
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/bulk",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/bulk",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "notifications",
                     "bulk"
@@ -945,12 +942,12 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/gcnotify/v2/notifications",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "notifications"
                   ],
@@ -1022,12 +1019,12 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/gcnotify/v2/templates",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/templates",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "templates"
                   ],
@@ -1058,13 +1055,12 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/template/{{gc_notify_template_id}}",
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/template/{{gc_notify_template_id}}",
                   "host": [
                     "{{gateway_url}}"
                   ],
                   "path": [
-                    "api",
-                    "gcnotify",
+                    "gcnotify-passthrough",
                     "v2",
                     "template",
                     "{{gc_notify_template_id}}"
