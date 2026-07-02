@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -19,8 +20,14 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplatesTemplateIdRouteImport } from './routes/templates/$templateId'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
+import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -71,6 +78,11 @@ const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   path: '/template-edit/$templateId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsageRoute = AdminUsageRouteImport.update({
+  id: '/admin/usage',
+  path: '/admin/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   id: '/admin/feature-flags',
   path: '/admin/feature-flags',
@@ -86,7 +98,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -99,7 +113,9 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -113,7 +129,9 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
@@ -128,7 +146,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
@@ -141,7 +161,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   id:
@@ -154,7 +176,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
     | '/templates/$templateId'
   fileRoutesById: FileRoutesById
@@ -168,12 +192,21 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
+  UsageRoute: typeof UsageRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminUsageRoute: typeof AdminUsageRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -244,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/usage': {
+      id: '/admin/usage'
+      path: '/admin/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/feature-flags': {
       id: '/admin/feature-flags'
       path: '/admin/feature-flags'
@@ -275,7 +315,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
+  UsageRoute: UsageRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminUsageRoute: AdminUsageRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
 }
 export const routeTree = rootRouteImport

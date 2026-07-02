@@ -14,6 +14,8 @@ import { BulkEmailRequest } from '../../api/notify/schemas/bulk-email-request'
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
+import type { ApiKeyUsageService } from '../../api/api-keys/api-key-usage.service'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 
 /**
  * Context required by the Queueable decorator.
@@ -24,7 +26,34 @@ export interface QueueableContext {
   attachmentValidationService: AttachmentValidationService
   attachmentProcessingService: AttachmentProcessingService
   notificationPubSubService?: NotificationPubSubService
+  apiKeyUsageService?: ApiKeyUsageService
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+/**
+ * Attribute accepted notifications against the authenticating API key's usage limits.
+ * Non-fatal: usage tracking must never block or fail an accepted send. Skipped when the
+ * request has no bound API key (e.g. no credential on the request) or the service is absent.
+ */
+async function recordAcceptedUsage(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  entries: Array<{ channel: string; count: number }>,
+): Promise<void> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+  const logger = new Logger('Queueable[usage]')
+  for (const { channel, count } of entries) {
+    if (count <= 0) continue
+    try {
+      await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+    } catch (error) {
+      logger.warn(
+        `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+  }
 }
 
 /**
@@ -63,6 +92,7 @@ async function handleBulkEmail(
   queueName: QueueName,
   tenantId: string,
   dto: BulkEmailRequest,
+  apiKeyConsumerId: string | undefined,
 ) {
   const logger = new Logger(`Queueable[${queueName}][bulk]`)
 
@@ -83,6 +113,11 @@ async function handleBulkEmail(
   logger.debug(
     `Bulk notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${addresses.length})`,
   )
+
+  // Attribute accepted bulk emails against the API key's usage limits (non-fatal).
+  await recordAcceptedUsage(ctx, apiKeyConsumerId, [
+    { channel: NotificationChannel.EMAIL, count: addresses.length },
+  ])
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
   const updateSvc = ctx.notificationPubSubService
@@ -276,6 +311,7 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
             queueName,
             tenantId,
             payload,
+            req?.apiKeyConsumerId,
           )
         }
 
@@ -356,6 +392,19 @@ export function Queueable(queueName: QueueName = QueueName.INGESTION) {
         if (processedPayload.email) channels.push('email')
         if (processedPayload.sms) channels.push('sms')
         if (processedPayload.msgApp) channels.push('msgApp')
+
+        // Attribute accepted notifications against the API key's usage limits (non-fatal).
+        // Counts primary (to) recipients per channel.
+        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, [
+          {
+            channel: NotificationChannel.EMAIL,
+            count: processedPayload.email?.recipients?.to?.length ?? 0,
+          },
+          {
+            channel: NotificationChannel.SMS,
+            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+          },
+        ])
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =

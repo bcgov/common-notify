@@ -431,3 +431,6 @@ api-gateway/generated/
 
 # Claude Code local preferences
 .claude/
+
+# Mac
+**/*.DS_Store

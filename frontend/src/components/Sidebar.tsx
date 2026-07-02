@@ -10,6 +10,7 @@ import UserService from '@/service/user-service'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
@@ -37,6 +38,11 @@ const navItems = [
     icon: <FolderOutlinedIcon />,
   },
   {
+    label: 'Usage & Limits',
+    to: '/usage',
+    icon: <SpeedOutlinedIcon />,
+  },
+  {
     label: 'Distribution Lists',
     to: '/distribution-lists',
     icon: <GroupsOutlinedIcon />,
@@ -56,6 +62,10 @@ const adminItems = {
       label: 'Feature Flags',
       to: '/admin/feature-flags',
     },
+    {
+      label: 'Usage & Limits',
+      to: '/admin/usage',
+    },
   ],
 } as const
 
@@ -71,6 +81,7 @@ const Sidebar: FC = () => {
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
   const showDashboard = cstarTenants.length > 0
   const showTemplates = cstarTenants.length > 0
+  const showUsage = cstarTenants.length > 0
   // Feature Flags requires NOTIFY_ADMIN (SSO)
   const showAdminFeatureFlags = isAdmin
 
@@ -104,7 +115,10 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Dashboard' && showDashboard) ||
             (item.label === 'Templates' && showTemplates) ||
-            (item.label !== 'Dashboard' && item.label !== 'Templates') // Always show non-conditional items
+            (item.label === 'Usage & Limits' && showUsage) ||
+            (item.label !== 'Dashboard' &&
+              item.label !== 'Templates' &&
+              item.label !== 'Usage & Limits') // Always show non-conditional items
 
           return shouldShow ? (
             <Link
@@ -145,6 +159,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Feature Flags</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/usage"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">Usage &amp; Limits</span>
                   </Link>
                 )}
               </div>
