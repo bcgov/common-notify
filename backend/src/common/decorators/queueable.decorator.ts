@@ -50,7 +50,7 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
 /**
  * Detect a mail-merge email payload: an email channel whose recipients use `mergeArray`. The global
  * ValidationPipe has already validated the body, so the presence of `email.recipients.mergeArray` is
- * sufficient to route the request through the bulk fan-out flow.
+ * sufficient to route the request through the mail merge fan-out flow.
  */
 function isEmailMergeRequest(payload: unknown): payload is NotifySimpleRequest {
   const email = (payload as NotifySimpleRequest | undefined)?.email
@@ -83,7 +83,7 @@ async function handleEmailMerge(
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }
 
-  const recipients = ctx.notificationService.parseBulkRecipients(mergeArray)
+  const recipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
 
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
@@ -148,8 +148,8 @@ async function handleEmailMerge(
         tenantId,
         request: { templateId: email.content?.templateId },
         requestedAt: new Date().toISOString(),
-        bulk: true,
-        bulkEmail: {
+        mailMerge: true,
+        mailMergeData: {
           templateId: email.content?.templateId,
           content: email.content,
           params: globalParams,
@@ -174,7 +174,7 @@ async function handleEmailMerge(
       await queue.add(jobPayload, queueOptions)
 
       logger.log(
-        `Bulk ingestion job enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,
+        `Mail merge ingestion job enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,
       )
 
       // For scheduled sends keep status as SCHEDULED; for immediate sends update to QUEUED
@@ -184,13 +184,16 @@ async function handleEmailMerge(
           updatedBy: 'system',
         })
       } catch (updateError) {
-        logger.error(`Failed to update status after queuing bulk job: ${notificationRecord.id}`, {
-          tenantId,
-          error: (updateError as Error).message,
-        })
+        logger.error(
+          `Failed to update status after queuing mail merge job: ${notificationRecord.id}`,
+          {
+            tenantId,
+            error: (updateError as Error).message,
+          },
+        )
       }
     } catch (queueError) {
-      logger.warn(`Failed to enqueue bulk job (will be retried): ${notificationRecord.id}`, {
+      logger.warn(`Failed to enqueue mail merge job (will be retried): ${notificationRecord.id}`, {
         tenantId,
         error: (queueError as Error).message,
       })

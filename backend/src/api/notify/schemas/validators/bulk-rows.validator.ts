@@ -4,7 +4,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator'
-import { BULK_EMAIL_ADDRESS_HEADER } from '../bulk-email.constants'
+import { BULK_EMAIL_ADDRESS_HEADER } from '../mail-merge.constants'
 
 /**
  * Validator constraint for the bulk-send `mergeArray` structure.

@@ -42,14 +42,14 @@ export interface NotificationRequest {
 }
 
 /**
- * Bulk email (mail-merge) payload carried by ingestion and delivery jobs for the
+ * Mail-merge payload carried by ingestion and delivery jobs for the
  * /notifysimple/email merge flow (a request whose email recipients use `mergeArray`).
  * On the ingestion job `recipients` holds every recipient; on a delivery job it holds only
  * the recipients of a single batch (identified by `batchId`). Content is rendered from either a
  * server `templateId` or inline `content`. `params` are global params applied when rendering;
  * per-recipient `params` override them on a per-key basis.
  */
-export interface BulkEmailJobData {
+export interface MailMergeJobData {
   templateId?: string
   content?: {
     subject?: string
@@ -70,8 +70,8 @@ export interface IngestionJobPayload {
   request: NotifyRequest
   requestedAt: string
   scheduledFor?: string // ISO datetime for delayed sends (optional).  Works by delaying the ingestion job, which in turn delays all downstream delivery jobs.  This simplifies handling of scheduled notifications by centralizing the scheduling logic in one place (ingestion worker) rather than needing to handle scheduling in each delivery worker.
-  bulk?: boolean // When true, this is a bulk email send and `bulkEmail` carries the recipients
-  bulkEmail?: BulkEmailJobData
+  mailMerge?: boolean // When true, this is an email merge send and `mailMergeData` carries the recipients
+  mailMergeData?: MailMergeJobData
 }
 
 /**
@@ -84,9 +84,9 @@ export interface DeliveryJobPayload {
   request: NotifyRequest // Original request (channels may carry a content.templateId)
   payload: DeliveryPayload // Channel-specific payload
   attempt: number
-  bulk?: boolean // When true, this is one batch of a bulk email send
-  batchId?: string // Identifies the batch within the parent notification_request (bulk only)
-  bulkEmail?: BulkEmailJobData // Recipients for this batch (bulk only)
+  mailMerge?: boolean // When true, this is one batch of an email merge send
+  batchId?: string // Identifies the batch within the parent notification_request (mail merge only)
+  mailMergeData?: MailMergeJobData // Recipients for this batch (mail merge only)
 }
 
 /**

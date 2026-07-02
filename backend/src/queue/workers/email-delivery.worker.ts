@@ -1,7 +1,7 @@
 import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
-import { DeliveryJobPayload, BulkEmailJobData } from '../queue.types'
+import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -92,11 +92,11 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
-        // Bulk batch: resolve the template once, then render + send per recipient individually.
-        if (job.data.bulk && job.data.bulkEmail && job.data.batchId) {
-          return await EmailDeliveryWorker.processBulkBatch(
+        // Mail merge batch: resolve the template once, then render + send per recipient individually.
+        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
+          return await EmailDeliveryWorker.processMailMergeBatch(
             job.data.batchId,
-            job.data.bulkEmail,
+            job.data.mailMergeData,
             notifyId,
             tenantId,
             logger,
@@ -330,7 +330,7 @@ export class EmailDeliveryWorker {
   }
 
   /**
-   * Process one batch of a bulk email send.
+   * Process one batch of a mail merge email send.
    *
    * Resolves the template ONCE and renders it ONCE with the global params (no per-recipient
    * personalization), then calls the email adapter once per individual address reusing that
@@ -339,9 +339,9 @@ export class EmailDeliveryWorker {
    * already-delivered addresses; only systemic errors (e.g. template not found) throw to trigger
    * a BullMQ retry of the whole batch.
    */
-  private static async processBulkBatch(
+  private static async processMailMergeBatch(
     batchId: string,
-    bulkEmail: BulkEmailJobData,
+    mailMergeData: MailMergeJobData,
     notifyId: string,
     tenantId: string,
     logger: Logger,
@@ -352,11 +352,11 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { templateId, content, params, recipients } = bulkEmail
+    const { templateId, content, params, recipients } = mailMergeData
 
-    // A bulk send renders from either a server template or inline content (systemic error if neither).
+    // A mail merge send renders from either a server template or inline content (systemic error if neither).
     if (!templateId && !(content && (content.subject || content.body))) {
-      throw new Error('Bulk email requires either a templateId or inline content')
+      throw new Error('Mail merge requires either a templateId or inline content')
     }
 
     // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
@@ -375,7 +375,9 @@ export class EmailDeliveryWorker {
       ? { ...content, renderer: content.renderer ?? ('handlebars' as const) }
       : null
 
-    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${recipients.length} recipient(s)`)
+    logger.debug(
+      `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
+    )
 
     let sent = 0
     let failed = 0
@@ -423,7 +425,7 @@ export class EmailDeliveryWorker {
         const errorMessage =
           recipientError instanceof Error ? recipientError.message : String(recipientError)
         logger.error(
-          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${recipient.address}): ${errorMessage}`,
+          `[${notifyId}] Mail merge recipient send failed (batch=${batchId}, address=${recipient.address}): ${errorMessage}`,
         )
         await requestDetailService.markRecipientFailed(
           notifyId,
@@ -435,7 +437,7 @@ export class EmailDeliveryWorker {
       }
     }
 
-    logger.log(`[${notifyId}] Bulk batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+    logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
 
     // Reconcile the parent request once no recipients remain pending across all batches.
     // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
@@ -456,7 +458,7 @@ export class EmailDeliveryWorker {
         updatedBy: 'email-delivery-worker',
       })
       logger.log(
-        `[${notifyId}] All bulk batches complete; parent marked ${finalStatus.toUpperCase()}`,
+        `[${notifyId}] All mail merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
       )
     }
 

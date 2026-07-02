@@ -767,8 +767,8 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: { key: 'val' },
               recipients,
@@ -830,8 +830,8 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: {},
               recipients: [
@@ -895,8 +895,8 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: {},
               recipients,

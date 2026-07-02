@@ -1,6 +1,6 @@
 import { IsArray, IsEmail, IsOptional, ArrayMaxSize } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { BULK_EMAIL_MAX_ROWS } from './bulk-email.constants'
+import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
 import { IsValidBulkRows } from './validators/bulk-rows.validator'
 
 export class NotifyEmailRecipients {
@@ -33,7 +33,7 @@ export class NotifyEmailRecipients {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(BULK_EMAIL_MAX_ROWS)
+  @ArrayMaxSize(MAIL_MERGE_MAX_ROWS)
   @IsValidBulkRows()
   mergeArray?: string[][]
 }

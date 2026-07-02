@@ -1097,9 +1097,9 @@ describe('EmailDeliveryWorker', () => {
           data: {
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
-            bulk: true,
+            mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
-            bulkEmail: {
+            mailMergeData: {
               templateId: 'template-uuid',
               params: {},
               recipients: addresses.map((address) => ({ address, params: {} })),
@@ -1148,7 +1148,7 @@ describe('EmailDeliveryWorker', () => {
         })
 
         const job = makeBulkJob(['alice@example.com'], {
-          bulkEmail: {
+          mailMergeData: {
             content: { subject: 'Hi', body: 'Dear {{firstname}}', bodyType: 'text' },
             params: {},
             recipients: [{ address: 'alice@example.com', params: { firstname: 'Alice' } }],

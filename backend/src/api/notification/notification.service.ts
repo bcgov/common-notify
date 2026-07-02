@@ -13,7 +13,7 @@ import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
-import { BULK_EMAIL_MAX_REPORTED_ERRORS } from '../notify/schemas/bulk-email.constants'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -127,18 +127,18 @@ export class NotificationService {
    * Extract channel code, recipients, and delayed send time from notification payload
    */
   /**
-   * Extract channel code, recipients, and delayed send time from a bulk email payload. Bulk sends
-   * are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
+   * Extract channel code, recipients, and delayed send time from a mail merge email payload. Mail merge
+   * sends are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
    * (mirroring how simple sends store their recipients on the parent request).
    */
-  private extractBulkChannelAndRecipients(payload: NotifySimpleRequest): {
+  private extractMailMergeChannelAndRecipients(payload: NotifySimpleRequest): {
     channel: string | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
   } {
     const email = payload.email
     const delayedSendTime = email?.delayedSend ? new Date(email.delayedSend) : null
-    const parsed = this.parseBulkRecipients(email?.recipients?.mergeArray ?? [])
+    const parsed = this.parseMailMergeRecipients(email?.recipients?.mergeArray ?? [])
     const addresses = parsed.map((r) => r.address)
     return {
       channel: 'EMAIL',
@@ -217,7 +217,7 @@ export class NotificationService {
     const { channel, recipients, delayedSendTime } = Array.isArray(
       dto.payload?.email?.recipients?.mergeArray,
     )
-      ? this.extractBulkChannelAndRecipients(dto.payload as NotifySimpleRequest)
+      ? this.extractMailMergeChannelAndRecipients(dto.payload as NotifySimpleRequest)
       : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
@@ -240,7 +240,7 @@ export class NotificationService {
   }
 
   /**
-   * Validate a bulk email request's business rules: the template must exist for the tenant and
+   * Validate a mail merge request's business rules: the template must exist for the tenant and
    * every row's email address must be well-formed. Returns a bounded list of error strings
    * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
    */
@@ -291,9 +291,9 @@ export class NotificationService {
 
     const seen = new Map<string, number>()
     for (let i = 1; i < mergeArray.length; i++) {
-      if (errors.length >= BULK_EMAIL_MAX_REPORTED_ERRORS) {
+      if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
         errors.push(
-          `Additional invalid rows omitted (showing first ${BULK_EMAIL_MAX_REPORTED_ERRORS})`,
+          `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`,
         )
         break
       }
@@ -321,7 +321,7 @@ export class NotificationService {
    * the recipient address (from the "to" column) and any extra columns as template params.
    * Per-recipient params take precedence over global params when rendering.
    */
-  parseBulkRecipients(
+  parseMailMergeRecipients(
     mergeArray: string[][],
   ): Array<{ address: string; params: Record<string, unknown> }> {
     const header = mergeArray[0] ?? []
