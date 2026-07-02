@@ -78,7 +78,7 @@ async function handleEmailMerge(
   // Global params cascade: request-level params augmented/overridden by channel-level params
   const globalParams = { ...dto.params, ...email.params }
 
-  const errors = await ctx.notificationService.validateEmailMergeRules(tenantId, dto)
+  const errors = await ctx.notificationService.validateMailMergeRules(tenantId, dto)
   if (errors.length > 0) {
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }

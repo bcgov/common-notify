@@ -244,7 +244,7 @@ export class NotificationService {
    * every row's email address must be well-formed. Returns a bounded list of error strings
    * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
    */
-  async validateEmailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
+  async validateMailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
     const errors: string[] = []
 
     const email = dto.email
