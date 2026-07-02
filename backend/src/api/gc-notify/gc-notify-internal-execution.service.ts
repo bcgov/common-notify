@@ -288,12 +288,6 @@ export class GcNotifyInternalExecutionService {
       payload: notifyRequest,
     })
 
-    await this.notificationRequestDetailService.createPending(
-      notificationRecord.id,
-      notifyRequest as any,
-      tenantId,
-    )
-
     const hasDelayedSend = !!scheduledFor
     const delayMs = hasDelayedSend
       ? Math.max(0, new Date(scheduledFor as string).getTime() - Date.now())
