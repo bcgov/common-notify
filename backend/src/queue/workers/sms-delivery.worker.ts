@@ -27,6 +27,16 @@ import { ISmsTransport } from '../../adapters'
 export class SmsDeliveryWorker {
   private readonly logger = new Logger(SmsDeliveryWorker.name)
 
+  private static normalizeTemplateBodyType(
+    bodyType: 'text' | 'markdown' | 'html' | undefined,
+  ): 'markdown' | undefined {
+    if (bodyType === 'markdown' || bodyType === 'text') {
+      return 'markdown'
+    }
+
+    return undefined
+  }
+
   /**
    * Initialize the SMS delivery worker on a queue
    * @param smsQueue The BullMQ queue instance for SMS delivery jobs
@@ -93,11 +103,11 @@ export class SmsDeliveryWorker {
             // Merge template content into SMS payload if channel matches
             if (template.channelCode === 'SMS') {
               // Render the template with personalisation data from request.params
-              // Use request's bodyType if provided, otherwise template's default
+              // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
                 request.params || {},
-                payload.content?.bodyType,
+                SmsDeliveryWorker.normalizeTemplateBodyType(payload.content?.bodyType),
               )
 
               resolvedPayload = {

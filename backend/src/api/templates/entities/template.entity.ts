@@ -100,11 +100,11 @@ export class Template {
   engine: TemplateEngineCode
 
   /**
-   * Body content type: 'text' (plain), 'markdown' (markdown→HTML), 'html' (raw HTML)
+   * Body content type: 'markdown' (markdown→HTML)
    * Determines rendering behavior during template rendering
    */
-  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'html', nullable: true })
-  bodyType?: 'text' | 'markdown' | 'html' | null
+  @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'markdown', nullable: true })
+  bodyType?: 'markdown' | null
 
   /**
    * Current version number

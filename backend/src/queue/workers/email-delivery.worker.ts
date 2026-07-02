@@ -35,6 +35,16 @@ type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
 
+  private static normalizeTemplateBodyType(
+    bodyType: 'text' | 'markdown' | 'html' | undefined,
+  ): 'markdown' | undefined {
+    if (bodyType === 'markdown' || bodyType === 'text') {
+      return 'markdown'
+    }
+
+    return undefined
+  }
+
   private static hasAttachmentReferences(
     attachments: unknown,
   ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
@@ -157,11 +167,11 @@ export class EmailDeliveryWorker {
             // Merge template content into email payload if channel matches
             if (template.channelCode === 'EMAIL') {
               // Render the template with personalisation data from request.params
-              // Use request's bodyType if provided, otherwise template's default
+              // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
                 request.params || {},
-                emailPayload.content?.bodyType,
+                EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
 
               emailPayload = {

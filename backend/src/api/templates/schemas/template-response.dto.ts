@@ -43,9 +43,9 @@ export class TemplateResponseDto {
 
   /**
    * Body content type
-   * @example "html"
+   * @example "markdown"
    */
-  bodyType?: 'text' | 'markdown' | 'html'
+  bodyType?: 'markdown'
 
   /**
    * Template rendering engine
