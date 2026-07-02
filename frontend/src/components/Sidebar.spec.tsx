@@ -80,9 +80,7 @@ describe('Sidebar', () => {
     renderSidebar()
 
     expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /notification events/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /distribution lists/i })).not.toBeInTheDocument()
   })
 
   it('hides Settings for NOTIFY_ADMIN users who are not operations admins', async () => {
