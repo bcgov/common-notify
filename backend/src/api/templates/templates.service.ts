@@ -5,7 +5,6 @@ import {
   ConflictException,
   Inject,
 } from '@nestjs/common'
-import MarkdownIt from 'markdown-it'
 import { Template } from './entities/template.entity'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -27,21 +26,12 @@ import type { ParsedListQuery } from '../../common/query/list-query.types'
  */
 @Injectable()
 export class TemplatesService {
-  private readonly markdown: MarkdownIt
-
   constructor(
     private readonly templatesRepository: TemplatesRepository,
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
     private readonly rendererRegistry: ITemplateRendererRegistry,
     private readonly tenantsService: TenantsService,
-  ) {
-    // Initialize markdown-it with safe defaults
-    this.markdown = new MarkdownIt({
-      html: true,
-      linkify: true,
-      typographer: false,
-    })
-  }
+  ) {}
 
   /**
    * List all active templates for a tenant
@@ -101,7 +91,7 @@ export class TemplatesService {
     }
 
     const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
-    const bodyType = engineCode === TemplateEngine.MJML ? null : (createDto.bodyType ?? 'html')
+    const bodyType = engineCode === TemplateEngine.MJML ? null : 'markdown'
 
     const template = await this.templatesRepository.create({
       tenantId,
@@ -181,7 +171,7 @@ export class TemplatesService {
     if (nextEngineCode === TemplateEngine.MJML) {
       template.bodyType = null
     } else {
-      template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'html'
+      template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'markdown'
     }
     template.updatedBy = userId
 
@@ -237,14 +227,14 @@ export class TemplatesService {
    * Returns raw body with bodyType flag - adapter will handle format conversion
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
-   * @param bodyType Optional override for body content type (text, markdown, html)
+   * @param bodyType Optional override for body content type
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
     template: Template,
     personalisation: Record<string, any> = {},
-    bodyType?: 'text' | 'markdown' | 'html',
-  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+    bodyType?: 'markdown',
+  ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
     // Convert all personalisation values to strings for template rendering
     const stringPersonalisation: Record<string, string> = {}
     for (const [key, value] of Object.entries(personalisation)) {
@@ -282,7 +272,10 @@ export class TemplatesService {
     const rendered = await renderer.renderEmail(renderContext)
 
     // Use provided bodyType or fall back to template's bodyType setting
-    const effectiveBodyType = bodyType ?? template.bodyType ?? 'html'
+    const effectiveBodyType =
+      bodyType ??
+      template.bodyType ??
+      (template.engineCode === TemplateEngine.MJML ? 'html' : 'markdown')
 
     // Return rendered content with bodyType flag for adapter to process
     return {
@@ -321,20 +314,6 @@ export class TemplatesService {
         return 'sms'
       default:
         return 'email' // default fallback
-    }
-  }
-
-  /**
-   * Render markdown to HTML
-   * Converts markdown-formatted text to HTML
-   * @param markdown The markdown text to convert
-   * @returns HTML-formatted text
-   */
-  private renderMarkdown(markdown: string): string {
-    try {
-      return this.markdown.render(markdown)
-    } catch (error) {
-      throw new BadRequestException(`Markdown rendering error: ${(error as Error).message}`)
     }
   }
 

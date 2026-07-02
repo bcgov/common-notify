@@ -15,7 +15,6 @@ export enum TemplateEngine {
 }
 
 export enum TemplateBodyType {
-  HTML = 'html',
   MARKDOWN = 'markdown',
 }
 

@@ -52,9 +52,9 @@ export class ChesEmailTransport implements IEmailTransport {
   private readonly markdown: MarkdownIt
 
   constructor(private readonly configService: ConfigService) {
-    // Initialize markdown-it with safe defaults
+    // Initialize markdown-it with HTML disabled so raw tags are not rendered.
     this.markdown = new MarkdownIt({
-      html: true,
+      html: false,
       linkify: true, // converst urls and links to clickable links
       typographer: true, // enables smart quotes and other typographic replacements
     })

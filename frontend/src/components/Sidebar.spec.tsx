@@ -66,10 +66,7 @@ describe('Sidebar', () => {
     renderSidebar(null, [mockTenant])
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /notification events/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /distribution lists/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

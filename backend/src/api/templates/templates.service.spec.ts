@@ -20,7 +20,7 @@ describe('TemplatesService', () => {
     subject: 'Welcome to {{siteName}}!',
     body: 'Hello {{userName}}, welcome!',
     engineCode: TemplateEngine.HANDLEBARS,
-    bodyType: 'html',
+    bodyType: 'markdown',
     version: 1,
     active: true,
     createdBy: 'user-123',
@@ -59,6 +59,7 @@ describe('TemplatesService', () => {
     subject: undefined,
     body: 'Your code is {{code}}',
     engineCode: TemplateEngine.MJML,
+    bodyType: null,
   }
 
   const mockRepository = {
@@ -99,7 +100,7 @@ describe('TemplatesService', () => {
   })
 
   describe('renderTemplateContent', () => {
-    it('should render template and return with bodyType', async () => {
+    it('should render template and return with markdown bodyType', async () => {
       const result = await service.renderTemplateContent(mockTemplate, {
         userName: 'John',
         siteName: 'MyApp',
@@ -107,7 +108,7 @@ describe('TemplatesService', () => {
 
       expect(result.subject).toBe('Welcome to MyApp!')
       expect(result.body).toBe('Hello John, welcome!')
-      expect(result.bodyType).toBe('html')
+      expect(result.bodyType).toBe('markdown')
     })
 
     it('should fall back to html when stored MJML bodyType is null', async () => {
@@ -273,7 +274,7 @@ describe('TemplatesService', () => {
       )
     })
 
-    it('should default bodyType to html if not provided', async () => {
+    it('should default bodyType to markdown if not provided', async () => {
       const createDto = {
         name: 'Test Template',
         description: 'Test',
@@ -286,7 +287,7 @@ describe('TemplatesService', () => {
       mockRepository.create.mockResolvedValue({
         ...mockTemplate,
         ...createDto,
-        bodyType: 'html',
+        bodyType: 'markdown',
       })
       mockRepository.createVersion.mockResolvedValue({})
 
@@ -294,7 +295,7 @@ describe('TemplatesService', () => {
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          bodyType: 'html',
+          bodyType: 'markdown',
         }),
       )
     })
