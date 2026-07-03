@@ -7,11 +7,12 @@ import {
   updateTemplate,
   NotificationChannel,
   TemplateEngine,
-  TemplateBodyType,
 } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
 
 interface TemplateEditProps {
@@ -20,6 +21,8 @@ interface TemplateEditProps {
 
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
+  const { primaryRole } = useCstarRoles()
+  const isReadOnly = primaryRole === CstarRole.NOTIFY_VIEWER
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -27,18 +30,15 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     name: '',
     channelCode: NotificationChannel.EMAIL as string,
     engineCode: TemplateEngine.HANDLEBARS as string,
-    bodyType: '' as string,
     subject: '',
     body: '',
   })
   const [formErrors, setFormErrors] = useState({
     name: '',
     engineCode: '',
-    bodyType: '',
     subject: '',
     body: '',
   })
-  const isMjml = formData.engineCode === TemplateEngine.MJML
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -50,7 +50,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           name: data.name,
           channelCode: data.channelCode,
           engineCode: data.engineCode,
-          bodyType: data.bodyType || '',
           subject: data.subject || '',
           body: data.body || '',
         })
@@ -70,15 +69,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   }
 
   const validate = (): boolean => {
-    const errors = { name: '', engineCode: '', bodyType: '', subject: '', body: '' }
+    const errors = { name: '', engineCode: '', subject: '', body: '' }
     if (!formData.name.trim()) {
       errors.name = ' '
     }
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
-    }
-    if (!isMjml && !formData.bodyType) {
-      errors.bodyType = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
       errors.subject = ' '
@@ -100,9 +96,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
         engineCode: formData.engineCode as TemplateEngine,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
-        ...(!isMjml && formData.bodyType
-          ? { bodyType: formData.bodyType as TemplateBodyType }
-          : {}),
       })
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
@@ -137,7 +130,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   return (
     <div>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <PageHeading title="Edit reusable template" />
+        <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form onSubmit={handleSave}>
           <div className="mb-4 desc-above">
             <TextField
@@ -152,6 +145,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               value={formData.name}
               onChange={handleFieldChange('name')}
               style={{ maxWidth: '400px' }}
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.name}
               errorMessage={formErrors.name}
             />
@@ -193,10 +187,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 setFormData((prev) => ({
                   ...prev,
                   engineCode: value,
-                  bodyType: value === TemplateEngine.MJML ? '' : prev.bodyType,
                 }))
-                setFormErrors((prev) => ({ ...prev, engineCode: '', bodyType: '' }))
+                setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
@@ -215,34 +209,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             </RadioGroup>
           </div>
 
-          {!isMjml && (
-            <div className="mb-4 error-after-label">
-              <RadioGroup
-                label={
-                  (
-                    <>
-                      <strong>Body type</strong> (required)
-                    </>
-                  ) as any
-                }
-                value={formData.bodyType}
-                onChange={(value) => {
-                  setFormData((prev) => ({ ...prev, bodyType: value }))
-                  setFormErrors((prev) => ({ ...prev, bodyType: '' }))
-                }}
-                isInvalid={!!formErrors.bodyType}
-                errorMessage={formErrors.bodyType}
-              >
-                <Radio key="html" value={TemplateBodyType.HTML}>
-                  HTML
-                </Radio>
-                <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
-                  Markdown
-                </Radio>
-              </RadioGroup>
-            </div>
-          )}
-
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="mb-4 desc-above">
               <TextField
@@ -257,6 +223,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 value={formData.subject}
                 onChange={handleFieldChange('subject')}
                 style={{ width: '100%' }}
+                isDisabled={isReadOnly}
                 isInvalid={!!formErrors.subject}
                 errorMessage={formErrors.subject}
               />
@@ -272,7 +239,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               className={`form-control${formErrors.body ? ' is-invalid' : ''}`}
               value={formData.body}
               onChange={(e) => handleFieldChange('body')(e.target.value)}
-              style={{ width: '100%', height: '16rem' }}
+              style={
+                isReadOnly
+                  ? { width: '100%', height: '16rem', color: '#9f9d9c', backgroundColor: '#EDEBE9' }
+                  : { width: '100%', height: '16rem' }
+              }
+              readOnly={isReadOnly}
             />
             {formErrors.body && (
               <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
@@ -280,15 +252,19 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
 
           <div className="d-flex justify-content-end gap-2">
-            <Button type="button" variant="secondary" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
-              Preview
-            </Button>
-            <Button type="submit" isDisabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <>
+              <Button type="button" variant="secondary" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+                Preview
+              </Button>
+              {!isReadOnly && (
+                <Button type="submit" isDisabled={saving}>
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              )}
+            </>
           </div>
         </form>
       </div>

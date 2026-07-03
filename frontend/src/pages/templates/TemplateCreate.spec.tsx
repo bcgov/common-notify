@@ -134,12 +134,8 @@ describe('TemplateCreate', () => {
     createTemplateMock.mockResolvedValue({})
   })
 
-  it('hides body type when MJML is selected', () => {
+  it('does not show body type choices', () => {
     render(<TemplateCreate />)
-
-    expect(screen.getByText('Body type')).toBeTruthy()
-
-    fireEvent.click(screen.getByLabelText('MJML'))
 
     expect(screen.queryByText('Body type')).toBeNull()
   })
@@ -177,6 +173,39 @@ describe('TemplateCreate', () => {
       engineCode: 'mjml',
       subject: 'Hello {{name}}',
       body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{name}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+    })
+  })
+
+  it('does not send bodyType when saving a non-MJML template', async () => {
+    render(<TemplateCreate />)
+
+    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Handlebars'))
+
+    const [titleInput, subjectInput, bodyTextarea] = screen.getAllByRole('textbox')
+
+    fireEvent.change(titleInput, {
+      target: { value: 'welcome template' },
+    })
+    fireEvent.change(subjectInput, {
+      target: { value: 'Welcome {{name}}' },
+    })
+    fireEvent.change(bodyTextarea, {
+      target: { value: '# Hello {{name}}' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(createTemplateMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(createTemplateMock).toHaveBeenCalledWith({
+      name: 'welcome template',
+      channelCode: 'EMAIL',
+      engineCode: 'handlebars',
+      subject: 'Welcome {{name}}',
+      body: '# Hello {{name}}',
     })
   })
 })

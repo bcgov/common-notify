@@ -2,12 +2,7 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react-components'
-import {
-  createTemplate,
-  NotificationChannel,
-  TemplateEngine,
-  TemplateBodyType,
-} from '@/api/templates.api'
+import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import '@/scss/components/templates.scss'
@@ -19,7 +14,6 @@ const TemplateCreate: FC = () => {
     name: '',
     channelCode: '' as string,
     engineCode: '' as string,
-    bodyType: '' as string,
     subject: '',
     body: '',
   })
@@ -27,13 +21,11 @@ const TemplateCreate: FC = () => {
     name: '',
     channelCode: '',
     engineCode: '',
-    bodyType: '',
     subject: '',
     body: '',
   })
 
   const isSaveDisabled = saving || !formData.name.trim()
-  const isMjml = formData.engineCode === TemplateEngine.MJML
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -45,7 +37,6 @@ const TemplateCreate: FC = () => {
       name: '',
       channelCode: '',
       engineCode: '',
-      bodyType: '',
       subject: '',
       body: '',
     }
@@ -57,9 +48,6 @@ const TemplateCreate: FC = () => {
     }
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
-    }
-    if (!isMjml && !formData.bodyType) {
-      errors.bodyType = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
       errors.subject = ' '
@@ -82,9 +70,6 @@ const TemplateCreate: FC = () => {
         engineCode: formData.engineCode as TemplateEngine,
         subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
         body: formData.body,
-        ...(!isMjml && formData.bodyType
-          ? { bodyType: formData.bodyType as TemplateBodyType }
-          : {}),
       })
       showSuccessToast('Template created successfully')
       navigate({ to: '/templates' })
@@ -166,12 +151,10 @@ const TemplateCreate: FC = () => {
                 setFormData((prev) => ({
                   ...prev,
                   engineCode: value,
-                  bodyType: value === TemplateEngine.MJML ? '' : prev.bodyType,
                 }))
                 setFormErrors((prev) => ({
                   ...prev,
                   engineCode: '',
-                  bodyType: '',
                 }))
               }}
               isInvalid={!!formErrors.engineCode}
@@ -191,34 +174,6 @@ const TemplateCreate: FC = () => {
               </Radio>
             </RadioGroup>
           </div>
-
-          {!isMjml && (
-            <div className="mb-4 error-after-label">
-              <RadioGroup
-                label={
-                  (
-                    <>
-                      <strong>Body type</strong> (required)
-                    </>
-                  ) as any
-                }
-                value={formData.bodyType}
-                onChange={(value) => {
-                  setFormData((prev) => ({ ...prev, bodyType: value }))
-                  setFormErrors((prev) => ({ ...prev, bodyType: '' }))
-                }}
-                isInvalid={!!formErrors.bodyType}
-                errorMessage={formErrors.bodyType}
-              >
-                <Radio key="html" value={TemplateBodyType.HTML}>
-                  HTML
-                </Radio>
-                <Radio key="markdown" value={TemplateBodyType.MARKDOWN}>
-                  Markdown
-                </Radio>
-              </RadioGroup>
-            </div>
-          )}
 
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="mb-4 desc-above">

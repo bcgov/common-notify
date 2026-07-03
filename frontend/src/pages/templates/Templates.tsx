@@ -9,6 +9,7 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
 
 const columns: TableColumn<TemplateResponse>[] = [
   {
@@ -82,6 +83,7 @@ const Templates: FC = () => {
     isLoading,
   } = useAppSelector((state) => state.templates)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const { canEdit } = useCstarRoles()
   const [searchInput, setSearchInput] = useState(search)
 
   useEffect(() => {
@@ -123,7 +125,9 @@ const Templates: FC = () => {
           </button>
         </div>
         <div className="col-auto ms-auto">
-          <Button onPress={() => navigate({ to: '/template-create' })}>Create New Template</Button>
+          <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
+            Create New Template
+          </Button>
         </div>
       </div>
 
