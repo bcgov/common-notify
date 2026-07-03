@@ -348,10 +348,16 @@ export class EmailDeliveryWorker {
     emailQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId } = job.data
       logger.debug(`[${notifyId}] Email delivery job completed`)
-      structuredLogger?.logQueueOperation('complete', emailQueue.name, job.id?.toString(), notifyId, {
-        channel: 'email',
-        context: workerContext,
-      })
+      structuredLogger?.logQueueOperation(
+        'complete',
+        emailQueue.name,
+        job.id?.toString(),
+        notifyId,
+        {
+          channel: 'email',
+          context: workerContext,
+        },
+      )
     })
 
     emailQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
