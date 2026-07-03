@@ -61,6 +61,13 @@ export interface PaginatedAdminUsageResponse {
   totalPages: number
 }
 
+export interface UpdateTenantLimitsRequest {
+  tenantId: string
+  channel: string
+  dailyLimit: number
+  annualLimit: number
+}
+
 /**
  * Get current usage vs configured limits for the selected tenant.
  */
@@ -119,6 +126,21 @@ export async function getAllTenantsUsage(
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
+  }
+}
+
+/**
+ * Update a tenant's daily and annual limits for a channel. Requires NOTIFY_ADMIN.
+ * Returns the tenant's refreshed usage rows.
+ */
+export async function updateTenantLimits(
+  data: UpdateTenantLimitsRequest,
+): Promise<AdminTenantUsageRow[]> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/limits', data)
+    return await patch<AdminTenantUsageRow[]>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenant limits')
   }
 }
 

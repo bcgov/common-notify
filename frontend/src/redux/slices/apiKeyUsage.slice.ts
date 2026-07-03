@@ -9,6 +9,7 @@ import {
   fetchApiKeyUsage,
   fetchApiKeyUsageHistory,
   fetchAllTenantsUsage,
+  updateTenantLimits,
   updateThreshold,
 } from '../thunks/apiKeyUsage.thunks'
 
@@ -31,6 +32,9 @@ interface ApiKeyUsageState {
   adminSearch: string
   adminCount: number
   adminTotalPages: number
+  // Key (`${tenantId}-${channel}`) currently being saved via the admin limit editor
+  adminUpdatingKey: string | null
+  adminUpdateError: string | null
 }
 
 const initialState: ApiKeyUsageState = {
@@ -51,6 +55,8 @@ const initialState: ApiKeyUsageState = {
   adminSearch: '',
   adminCount: 0,
   adminTotalPages: 0,
+  adminUpdatingKey: null,
+  adminUpdateError: null,
 }
 
 export const apiKeyUsageSlice = createSlice({
@@ -114,6 +120,24 @@ export const apiKeyUsageSlice = createSlice({
       .addCase(fetchAllTenantsUsage.rejected, (state, action) => {
         state.adminLoading = false
         state.adminError = action.payload ?? 'Failed to load tenant usage'
+      })
+      // Update tenant limits (admin) — merge the returned rows in place
+      .addCase(updateTenantLimits.pending, (state, action) => {
+        state.adminUpdatingKey = `${action.meta.arg.tenantId}-${action.meta.arg.channel}`
+        state.adminUpdateError = null
+      })
+      .addCase(updateTenantLimits.fulfilled, (state, action) => {
+        const updated = new Map(
+          action.payload.map((row) => [`${row.tenantId}-${row.channel}`, row]),
+        )
+        state.adminRows = state.adminRows.map(
+          (row) => updated.get(`${row.tenantId}-${row.channel}`) ?? row,
+        )
+        state.adminUpdatingKey = null
+      })
+      .addCase(updateTenantLimits.rejected, (state, action) => {
+        state.adminUpdatingKey = null
+        state.adminUpdateError = action.payload ?? 'Failed to update limits'
       })
       // Update threshold
       .addCase(updateThreshold.pending, (state, action) => {

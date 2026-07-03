@@ -4,12 +4,15 @@ import {
   getApiKeyUsageHistory,
   getAllTenantsUsage,
   updateApiKeyThreshold,
+  updateTenantLimits as updateTenantLimitsApi,
 } from '@/api/apiKeyUsage.api'
 import type {
   TenantUsageResponse,
   UsageHistoryEntry,
   UpdateThresholdRequest,
   PaginatedAdminUsageResponse,
+  UpdateTenantLimitsRequest,
+  AdminTenantUsageRow,
 } from '@/api/apiKeyUsage.api'
 import type { RootState } from '../store'
 
@@ -53,6 +56,18 @@ export const fetchAllTenantsUsage = createAsyncThunk<
     return await getAllTenantsUsage(adminPage, adminLimit, adminSearch || undefined)
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load tenant usage')
+  }
+})
+
+export const updateTenantLimits = createAsyncThunk<
+  AdminTenantUsageRow[],
+  UpdateTenantLimitsRequest,
+  { rejectValue: string }
+>('apiKeyUsage/updateTenantLimits', async (payload, { rejectWithValue }) => {
+  try {
+    return await updateTenantLimitsApi(payload)
+  } catch (error) {
+    return rejectWithValue(error instanceof Error ? error.message : 'Failed to update limits')
   }
 })
 

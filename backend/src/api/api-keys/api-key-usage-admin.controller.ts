@@ -1,10 +1,14 @@
-import { Controller, Get, Query, UseGuards, Version } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Query, Req, Request, UseGuards, Version } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
 import { ApiKeyUsageService } from './api-key-usage.service'
-import { PaginatedAdminUsageResponseDto } from './dto/tenant-usage-response.dto'
+import {
+  AdminTenantUsageRowDto,
+  PaginatedAdminUsageResponseDto,
+} from './dto/tenant-usage-response.dto'
+import { UpdateTenantLimitsDto } from './dto/update-tenant-limits.dto'
 
 /**
  * Admin API Controller for notification usage across all tenants.
@@ -43,5 +47,24 @@ export class ApiKeyUsageAdminController {
       limit: limit ? parseInt(limit, 10) : undefined,
       search,
     })
+  }
+
+  @Version('1')
+  @Patch('limits')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "Update a tenant's daily and annual limits for a channel (admin only)" })
+  @ApiOkResponse({ type: [AdminTenantUsageRowDto] })
+  updateTenantLimits(
+    @Req() req: Request,
+    @Body() dto: UpdateTenantLimitsDto,
+  ): Promise<AdminTenantUsageRowDto[]> {
+    const updatedBy = (req as any).user?.sub as string | undefined
+    return this.apiKeyUsageService.updateTenantLimits(
+      dto.tenantId,
+      dto.channel,
+      dto.dailyLimit,
+      dto.annualLimit,
+      updatedBy,
+    )
   }
 }

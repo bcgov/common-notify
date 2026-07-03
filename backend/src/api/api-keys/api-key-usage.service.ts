@@ -218,6 +218,40 @@ export class ApiKeyUsageService {
   }
 
   /**
+   * Update a tenant's daily and annual limits for a channel (admin only). Applies the same
+   * values to every API key the tenant has on that channel. Returns the tenant's refreshed
+   * usage rows so the admin table can update in place.
+   */
+  async updateTenantLimits(
+    tenantId: string,
+    channel: string,
+    dailyLimit: number,
+    annualLimit: number,
+    updatedBy?: string,
+  ): Promise<AdminTenantUsageRowDto[]> {
+    const consumerIds = await this.getConsumerIds(tenantId)
+    if (consumerIds.length === 0) {
+      throw new NotFoundException('No API keys are bound to this tenant')
+    }
+
+    const result = await this.apiKeyLimitRepository.update(
+      { apiKeyConsumerId: In(consumerIds), channelCode: channel },
+      { dailyLimit, annualLimit, updatedBy, updatedAt: new Date() },
+    )
+
+    if (!result.affected) {
+      throw new NotFoundException(`No ${channel} limits are configured for this tenant`)
+    }
+
+    this.logger.log(
+      `Updated ${channel} limits (daily=${dailyLimit}, annual=${annualLimit}) for tenant ${tenantId}` +
+        (updatedBy ? ` by ${updatedBy}` : ''),
+    )
+
+    return this.buildUsageRows([tenantId])
+  }
+
+  /**
    * Usage vs limits for every tenant, one row per (tenant, channel). For the
    * NOTIFY_ADMIN all-tenants view. Values are aggregated across each tenant's API keys.
    */
