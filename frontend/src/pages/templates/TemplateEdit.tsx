@@ -13,13 +13,6 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import '@/scss/components/templates.scss'
 
-const renderRequiredLabel = (label: string) => (
-  <>
-    <span className="template-form__label-text">{label}</span>
-    <span className="template-form__required-text">(required)</span>
-  </>
-)
-
 interface TemplateEditProps {
   templateId: string
 }
@@ -137,12 +130,13 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
         <form className="template-form" onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">
             <TextField
-              label={renderRequiredLabel('Template title') as any}
+              label="Template title"
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
               onChange={handleFieldChange('name')}
               className="template-form__field"
               size="small"
+              isRequired
               isInvalid={!!formErrors.name}
               errorMessage={formErrors.name}
             />
@@ -151,9 +145,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           <div className="template-form__section template-form__section--template-type">
             <RadioGroup
               className="template-form__radio-group"
-              label={renderRequiredLabel('Template type') as any}
+              label="Template type"
               value={formData.channelCode}
               onChange={(value) => setFormData((prev) => ({ ...prev, channelCode: value }))}
+              isRequired
               isDisabled
             >
               <Radio key="email" value={NotificationChannel.EMAIL}>
@@ -168,12 +163,13 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           {formData.channelCode === NotificationChannel.EMAIL && (
             <div className="template-form__section template-form__section--subject">
               <TextField
-                label={renderRequiredLabel('Subject line of the email') as any}
+                label="Subject line of the email"
                 description="Use a subject line that clearly describes the email content."
                 value={formData.subject}
                 onChange={handleFieldChange('subject')}
                 className="template-form__field template-form__field--full"
                 size="small"
+                isRequired
                 isInvalid={!!formErrors.subject}
                 errorMessage={formErrors.subject}
               />
@@ -183,7 +179,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           <div className="template-form__section template-form__section--syntax-type error-after-label">
             <RadioGroup
               className="template-form__radio-group"
-              label={renderRequiredLabel('Syntax type') as any}
+              label="Syntax type"
               description="Choose the syntax used for dynamic variables and placeholders in this template."
               value={formData.engineCode}
               onChange={(value) => {
@@ -193,6 +189,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 }))
                 setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
+              isRequired
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
@@ -216,8 +213,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               htmlFor="body"
               className="bcds-react-aria-TextField--Label template-form__body-label"
             >
-              <span className="template-form__label-text">Template body</span>
-              <span className="template-form__required-text">(required)</span>
+              Template body (required)
             </label>
             <textarea
               aria-label="Template body (required)"

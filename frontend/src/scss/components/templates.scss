@@ -76,13 +76,7 @@
 .template-form__section .bcds-react-aria-TextField--Label,
 .template-form__section .bcds-react-aria-RadioGroup--label,
 .template-form__body-label {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
   padding: 7px 0;
-}
-
-.template-form__label-text {
   color: #474543;
   font-family: 'BC Sans', sans-serif;
   font-size: 16px;
@@ -90,9 +84,8 @@
   line-height: 27px;
 }
 
-.template-form__required-text {
+.template-form__section .bcds-react-aria-TextField--Label .required {
   color: #2d2d2d;
-  font-family: 'BC Sans', sans-serif;
   font-size: 14px;
   font-weight: 400;
   line-height: 21px;
