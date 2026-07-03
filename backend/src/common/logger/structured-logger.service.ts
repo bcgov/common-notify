@@ -16,8 +16,14 @@ export interface LogContext {
 /**
  * Structured JSON Logger Service
  *
- * Outputs logs in JSON format for Loki/Grafana ingestion
- * Includes notification-specific context fields for querying
+ * The single application-wide logger. Installed as the Nest app logger in
+ * app.ts (via app.useLogger), so every `new Logger(context)` call across the
+ * codebase and every framework log routes through winston here.
+ *
+ * - Outputs JSON for Loki/Grafana ingestion in production/k8s
+ * - Pretty console output in local development
+ * - Adds notification-specific context fields for querying, plus typed
+ *   domain helpers (logNotification*, logQueueOperation, ...)
  */
 @Injectable()
 export class StructuredLoggerService implements LoggerService {
@@ -49,7 +55,7 @@ export class StructuredLoggerService implements LoggerService {
     )
 
     // Configure transports
-    const transports: winston.transport[] = [new winston.transports.Console()]
+    const transports: winston.transport[] = [new winston.transports.Console({ level: 'silly' })]
 
     // Add Loki transport in Kubernetes/production
     if (isProduction) {
@@ -57,6 +63,15 @@ export class StructuredLoggerService implements LoggerService {
       const namespace = process.env.NAMESPACE || 'f6bc3f-dev'
       const podName = process.env.HOSTNAME || 'unknown'
       const instanceLabel = process.env.INSTANCE_LABEL || 'common-notify-dev'
+
+      // Determine environment from namespace
+      const environment = namespace.includes('-dev')
+        ? 'dev'
+        : namespace.includes('-test')
+          ? 'test'
+          : namespace.includes('-prod')
+            ? 'prod'
+            : 'unknown'
 
       transports.push(
         new LokiTransport({
@@ -66,11 +81,15 @@ export class StructuredLoggerService implements LoggerService {
             namespace: namespace,
             pod: podName,
             app: 'backend',
+            environment: environment,
             app_kubernetes_io_instance: instanceLabel,
           },
           json: true,
           format: winston.format.json(),
           replaceTimestamp: true,
+          interval: 5, // Flush logs every 5 seconds
+          batching: true,
+          clearOnError: true,
           onConnectionError: (err) => {
             console.error('Loki connection error:', err)
           },
@@ -79,7 +98,7 @@ export class StructuredLoggerService implements LoggerService {
     }
 
     this.logger = winston.createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      level: process.env.LOG_LEVEL || 'debug',
       format: isProduction ? jsonFormat : prettyFormat,
       transports: transports,
       exitOnError: false,
@@ -87,10 +106,22 @@ export class StructuredLoggerService implements LoggerService {
   }
 
   /**
-   * Set context for all logs from this logger instance
+   * Set the default context for logs from this logger instance
    */
   setContext(context: string) {
     this.context = context
+  }
+
+  /**
+   * Normalize the caller-supplied context.
+   *
+   * Nest's LoggerService calls methods with a plain string context (the class
+   * name), whereas our own code passes a structured LogContext object. Coerce
+   * a bare string into `{ context }` so both paths produce the same shape.
+   */
+  private toContext(context?: LogContext | string): LogContext | undefined {
+    if (context === undefined || context === null) return undefined
+    return typeof context === 'string' ? { context } : context
   }
 
   /**
@@ -130,7 +161,7 @@ export class StructuredLoggerService implements LoggerService {
         }
       }
 
-      // Add any additional fields
+      // Add any additional fields (a `context` key overrides the default)
       Object.keys(logContext).forEach((key) => {
         if (
           ![
@@ -154,54 +185,70 @@ export class StructuredLoggerService implements LoggerService {
   /**
    * Debug level logging
    */
-  debug(message: string, context?: LogContext) {
-    this.writeLog('debug', message, context)
+  debug(message: string, context?: LogContext | string) {
+    this.writeLog('debug', message, this.toContext(context))
   }
 
   /**
    * Info level logging
    */
-  log(message: string, context?: LogContext) {
-    this.writeLog('info', message, context)
+  log(message: string, context?: LogContext | string) {
+    this.writeLog('info', message, this.toContext(context))
   }
 
   /**
    * Info level logging (alias for log)
    */
-  info(message: string, context?: LogContext) {
-    this.writeLog('info', message, context)
+  info(message: string, context?: LogContext | string) {
+    this.writeLog('info', message, this.toContext(context))
   }
 
   /**
    * Warning level logging
    */
-  warn(message: string, context?: LogContext) {
-    this.writeLog('warn', message, context)
+  warn(message: string, context?: LogContext | string) {
+    this.writeLog('warn', message, this.toContext(context))
   }
 
   /**
-   * Error level logging
+   * Error level logging.
+   *
+   * Nest calls this as `error(message, stack, context)` with string args, while
+   * our own code calls `error(message, logContext)` with a structured object.
    */
-  error(message: string, context?: LogContext) {
-    this.writeLog('error', message, context)
+  error(message: string, context?: LogContext | string, nestContext?: string) {
+    if (typeof context === 'string') {
+      this.writeLog('error', message, { context: nestContext, stack: context })
+      return
+    }
+    this.writeLog('error', message, this.toContext(context))
   }
 
   /**
    * Verbose level logging (mapped to debug)
    */
-  verbose(message: string, context?: LogContext) {
-    this.writeLog('debug', message, context)
+  verbose(message: string, context?: LogContext | string) {
+    this.writeLog('debug', message, this.toContext(context))
   }
 
   /**
-   * Helper: Log notification processing started
+   * Helper: Log notification processing started.
+   *
+   * `context` (optional) overrides the log's context label, e.g. the worker
+   * name, so the source is preserved on the shared logger instance.
    */
-  logNotificationStart(notificationId: string, tenantId: string, channel: 'email' | 'sms') {
+  logNotificationStart(
+    notificationId: string,
+    tenantId: string,
+    channel: 'email' | 'sms',
+    context?: string,
+  ) {
     this.info('Notification processing started', {
       notificationId,
       tenantId,
       channel,
       status: 'processing',
+      ...(context ? { context } : {}),
     })
   }
 
@@ -214,6 +261,7 @@ export class StructuredLoggerService implements LoggerService {
     channel: 'email' | 'sms',
     gcNotifyId: string,
     duration: number,
+    context?: string,
   ) {
     this.info('Notification delivered successfully', {
       notificationId,
@@ -222,6 +270,7 @@ export class StructuredLoggerService implements LoggerService {
       status: 'success',
       gcNotifyId,
       duration,
+      ...(context ? { context } : {}),
     })
   }
 
@@ -234,6 +283,7 @@ export class StructuredLoggerService implements LoggerService {
     channel: 'email' | 'sms',
     error: Error | string,
     duration?: number,
+    context?: string,
   ) {
     this.error('Notification delivery failed', {
       notificationId,
@@ -242,6 +292,7 @@ export class StructuredLoggerService implements LoggerService {
       status: 'failed',
       error,
       duration,
+      ...(context ? { context } : {}),
     })
   }
 
@@ -259,7 +310,10 @@ export class StructuredLoggerService implements LoggerService {
   }
 
   /**
-   * Helper: Log queue operation
+   * Helper: Log queue operation.
+   *
+   * A `failed` operation is logged at `warn` so it surfaces for alerting; all
+   * other operations are informational.
    */
   logQueueOperation(
     operation: 'add' | 'process' | 'complete' | 'failed',
@@ -268,7 +322,8 @@ export class StructuredLoggerService implements LoggerService {
     notificationId?: string,
     context?: LogContext,
   ) {
-    this.info(`Queue ${operation}: ${queueName}`, {
+    const level = operation === 'failed' ? 'warn' : 'info'
+    this.writeLog(level, `Queue ${operation}: ${queueName}`, {
       operation,
       queueName,
       jobId,
