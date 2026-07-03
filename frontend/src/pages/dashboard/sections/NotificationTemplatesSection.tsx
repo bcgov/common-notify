@@ -5,6 +5,7 @@ import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 import { Link, useNavigate } from '@tanstack/react-router'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
 
 /**
  * Used on the Dashboard page
@@ -14,6 +15,7 @@ export const NotificationTemplatesSection: FC = () => {
   const navigate = useNavigate()
   const templates = useAppSelector((state) => state.templates.items)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const { canEdit } = useCstarRoles()
 
   useEffect(() => {
     dispatch(fetchTemplates())
@@ -22,7 +24,11 @@ export const NotificationTemplatesSection: FC = () => {
   return (
     <section className="mb-4">
       <PageSubHeading title="Notification Templates" />
-      <Button variant="primary" onPress={() => navigate({ to: '/template-create' })}>
+      <Button
+        variant="primary"
+        onPress={() => navigate({ to: '/template-create' })}
+        isDisabled={!canEdit}
+      >
         Create New Template
       </Button>
       <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
