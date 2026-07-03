@@ -4,7 +4,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
 export class NotifyContent {
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'ID of the template to render this content from. Mutually exclusive with inline content.',
+    description:
+      'ID of the template to render this content from. Mutually exclusive with inline content.',
   })
   @IsOptional()
   @IsUUID()
