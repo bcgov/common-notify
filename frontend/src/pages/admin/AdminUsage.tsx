@@ -7,7 +7,6 @@ import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyU
 import { setAdminPage, setAdminLimit, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
-import Card from '@/components/Card'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import NotAuthorized from '@/components/NotAuthorized'
