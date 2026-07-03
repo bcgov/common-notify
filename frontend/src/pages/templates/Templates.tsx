@@ -4,7 +4,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '@bcgov/design-system-react-components'
 import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { setPage, setLimit, setSearch } from '@/redux/slices/templates.slice'
+import { setPage, setLimit, setSearch, setSort, setFilter } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
@@ -15,6 +15,7 @@ const columns: TableColumn<TemplateResponse>[] = [
   {
     key: 'name',
     label: 'Template Title',
+    sortable: true,
     render: (_, row) => (
       <Link
         to={`/template-edit/$templateId`}
@@ -28,6 +29,11 @@ const columns: TableColumn<TemplateResponse>[] = [
   {
     key: 'channelCode',
     label: 'Template Type',
+    sortable: true,
+    filterOptions: [
+      { label: 'Email', value: 'EMAIL' },
+      { label: 'SMS', value: 'SMS' },
+    ],
     render: (_, row) => {
       const channelCode =
         row.channelCode.charAt(0).toUpperCase() + row.channelCode.slice(1).toLowerCase()
@@ -42,6 +48,8 @@ const columns: TableColumn<TemplateResponse>[] = [
   {
     key: 'createdAt',
     label: 'Initiated Date',
+    sortable: true,
+    sortType: 'date',
     render: (_, row) => {
       const formatted = new Date(row.createdAt).toLocaleString(undefined, {
         month: 'short',
@@ -57,6 +65,8 @@ const columns: TableColumn<TemplateResponse>[] = [
   {
     key: 'updatedAt',
     label: 'Last Updated Date',
+    sortable: true,
+    sortType: 'date',
     render: (_, row) => {
       const formatted = new Date(row.updatedAt).toLocaleString(undefined, {
         month: 'short',
@@ -80,7 +90,11 @@ const Templates: FC = () => {
     limit,
     count,
     search,
+    sortBy,
+    sortOrder,
+    filters,
     isLoading,
+    hasLoaded,
   } = useAppSelector((state) => state.templates)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
@@ -90,7 +104,7 @@ const Templates: FC = () => {
     if (selectedTenant) {
       dispatch(fetchTemplates())
     }
-  }, [page, limit, search, selectedTenant, dispatch])
+  }, [page, limit, search, sortBy, sortOrder, filters, selectedTenant, dispatch])
 
   function handleSearch() {
     dispatch(setSearch(searchInput))
@@ -100,6 +114,14 @@ const Templates: FC = () => {
   function handleLimitChange(newLimit: number) {
     dispatch(setLimit(newLimit))
     dispatch(fetchTemplates())
+  }
+
+  function handleSort(key: string, order: 'asc' | 'desc' | null) {
+    dispatch(setSort({ sortBy: order != null ? key : null, sortOrder: order }))
+  }
+
+  function handleFilter(key: string, values: string[]) {
+    dispatch(setFilter({ field: key, values }))
   }
 
   return (
@@ -139,7 +161,12 @@ const Templates: FC = () => {
         currentPage={page}
         pageSize={limit}
         totalCount={count}
-        isLoading={isLoading}
+        isLoading={isLoading && !hasLoaded}
+        sortBy={sortBy ?? undefined}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        activeFilters={filters}
+        onFilter={handleFilter}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
         onPageSizeChange={handleLimitChange}
         pageSizeOptions={[15, 30]}
