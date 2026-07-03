@@ -5,6 +5,7 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
 import cstarReducer from '@/redux/slices/cstar.slice'
+import userReducer from '@/redux/slices/user.slice'
 import Sidebar from './Sidebar'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -29,9 +30,9 @@ const mockUser = {
   displayName: 'Test User',
 }
 
-function makeStore(user: typeof mockUser | null = null, tenants: any[] = []) {
+function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
   return configureStore({
-    reducer: { auth: authReducer, cstar: cstarReducer },
+    reducer: { auth: authReducer, cstar: cstarReducer, user: userReducer },
     preloadedState: {
       auth: {
         user,
@@ -40,17 +41,24 @@ function makeStore(user: typeof mockUser | null = null, tenants: any[] = []) {
         error: null,
       },
       cstar: {
-        tenants,
+        tenants: [],
         isLoading: false,
         error: null,
+      },
+      user: {
+        current: cstarRoles.length > 0 ? ({ cstarRoles } as any) : null,
+        isLoading: false,
+        rolesLoading: false,
+        error: null,
+        rolesError: null,
       },
     },
   })
 }
 
-function renderSidebar(user: typeof mockUser | null = null, tenants: any[] = []) {
+function renderSidebar(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
   return render(
-    <Provider store={makeStore(user, tenants)}>
+    <Provider store={makeStore(user, cstarRoles)}>
       <Sidebar />
     </Provider>,
   )
@@ -61,12 +69,40 @@ describe('Sidebar', () => {
     vi.clearAllMocks()
   })
 
-  it('renders primary nav items when user has CSTAR tenants', () => {
-    const mockTenant = { id: 'tenant-1', name: 'Test Tenant' }
-    renderSidebar(null, [mockTenant])
+  it('renders primary nav items when user has CSTAR roles', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'])
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
+  })
+
+  it('hides tenant pages when user has no CSTAR roles', () => {
+    renderSidebar()
+
+    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument()
+  })
+
+  it('hides Settings for NOTIFY_ADMIN users who are not operations admins', async () => {
+    const UserService = (await import('@/service/user-service')).default
+    vi.mocked(UserService.hasRole).mockReturnValue(true)
+
+    renderSidebar()
+
+    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the Feature Flags admin link for NOTIFY_OPERATIONS_ADMIN users', async () => {
+    const user = userEvent.setup()
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
+
+    const adminButton = screen.getByRole('button', { name: /admin/i })
+    expect(adminButton).toBeInTheDocument()
+
+    await user.click(adminButton)
+
+    expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

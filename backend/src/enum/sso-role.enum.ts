@@ -4,5 +4,4 @@
  */
 export enum SsoRole {
   NOTIFY_ADMIN = 'NOTIFY_ADMIN',
-  NOTIFY_USER = 'NOTIFY_USER',
 }
