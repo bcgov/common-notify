@@ -2,9 +2,7 @@ import type { FC } from 'react'
 import { useAppSelector } from '@/redux/hooks'
 import PageHeading from '@/components/PageHeading'
 import { Col, Row } from 'react-bootstrap'
-import TestNotificationForm from '@/pages/dashboard/sections/TestNotificationForm'
 import { NotificationStatusSection } from '@/pages/dashboard/sections/NotificationStatusSection'
-import { NotificationEventsSection } from '@/pages/dashboard/sections/NotificationEventsSection'
 import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection'
 
 const Dashboard: FC = () => {
@@ -14,12 +12,8 @@ const Dashboard: FC = () => {
       <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
 
       <Row className="mb-5">
-        <Col md={7}>
+        <Col md={12}>
           <NotificationTemplatesSection />
-          <NotificationEventsSection />
-        </Col>
-        <Col md={5}>
-          <TestNotificationForm />
         </Col>
       </Row>
 

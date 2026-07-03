@@ -9,14 +9,6 @@ import tenantReducer from '@/redux/slices/tenant.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 
-vi.mock('@/pages/dashboard/sections/TestNotificationForm', () => ({
-  default: () => <div data-testid="test-notification-form" />,
-}))
-
-vi.mock('@/pages/dashboard/sections/NotificationEventsSection', () => ({
-  NotificationEventsSection: () => <div data-testid="notification-events-section" />,
-}))
-
 vi.mock('@/pages/dashboard/sections/NotificationTemplatesSection', () => ({
   NotificationTemplatesSection: () => <div data-testid="notification-templates-section" />,
 }))
