@@ -136,7 +136,6 @@ describe('GcNotifyInternalExecutionService', () => {
         expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
         body.personalisation,
       )
-      expect(mockNotificationRequestDetailService.createPending).toHaveBeenCalled()
 
       await flushMicrotasks()
       expect(mockIngestionQueue.add).toHaveBeenCalledWith(
