@@ -32,6 +32,12 @@ vi.mock('@/components/PageHeading', () => ({
 
 vi.mock('@bcgov/design-system-react-components', async () => {
   const React = await import('react')
+  type RadioOptionProps = {
+    value: string
+    checked?: boolean
+    onSelect?: (value: string) => void
+    disabled?: boolean
+  }
 
   const Button = ({
     children,
@@ -57,15 +63,17 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     onChange,
     description,
     errorMessage,
+    isRequired,
   }: {
     label: ReactNode
     value: string
     onChange: (value: string) => void
     description?: string
     errorMessage?: string
+    isRequired?: boolean
   }) => (
     <label>
-      {label}
+      {isRequired ? `${label} (required)` : label}
       <input value={value} onChange={(event) => onChange(event.target.value)} />
       {description ? <span>{description}</span> : null}
       {errorMessage ? <span>{errorMessage}</span> : null}
@@ -104,6 +112,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children,
     errorMessage,
     isDisabled,
+    isRequired,
   }: {
     label: ReactNode
     value: string
@@ -111,12 +120,13 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children: ReactNode
     errorMessage?: string
     isDisabled?: boolean
+    isRequired?: boolean
   }) => (
     <fieldset disabled={isDisabled}>
-      <legend>{label}</legend>
+      <legend>{isRequired ? `${label} (required)` : label}</legend>
       {React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child, {
+        React.isValidElement<RadioOptionProps>(child)
+          ? React.cloneElement<RadioOptionProps>(child, {
               checked: child.props.value === value,
               onSelect: onChange,
               disabled: isDisabled,

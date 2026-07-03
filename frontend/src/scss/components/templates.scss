@@ -1,16 +1,169 @@
-.desc-above {
-  .bcds-react-aria-TextField--container {
-    order: 1;
+.template-form-page {
+  padding: 0 0 2rem;
+}
+
+.template-form-page__content {
+  margin: 0 auto;
+  max-width: 572px;
+}
+
+.template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.template-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.template-form__section--title {
+  width: 572px;
+}
+
+.template-form__section--subject {
+  width: 381px;
+}
+
+.template-form__section--template-type {
+  width: 184px;
+}
+
+.template-form__section--syntax-type {
+  width: 528px;
+}
+
+.template-form__section--body {
+  width: 572px;
+}
+
+.template-form__field,
+.template-form__field--full,
+.template-form__radio-group {
+  width: 100%;
+  max-width: 100%;
+}
+
+.template-form__field {
+  gap: 2px;
+}
+
+.template-form__textarea {
+  width: 572px;
+  min-height: 71px;
+  height: 71px;
+  padding: 8px 12px;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+  color: #474543;
+  font-family: 'BC Sans', sans-serif;
+  font-size: 16px;
+  line-height: 27px;
+  resize: vertical;
+}
+
+.template-form__textarea::placeholder {
+  color: #605e5c;
+  opacity: 1;
+}
+
+.template-form__actions {
+  margin-top: 0.5rem;
+}
+
+.template-form__section .bcds-react-aria-TextField--Label,
+.template-form__section .bcds-react-aria-RadioGroup--label,
+.template-form__body-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 7px 0;
+}
+
+.template-form__label-text {
+  color: #474543;
+  font-family: 'BC Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 27px;
+}
+
+.template-form__required-text {
+  color: #2d2d2d;
+  font-family: 'BC Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+}
+
+.template-form__field .bcds-react-aria-TextField--container {
+  width: 248px;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px 12px;
+  gap: 2px;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+}
+
+.template-form__field .bcds-react-aria-TextField--Input {
+  color: #474543;
+  font-family: 'BC Sans', sans-serif;
+  font-size: 16px;
+  line-height: 27px;
+}
+
+.template-form__section--title .bcds-react-aria-TextField--Description,
+.template-form__section--subject .bcds-react-aria-TextField--Description,
+.template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {
+  color: #474543;
+  font-family: 'BC Sans', sans-serif;
+  font-size: 14px;
+  line-height: 21px;
+  padding: 0;
+}
+
+.template-form__section--title .bcds-react-aria-TextField--Description {
+  width: 572px;
+  white-space: nowrap;
+}
+
+.template-form__section--subject .bcds-react-aria-TextField--Description {
+  width: 381px;
+}
+
+.template-form__radio-group {
+  .bcds-react-aria-RadioGroup--options {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 0;
   }
 
-  .bcds-react-aria-TextField--Description {
-    white-space: nowrap;
+  .bcds-react-aria-Radio {
+    min-height: 32px;
+    padding: 7px 0;
+    gap: 10px;
+    color: #474543;
+    font-family: 'BC Sans', sans-serif;
+    font-size: 14px;
+    line-height: 21px;
   }
+}
+
+.template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {
+  width: 528px;
 }
 
 .error-after-label {
   .bcds-react-aria-RadioGroup--options {
     order: 2;
+  }
+
+  .bcds-react-aria-RadioGroup--description {
+    order: 3;
   }
 
   .bcds-react-aria-RadioGroup--error {
