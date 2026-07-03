@@ -68,8 +68,6 @@ const Sidebar: FC = () => {
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
   const showTemplates = cstarTenants.length > 0
   const showUsage = cstarTenants.length > 0
-  // Feature Flags requires NOTIFY_ADMIN (SSO)
-  const showAdminFeatureFlags = isAdmin
 
   const handleLogout = () => {
     UserService.doLogout()
