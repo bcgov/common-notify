@@ -1,7 +1,6 @@
 import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
-import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
@@ -9,7 +8,8 @@ import UserService from '@/service/user-service'
 export interface ListNotificationsOptions {
   page?: number
   limit?: number
-  status?: NotificationStatus | 'all'
+  sort?: string
+  filter?: string[]
 }
 
 export const notificationApi = {
@@ -20,13 +20,14 @@ export const notificationApi = {
    */
   async listNotifications(options: ListNotificationsOptions = {}) {
     try {
-      const params = generateApiParameters('/api/v1/frontend/notification_request')
-      const queryParams = {
-        ...(options.page ? { page: options.page } : {}),
-        ...(options.limit ? { limit: options.limit } : {}),
-        ...(options.status && options.status !== 'all' ? { status: options.status } : {}),
-      }
-      return await get<PaginatedNotificationResponse>({ ...params, params: queryParams })
+      const qs = new URLSearchParams()
+      if (options.page) qs.set('page', String(options.page))
+      if (options.limit) qs.set('limit', String(options.limit))
+      if (options.sort) qs.set('sort', options.sort)
+      if (options.filter && options.filter.length > 0)
+        options.filter.forEach((f) => qs.append('filter', f))
+      const params = generateApiParameters(`/api/v1/frontend/notification_request?${qs.toString()}`)
+      return await get<PaginatedNotificationResponse>(params)
     } catch (error) {
       const axiosError = error as AxiosError
       if (axiosError.response?.status === STATUS_CODES.NotFound) {

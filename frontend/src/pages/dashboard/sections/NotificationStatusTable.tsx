@@ -1,14 +1,13 @@
-import { Link, Select } from '@bcgov/design-system-react-components'
+import { Link } from '@bcgov/design-system-react-components'
 import type { FC } from 'react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { setPage, setStatusFilter, selectNotifications } from '@/redux/slices/notification.slice'
+import { setPage, setSort, setFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { setLimit } from '@/redux/slices/notification.slice'
 import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
 import { selectFeatureFlag } from '@/config/featureFlags/featureFlagsSelectors'
-import type { NotificationStatus } from '@/enum/notification-status.enum'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
@@ -22,7 +21,7 @@ import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
  */
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
-  const { statusFilter, page, limit, count, isLoading, hasLoaded } = useAppSelector(
+  const { sortBy, sortOrder, filters, page, limit, count, isLoading, hasLoaded } = useAppSelector(
     (state) => state.notification,
   )
   const notifications = useAppSelector(selectNotifications)
@@ -41,7 +40,7 @@ const NotificationStatusTable: FC = () => {
     if (selectedTenant) {
       dispatch(fetchNotifications())
     }
-  }, [statusFilter, page, limit, selectedTenant, dispatch])
+  }, [sortBy, sortOrder, filters, page, limit, selectedTenant, dispatch])
 
   // Fetch feature flags for the selected tenant
   // This ensures byCode contains flags that apply to this tenant (global + tenant-specific)
@@ -60,23 +59,17 @@ const NotificationStatusTable: FC = () => {
     return () => controller.abort()
   }, [dispatch, selectedTenant, sseEnabled])
 
-  // Build status filter items from Redux with index-based unique identifiers
-  // Memoized to prevent unnecessary re-renders of Select component
-  const statusFilterItems = useMemo(
-    () => [
-      { id: 'all', label: 'All', key: 'all' },
-      ...statuses.map((s, idx) => ({
-        id: String(s.id || `unknown-${idx}`),
-        label: s.label,
-        key: `status-${idx}-${s.id}`,
-      })),
-    ],
-    [statuses],
-  )
-
   const handleShowRecipients = (notification: NotificationRequest) => {
     setSelectedNotification(notification)
     setShowRecipientsModal(true)
+  }
+
+  const handleSort = (key: string, order: 'asc' | 'desc' | null) => {
+    dispatch(setSort({ sortBy: order != null ? key : null, sortOrder: order }))
+  }
+
+  const handleFilter = (key: string, values: string[]) => {
+    dispatch(setFilter({ field: key, values }))
   }
 
   const columns: TableColumn<NotificationRequest>[] = [
@@ -84,7 +77,6 @@ const NotificationStatusTable: FC = () => {
       key: 'tenant',
       label: 'Tenant Name',
       render: (_, row) => row.tenant?.name || row.tenantId,
-      sortable: true,
     },
     {
       key: 'channel',
@@ -122,6 +114,8 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'status',
       label: 'Status',
+      sortable: true,
+      filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
       render: (_, row) => <StatusBadge status={row.status} />,
     },
     {
@@ -133,20 +127,6 @@ const NotificationStatusTable: FC = () => {
 
   return (
     <div>
-      {statuses.length > 0 && (
-        <div className="mb-3" style={{ maxWidth: '220px' }}>
-          <Select
-            key={`status-filter-${statusFilterItems.map((s) => s.id).join('-')}`}
-            label="Filter by status"
-            items={statusFilterItems}
-            selectedKey={statusFilter}
-            onSelectionChange={(key) =>
-              dispatch(setStatusFilter(key as NotificationStatus | 'all'))
-            }
-          />
-        </div>
-      )}
-
       <DataTable
         columns={columns}
         data={notifications ?? []}
@@ -157,6 +137,11 @@ const NotificationStatusTable: FC = () => {
         currentPage={page}
         pageSize={limit}
         totalCount={count}
+        sortBy={sortBy ?? undefined}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        activeFilters={filters}
+        onFilter={handleFilter}
         onPageChange={(nextPage) => dispatch(setPage(nextPage))}
         onPageSizeChange={(newLimit) => dispatch(setLimit(newLimit))}
         pageSizeOptions={[15, 30]}
