@@ -11,6 +11,8 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
 
 interface TemplateEditProps {
@@ -19,6 +21,8 @@ interface TemplateEditProps {
 
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
+  const { primaryRole } = useCstarRoles()
+  const isReadOnly = primaryRole === CstarRole.NOTIFY_VIEWER
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -126,7 +130,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   return (
     <div>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <PageHeading title="Edit reusable template" />
+        <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form onSubmit={handleSave}>
           <div className="mb-4 desc-above">
             <TextField
@@ -141,6 +145,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               value={formData.name}
               onChange={handleFieldChange('name')}
               style={{ maxWidth: '400px' }}
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.name}
               errorMessage={formErrors.name}
             />
@@ -185,6 +190,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 }))
                 setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
@@ -217,6 +223,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 value={formData.subject}
                 onChange={handleFieldChange('subject')}
                 style={{ width: '100%' }}
+                isDisabled={isReadOnly}
                 isInvalid={!!formErrors.subject}
                 errorMessage={formErrors.subject}
               />
@@ -232,7 +239,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               className={`form-control${formErrors.body ? ' is-invalid' : ''}`}
               value={formData.body}
               onChange={(e) => handleFieldChange('body')(e.target.value)}
-              style={{ width: '100%', height: '16rem' }}
+              style={
+                isReadOnly
+                  ? { width: '100%', height: '16rem', color: '#9f9d9c', backgroundColor: '#EDEBE9' }
+                  : { width: '100%', height: '16rem' }
+              }
+              readOnly={isReadOnly}
             />
             {formErrors.body && (
               <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
@@ -240,15 +252,19 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
 
           <div className="d-flex justify-content-end gap-2">
-            <Button type="button" variant="secondary" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
-              Preview
-            </Button>
-            <Button type="submit" isDisabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <>
+              <Button type="button" variant="secondary" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+                Preview
+              </Button>
+              {!isReadOnly && (
+                <Button type="submit" isDisabled={saving}>
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              )}
+            </>
           </div>
         </form>
       </div>
