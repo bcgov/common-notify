@@ -28,11 +28,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
     TenantsModule,
   ],
   providers: [ApiKeysService, ApiKeyUsageService],
-  controllers: [
-    ApiKeysController,
-    ApiKeyUsageFrontendController,
-    ApiKeyUsageAdminController,
-  ],
+  controllers: [ApiKeysController, ApiKeyUsageFrontendController, ApiKeyUsageAdminController],
   exports: [TypeOrmModule, ApiKeysService, ApiKeyUsageService],
 })
 export class ApiKeysModule {}
