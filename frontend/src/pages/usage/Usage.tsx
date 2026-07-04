@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Modal, AlertDialog, Button } from '@bcgov/design-system-react-components'
-import type { ChannelUsage, UsageHistoryEntry } from '@/api/apiKeyUsage.api'
+import type { ChannelUsage } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import {
   fetchApiKeyUsage,
@@ -145,23 +145,7 @@ const Usage: FC = () => {
     },
   ]
 
-  const historyColumns: TableColumn<UsageHistoryEntry>[] = [
-    {
-      key: 'channel',
-      label: 'Channel',
-      render: (_, row) => <span className="fw-semibold">{formatChannel(row.channel)}</span>,
-    },
-    {
-      key: 'fiscalYearStart',
-      label: 'Fiscal year',
-      render: (_, row) => <span>{fiscalYearLabel(row.fiscalYearStart)}</span>,
-    },
-    {
-      key: 'sentCount',
-      label: 'Notifications sent',
-      render: (_, row) => <span>{row.sentCount.toLocaleString()}</span>,
-    },
-  ]
+
 
   const channels = usage?.channels ?? []
 
