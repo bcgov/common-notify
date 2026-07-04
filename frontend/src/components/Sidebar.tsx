@@ -66,7 +66,6 @@ const Sidebar: FC = () => {
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
-  const showTemplates = cstarTenants.length > 0
   const showUsage = cstarTenants.length > 0
 
   const handleLogout = () => {
