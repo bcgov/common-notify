@@ -9,7 +9,6 @@ import {
   updateThreshold,
 } from '@/redux/thunks/apiKeyUsage.thunks'
 import PageHeading from '@/components/PageHeading'
-import Card from '@/components/Card'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
