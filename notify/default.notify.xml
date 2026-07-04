@@ -425,7 +425,7 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="11" name="created_at" nullable="false" remarks="Timestamp when the template was created." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="updated_by" nullable="false" remarks="User or process that last updated this template." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the template was last updated." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="14" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'markdown'::character varying" digits="0" id="14" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -492,7 +492,7 @@
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="created_by" nullable="false" remarks="User or process that created this version." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="Timestamp when this version was created." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="'html'::character varying" digits="0" id="11" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'markdown'::character varying" digits="0" id="11" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_version_pkey" unique="true">
             <column ascending="true" name="id"/>
