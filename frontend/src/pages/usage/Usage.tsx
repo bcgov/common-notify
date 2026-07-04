@@ -46,13 +46,6 @@ function UsageCell({
   )
 }
 
-/** Fiscal-year label from the window start date, e.g. 2025-04-01 -> "FY2025". */
-function fiscalYearLabel(isoDate: string): string {
-  if (!isoDate) return '—'
-  const year = new Date(isoDate).getUTCFullYear()
-  return `FY${year}`
-}
-
 const Usage: FC = () => {
   const dispatch = useAppDispatch()
   const { usage, isLoading, updatingChannel } = useAppSelector((state) => state.apiKeyUsage)
