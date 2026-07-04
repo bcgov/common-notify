@@ -55,9 +55,7 @@ function fiscalYearLabel(isoDate: string): string {
 
 const Usage: FC = () => {
   const dispatch = useAppDispatch()
-  const { usage, isLoading, historyLoading, updatingChannel } = useAppSelector(
-    (state) => state.apiKeyUsage,
-  )
+  const { usage, isLoading, updatingChannel } = useAppSelector((state) => state.apiKeyUsage)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
 
