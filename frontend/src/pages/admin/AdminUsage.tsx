@@ -4,7 +4,7 @@ import { Modal, AlertDialog, Button } from '@bcgov/design-system-react-component
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
-import { setAdminPage, setAdminLimit, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
+import { setAdminPage, setAdminLimit } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
