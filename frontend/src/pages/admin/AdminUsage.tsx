@@ -57,7 +57,6 @@ const AdminUsage: FC = () => {
     adminUpdatingKey,
   } = useAppSelector((state) => state.apiKeyUsage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
-  const [searchInput] = useState(adminSearch)
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)
   const [dailyLimit, setDailyLimit] = useState(0)
   const [annualLimit, setAnnualLimit] = useState(0)
