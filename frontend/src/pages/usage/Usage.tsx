@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { Modal, AlertDialog, Button } from '@bcgov/design-system-react-components'
 import type { ChannelUsage } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import {
@@ -11,30 +10,13 @@ import {
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
+import UsageCell from '@/components/UsageCell'
+import EditModal from '@/components/EditModal'
+import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { formatChannel, percentOf } from '@/utils/usage'
+import { formatChannel } from '@/utils/usage'
 
 const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
-
-/** Render "used / limit (pct%)", highlighting when at/over the warning threshold. */
-function UsageCell({
-  used,
-  limit,
-  thresholdPercent,
-}: {
-  used: number
-  limit: number
-  thresholdPercent: number
-}) {
-  const pct = percentOf(used, limit)
-  const warn = pct >= thresholdPercent
-  return (
-    <span className={warn ? 'text-danger fw-semibold' : ''}>
-      {used.toLocaleString()} / {limit.toLocaleString()}{' '}
-      <span className="text-muted">({pct}%)</span>
-    </span>
-  )
-}
 
 const Usage: FC = () => {
   const dispatch = useAppDispatch()
@@ -147,51 +129,29 @@ const Usage: FC = () => {
           Only users with the NOTIFY_OPERATIONS_ADMIN role can change alert thresholds.
         </p>
       )}
-      <Modal
+      <EditModal
         isOpen={editingChannel !== null}
-        isDismissable={!isSaving}
-        onOpenChange={(open) => {
-          if (!open) closeEdit()
-        }}
+        title={
+          editingChannel ? `Edit ${formatChannel(editingChannel.channel)} alert threshold` : ''
+        }
+        isSaving={isSaving}
+        onClose={closeEdit}
+        onSave={handleSaveThreshold}
       >
-        {editingChannel && (
-          <AlertDialog
-            isIconHidden
-            isCloseable
-            title={`Edit ${formatChannel(editingChannel.channel)} alert threshold`}
-            buttons={
-              <>
-                <Button variant="tertiary" onPress={closeEdit} isDisabled={isSaving}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onPress={handleSaveThreshold} isDisabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Save'}
-                </Button>
-              </>
-            }
-          >
-            <p className="text-muted mb-3">
-              Warn when usage reaches this percentage of a limit. The 100% (limit reached) alert
-              always fires.
-            </p>
-            <div>
-              <label className="form-label" htmlFor="edit-threshold">
-                Warning threshold (%)
-              </label>
-              <input
-                id="edit-threshold"
-                type="number"
-                min={1}
-                max={100}
-                className="form-control"
-                value={thresholdValue}
-                disabled={isSaving}
-                onChange={(e) => setThresholdValue(Number(e.target.value))}
-              />
-            </div>
-          </AlertDialog>
-        )}
-      </Modal>
+        <p className="text-muted mb-3">
+          Warn when usage reaches this percentage of a limit. The 100% (limit reached) alert always
+          fires.
+        </p>
+        <NumberInputField
+          id="edit-threshold"
+          label="Warning threshold (%)"
+          value={thresholdValue}
+          min={1}
+          max={100}
+          disabled={isSaving}
+          onChange={setThresholdValue}
+        />
+      </EditModal>
     </div>
   )
 }

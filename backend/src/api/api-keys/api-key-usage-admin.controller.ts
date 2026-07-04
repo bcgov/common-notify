@@ -17,8 +17,8 @@ import { ApiKeyUsageService } from './api-key-usage.service'
 import {
   AdminTenantUsageRowDto,
   PaginatedAdminUsageResponseDto,
-} from './dto/tenant-usage-response.dto'
-import { UpdateTenantLimitsDto } from './dto/update-tenant-limits.dto'
+} from './schemas/tenant-usage-response.dto'
+import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
 
 /**
  * Admin API Controller for notification usage across all tenants.

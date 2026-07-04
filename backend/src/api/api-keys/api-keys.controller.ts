@@ -14,7 +14,7 @@ import { UseGuards } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
-import { BindApiKeyDto } from './dto/bind-api-key.dto'
+import { BindApiKeyDto } from './schemas/bind-api-key.dto'
 
 @ApiTags('api-keys')
 @Controller('service/api-key')

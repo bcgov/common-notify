@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { Modal, AlertDialog, Button } from '@bcgov/design-system-react-components'
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -10,28 +9,11 @@ import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import NotAuthorized from '@/components/NotAuthorized'
+import UsageCell from '@/components/UsageCell'
+import EditModal from '@/components/EditModal'
+import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { formatChannel, percentOf } from '@/utils/usage'
-
-/** Render "used / limit (pct%)", highlighting when at/over the warning threshold. */
-function UsageCell({
-  used,
-  limit,
-  thresholdPercent,
-}: {
-  used: number
-  limit: number
-  thresholdPercent: number
-}) {
-  const pct = percentOf(used, limit)
-  const warn = pct >= thresholdPercent
-  return (
-    <span className={warn ? 'text-danger fw-semibold' : ''}>
-      {used.toLocaleString()} / {limit.toLocaleString()}{' '}
-      <span className="text-muted">({pct}%)</span>
-    </span>
-  )
-}
+import { formatChannel } from '@/utils/usage'
 
 const rowKeyOf = (row: AdminTenantUsageRow) => `${row.tenantId}-${row.channel}`
 
@@ -175,63 +157,33 @@ const AdminUsage: FC = () => {
         label="All tenants notification usage"
       />
 
-      <Modal
+      <EditModal
         isOpen={editingRow !== null}
-        isDismissable={!isSaving}
-        onOpenChange={(open) => {
-          if (!open) closeEdit()
-        }}
+        title={editingRow ? `Edit ${formatChannel(editingRow.channel)} limits` : ''}
+        isSaving={isSaving}
+        onClose={closeEdit}
+        onSave={handleSaveLimits}
       >
-        {editingRow && (
-          <AlertDialog
-            isIconHidden
-            isCloseable
-            title={`Edit ${formatChannel(editingRow.channel)} limits`}
-            buttons={
-              <>
-                <Button variant="tertiary" onPress={closeEdit} isDisabled={isSaving}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onPress={handleSaveLimits} isDisabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Save'}
-                </Button>
-              </>
-            }
-          >
-            <p className="text-muted mb-3">{editingRow.tenantName}</p>
-            <div className="d-flex flex-column gap-3">
-              <div>
-                <label className="form-label" htmlFor="edit-daily-limit">
-                  Daily maximum
-                </label>
-                <input
-                  id="edit-daily-limit"
-                  type="number"
-                  min={1}
-                  className="form-control"
-                  value={dailyLimit}
-                  disabled={isSaving}
-                  onChange={(e) => setDailyLimit(Number(e.target.value))}
-                />
-              </div>
-              <div>
-                <label className="form-label" htmlFor="edit-annual-limit">
-                  Annual maximum
-                </label>
-                <input
-                  id="edit-annual-limit"
-                  type="number"
-                  min={1}
-                  className="form-control"
-                  value={annualLimit}
-                  disabled={isSaving}
-                  onChange={(e) => setAnnualLimit(Number(e.target.value))}
-                />
-              </div>
-            </div>
-          </AlertDialog>
-        )}
-      </Modal>
+        <p className="text-muted mb-3">{editingRow?.tenantName}</p>
+        <div className="d-flex flex-column gap-3">
+          <NumberInputField
+            id="edit-daily-limit"
+            label="Daily maximum"
+            value={dailyLimit}
+            min={1}
+            disabled={isSaving}
+            onChange={setDailyLimit}
+          />
+          <NumberInputField
+            id="edit-annual-limit"
+            label="Annual maximum"
+            value={annualLimit}
+            min={1}
+            disabled={isSaving}
+            onChange={setAnnualLimit}
+          />
+        </div>
+      </EditModal>
     </div>
   )
 }

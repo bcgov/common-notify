@@ -5,8 +5,8 @@ import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ApiKeyUsageService } from './api-key-usage.service'
-import { UpdateThresholdDto } from './dto/update-threshold.dto'
-import { TenantUsageResponseDto, UsageHistoryEntryDto } from './dto/tenant-usage-response.dto'
+import { UpdateThresholdDto } from './schemas/update-threshold.dto'
+import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-usage-response.dto'
 
 /**
  * Frontend API Controller for notification limits and usage.

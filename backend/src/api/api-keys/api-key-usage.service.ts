@@ -14,7 +14,7 @@ import {
   PaginatedAdminUsageResponseDto,
   TenantUsageResponseDto,
   UsageHistoryEntryDto,
-} from './dto/tenant-usage-response.dto'
+} from './schemas/tenant-usage-response.dto'
 
 const FISCAL_YEAR_START_KEY = 'fiscal_year_start'
 const DEFAULT_FISCAL_MONTH = 4 // April
