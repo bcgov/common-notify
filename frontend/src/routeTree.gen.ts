@@ -70,8 +70,8 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/template-create': typeof TemplateCreateRoute
-  '/usage': typeof UsageRoute
   '/templates': typeof TemplatesRoute
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
