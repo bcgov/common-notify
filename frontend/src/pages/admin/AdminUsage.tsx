@@ -11,17 +11,7 @@ import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import NotAuthorized from '@/components/NotAuthorized'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-
-/** Title-case a channel code, e.g. EMAIL -> Email. */
-function formatChannel(channel: string): string {
-  return channel.charAt(0).toUpperCase() + channel.slice(1).toLowerCase()
-}
-
-/** Usage as a percentage of a limit, to one decimal place. */
-function percentOf(used: number, limit: number): number {
-  if (!limit || limit <= 0) return 0
-  return Math.round((used / limit) * 1000) / 10
-}
+import { formatChannel, percentOf } from '@/utils/usage'
 
 /** Render "used / limit (pct%)", highlighting when at/over the warning threshold. */
 function UsageCell({
@@ -170,21 +160,20 @@ const AdminUsage: FC = () => {
     <div>
       <PageHeading title="Tenant Usage & Limits" />
 
-
-        <DataTable
-          columns={columns}
-          data={adminRows}
-          keyExtractor={(row) => rowKeyOf(row)}
-          isLoading={adminLoading}
-          emptyMessage="No tenant usage data found."
-          currentPage={adminPage}
-          pageSize={adminLimit}
-          totalCount={adminCount}
-          onPageChange={(nextPage) => dispatch(setAdminPage(nextPage))}
-          onPageSizeChange={handleLimitChange}
-          pageSizeOptions={[15, 30]}
-          label="All tenants notification usage"
-        />
+      <DataTable
+        columns={columns}
+        data={adminRows}
+        keyExtractor={(row) => rowKeyOf(row)}
+        isLoading={adminLoading}
+        emptyMessage="No tenant usage data found."
+        currentPage={adminPage}
+        pageSize={adminLimit}
+        totalCount={adminCount}
+        onPageChange={(nextPage) => dispatch(setAdminPage(nextPage))}
+        onPageSizeChange={handleLimitChange}
+        pageSizeOptions={[15, 30]}
+        label="All tenants notification usage"
+      />
 
       <Modal
         isOpen={editingRow !== null}

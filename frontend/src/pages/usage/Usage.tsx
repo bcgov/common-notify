@@ -12,19 +12,9 @@ import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
+import { formatChannel, percentOf } from '@/utils/usage'
 
 const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
-
-/** Title-case a channel code, e.g. EMAIL -> Email. */
-function formatChannel(channel: string): string {
-  return channel.charAt(0).toUpperCase() + channel.slice(1).toLowerCase()
-}
-
-/** Usage as a percentage of a limit, to one decimal place. */
-function percentOf(used: number, limit: number): number {
-  if (!limit || limit <= 0) return 0
-  return Math.round((used / limit) * 1000) / 10
-}
 
 /** Render "used / limit (pct%)", highlighting when at/over the warning threshold. */
 function UsageCell({
@@ -138,28 +128,25 @@ const Usage: FC = () => {
     },
   ]
 
-
-
   const channels = usage?.channels ?? []
 
   return (
     <div>
       <PageHeading title="Notification Usage & Limits" />
 
-
-        <DataTable
-          columns={channelColumns}
-          data={channels}
-          keyExtractor={(row) => row.channel}
-          isLoading={isLoading}
-          emptyMessage="No notification limits are configured for this tenant."
-          label="Notification usage and limits"
-        />
-        {!canEditThreshold && channels.length > 0 && (
-          <p className="text-muted small mt-2 mb-0">
-            Only users with the NOTIFY_OPERATIONS_ADMIN role can change alert thresholds.
-          </p>
-        )}
+      <DataTable
+        columns={channelColumns}
+        data={channels}
+        keyExtractor={(row) => row.channel}
+        isLoading={isLoading}
+        emptyMessage="No notification limits are configured for this tenant."
+        label="Notification usage and limits"
+      />
+      {!canEditThreshold && channels.length > 0 && (
+        <p className="text-muted small mt-2 mb-0">
+          Only users with the NOTIFY_OPERATIONS_ADMIN role can change alert thresholds.
+        </p>
+      )}
       <Modal
         isOpen={editingChannel !== null}
         isDismissable={!isSaving}
