@@ -75,11 +75,6 @@ const AdminUsage: FC = () => {
 
   const isSaving = editingRow ? adminUpdatingKey === rowKeyOf(editingRow) : false
 
-  function handleSearch() {
-    // setAdminSearch resets to page 1; the effect above triggers the refetch.
-    dispatch(setAdminSearch(searchInput.trim()))
-  }
-
   function handleLimitChange(newLimit: number) {
     dispatch(setAdminLimit(newLimit))
   }
