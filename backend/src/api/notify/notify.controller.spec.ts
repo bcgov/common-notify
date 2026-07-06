@@ -70,6 +70,11 @@ const mockNotificationService = {
     { address: 'alice@example.com', params: {} },
     { address: 'bob@example.com', params: {} },
   ]),
+  parseMailMergeRecipients: vi.fn().mockReturnValue([
+    { address: 'alice@example.com', params: {} },
+    { address: 'bob@example.com', params: {} },
+  ]),
+  validateMailMergeRules: vi.fn().mockResolvedValue([]),
 }
 
 const mockAttachmentValidationService = {
@@ -413,7 +418,7 @@ describe('Notify Controllers', () => {
         })
 
         it('should return 422 when validateBulkRules returns errors', async () => {
-          mockNotificationService.validateBulkRules.mockResolvedValueOnce([
+          mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
             'Template not found for tenant',
           ])
           return request(app.getHttpServer())

@@ -26,7 +26,7 @@ describe('IngestionWorker', () => {
 
     mockRequestDetailService = {
       createPending: vi.fn().mockResolvedValue(undefined),
-      createBulkPending: vi.fn().mockResolvedValue(undefined),
+      createEmailMergePending: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -779,8 +779,8 @@ describe('IngestionWorker', () => {
         const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(1)
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledWith(
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
           ['alice@example.com', 'bob@example.com'],
@@ -791,15 +791,20 @@ describe('IngestionWorker', () => {
           expect.objectContaining({
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
-            bulk: true,
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
-            bulkEmail: expect.objectContaining({ recipients }),
+            mailMergeData: expect.objectContaining({ recipients }),
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
             removeOnComplete: true,
             removeOnFail: false,
             attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
           }),
         )
         expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
@@ -847,12 +852,14 @@ describe('IngestionWorker', () => {
 
         // 3 addresses, batchSize=2 → 2 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-multi-EMAIL-0',
-            bulkEmail: expect.objectContaining({
+            mailMergeData: expect.objectContaining({
               recipients: [
                 { address: 'a@example.com', params: {} },
                 { address: 'b@example.com', params: {} },
@@ -863,8 +870,10 @@ describe('IngestionWorker', () => {
         )
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-multi-EMAIL-1',
-            bulkEmail: expect.objectContaining({
+            mailMergeData: expect.objectContaining({
               recipients: [{ address: 'c@example.com', params: {} }],
             }),
           }),
