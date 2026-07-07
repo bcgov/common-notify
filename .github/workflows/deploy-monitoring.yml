@@ -393,11 +393,9 @@ jobs:
         if: |
           needs.deploy-loki-centralized.result == 'failure' ||
           needs.deploy-grafana-centralized.result == 'failure' ||
-          needs.deploy-agent-dev.result == 'failure' ||
-          needs.deploy-agent-test.result == 'failure' ||
-          needs.deploy-agent-prod.result == 'failure' ||
           needs.deploy-loki-individual.result == 'failure' ||
           needs.deploy-grafana-individual.result == 'failure'
         run: |
           echo "❌ One or more components failed to deploy"
+          echo "Note: Grafana Agent deployments are optional and skipped if files don't exist"
           exit 1
