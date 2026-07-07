@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react-components'
 import {
   getTemplateById,
@@ -19,6 +19,7 @@ interface TemplateEditProps {
 
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -35,6 +36,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
+  const isReadOnly = location.pathname.startsWith('/templates/')
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -126,7 +128,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   return (
     <div className="template-form-page">
       <div className="template-form-page__content">
-        <PageHeading title="Edit reusable template" />
+        <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form className="template-form" onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">
             <TextField
@@ -137,6 +139,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               className="template-form__field"
               size="small"
               isRequired
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.name}
               errorMessage={formErrors.name}
             />
@@ -170,6 +173,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 className="template-form__field template-form__field--full"
                 size="small"
                 isRequired
+                isDisabled={isReadOnly}
                 isInvalid={!!formErrors.subject}
                 errorMessage={formErrors.subject}
               />
@@ -190,6 +194,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
               isRequired
+              isDisabled={isReadOnly}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
@@ -222,6 +227,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
               value={formData.body}
               onChange={(e) => handleFieldChange('body')(e.target.value)}
+              readOnly={isReadOnly}
             />
             {formErrors.body && (
               <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
@@ -235,9 +241,11 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
               Preview
             </Button>
-            <Button type="submit" isDisabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            {!isReadOnly && (
+              <Button type="submit" isDisabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            )}
           </div>
         </form>
       </div>

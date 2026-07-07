@@ -5,11 +5,15 @@ import type * as TemplatesApi from '@/api/templates.api'
 import TemplateEdit from './TemplateEdit'
 
 const navigateMock = vi.fn()
+const locationMock = {
+  pathname: '/template-edit/template-123',
+}
 const getTemplateByIdMock = vi.fn()
 const updateTemplateMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  useLocation: () => locationMock,
 }))
 
 vi.mock('@/api/templates.api', async () => {
@@ -159,6 +163,7 @@ const template = {
 describe('TemplateEdit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    locationMock.pathname = '/template-edit/template-123'
     getTemplateByIdMock.mockResolvedValue(template)
     updateTemplateMock.mockResolvedValue({})
   })
@@ -173,6 +178,27 @@ describe('TemplateEdit', () => {
     })
 
     expect(screen.queryByText('Body type')).toBeNull()
+  })
+
+  it('keeps preview disabled and shows inline errors for missing required fields', async () => {
+    const { container } = render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Welcome Template')).toBeTruthy()
+    })
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Template body (required)'), {
+      target: { value: '' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateTemplateMock).not.toHaveBeenCalled()
+    })
+
+    expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

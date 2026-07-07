@@ -150,6 +150,21 @@ describe('TemplateCreate', () => {
     expect(screen.queryByText('Body type')).toBeNull()
   })
 
+  it('keeps preview disabled and shows inline errors for missing required fields', async () => {
+    const { container } = render(<TemplateCreate />)
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: 'Missing fields template' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+    expect(screen.getAllByText('Please select an option to continue.')).toHaveLength(2)
+    expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
+  })
+
   it('does not require or send bodyType when saving an MJML template', async () => {
     render(<TemplateCreate />)
 
