@@ -84,6 +84,22 @@
   line-height: 27px;
 }
 
+.template-form__section .bcds-react-aria-TextField--Label.required {
+  display: inline;
+  padding: 0 0 0 4px;
+  font-weight: 400;
+}
+
+.template-form__required-label {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.template-form__required-label-indicator {
+  font-weight: 400;
+}
+
 .template-form__field .bcds-react-aria-TextField--container {
   width: 248px;
   min-height: 40px;

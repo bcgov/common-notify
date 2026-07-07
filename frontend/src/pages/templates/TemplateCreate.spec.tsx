@@ -62,6 +62,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     description,
     errorMessage,
     isRequired,
+    placeholder,
   }: {
     label: ReactNode
     value: string
@@ -69,10 +70,15 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     description?: string
     errorMessage?: string
     isRequired?: boolean
+    placeholder?: string
   }) => (
     <label>
       {isRequired ? `${label} (required)` : label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
       {description ? <span>{description}</span> : null}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </label>
@@ -150,6 +156,12 @@ describe('TemplateCreate', () => {
     expect(screen.queryByText('Body type')).toBeNull()
   })
 
+  it('shows the Figma template title placeholder', () => {
+    render(<TemplateCreate />)
+
+    expect(screen.getByPlaceholderText('Type a template title')).toBeTruthy()
+  })
+
   it('keeps preview disabled and shows inline errors for missing required fields', async () => {
     const { container } = render(<TemplateCreate />)
 
@@ -162,7 +174,44 @@ describe('TemplateCreate', () => {
 
     expect(createTemplateMock).not.toHaveBeenCalled()
     expect(screen.getAllByText('Please select an option to continue.')).toHaveLength(2)
+    expect(screen.getByText('This field is required.')).toBeTruthy()
     expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
+  })
+
+  it('enables save after entering a title and still requires the remaining fields on submit', () => {
+    render(<TemplateCreate />)
+
+    const saveButton = screen.getByRole('button', { name: 'Save' })
+    const titleInput = screen.getByPlaceholderText('Type a template title')
+
+    expect(saveButton).toBeDisabled()
+
+    fireEvent.change(titleInput, {
+      target: { value: 'Email template' },
+    })
+    expect(saveButton).not.toBeDisabled()
+
+    fireEvent.click(saveButton)
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+  })
+
+  it('shows an inline required error for email subject when email is selected', () => {
+    render(<TemplateCreate />)
+
+    fireEvent.change(screen.getByPlaceholderText('Type a template title'), {
+      target: { value: 'Email template' },
+    })
+    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Handlebars'))
+    fireEvent.change(screen.getByLabelText('Template body (required)'), {
+      target: { value: 'Hello {{name}}' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+    expect(screen.getByText('This field is required.')).toBeTruthy()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

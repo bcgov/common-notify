@@ -17,6 +17,15 @@ interface TemplateEditProps {
   templateId: string
 }
 
+const REQUIRED_FIELD_ERROR = 'This field is required.'
+
+const RequiredLabel = ({ text }: { text: string }) => (
+  <span className="template-form__required-label">
+    <span className="template-form__required-label-text">{text}</span>{' '}
+    <span className="template-form__required-label-indicator">(required)</span>
+  </span>
+)
+
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -69,16 +78,16 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const validate = (): boolean => {
     const errors = { name: '', engineCode: '', subject: '', body: '' }
     if (!formData.name.trim()) {
-      errors.name = ' '
+      errors.name = REQUIRED_FIELD_ERROR
     }
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
-      errors.subject = ' '
+      errors.subject = REQUIRED_FIELD_ERROR
     }
     if (!formData.body.trim()) {
-      errors.body = ' '
+      errors.body = REQUIRED_FIELD_ERROR
     }
     setFormErrors(errors)
     return !Object.values(errors).some(Boolean)
@@ -136,6 +145,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
               onChange={handleFieldChange('name')}
+              placeholder="Type a template title"
               className="template-form__field"
               size="small"
               isRequired
@@ -148,10 +158,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           <div className="template-form__section template-form__section--template-type">
             <RadioGroup
               className="template-form__radio-group"
-              label="Template type"
+              label={<RequiredLabel text="Template type" />}
               value={formData.channelCode}
               onChange={(value) => setFormData((prev) => ({ ...prev, channelCode: value }))}
-              isRequired
+              aria-required="true"
               isDisabled
             >
               <Radio key="email" value={NotificationChannel.EMAIL}>
@@ -183,7 +193,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           <div className="template-form__section template-form__section--syntax-type error-after-label">
             <RadioGroup
               className="template-form__radio-group"
-              label="Syntax type"
+              label={<RequiredLabel text="Syntax type" />}
               description="Choose the syntax used for dynamic variables and placeholders in this template."
               value={formData.engineCode}
               onChange={(value) => {
@@ -193,7 +203,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 }))
                 setFormErrors((prev) => ({ ...prev, engineCode: '' }))
               }}
-              isRequired
+              aria-required="true"
               isDisabled={isReadOnly}
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
@@ -218,7 +228,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               htmlFor="body"
               className="bcds-react-aria-TextField--Label template-form__body-label"
             >
-              Template body (required)
+              <RequiredLabel text="Template body" />
             </label>
             <textarea
               aria-label="Template body (required)"

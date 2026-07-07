@@ -68,6 +68,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     description,
     errorMessage,
     isRequired,
+    placeholder,
   }: {
     label: ReactNode
     value: string
@@ -75,10 +76,15 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     description?: string
     errorMessage?: string
     isRequired?: boolean
+    placeholder?: string
   }) => (
     <label>
       {isRequired ? `${label} (required)` : label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
       {description ? <span>{description}</span> : null}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </label>
@@ -180,6 +186,14 @@ describe('TemplateEdit', () => {
     expect(screen.queryByText('Body type')).toBeNull()
   })
 
+  it('shows the Figma template title placeholder', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Type a template title')).toBeTruthy()
+    })
+  })
+
   it('keeps preview disabled and shows inline errors for missing required fields', async () => {
     const { container } = render(<TemplateEdit templateId="template-123" />)
 
@@ -198,7 +212,21 @@ describe('TemplateEdit', () => {
       expect(updateTemplateMock).not.toHaveBeenCalled()
     })
 
+    expect(screen.getByText('This field is required.')).toBeTruthy()
     expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
+  })
+
+  it('preserves read-only view mode behavior', async () => {
+    locationMock.pathname = '/templates/template-123'
+
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'View reusable template' })).toBeTruthy()
+    })
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {
