@@ -31,7 +31,7 @@ export function ColumnHeaderDropdown({
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [ascLabel, descLabel] =
-    sortType === 'text' ? ['A to Z', 'Z to A'] : ['Ascending', 'Descending']
+    sortType === 'text' ? ['A to Z', 'Z to A'] : ['Oldest to Newest', 'Newest to Oldest']
 
   // Sync pending values when active filters change externally
   useEffect(() => {
