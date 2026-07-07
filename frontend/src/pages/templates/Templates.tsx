@@ -35,8 +35,7 @@ const columns: TableColumn<TemplateResponse>[] = [
       { label: 'SMS', value: 'SMS' },
     ],
     render: (_, row) => {
-      const channelCode =
-        row.channelCode.charAt(0).toUpperCase() + row.channelCode.slice(1).toLowerCase()
+      const channelCode = row.channelCode === 'EMAIL' ? 'Email' : row.channelCode
       return <span>{channelCode}</span>
     },
   },
