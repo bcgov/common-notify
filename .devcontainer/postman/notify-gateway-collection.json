@@ -770,7 +770,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Email Merge Test Template\",\n  \"description\": \"Handlebars template for email merge testing with per-recipient params (firstName, lastName) and global param (eventName)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{firstName}}\",\n  \"bodyType\": \"text\",\n  \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
+                  "raw": "{\n  \"name\": \"Email Merge Test Template\",\n  \"description\": \"Handlebars template for email merge testing with per-recipient params (firstName, lastName) and global param (eventName)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{firstName}}\",\n  \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
