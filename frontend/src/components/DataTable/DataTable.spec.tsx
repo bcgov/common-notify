@@ -230,8 +230,8 @@ describe('DataTable', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /column options for name/i }))
 
-      expect(await screen.findByRole('menuitem', { name: 'Ascending' })).toBeInTheDocument()
-      expect(screen.getByRole('menuitem', { name: 'Descending' })).toBeInTheDocument()
+      expect(await screen.findByRole('menuitem', { name: 'Oldest to Newest' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Newest to Oldest' })).toBeInTheDocument()
       expect(screen.queryByRole('menuitem', { name: 'A to Z' })).not.toBeInTheDocument()
     })
 
