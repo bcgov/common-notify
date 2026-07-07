@@ -150,6 +150,9 @@ export function ColumnHeaderDropdown({
               )}
             </div>
           )}
+          <div className="data-table__dropdown-item data-table__dropdown-item--submenu" role="menuitem">
+            <span>Column settings</span>
+          </div>
         </div>
       )}
     </div>
