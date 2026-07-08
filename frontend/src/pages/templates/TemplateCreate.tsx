@@ -49,7 +49,7 @@ const SYNTAX_TOOLTIPS = [
 
 const RequiredLabel = ({ text }: { text: string }) => (
   <span className="template-form__required-label">
-    <span className="template-form__required-label-text">{text}</span>{' '}
+    <span className="template-form__required-label-text">{text}</span>
     <span className="template-form__required-label-indicator">(required)</span>
   </span>
 )

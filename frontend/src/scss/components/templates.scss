@@ -79,7 +79,7 @@
 .template-form__required-label {
   display: inline-flex;
   align-items: baseline;
-  white-space: nowrap;
+  gap: 4px;
 }
 
 .template-form__required-label-indicator {
@@ -104,6 +104,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.template-form__radio-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--label,
+.template-form__radio-group .bcds-react-aria-RadioGroup--options,
+.template-form__radio-group .bcds-react-aria-RadioGroup--description,
+.template-form__radio-group .bcds-react-aria-RadioGroup--error {
+  width: 100%;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--description {
+  display: block;
+  margin-top: 0.25rem;
 }
 
 .template-form__syntax-tooltip-trigger {

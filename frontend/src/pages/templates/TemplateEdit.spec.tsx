@@ -5,15 +5,12 @@ import type * as TemplatesApi from '@/api/templates.api'
 import TemplateEdit from './TemplateEdit'
 
 const navigateMock = vi.fn()
-const locationMock = {
-  pathname: '/template-edit/template-123',
-}
 const getTemplateByIdMock = vi.fn()
 const updateTemplateMock = vi.fn()
+const useCstarRolesMock = vi.fn(() => ({ primaryRole: 'NOTIFY_ADMIN' }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
-  useLocation: () => locationMock,
 }))
 
 vi.mock('@/api/templates.api', async () => {
@@ -36,6 +33,10 @@ vi.mock('@/hooks/useCstarRoles', () => ({
 
 vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
+}))
+
+vi.mock('@/hooks/useCstarRoles', () => ({
+  useCstarRoles: () => useCstarRolesMock(),
 }))
 
 vi.mock('@bcgov/design-system-react-components', async () => {
@@ -227,7 +228,7 @@ const template = {
 describe('TemplateEdit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    locationMock.pathname = '/template-edit/template-123'
+    useCstarRolesMock.mockReturnValue({ primaryRole: 'NOTIFY_ADMIN' })
     getTemplateByIdMock.mockResolvedValue(template)
     updateTemplateMock.mockResolvedValue({})
   })
@@ -275,7 +276,7 @@ describe('TemplateEdit', () => {
   })
 
   it('preserves read-only view mode behavior', async () => {
-    locationMock.pathname = '/templates/template-123'
+    useCstarRolesMock.mockReturnValue({ primaryRole: 'NOTIFY_VIEWER' })
 
     render(<TemplateEdit templateId="template-123" />)
 
