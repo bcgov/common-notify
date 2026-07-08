@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { useLocation, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import {
   Button,
   TextField,
