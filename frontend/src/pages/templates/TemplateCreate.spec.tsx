@@ -36,6 +36,10 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     onSelect?: (value: string) => void
     disabled?: boolean
   }
+  type NestedRadioChildProps = {
+    value?: string
+    children?: ReactNode
+  }
 
   const Button = ({
     className,
@@ -138,21 +142,23 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     isDisabled?: boolean,
   ): ReactNode =>
     React.Children.map(children, (child) => {
-      if (!React.isValidElement(child)) {
+      if (!React.isValidElement<NestedRadioChildProps>(child)) {
         return child
       }
 
-      if ('value' in child.props) {
-        return React.cloneElement<RadioOptionProps>(child, {
-          checked: child.props.value === value,
+      const childProps = child.props
+
+      if (typeof childProps.value === 'string') {
+        return React.cloneElement(child as React.ReactElement<RadioOptionProps>, {
+          checked: childProps.value === value,
           onSelect: onChange,
           disabled: isDisabled,
         })
       }
 
-      if ('children' in child.props) {
+      if (childProps.children !== undefined) {
         return React.cloneElement(child, {
-          children: enhanceRadioChildren(child.props.children, value, onChange, isDisabled),
+          children: enhanceRadioChildren(childProps.children, value, onChange, isDisabled),
         })
       }
 

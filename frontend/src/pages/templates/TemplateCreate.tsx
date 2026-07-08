@@ -146,7 +146,7 @@ const TemplateCreate: FC = () => {
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
               onChange={handleFieldChange('name')}
-              placeholder="Type a template title"
+              {...({ placeholder: 'Type a template title' } as any)}
               className="template-form__field"
               size="small"
               isRequired
@@ -158,7 +158,7 @@ const TemplateCreate: FC = () => {
           <div className="template-form__section template-form__section--template-type">
             <RadioGroup
               className="template-form__radio-group"
-              label={<RequiredLabel text="Template type" />}
+              label={(<RequiredLabel text="Template type" />) as unknown as string}
               value={formData.channelCode}
               onChange={(value) => {
                 setFormData((prev) => ({ ...prev, channelCode: value }))
@@ -196,7 +196,7 @@ const TemplateCreate: FC = () => {
           <div className="template-form__section template-form__section--syntax-type error-after-label">
             <RadioGroup
               className="template-form__radio-group"
-              label={<RequiredLabel text="Syntax type" />}
+              label={(<RequiredLabel text="Syntax type" />) as unknown as string}
               description="Choose the syntax used for dynamic variables and placeholders in this template."
               value={formData.engineCode}
               onChange={(value) => {
