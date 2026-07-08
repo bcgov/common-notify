@@ -1,0 +1,65 @@
+# mcp-console
+#
+# DEFAULT DEPLOYMENT (2 containers)
+#   backend   — NestJS API + Postgres combined in one container (data persisted in the
+#               "mcp-console-pgdata" volume)
+#   frontend  — static build served by nginx, proxying /api to the backend container
+#
+#   1. cp .env.example .env && edit ENCRYPTION_KEY (see .env.example for how to generate one)
+#   2. docker compose up -d --build
+#   3. Open http://localhost:8080
+#
+# LOCAL DEVELOPMENT (hot reload, backend runs un-containerized on the host)
+#   The backend needs to reach arbitrary MCP servers you register — often on
+#   localhost/127.0.0.1 — which is simplest from the host's own network namespace.
+#
+#   1. docker compose --profile dev up -d postgres-dev
+#   2. cd backend && npm install && npm run migration:run && npm run start:dev
+#   3. cd frontend && npm install && npm run dev
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mcp_console}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mcp_console}
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-mcp_console}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set — see .env.example}
+      PORT: 3100
+    ports:
+      - "3100:3100"
+    volumes:
+      - mcp-console-pgdata:/var/lib/postgresql/data
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+  # ── Local dev only — standalone Postgres for a host-run backend (npm run start:dev) ──
+  postgres-dev:
+    profiles: [dev]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-mcp_console}
+      POSTGRES_USER: ${POSTGRES_USER:-mcp_console}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mcp_console}
+    ports:
+      # Offset from 5432 to avoid clashing with the "backend" container's internal Postgres
+      # or any other local Postgres instance.
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - mcp-console-pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mcp_console}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mcp-console-pgdata:
+  mcp-console-pgdata-dev:

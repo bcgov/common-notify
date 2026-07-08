@@ -1,0 +1,22 @@
+registry:
+  teams-connector:
+    title: "Teams Connector"
+    type: server
+    image: "teams-connector-mcp:latest"
+    description: >
+      Post notifications to Microsoft Teams channels via the devx-teams-connector
+      Bot Framework relay. Supports plain text, HTML, pre-built templates
+      (generic, GitHub PR/workflow, Sysdig, Uptime, DB backup, ArgoCD),
+      and raw Adaptive Card pass-through.
+    # TEAMS_CONNECTOR_URL is intentionally not declared here — it's optional
+    # and defaults to the BC Gov relay deployment inside the server itself.
+    # Set it via `docker run -e` for the standalone stdio path if you need to
+    # point at a different connector instance.
+    env:
+      - name: CONNECTOR_API_KEY
+        value: "{{teams-connector.connector_api_key}}"
+    secrets:
+      - name: teams-connector.connector_api_key
+        env: CONNECTOR_API_KEY
+        example: your-api-key-here
+        description: Bearer token matching CONNECTOR_API_KEY on the devx-teams-connector service

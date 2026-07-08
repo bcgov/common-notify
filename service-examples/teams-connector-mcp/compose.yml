@@ -1,0 +1,58 @@
+# Docker MCP Toolkit — teams-connector-mcp
+#
+# PROFILES
+#   gateway  (default)   docker/mcp-gateway proxies the MCP server over SSE.
+#                        Used when integrating via Docker MCP Toolkit / Docker Desktop.
+#
+#   build                Build-only helper; used to build the local image before
+#                        the gateway can reference it.
+#
+# QUICK START
+#   1. cp .env.example .env && edit .env
+#   2. docker compose --profile build build
+#   3. docker compose --profile gateway up
+#   4. Point your MCP client at http://localhost:8811/mcp (SSE transport)
+
+services:
+
+  # ── Build helper ─────────────────────────────────────────────────────────
+  # Not started by default; used only to produce the local image.
+  teams-connector-mcp:
+    profiles: [build]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: teams-connector-mcp:latest
+
+  # ── Docker MCP Gateway ────────────────────────────────────────────────────
+  # Acts as the MCP proxy between AI clients (Claude Desktop, Claude Code, etc.)
+  # and the containerised MCP server. The gateway spawns the server container
+  # on-demand using the Docker socket.
+  gateway:
+    profiles: [gateway]
+    image: docker/mcp-gateway:latest
+    ports:
+      - "8811:8811"
+    volumes:
+      # Docker socket — required so the gateway can launch the server container
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Custom catalog that registers teams-connector-mcp:latest.
+      # Must live under ~/.docker/mcp/catalogs/ inside the container — the
+      # gateway refuses --catalog paths that resolve outside that directory.
+      - ./catalog.yaml:/root/.docker/mcp/catalogs/teams-connector.yaml:ro
+    command:
+      - --servers=teams-connector
+      - --catalog=/root/.docker/mcp/catalogs/teams-connector.yaml
+      - --transport=sse
+      - --port=8811
+      - --secrets=/run/secrets/mcp_secrets
+    secrets:
+      - mcp_secrets
+    restart: unless-stopped
+
+secrets:
+  # The gateway reads CONNECTOR_API_KEY (and optionally TEAMS_CONNECTOR_URL) from
+  # this file and injects them into the MCP server container at runtime.
+  # Copy .env.example → .env and fill in real values before starting.
+  mcp_secrets:
+    file: .env

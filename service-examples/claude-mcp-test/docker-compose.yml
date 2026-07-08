@@ -1,0 +1,34 @@
+services:
+
+  # ── HTTP mode — for direct API use and ToolHive MCP Inspector ─────────────
+  subscription-mcp-http:
+    build: .
+    image: subscription-mcp:latest
+    container_name: subscription-mcp-http
+    environment:
+      TRANSPORT: http
+      PORT: "8000"
+      HOST: "0.0.0.0"
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      MCP_API_KEY: ${MCP_API_KEY:-}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    profiles:
+      - http
+
+  # ── stdio mode — invoked by Claude Desktop per-session ────────────────────
+  # Claude Desktop launches this with docker run -i, not docker-compose.
+  # This service is here for reference only; use the claude_desktop_config.json
+  # snippet in README.md to configure Claude Desktop.
+  subscription-mcp-stdio:
+    build: .
+    image: subscription-mcp:latest
+    container_name: subscription-mcp-stdio
+    environment:
+      TRANSPORT: stdio
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    stdin_open: true
+    tty: false
+    profiles:
+      - stdio

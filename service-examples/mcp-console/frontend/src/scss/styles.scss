@@ -1,0 +1,49 @@
+@import './variables.scss';
+@import '../../node_modules/bootstrap/scss/bootstrap';
+$bootstrap-icons-font-src:
+  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2') format('woff2'),
+  url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff') format('woff');
+@import '../../node_modules/bootstrap-icons/font/bootstrap-icons.scss';
+
+html,
+body {
+  font-family: 'BC Sans', sans-serif;
+  background-color: $light-bg;
+}
+
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.layout-body {
+  display: flex;
+  justify-content: center;
+  flex: 1;
+}
+
+.layout-content {
+  width: 100%;
+  max-width: 1100px;
+  padding: $spacing-xl $spacing-md;
+}
+
+.required-marker {
+  color: $danger-color;
+}
+
+.tool-result-panel {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: $font-size-sm;
+  background-color: $dark-text;
+  color: $white;
+  border-radius: 0.25rem;
+  padding: $spacing-md;
+}
+
+.tool-result-panel--error {
+  background-color: $danger-color;
+}

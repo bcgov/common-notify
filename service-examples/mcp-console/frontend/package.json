@@ -1,0 +1,33 @@
+{
+  "name": "mcp-console-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@bcgov/bc-sans": "^2.1.0",
+    "@bcgov/design-system-react-components": "^0.6.1",
+    "@tanstack/react-router": "^1.114.12",
+    "axios": "^1.15.0",
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
+    "react": "^19.0.0",
+    "react-bootstrap": "^2.10.9",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/router-plugin": "^1.114.27",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^5.0.0",
+    "sass-embedded": "^1.86.0",
+    "typescript": "^5.7.3",
+    "vite": "^7.0.0"
+  }
+}
