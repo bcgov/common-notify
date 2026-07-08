@@ -127,7 +127,7 @@ const Templates: FC = () => {
     <div>
       <PageHeading title="Notification Templates" />
 
-      <div className="row mb-3 g-2 align-items-center">
+      <div className="row mb-5 g-2 align-items-center">
         <div className="col-auto">
           <input
             type="search"
