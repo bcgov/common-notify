@@ -1,13 +1,51 @@
 import { useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react-components'
+import {
+  Button,
+  TextField,
+  RadioGroup,
+  Radio,
+  Tooltip,
+  TooltipTrigger,
+  SvgInfoIcon,
+} from '@bcgov/design-system-react-components'
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'This field is required.'
+const SYNTAX_TOOLTIPS = [
+  {
+    value: TemplateEngine.HANDLEBARS,
+    label: 'Handlebars',
+    tooltipLabel: 'About Handlebars syntax',
+    tooltipText:
+      'A templating language that uses placeholders (e.g., {{firstName}}) and supports helpers, conditions, and loops for creating dynamic content.',
+  },
+  {
+    value: TemplateEngine.MUSTACHE,
+    label: 'Mustache',
+    tooltipLabel: 'About Mustache syntax',
+    tooltipText:
+      'A logic-less templating language that uses placeholders (e.g., {{firstName}}) to insert dynamic values into templates.',
+  },
+  {
+    value: TemplateEngine.LEGACY_GC_NOTIFY,
+    label: 'GC Notify (legacy)',
+    tooltipLabel: 'About GC Notify legacy syntax',
+    tooltipText:
+      'Legacy syntax used by GC Notify templates. Select this when importing or editing templates created with GC Notify.',
+  },
+  {
+    value: TemplateEngine.MJML,
+    label: 'MJML',
+    tooltipLabel: 'About MJML syntax',
+    tooltipText:
+      'A markup language for building responsive HTML emails that render consistently across email clients.',
+  },
+] as const
 
 const RequiredLabel = ({ text }: { text: string }) => (
   <span className="template-form__required-label">
@@ -101,7 +139,7 @@ const TemplateCreate: FC = () => {
     <div className="template-form-page">
       <div className="template-form-page__content">
         <PageHeading title="Create reusable template" />
-        <form className="template-form" onSubmit={handleSave}>
+        <form className="template-form" noValidate onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">
             <TextField
               label="Template title"
@@ -175,18 +213,24 @@ const TemplateCreate: FC = () => {
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
-              <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
-                Handlebars
-              </Radio>
-              <Radio key="mustache" value={TemplateEngine.MUSTACHE}>
-                Mustache
-              </Radio>
-              <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
-                GC Notify (legacy)
-              </Radio>
-              <Radio key="mjml" value={TemplateEngine.MJML}>
-                MJML
-              </Radio>
+              {SYNTAX_TOOLTIPS.map((option) => (
+                <div className="template-form__syntax-option" key={option.value}>
+                  <Radio value={option.value}>{option.label}</Radio>
+                  <TooltipTrigger>
+                    <Button
+                      aria-label={option.tooltipLabel}
+                      className="template-form__syntax-tooltip-trigger"
+                      isIconButton
+                      size="xsmall"
+                      type="button"
+                      variant="tertiary"
+                    >
+                      <SvgInfoIcon />
+                    </Button>
+                    <Tooltip placement="left">{option.tooltipText}</Tooltip>
+                  </TooltipTrigger>
+                </div>
+              ))}
             </RadioGroup>
           </div>
 

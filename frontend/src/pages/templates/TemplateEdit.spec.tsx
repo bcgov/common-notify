@@ -44,22 +44,44 @@ vi.mock('@bcgov/design-system-react-components', async () => {
   }
 
   const Button = ({
+    className,
     children,
+    isIconButton,
     onClick,
     onPress,
+    size,
     type,
     isDisabled,
+    variant,
+    ...props
   }: {
+    className?: string
     children: ReactNode
+    isIconButton?: boolean
     onClick?: () => void
     onPress?: () => void
+    size?: string
     type?: 'button' | 'submit'
     isDisabled?: boolean
-  }) => (
-    <button disabled={isDisabled} onClick={onClick ?? onPress} type={type ?? 'button'}>
-      {children}
-    </button>
-  )
+    variant?: string
+    [key: string]: unknown
+  }) => {
+    void isIconButton
+    void size
+    void variant
+
+    return (
+      <button
+        className={className}
+        disabled={isDisabled}
+        onClick={onClick ?? onPress}
+        {...props}
+        type={type ?? 'button'}
+      >
+        {children}
+      </button>
+    )
+  }
 
   const TextField = ({
     label,
@@ -115,6 +137,34 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     </label>
   )
 
+  const enhanceRadioChildren = (
+    children: ReactNode,
+    value: string,
+    onChange: (value: string) => void,
+    isDisabled?: boolean,
+  ): ReactNode =>
+    React.Children.map(children, (child) => {
+      if (!React.isValidElement(child)) {
+        return child
+      }
+
+      if ('value' in child.props) {
+        return React.cloneElement<RadioOptionProps>(child, {
+          checked: child.props.value === value,
+          onSelect: onChange,
+          disabled: isDisabled,
+        })
+      }
+
+      if ('children' in child.props) {
+        return React.cloneElement(child, {
+          children: enhanceRadioChildren(child.props.children, value, onChange, isDisabled),
+        })
+      }
+
+      return child
+    })
+
   const RadioGroup = ({
     label,
     value,
@@ -134,20 +184,18 @@ vi.mock('@bcgov/design-system-react-components', async () => {
   }) => (
     <fieldset disabled={isDisabled}>
       <legend>{isRequired ? `${label} (required)` : label}</legend>
-      {React.Children.map(children, (child) =>
-        React.isValidElement<RadioOptionProps>(child)
-          ? React.cloneElement<RadioOptionProps>(child, {
-              checked: child.props.value === value,
-              onSelect: onChange,
-              disabled: isDisabled,
-            })
-          : child,
-      )}
+      {enhanceRadioChildren(children, value, onChange, isDisabled)}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </fieldset>
   )
 
-  return { Button, Radio, RadioGroup, TextField }
+  const TooltipTrigger = ({ children }: { children: ReactNode }) => <>{children}</>
+
+  const Tooltip = ({ children }: { children: ReactNode }) => <span>{children}</span>
+
+  const SvgInfoIcon = () => <svg aria-hidden="true" />
+
+  return { Button, Radio, RadioGroup, SvgInfoIcon, TextField, Tooltip, TooltipTrigger }
 })
 
 const template = {
@@ -227,6 +275,18 @@ describe('TemplateEdit', () => {
 
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+  })
+
+  it('renders all syntax tooltip triggers', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'About Handlebars syntax' })).toBeTruthy()
+    })
+
+    expect(screen.getByRole('button', { name: 'About Mustache syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About GC Notify legacy syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {
