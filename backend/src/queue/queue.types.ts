@@ -52,6 +52,7 @@ export interface NotificationRequest {
 export interface MailMergeJobData {
   templateId?: string
   content?: {
+    templateId?: string
     subject?: string
     body?: string
     bodyType?: 'text' | 'markdown' | 'html'

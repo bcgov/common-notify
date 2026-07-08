@@ -362,10 +362,15 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { templateId, content, params, recipients } = mailMergeData
+    const { content, params, recipients } = mailMergeData
+    const templateId = content?.templateId
+    const hasInlineContent = !!(content && (content.subject || content.body))
 
-    // A mail merge send renders from either a server template or inline content (systemic error if neither).
-    if (!templateId && !(content && (content.subject || content.body))) {
+    // A mail merge send renders from exactly one source: a server template or inline content.
+    if (templateId && hasInlineContent) {
+      throw new Error('Mail merge requires either a templateId or inline content, not both')
+    }
+    if (!templateId && !hasInlineContent) {
       throw new Error('Mail merge requires either a templateId or inline content')
     }
 

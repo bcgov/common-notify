@@ -95,7 +95,7 @@ export class IngestionWorker {
         // Mail merge email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
         if (job.data.mailMerge && job.data.mailMergeData) {
-          const { templateId, content, params, recipients } = job.data.mailMergeData
+          const { content, params, recipients } = job.data.mailMergeData
           const batchSize = configService?.get<number>('queue.batchSize') || 100
 
           logger.log(
@@ -125,7 +125,7 @@ export class IngestionWorker {
               attempt: 0,
               mailMerge: true,
               batchId,
-              mailMergeData: { templateId, content, params, recipients: chunk },
+              mailMergeData: { content, params, recipients: chunk },
             }
 
             await emailQueue.add(deliveryPayload, {
