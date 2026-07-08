@@ -19,6 +19,8 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
 
 interface TemplateEditProps {
@@ -66,7 +68,8 @@ const RequiredLabel = ({ text }: { text: string }) => (
 
 const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
-  const location = useLocation()
+  const { primaryRole } = useCstarRoles()
+  const isReadOnly = primaryRole === CstarRole.NOTIFY_VIEWER
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

@@ -5,20 +5,20 @@ import { Link } from '@tanstack/react-router'
 import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import { CstarRole } from '@/enum/cstar-role.enum'
 
 const navItems = [
   {
@@ -27,24 +27,9 @@ const navItems = [
     icon: <HomeOutlinedIcon />,
   },
   {
-    label: 'Notification Events',
-    to: '/notification-events',
-    icon: <WorkspacesOutlinedIcon />,
-  },
-  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
-  },
-  {
-    label: 'Distribution Lists',
-    to: '/distribution-lists',
-    icon: <GroupsOutlinedIcon />,
-  },
-  {
-    label: 'Settings',
-    to: '/settings',
-    icon: <SettingsOutlinedIcon />,
   },
 ]
 
@@ -64,15 +49,9 @@ const Sidebar: FC = () => {
   const [adminExpanded, setAdminExpanded] = useState(false)
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
-  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
-
-  // Determine which menu items to show based on roles
-  // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
-  const showDashboard = cstarTenants.length > 0
-  const showTemplates = cstarTenants.length > 0
-  // Feature Flags requires NOTIFY_ADMIN (SSO)
-  const showAdminFeatureFlags = isAdmin
+  const { hasRole, hasTenantRole } = useCstarRoles()
+  const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+  const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -100,11 +79,12 @@ const Sidebar: FC = () => {
       {/* Top nav */}
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
-          // Conditionally show nav items based on user roles
           const shouldShow =
-            (item.label === 'Dashboard' && showDashboard) ||
-            (item.label === 'Templates' && showTemplates) ||
-            (item.label !== 'Dashboard' && item.label !== 'Templates') // Always show non-conditional items
+            (item.label === 'Dashboard' && hasTenantRole) ||
+            (item.label === 'Notification Events' && hasTenantRole) ||
+            (item.label === 'Templates' && hasTenantRole) ||
+            (item.label === 'Distribution Lists' && hasTenantRole) ||
+            (item.label === 'Settings' && isOperationsAdmin)
 
           return shouldShow ? (
             <Link
@@ -138,7 +118,7 @@ const Sidebar: FC = () => {
             </button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
-                {showAdminFeatureFlags && (
+                {isAdmin && (
                   <Link
                     to="/admin/feature-flags"
                     className="sidebar__subitem"
