@@ -68,6 +68,13 @@
 
 .template-form__body-label {
   margin-bottom: 0;
+  font-weight: 700;
+}
+
+.template-form__section .bcds-react-aria-TextField--Label,
+.template-form__radio-group .bcds-react-aria-RadioGroup--label,
+.template-form__required-label-text {
+  font-weight: 700;
 }
 
 .template-form__section .bcds-react-aria-TextField--Label.required {
