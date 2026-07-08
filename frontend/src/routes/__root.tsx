@@ -8,6 +8,7 @@ import { fetchAllNotifyTenants } from '@/redux/thunks/adminTenants.thunks'
 import NotFound from '@/components/NotFound'
 import Layout from '@/components/Layout'
 import UserService from '@/service/user-service'
+import { SsoRole } from '@/enum/sso-role.enum'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -36,7 +37,7 @@ function RootLayout() {
   useEffect(() => {
     // Load feature flags and admin tenants only if user is NOTIFY_ADMIN
     // The backend will return 401/403 if user isn't an admin, so skip the fetch entirely
-    if (!UserService.hasRole('NOTIFY_ADMIN')) {
+    if (!UserService.hasRole(SsoRole.NOTIFY_ADMIN)) {
       adminDataFetchedRef.current = true
       return
     }
@@ -91,7 +92,7 @@ function RootLayout() {
     checkAuthorizationRef.current = true
 
     // Check user's authorization status
-    const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+    const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
 
     // If user has no CSTAR tenants AND no tenant is selected:
     // - If they are NOTIFY_ADMIN: redirect to feature flags (bootstrap/admin access)
