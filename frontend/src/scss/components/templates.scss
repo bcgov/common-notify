@@ -170,11 +170,24 @@
   width: 20px;
   height: 20px;
   padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #605e5c;
 }
 
 .template-form__syntax-tooltip-trigger svg {
   width: 16px;
   height: 16px;
+}
+
+.template-form__syntax-tooltip-trigger[data-hovered],
+.template-form__syntax-tooltip-trigger[data-pressed],
+.template-form__syntax-tooltip-trigger[data-selected],
+.template-form__syntax-tooltip-trigger[data-disabled] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {
