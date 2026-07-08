@@ -1100,7 +1100,7 @@ describe('EmailDeliveryWorker', () => {
             mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
             mailMergeData: {
-              templateId: 'template-uuid',
+              content: { templateId: 'template-uuid' },
               params: {},
               recipients: addresses.map((address) => ({ address, params: {} })),
             },
