@@ -121,6 +121,8 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'createdAt',
       label: 'Created',
+      sortable: true,
+      sortType: 'date',
       render: (_, row) => new Date(row.createdAt).toLocaleString(),
     },
   ]

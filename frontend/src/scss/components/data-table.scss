@@ -260,17 +260,15 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     gap: $spacing-xs;
   }
 
-  &__header-label {
-    flex: 1;
-  }
-
   &__dropdown-btn {
     @include button-reset;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 2px;
+    position: relative;
+    top: 2px;
+    padding: 3px;
     color: inherit;
     line-height: 1;
     border-radius: 3px;
@@ -282,7 +280,7 @@ $table-header-bg: #f1f8fe; // Table header / footer color
 
   &__dropdown-icon {
     display: block;
-    font-size: 1rem !important;
+    font-size: 1.2rem !important;
     opacity: 0.7;
   }
 
