@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { BadRequestException } from '@nestjs/common'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -60,6 +61,13 @@ describe('TemplatesService', () => {
     body: 'Your code is {{code}}',
     engineCode: TemplateEngine.MJML,
     bodyType: null,
+  }
+
+  const mockLegacyTemplate: Template = {
+    ...mockTemplate,
+    subject: 'Order ((orderNumber)) update',
+    body: 'Hello ((firstName)), status: ((status))',
+    engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
   }
 
   const mockRepository = {
@@ -238,6 +246,122 @@ describe('TemplatesService', () => {
 
       expect(result.body).toBe('Your code is 123456')
       expect(result.bodyType).toBe('html')
+    })
+
+    it('should throw BadRequestException when legacy body personalisation is missing', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Static subject',
+        body: 'Hello ((firstName))',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(BadRequestException)
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName',
+      )
+    })
+
+    it('should throw BadRequestException when legacy subject personalisation is missing', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Order ((orderNumber)) ready',
+        body: 'Body only',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(BadRequestException)
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: orderNumber',
+      )
+    })
+
+    it('should render legacy templates when all required keys are present', async () => {
+      const result = await service.renderTemplateContent(mockLegacyTemplate, {
+        firstName: 'John',
+        status: 'submitted',
+        orderNumber: 'ORD-123',
+      })
+
+      expect(result.subject).toBe('Order ORD-123 update')
+      expect(result.body).toBe('Hello John, status: submitted')
+      expect(result.bodyType).toBe('markdown')
+    })
+
+    it('should require the placeholder key even when legacy syntax includes fallback text', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        body: 'Status: ((status??submitted for review))',
+        subject: 'Static subject',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: status',
+      )
+    })
+
+    it('should list multiple missing legacy keys in stable order', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Order ((orderNumber)) for ((status??submitted for review))',
+        body: 'Hello ((firstName)), amount: ((amount))',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName, amount, orderNumber, status',
+      )
+    })
+
+    it('should treat null personalisation as an empty object for legacy templates', async () => {
+      await expect(service.renderTemplateContent(mockLegacyTemplate, null as any)).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName, status, orderNumber',
+      )
+    })
+
+    it('should not change handlebars validation behavior', async () => {
+      const result = await service.renderTemplateContent(
+        {
+          ...mockTemplate,
+          body: 'Hello {{missing}}',
+          engineCode: TemplateEngine.HANDLEBARS,
+        },
+        {},
+      )
+
+      expect(result.body).toBe('Hello ')
+    })
+
+    it('should not change mustache validation behavior', async () => {
+      const result = await service.renderTemplateContent(
+        {
+          ...mockTemplate,
+          body: 'Hello {{missing}}',
+          engineCode: TemplateEngine.MUSTACHE,
+        },
+        {},
+      )
+
+      expect(result.body).toBe('Hello ')
+    })
+
+    it('should not change MJML validation behavior', async () => {
+      const result = await service.renderTemplateContent(
+        {
+          ...mockMjmlTemplate,
+          body: `
+            <mjml>
+              <mj-body>
+                <mj-section>
+                  <mj-column>
+                    <mj-text>Hello {{missing}}</mj-text>
+                  </mj-column>
+                </mj-section>
+              </mj-body>
+            </mjml>
+          `,
+        },
+        {},
+      )
+
+      expect(result.body).toContain('Hello')
     })
   })
 

@@ -19,6 +19,7 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
+import { extractLegacyGcNotifyPlaceholders } from '../../services/rendering/engines/legacy-gc-notify-placeholder.parser'
 
 /**
  * Service for template business logic
@@ -235,9 +236,13 @@ export class TemplatesService {
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
   ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
+    const normalizedPersonalisation = personalisation ?? {}
+
+    this.validateLegacyGcNotifyPersonalisation(template, normalizedPersonalisation)
+
     // Convert all personalisation values to strings for template rendering
     const stringPersonalisation: Record<string, string> = {}
-    for (const [key, value] of Object.entries(personalisation)) {
+    for (const [key, value] of Object.entries(normalizedPersonalisation)) {
       stringPersonalisation[key] = value !== null && value !== undefined ? String(value) : ''
     }
 
@@ -314,6 +319,34 @@ export class TemplatesService {
         return 'sms'
       default:
         return 'email' // default fallback
+    }
+  }
+
+  private validateLegacyGcNotifyPersonalisation(
+    template: Template,
+    personalisation: Record<string, any>,
+  ): void {
+    if (template.engineCode !== TemplateEngine.LEGACY_GC_NOTIFY) {
+      return
+    }
+
+    const requiredKeys = [
+      ...new Set([
+        ...extractLegacyGcNotifyPlaceholders(template.body),
+        ...(template.channelCode === NotificationChannel.EMAIL
+          ? extractLegacyGcNotifyPlaceholders(template.subject)
+          : []),
+      ]),
+    ]
+
+    const missingKeys = requiredKeys.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
+    )
+
+    if (missingKeys.length > 0) {
+      throw new BadRequestException(
+        `Missing personalisation for template ID ${template.id}: ${missingKeys.join(', ')}`,
+      )
     }
   }
 
