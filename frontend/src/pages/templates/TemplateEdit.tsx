@@ -86,7 +86,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
-  const isReadOnly = location.pathname.startsWith('/templates/')
 
   useEffect(() => {
     const fetchTemplate = async () => {
