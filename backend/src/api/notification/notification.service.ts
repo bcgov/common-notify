@@ -261,8 +261,12 @@ export class NotificationService {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
-    // A merge renders from either a server template or inline content.
-    if (templateId) {
+    // A merge renders from exactly one source: a server template or inline content.
+    if (templateId && hasInlineContent) {
+      errors.push(
+        'Request must provide either a templateId or inline content (subject/body), not both',
+      )
+    } else if (templateId) {
       const template = await this.templatesRepository.findById(tenantId, templateId)
       if (!template) {
         errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)

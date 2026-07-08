@@ -150,7 +150,6 @@ async function handleEmailMerge(
         requestedAt: new Date().toISOString(),
         mailMerge: true,
         mailMergeData: {
-          templateId: email.content?.templateId,
           content: email.content,
           params: globalParams,
           recipients,

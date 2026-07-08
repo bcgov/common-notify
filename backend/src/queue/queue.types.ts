@@ -50,7 +50,6 @@ export interface NotificationRequest {
  * per-recipient `params` override them on a per-key basis.
  */
 export interface MailMergeJobData {
-  templateId?: string
   content?: {
     templateId?: string
     subject?: string
