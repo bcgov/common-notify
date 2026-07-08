@@ -17,3 +17,10 @@
     order: 1;
   }
 }
+
+// The design system ships a disabled+selected override, but its selector has a
+// casing typo (.bcds-react-aria-radio) so it never matches and the selected
+// radio keeps the primary color. Re-apply it with the correct casing.
+.bcds-react-aria-Radio[data-selected][data-disabled]:before {
+  border: 5px solid #d8d8d8;
+}
