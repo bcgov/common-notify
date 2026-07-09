@@ -7,6 +7,7 @@ import TemplateEdit from './TemplateEdit'
 const navigateMock = vi.fn()
 const getTemplateByIdMock = vi.fn()
 const updateTemplateMock = vi.fn()
+const useCstarRolesMock = vi.fn(() => ({ primaryRole: 'NOTIFY_ADMIN' }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -34,26 +35,62 @@ vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
 
+vi.mock('@/hooks/useCstarRoles', () => ({
+  useCstarRoles: () => useCstarRolesMock(),
+}))
+
 vi.mock('@bcgov/design-system-react-components', async () => {
   const React = await import('react')
+  type RadioOptionProps = {
+    value: string
+    checked?: boolean
+    onSelect?: (value: string) => void
+    disabled?: boolean
+  }
+  type NestedRadioChildProps = {
+    value?: string
+    children?: ReactNode
+  }
 
   const Button = ({
+    className,
     children,
+    isIconButton,
     onClick,
     onPress,
+    size,
     type,
     isDisabled,
+    variant,
+    ...props
   }: {
+    className?: string
     children: ReactNode
+    isIconButton?: boolean
     onClick?: () => void
     onPress?: () => void
+    size?: string
     type?: 'button' | 'submit'
     isDisabled?: boolean
-  }) => (
-    <button disabled={isDisabled} onClick={onClick ?? onPress} type={type ?? 'button'}>
-      {children}
-    </button>
-  )
+    variant?: string
+    [key: string]: unknown
+  }) => {
+    void isIconButton
+    void size
+    void variant
+
+    return (
+      <button
+        className={className}
+        disabled={isDisabled}
+        onClick={onClick ?? onPress}
+        {...props}
+        type={type ?? 'button'}
+      >
+        {children}
+      </button>
+    )
+  }
 
   const TextField = ({
     label,
@@ -61,16 +98,24 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     onChange,
     description,
     errorMessage,
+    isRequired,
+    placeholder,
   }: {
     label: ReactNode
     value: string
     onChange: (value: string) => void
     description?: string
     errorMessage?: string
+    isRequired?: boolean
+    placeholder?: string
   }) => (
     <label>
-      {label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      {isRequired ? `${label} (required)` : label}
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
       {description ? <span>{description}</span> : null}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </label>
@@ -101,6 +146,36 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     </label>
   )
 
+  const enhanceRadioChildren = (
+    children: ReactNode,
+    value: string,
+    onChange: (value: string) => void,
+    isDisabled?: boolean,
+  ): ReactNode =>
+    React.Children.map(children, (child) => {
+      if (!React.isValidElement<NestedRadioChildProps>(child)) {
+        return child
+      }
+
+      const childProps = child.props
+
+      if (typeof childProps.value === 'string') {
+        return React.cloneElement(child as React.ReactElement<RadioOptionProps>, {
+          checked: childProps.value === value,
+          onSelect: onChange,
+          disabled: isDisabled,
+        })
+      }
+
+      if (childProps.children !== undefined) {
+        return React.cloneElement(child, {
+          children: enhanceRadioChildren(childProps.children, value, onChange, isDisabled),
+        })
+      }
+
+      return child
+    })
+
   const RadioGroup = ({
     label,
     value,
@@ -108,6 +183,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children,
     errorMessage,
     isDisabled,
+    isRequired,
   }: {
     label: ReactNode
     value: string
@@ -115,23 +191,22 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children: ReactNode
     errorMessage?: string
     isDisabled?: boolean
+    isRequired?: boolean
   }) => (
     <fieldset disabled={isDisabled}>
-      <legend>{label}</legend>
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child, {
-              checked: child.props.value === value,
-              onSelect: onChange,
-              disabled: isDisabled,
-            })
-          : child,
-      )}
+      <legend>{isRequired ? `${label} (required)` : label}</legend>
+      {enhanceRadioChildren(children, value, onChange, isDisabled)}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </fieldset>
   )
 
-  return { Button, Radio, RadioGroup, TextField }
+  const TooltipTrigger = ({ children }: { children: ReactNode }) => <>{children}</>
+
+  const Tooltip = ({ children }: { children: ReactNode }) => <span>{children}</span>
+
+  const SvgInfoIcon = () => <svg aria-hidden="true" />
+
+  return { Button, Radio, RadioGroup, SvgInfoIcon, TextField, Tooltip, TooltipTrigger }
 })
 
 const template = {
@@ -153,6 +228,7 @@ const template = {
 describe('TemplateEdit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useCstarRolesMock.mockReturnValue({ primaryRole: 'NOTIFY_ADMIN' })
     getTemplateByIdMock.mockResolvedValue(template)
     updateTemplateMock.mockResolvedValue({})
   })
@@ -167,6 +243,61 @@ describe('TemplateEdit', () => {
     })
 
     expect(screen.queryByText('Body type')).toBeNull()
+  })
+
+  it('shows the Figma template title placeholder', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Type a template title')).toBeTruthy()
+    })
+  })
+
+  it('keeps preview disabled and shows inline errors for missing required fields', async () => {
+    const { container } = render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Welcome Template')).toBeTruthy()
+    })
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Template body (required)'), {
+      target: { value: '' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateTemplateMock).not.toHaveBeenCalled()
+    })
+
+    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
+  })
+
+  it('preserves read-only view mode behavior', async () => {
+    useCstarRolesMock.mockReturnValue({ primaryRole: 'NOTIFY_VIEWER' })
+
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'View reusable template' })).toBeTruthy()
+    })
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+  })
+
+  it('renders all syntax tooltip triggers', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'About Handlebars syntax' })).toBeTruthy()
+    })
+
+    expect(screen.getByRole('button', { name: 'About Mustache syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About GC Notify legacy syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {
