@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import Dashboard from '@/pages/dashboard/Dashboard'
@@ -37,7 +38,9 @@ describe('Dashboard with CodeTables', () => {
 
   const baseNotificationState = {
     items: [],
-    statusFilter: 'all',
+    sortBy: null,
+    sortOrder: null,
+    filters: {},
     page: 1,
     limit: 10,
     count: 0,
@@ -100,25 +103,24 @@ describe('Dashboard with CodeTables', () => {
     expect(selectElements.length).toBeGreaterThan(0)
   })
 
-  it('should render status filter with code table items from Redux', async () => {
+  it('should render status column filter options from Redux code tables', async () => {
     const store = createStore(preloadedState)
+    const user = userEvent.setup()
 
-    const { container } = render(
+    render(
       <Provider store={store}>
         <Dashboard />
       </Provider>,
     )
 
-    await waitFor(() => {
-      // The filter dropdown should contain "All" plus the statuses from Redux
-      const selectOptions = container.querySelectorAll('select option')
-      const optionValues = Array.from(selectOptions).map((opt) => opt.getAttribute('value'))
+    // Open the Status column header dropdown and reveal the filter submenu
+    await user.click(screen.getByRole('button', { name: /column options for status/i }))
+    fireEvent.mouseEnter(screen.getByText('Filter by'))
 
-      expect(optionValues).toContain('all')
-      expect(optionValues).toContain('sent')
-      expect(optionValues).toContain('failed')
-      expect(optionValues).toContain('pending')
-    })
+    // Filter options should come from the Redux code table statuses
+    expect(screen.getByText('Sent')).toBeInTheDocument()
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Pending')).toBeInTheDocument()
   })
 
   it('should use Redux statuses instead of enum', () => {
@@ -190,19 +192,7 @@ describe('Dashboard with CodeTables', () => {
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
   })
 
-  it('should update filter options when code tables change', () => {
-    const store = createStore(preloadedState)
-
-    const { rerender, container } = render(
-      <Provider store={store}>
-        <Dashboard />
-      </Provider>,
-    )
-
-    let selectOptions = container.querySelectorAll('select option')
-    expect(selectOptions.length).toBeGreaterThan(1)
-
-    // Dispatch action to update code tables
+  it('should reflect updated code table statuses in the column filter options', async () => {
     const newState: any = {
       codeTables: {
         ...mockCodeTablesState,
@@ -218,17 +208,18 @@ describe('Dashboard with CodeTables', () => {
       },
     }
 
-    const newStore = createStore(newState)
+    const store = createStore(newState)
+    const user = userEvent.setup()
 
-    rerender(
-      <Provider store={newStore}>
+    render(
+      <Provider store={store}>
         <Dashboard />
       </Provider>,
     )
 
-    selectOptions = container.querySelectorAll('select option')
-    const optionValues = Array.from(selectOptions).map((opt) => opt.getAttribute('value'))
+    await user.click(screen.getByRole('button', { name: /column options for status/i }))
+    fireEvent.mouseEnter(screen.getByText('Filter by'))
 
-    expect(optionValues).toContain('scheduled')
+    expect(screen.getByText('Scheduled')).toBeInTheDocument()
   })
 })
