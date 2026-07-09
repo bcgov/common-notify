@@ -17,3 +17,9 @@
     order: 1;
   }
 }
+
+// There was a typo in the design system css preventing this from being applied
+// They are fixing it very soon
+.bcds-react-aria-Radio[data-selected][data-disabled]:before {
+  border: 5px solid #d8d8d8;
+}

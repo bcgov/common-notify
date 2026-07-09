@@ -1,5 +1,5 @@
 export { DataTable } from './DataTable'
-export type { TableColumn, TableProps } from './DataTable'
+export type { TableColumn, TableProps, FilterOption } from './DataTable'
 export { Table } from './Table'
 export type { TableProps as TableElementProps } from './Table'
 export { TableBody } from './TableBody'
