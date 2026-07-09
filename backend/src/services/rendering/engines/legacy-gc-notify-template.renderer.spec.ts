@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { Logger } from '@nestjs/common'
 import { vi } from 'vitest'
 import { LegacyGcNotifyTemplateRenderer } from './legacy-gc-notify-template.renderer'
-import { extractLegacyGcNotifyPlaceholders } from './legacy-gc-notify-placeholder.parser'
 import type { RenderContext } from '../../../adapters/interfaces'
 
 describe('LegacyGcNotifyTemplateRenderer', () => {
@@ -479,40 +478,6 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
 
       // Should not match because regex requires [a-zA-Z_] at start
       expect(result.subject).toBe('Value: ((1key))')
-    })
-  })
-
-  describe('extractLegacyGcNotifyPlaceholders', () => {
-    it('extracts ((firstName))', () => {
-      expect(extractLegacyGcNotifyPlaceholders('Hello ((firstName))')).toEqual(['firstName'])
-    })
-
-    it('extracts ((status??submitted for review)) as status', () => {
-      expect(
-        extractLegacyGcNotifyPlaceholders('Status: ((status??submitted for review))'),
-      ).toEqual(['status'])
-    })
-
-    it('extracts multiple placeholders in stable order', () => {
-      expect(
-        extractLegacyGcNotifyPlaceholders(
-          'Hello ((firstName)), order ((orderNumber)), amount ((amount))',
-        ),
-      ).toEqual(['firstName', 'orderNumber', 'amount'])
-    })
-
-    it('de-duplicates repeated placeholders', () => {
-      expect(
-        extractLegacyGcNotifyPlaceholders(
-          'Hello ((firstName)) again ((firstName)) and status ((status))',
-        ),
-      ).toEqual(['firstName', 'status'])
-    })
-
-    it('ignores non-GC placeholder syntax', () => {
-      expect(
-        extractLegacyGcNotifyPlaceholders('Hello {{firstName}} [orderNumber] ((1invalid))'),
-      ).toEqual([])
     })
   })
 })

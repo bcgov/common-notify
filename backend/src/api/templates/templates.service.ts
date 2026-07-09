@@ -19,7 +19,7 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
-import { extractLegacyGcNotifyPlaceholders } from '../../services/rendering/engines/legacy-gc-notify-placeholder.parser'
+import { extractTemplatePersonalisationKeys } from '../../services/rendering/template-personalisation-validation'
 
 /**
  * Service for template business logic
@@ -238,7 +238,7 @@ export class TemplatesService {
   ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
     const normalizedPersonalisation = personalisation ?? {}
 
-    this.validateLegacyGcNotifyPersonalisation(template, normalizedPersonalisation)
+    this.validateTemplatePersonalisation(template, normalizedPersonalisation)
 
     // Convert all personalisation values to strings for template rendering
     const stringPersonalisation: Record<string, string> = {}
@@ -322,22 +322,11 @@ export class TemplatesService {
     }
   }
 
-  private validateLegacyGcNotifyPersonalisation(
+  private validateTemplatePersonalisation(
     template: Template,
     personalisation: Record<string, any>,
   ): void {
-    if (template.engineCode !== TemplateEngine.LEGACY_GC_NOTIFY) {
-      return
-    }
-
-    const requiredKeys = [
-      ...new Set([
-        ...extractLegacyGcNotifyPlaceholders(template.body),
-        ...(template.channelCode === NotificationChannel.EMAIL
-          ? extractLegacyGcNotifyPlaceholders(template.subject)
-          : []),
-      ]),
-    ]
+    const requiredKeys = extractTemplatePersonalisationKeys(template)
 
     const missingKeys = requiredKeys.filter(
       (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
