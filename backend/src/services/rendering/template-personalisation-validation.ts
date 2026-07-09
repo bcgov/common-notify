@@ -63,12 +63,12 @@ function extractHandlebarsStylePlaceholders(text?: string): string[] {
   const placeholders = new Set<string>()
   const ast = Handlebars.parse(text) as any
 
-  visitHandlebarsNode(ast, placeholders)
+  visitHandlebarsNode(ast, placeholders, 0)
 
   return [...placeholders]
 }
 
-function visitHandlebarsNode(node: any, placeholders: Set<string>): void {
+function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: number): void {
   if (!node || typeof node !== 'object') {
     return
   }
@@ -76,69 +76,99 @@ function visitHandlebarsNode(node: any, placeholders: Set<string>): void {
   switch (node.type) {
     case 'Program':
       for (const child of node.body || []) {
-        visitHandlebarsNode(child, placeholders)
+        visitHandlebarsNode(child, placeholders, scopedDepth)
       }
       return
     case 'MustacheStatement':
-      collectHandlebarsReference(node, placeholders)
+      collectHandlebarsReference(node, placeholders, scopedDepth)
       return
-    case 'BlockStatement':
-      collectHandlebarsReference(node, placeholders)
-      visitHandlebarsNode(node.program, placeholders)
-      visitHandlebarsNode(node.inverse, placeholders)
+    case 'BlockStatement': {
+      const helperName = getHandlebarsPathName(node.path)
+      const nextScopedDepth =
+        helperName === 'with' || helperName === 'each' ? scopedDepth + 1 : scopedDepth
+
+      collectHandlebarsReference(node, placeholders, scopedDepth)
+      visitHandlebarsNode(node.program, placeholders, nextScopedDepth)
+      visitHandlebarsNode(node.inverse, placeholders, scopedDepth)
       return
+    }
     case 'PartialStatement':
     case 'PartialBlockStatement':
       for (const param of node.params || []) {
-        collectHandlebarsExpression(param, placeholders)
+        collectHandlebarsExpression(param, placeholders, scopedDepth)
       }
-      collectHandlebarsHash(node.hash, placeholders)
-      visitHandlebarsNode(node.program, placeholders)
+      collectHandlebarsHash(node.hash, placeholders, scopedDepth)
+      visitHandlebarsNode(node.program, placeholders, scopedDepth)
       return
     case 'SubExpression':
-      collectHandlebarsReference(node, placeholders)
+      collectHandlebarsReference(node, placeholders, scopedDepth)
       return
     default:
       return
   }
 }
 
-function collectHandlebarsReference(node: any, placeholders: Set<string>): void {
+function collectHandlebarsReference(
+  node: any,
+  placeholders: Set<string>,
+  scopedDepth: number,
+): void {
   const pathName = getHandlebarsPathName(node.path)
   const hasArguments = (node.params?.length ?? 0) > 0 || (node.hash?.pairs?.length ?? 0) > 0
 
-  if (pathName && !HANDLEBARS_CONTROL_NAMES.has(pathName) && !hasArguments) {
+  if (
+    pathName &&
+    !HANDLEBARS_CONTROL_NAMES.has(pathName) &&
+    !hasArguments &&
+    shouldCollectHandlebarsPath(node.path, scopedDepth)
+  ) {
     addPlaceholder(placeholders, pathName)
   }
 
   for (const param of node.params || []) {
-    collectHandlebarsExpression(param, placeholders)
+    collectHandlebarsExpression(param, placeholders, scopedDepth)
   }
 
-  collectHandlebarsHash(node.hash, placeholders)
+  collectHandlebarsHash(node.hash, placeholders, scopedDepth)
 }
 
-function collectHandlebarsExpression(expression: any, placeholders: Set<string>): void {
+function collectHandlebarsExpression(
+  expression: any,
+  placeholders: Set<string>,
+  scopedDepth: number,
+): void {
   if (!expression || typeof expression !== 'object') {
     return
   }
 
   switch (expression.type) {
     case 'PathExpression':
-      addPlaceholder(placeholders, getHandlebarsPathName(expression))
+      if (shouldCollectHandlebarsPath(expression, scopedDepth)) {
+        addPlaceholder(placeholders, getHandlebarsPathName(expression))
+      }
       return
     case 'SubExpression':
-      collectHandlebarsReference(expression, placeholders)
+      collectHandlebarsReference(expression, placeholders, scopedDepth)
       return
     default:
       return
   }
 }
 
-function collectHandlebarsHash(hash: any, placeholders: Set<string>): void {
+function collectHandlebarsHash(hash: any, placeholders: Set<string>, scopedDepth: number): void {
   for (const pair of hash?.pairs || []) {
-    collectHandlebarsExpression(pair.value, placeholders)
+    collectHandlebarsExpression(pair.value, placeholders, scopedDepth)
   }
+}
+
+function shouldCollectHandlebarsPath(path: any, scopedDepth: number): boolean {
+  const depth = typeof path?.depth === 'number' ? path.depth : 0
+
+  if (scopedDepth === 0) {
+    return true
+  }
+
+  return depth > 0
 }
 
 function getHandlebarsPathName(path: any): string | undefined {
