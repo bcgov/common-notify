@@ -14,6 +14,29 @@
   gap: 40px;
 }
 
+.template-id-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-id-section__label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.template-id-section__value {
+  display: inline-block;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  color: #313132;
+}
+
+.template-id-section__actions {
+  display: flex;
+  align-items: center;
+}
+
 .template-form__section {
   display: flex;
   flex-direction: column;

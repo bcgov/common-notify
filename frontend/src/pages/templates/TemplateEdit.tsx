@@ -19,6 +19,7 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import TemplateIdSection from '@/components/TemplateIdSection'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
@@ -179,6 +180,8 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       <div className="template-form-page__content">
         <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form className="template-form" noValidate onSubmit={handleSave}>
+          <TemplateIdSection templateId={template.id} />
+
           <div className="template-form__section template-form__section--title">
             <TextField
               label="Template title"

@@ -228,6 +228,11 @@ const template = {
 describe('TemplateEdit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    })
     useCstarRolesMock.mockReturnValue({ primaryRole: 'NOTIFY_ADMIN' })
     getTemplateByIdMock.mockResolvedValue(template)
     updateTemplateMock.mockResolvedValue({})
@@ -298,6 +303,24 @@ describe('TemplateEdit', () => {
     expect(screen.getByRole('button', { name: 'About Mustache syntax' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'About GC Notify legacy syntax' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
+  })
+
+  it('shows the template ID and copies it to the clipboard', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('API data: Template ID')).toBeTruthy()
+    })
+
+    expect(screen.getByText('template-123')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy template ID' }))
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('template-123')
+    })
+
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {
