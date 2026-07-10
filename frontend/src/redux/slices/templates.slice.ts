@@ -10,6 +10,9 @@ interface TemplatesState {
   count: number
   totalPages: number
   search: string
+  sortBy: string | null
+  sortOrder: 'asc' | 'desc' | null
+  filters: Record<string, string[]>
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
@@ -22,6 +25,9 @@ const initialState: TemplatesState = {
   count: 0,
   totalPages: 0,
   search: '',
+  sortBy: null,
+  sortOrder: null,
+  filters: {},
   isLoading: false,
   hasLoaded: false,
   error: null,
@@ -40,6 +46,23 @@ export const templatesSlice = createSlice({
     },
     setSearch(state, action: PayloadAction<string>) {
       state.search = action.payload
+      state.page = 1
+    },
+    setSort(
+      state,
+      action: PayloadAction<{ sortBy: string | null; sortOrder: 'asc' | 'desc' | null }>,
+    ) {
+      state.sortBy = action.payload.sortBy
+      state.sortOrder = action.payload.sortOrder
+      state.page = 1
+    },
+    setFilter(state, action: PayloadAction<{ field: string; values: string[] }>) {
+      const { field, values } = action.payload
+      if (values.length === 0) {
+        delete state.filters[field]
+      } else {
+        state.filters[field] = values
+      }
       state.page = 1
     },
   },
@@ -65,6 +88,6 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage, setLimit, setSearch } = templatesSlice.actions
+export const { setPage, setLimit, setSearch, setSort, setFilter } = templatesSlice.actions
 
 export default templatesSlice.reducer

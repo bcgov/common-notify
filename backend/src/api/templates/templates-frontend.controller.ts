@@ -28,7 +28,7 @@ import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
-import { ListQueryDto } from '../../common/query/list-query.dto'
+import { TemplateListQueryDto } from './schemas/template-list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -165,14 +165,21 @@ export class TemplatesFrontendController {
     example: ['channelCode:eq:EMAIL', 'name:like:welcome'],
     description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    example: 'welcome',
+    description: 'Case-insensitive search across template title and description.',
+  })
   @ApiOkResponse({ type: PaginatedTemplateResponse })
   async listTemplates(
     @Req() req: Request,
-    @Query() query: ListQueryDto,
+    @Query() query: TemplateListQueryDto,
   ): Promise<PaginatedTemplateResponse> {
     const tenant = await this.requireTenantContext(req)
     const parsedQuery = parseListQuery(query, this.templateListQueryConfig)
-    return this.templatesService.listTemplates(tenant.id, parsedQuery)
+    return this.templatesService.listTemplates(tenant.id, parsedQuery, query.search)
   }
 
   /**
