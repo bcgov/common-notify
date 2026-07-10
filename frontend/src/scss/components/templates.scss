@@ -1,19 +1,187 @@
-.desc-above {
-  .bcds-react-aria-TextField--container {
-    order: 1;
-  }
-
-  .bcds-react-aria-TextField--Description {
-    white-space: nowrap;
-  }
+.template-form-page {
+  padding: 0 0 2rem;
 }
 
+.template-form-page__content {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 572px;
+}
+
+.template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.template-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.template-form__section--title {
+  width: 100%;
+  max-width: 572px;
+}
+
+.template-form__section--subject {
+  width: 100%;
+  max-width: 381px;
+}
+
+.template-form__section--template-type {
+  width: 100%;
+  max-width: 184px;
+}
+
+.template-form__section--syntax-type {
+  width: 100%;
+  max-width: 528px;
+}
+
+.template-form__section--body {
+  width: 100%;
+  max-width: 572px;
+}
+
+.template-form__field,
+.template-form__field--full,
+.template-form__radio-group {
+  width: 100%;
+}
+
+.template-form__textarea {
+  width: 100%;
+  max-width: 572px;
+  min-height: 71px;
+  height: 71px;
+  padding: 8px 12px;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.template-form__actions {
+  margin-top: 0.5rem;
+}
+
+.template-form__body-label {
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
+.template-form__section .bcds-react-aria-TextField--Label,
+.template-form__radio-group .bcds-react-aria-RadioGroup--label,
+.template-form__required-label-text {
+  font-weight: 700;
+}
+
+.template-form__section .bcds-react-aria-TextField--Label.required {
+  display: inline;
+  padding: 0 0 0 4px;
+  font-weight: 400;
+}
+
+.template-form__required-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.template-form__required-label-indicator {
+  font-weight: 400;
+}
+
+.template-form__section--title .bcds-react-aria-TextField--Description,
+.template-form__section--subject .bcds-react-aria-TextField--Description,
+.template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {
+  padding: 0;
+}
+
+.template-form__section--title .bcds-react-aria-TextField--Description {
+  max-width: 572px;
+}
+
+.template-form__section--subject .bcds-react-aria-TextField--Description {
+  max-width: 381px;
+}
+
+.template-form__syntax-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-form__radio-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--label,
+.template-form__radio-group .bcds-react-aria-RadioGroup--options,
+.template-form__radio-group .bcds-react-aria-RadioGroup--description,
+.template-form__radio-group .bcds-react-aria-RadioGroup--error {
+  width: 100%;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-form__radio-group .bcds-react-aria-RadioGroup--description {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.template-form__syntax-tooltip-trigger {
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #605e5c;
+}
+
+.template-form__syntax-tooltip-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+.template-form__syntax-tooltip-trigger[data-hovered],
+.template-form__syntax-tooltip-trigger[data-pressed],
+.template-form__syntax-tooltip-trigger[data-selected],
+.template-form__syntax-tooltip-trigger[data-disabled] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {
+  max-width: 528px;
+}
+
+/* Keep Syntax type inline errors above helper text/options to match the approved layout. */
 .error-after-label {
   .bcds-react-aria-RadioGroup--options {
     order: 2;
   }
 
+  .bcds-react-aria-RadioGroup--description {
+    order: 3;
+  }
+
   .bcds-react-aria-RadioGroup--error {
     order: 1;
   }
+}
+
+// There was a typo in the design system css preventing this from being applied
+// They are fixing it very soon
+.bcds-react-aria-Radio[data-selected][data-disabled]:before {
+  border: 5px solid #d8d8d8;
 }

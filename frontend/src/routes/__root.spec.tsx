@@ -33,7 +33,7 @@ describe('RootLayout - CodeTables Loading', () => {
         notification: notificationReducer,
       },
       preloadedState,
-    })
+    } as any)
   }
 
   it('should dispatch fetchCodeTables on component mount', async () => {
@@ -46,7 +46,7 @@ describe('RootLayout - CodeTables Loading', () => {
       codeTables: mockCodeTablesState,
       notification: {
         items: [],
-        statusFilter: 'all',
+        filters: {},
         isLoading: false,
         error: null,
       },
@@ -66,7 +66,7 @@ describe('RootLayout - CodeTables Loading', () => {
       codeTables: mockCodeTablesState,
       notification: {
         items: [],
-        statusFilter: 'all',
+        filters: {},
         isLoading: false,
         error: null,
       },

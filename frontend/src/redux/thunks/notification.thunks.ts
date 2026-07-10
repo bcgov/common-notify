@@ -10,11 +10,24 @@ export const fetchNotifications = createAsyncThunk<
 >('notification/fetchAll', async (_, { getState, rejectWithValue }) => {
   try {
     const state = getState()
-    const { statusFilter, page, limit } = state.notification
+    const { page, limit, sortBy, sortOrder, filters } = state.notification
+
+    const sort =
+      sortBy != null && sortOrder != null
+        ? sortOrder === 'desc'
+          ? `-${sortBy}`
+          : sortBy
+        : undefined
+
+    const filter = Object.entries(filters)
+      .filter(([, values]) => values.length > 0)
+      .map(([field, values]) => `${field}:in:${values.join('|')}`)
+
     return await notificationApi.listNotifications({
       page,
       limit,
-      status: statusFilter,
+      sort,
+      filter: filter.length > 0 ? filter : undefined,
     })
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load notifications')
