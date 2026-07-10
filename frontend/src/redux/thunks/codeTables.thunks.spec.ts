@@ -24,17 +24,21 @@ describe('codeTables.thunks', () => {
   describe('fetchCodeTables', () => {
     it('should fetch and transform code tables successfully', async () => {
       const mockStatusesData = [
-        { id: 'sent', label: 'Sent', description: 'Sent notification was sent' },
-        { id: 'failed', label: 'Failed', description: 'Notification delivery failed' },
-        { id: 'pending', label: 'Pending', description: 'Notification is pending' },
+        { code: 'sent', displayName: 'Sent', description: 'Sent notification was sent' },
+        { code: 'failed', displayName: 'Failed', description: 'Notification delivery failed' },
+        { code: 'pending', displayName: 'Pending', description: 'Notification is pending' },
       ]
       const mockChannelsData = [
-        { id: 'EMAIL', label: 'Email', description: 'Email notification channel' },
-        { id: 'SMS', label: 'SMS', description: 'SMS notification channel' },
+        { code: 'EMAIL', displayName: 'Email', description: 'Email notification channel' },
+        { code: 'SMS', displayName: 'SMS', description: 'SMS notification channel' },
       ]
       const mockEventTypesData = [
-        { id: 'PASSWORD_RESET', label: 'Password Reset', description: 'User password reset event' },
-        { id: 'INVOICE_SENT', label: 'Invoice Sent', description: 'Invoice sent to user' },
+        {
+          code: 'PASSWORD_RESET',
+          displayName: 'Password Reset',
+          description: 'User password reset event',
+        },
+        { code: 'INVOICE_SENT', displayName: 'Invoice Sent', description: 'Invoice sent to user' },
       ]
 
       ;(api.get as any).mockResolvedValueOnce(mockStatusesData)

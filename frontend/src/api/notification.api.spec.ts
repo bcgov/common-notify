@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { notificationApi } from './notification.api'
-import { NotificationStatus } from '@/enum/notification-status.enum'
 import { get, STATUS_CODES } from '@/common/api'
 
 vi.mock('@/common/api', () => ({
@@ -11,12 +10,18 @@ vi.mock('@/common/api', () => ({
   },
 }))
 
+/** Extract the query params from the URL the `get` mock was called with. */
+function calledQuery() {
+  const call = vi.mocked(get).mock.calls[0][0] as { url: string }
+  return new URLSearchParams(call.url.split('?')[1] ?? '')
+}
+
 describe('notificationApi.listNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('sends page and limit with status when status is filtered', async () => {
+  it('sends page, limit, sort, and filter as query params', async () => {
     vi.mocked(get).mockResolvedValue({
       data: [],
       count: 0,
@@ -28,21 +33,18 @@ describe('notificationApi.listNotifications', () => {
     await notificationApi.listNotifications({
       page: 2,
       limit: 25,
-      status: NotificationStatus.COMPLETED,
+      sort: '-createdAt',
+      filter: ['status:in:SENT|FAILED', 'channelCode:in:EMAIL'],
     })
 
-    expect(get).toHaveBeenCalledWith({
-      url: '/api/v1/frontend/notification_request',
-      requiresAuthentication: true,
-      params: {
-        page: 2,
-        limit: 25,
-        status: NotificationStatus.COMPLETED,
-      },
-    })
+    const qs = calledQuery()
+    expect(qs.get('page')).toBe('2')
+    expect(qs.get('limit')).toBe('25')
+    expect(qs.get('sort')).toBe('-createdAt')
+    expect(qs.getAll('filter')).toEqual(['status:in:SENT|FAILED', 'channelCode:in:EMAIL'])
   })
 
-  it('omits status when status is all', async () => {
+  it('omits sort and filter when not provided', async () => {
     vi.mocked(get).mockResolvedValue({
       data: [],
       count: 0,
@@ -51,16 +53,13 @@ describe('notificationApi.listNotifications', () => {
       totalPages: 0,
     })
 
-    await notificationApi.listNotifications({ page: 1, limit: 10, status: 'all' })
+    await notificationApi.listNotifications({ page: 1, limit: 10 })
 
-    expect(get).toHaveBeenCalledWith({
-      url: '/api/v1/frontend/notification_request',
-      requiresAuthentication: true,
-      params: {
-        page: 1,
-        limit: 10,
-      },
-    })
+    const qs = calledQuery()
+    expect(qs.get('page')).toBe('1')
+    expect(qs.get('limit')).toBe('10')
+    expect(qs.has('sort')).toBe(false)
+    expect(qs.has('filter')).toBe(false)
   })
 
   it('returns an empty paginated response on 404', async () => {
@@ -70,9 +69,7 @@ describe('notificationApi.listNotifications', () => {
       },
     })
 
-    await expect(
-      notificationApi.listNotifications({ page: 3, limit: 15, status: NotificationStatus.QUEUED }),
-    ).resolves.toEqual({
+    await expect(notificationApi.listNotifications({ page: 3, limit: 15 })).resolves.toEqual({
       data: [],
       count: 0,
       page: 3,

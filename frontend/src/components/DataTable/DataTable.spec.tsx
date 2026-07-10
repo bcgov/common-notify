@@ -152,19 +152,21 @@ describe('DataTable', () => {
       { key: 'status' as const, label: 'Status' },
     ]
 
-    it('renders a sort button for sortable columns', () => {
+    it('renders a column options button for sortable columns', () => {
       render(<DataTable columns={sortableColumns} data={data} keyExtractor={keyExtractor} />)
 
-      expect(screen.getByRole('button', { name: /sort by name/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /column options for name/i })).toBeInTheDocument()
     })
 
-    it('does not render a sort button for non-sortable columns', () => {
+    it('does not render a column options button for non-sortable columns', () => {
       render(<DataTable columns={sortableColumns} data={data} keyExtractor={keyExtractor} />)
 
-      expect(screen.queryByRole('button', { name: /sort by status/i })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /column options for status/i }),
+      ).not.toBeInTheDocument()
     })
 
-    it('calls onSort with asc when clicking an unsorted column', async () => {
+    it('calls onSort with asc when clicking A to Z on an unsorted column', async () => {
       const onSort = vi.fn()
       render(
         <DataTable
@@ -175,12 +177,13 @@ describe('DataTable', () => {
         />,
       )
 
-      await userEvent.click(screen.getByRole('button', { name: /sort by name/i }))
+      await userEvent.click(screen.getByRole('button', { name: /column options for name/i }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'A to Z' }))
 
       expect(onSort).toHaveBeenCalledWith('name', 'asc')
     })
 
-    it('calls onSort with desc when clicking an asc-sorted column', async () => {
+    it('calls onSort with desc when clicking Z to A', async () => {
       const onSort = vi.fn()
       render(
         <DataTable
@@ -193,14 +196,13 @@ describe('DataTable', () => {
         />,
       )
 
-      await userEvent.click(
-        screen.getByRole('button', { name: /sort by name, currently ascending/i }),
-      )
+      await userEvent.click(screen.getByRole('button', { name: /column options for name/i }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Z to A' }))
 
       expect(onSort).toHaveBeenCalledWith('name', 'desc')
     })
 
-    it('calls onSort with null when clicking a desc-sorted column', async () => {
+    it('calls onSort with null when clicking the active sort option to deselect', async () => {
       const onSort = vi.fn()
       render(
         <DataTable
@@ -213,11 +215,24 @@ describe('DataTable', () => {
         />,
       )
 
-      await userEvent.click(
-        screen.getByRole('button', { name: /sort by name, currently descending/i }),
-      )
+      await userEvent.click(screen.getByRole('button', { name: /column options for name/i }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Z to A' }))
 
       expect(onSort).toHaveBeenCalledWith('name', null)
+    })
+
+    it('shows Ascending/Descending labels for non-text sortType columns', async () => {
+      const dateColumns = [
+        { key: 'name' as const, label: 'Name', sortable: true, sortType: 'date' as const },
+        { key: 'status' as const, label: 'Status' },
+      ]
+      render(<DataTable columns={dateColumns} data={data} keyExtractor={keyExtractor} />)
+
+      await userEvent.click(screen.getByRole('button', { name: /column options for name/i }))
+
+      expect(await screen.findByRole('menuitem', { name: 'Oldest to Newest' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Newest to Oldest' })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: 'A to Z' })).not.toBeInTheDocument()
     })
 
     it('sets aria-sort on the active sort column', () => {

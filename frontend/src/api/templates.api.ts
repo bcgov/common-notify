@@ -57,13 +57,17 @@ export async function getTemplates(
   page: number = 1,
   limit: number = 10,
   search?: string,
+  sort?: string,
+  filter?: string[],
 ): Promise<PaginatedTemplateResponse> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/templates', {
-      page: String(page),
-      limit: String(limit),
-      ...(search ? { search } : {}),
-    })
+    const qs = new URLSearchParams()
+    qs.set('page', String(page))
+    qs.set('limit', String(limit))
+    if (search) qs.set('search', search)
+    if (sort) qs.set('sort', sort)
+    if (filter && filter.length > 0) filter.forEach((f) => qs.append('filter', f))
+    const params = generateApiParameters(`/api/v1/frontend/templates?${qs.toString()}`)
     return await get<PaginatedTemplateResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError

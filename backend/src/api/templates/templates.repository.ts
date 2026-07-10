@@ -36,6 +36,7 @@ export class TemplatesRepository {
   async findWithQuery(
     tenantId: string,
     parsedQuery: ParsedListQuery,
+    search?: string,
   ): Promise<[Template[], number]> {
     // Define queryable fields configuration for templates
     const templateQueryConfig: QueryableFieldsConfig = {
@@ -77,6 +78,16 @@ export class TemplatesRepository {
       .leftJoinAndSelect('template.engine', 'engine')
       .where('template.tenantId = :tenantId', { tenantId })
       .andWhere('template.active = :active', { active: true })
+
+    // Case-insensitive search across template title (name) and description.
+    // Applied as an OR group since the parsed-query filter mechanism only supports AND.
+    if (search) {
+      const escaped = search.replace(/[\\%_]/g, '\\$&')
+      queryBuilder.andWhere(
+        `(template.name ILIKE :search ESCAPE '\\' OR template.description ILIKE :search ESCAPE '\\')`,
+        { search: `%${escaped}%` },
+      )
+    }
 
     // Apply parsed query (filters, sorts, pagination)
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, templateQueryConfig)
