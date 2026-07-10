@@ -1,14 +1,15 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { fetchNotifications } from '../thunks/notification.thunks'
-import type { NotificationStatus } from '@/enum/notification-status.enum'
 import { MAX_NOTIFICATION_RESULTS_PER_PAGE } from '@/config/notification'
 import type { RootState } from '../store'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 interface NotificationState {
   items: NotificationRequest[]
-  statusFilter: NotificationStatus | 'all'
+  sortBy: string | null
+  sortOrder: 'asc' | 'desc' | null
+  filters: Record<string, string[]>
   page: number
   limit: number
   count: number
@@ -20,7 +21,9 @@ interface NotificationState {
 
 const initialState: NotificationState = {
   items: [],
-  statusFilter: 'all',
+  sortBy: null,
+  sortOrder: null,
+  filters: {},
   page: 1,
   limit: MAX_NOTIFICATION_RESULTS_PER_PAGE,
   count: 0,
@@ -34,8 +37,21 @@ export const notificationSlice = createSlice({
   name: 'notification',
   initialState,
   reducers: {
-    setStatusFilter(state, action: PayloadAction<NotificationStatus | 'all'>) {
-      state.statusFilter = action.payload
+    setSort(
+      state,
+      action: PayloadAction<{ sortBy: string | null; sortOrder: 'asc' | 'desc' | null }>,
+    ) {
+      state.sortBy = action.payload.sortBy
+      state.sortOrder = action.payload.sortOrder
+      state.page = 1
+    },
+    setFilter(state, action: PayloadAction<{ field: string; values: string[] }>) {
+      const { field, values } = action.payload
+      if (values.length === 0) {
+        delete state.filters[field]
+      } else {
+        state.filters[field] = values
+      }
       state.page = 1
     },
     setPage(state, action: PayloadAction<number>) {
@@ -49,8 +65,15 @@ export const notificationSlice = createSlice({
       const idx = state.items.findIndex((item) => item.id === action.payload.id)
       if (idx !== -1) {
         state.items[idx] = action.payload
-      } else if (state.statusFilter === 'all' || state.statusFilter === action.payload.status) {
-        state.items.unshift(action.payload)
+      } else {
+        const statusFilters = state.filters.status
+        if (
+          !statusFilters ||
+          statusFilters.length === 0 ||
+          statusFilters.includes(action.payload.status)
+        ) {
+          state.items.unshift(action.payload)
+        }
       }
     },
   },
@@ -76,7 +99,8 @@ export const notificationSlice = createSlice({
   },
 })
 
-export const { setStatusFilter, setPage, setLimit, upsertNotification } = notificationSlice.actions
+export const { setSort, setFilter, setPage, setLimit, upsertNotification } =
+  notificationSlice.actions
 
 export const selectNotifications = (state: RootState) => state.notification.items
 
