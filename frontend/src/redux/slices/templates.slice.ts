@@ -3,6 +3,17 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import type { TemplateResponse } from '@/api/templates.api'
 import { fetchTemplates } from '../thunks/templates.thunks'
 
+const PREVIEW_VALUES_STORAGE_KEY = 'notify_template_preview_values'
+
+function loadPreviewValues(): Record<string, string> {
+  try {
+    const raw = sessionStorage.getItem(PREVIEW_VALUES_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
 interface TemplatesState {
   items: TemplateResponse[]
   page: number
@@ -13,6 +24,7 @@ interface TemplatesState {
   sortBy: string | null
   sortOrder: 'asc' | 'desc' | null
   filters: Record<string, string[]>
+  previewValues: Record<string, string>
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
@@ -28,6 +40,7 @@ const initialState: TemplatesState = {
   sortBy: null,
   sortOrder: null,
   filters: {},
+  previewValues: loadPreviewValues(),
   isLoading: false,
   hasLoaded: false,
   error: null,
@@ -65,6 +78,14 @@ export const templatesSlice = createSlice({
       }
       state.page = 1
     },
+    setPreviewValues(state, action: PayloadAction<Record<string, string>>) {
+      state.previewValues = { ...state.previewValues, ...action.payload }
+      try {
+        sessionStorage.setItem(PREVIEW_VALUES_STORAGE_KEY, JSON.stringify(state.previewValues))
+      } catch {
+        /* storage unavailable — keep in-memory value only */
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -88,6 +109,7 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage, setLimit, setSearch, setSort, setFilter } = templatesSlice.actions
+export const { setPage, setLimit, setSearch, setSort, setFilter, setPreviewValues } =
+  templatesSlice.actions
 
 export default templatesSlice.reducer

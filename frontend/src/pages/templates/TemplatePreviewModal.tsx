@@ -7,6 +7,8 @@ import {
   ToggleButtonGroup,
 } from '@bcgov/design-system-react-components'
 import { previewTemplateBody, NotificationChannel, TemplateEngine } from '@/api/templates.api'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { setPreviewValues } from '@/redux/slices/templates.slice'
 import '@/scss/components/templates.scss'
 
 interface TemplatePreviewModalProps {
@@ -110,6 +112,9 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
 }) => {
   const variables = useMemo(() => detectVariables(body, engineCode), [body, engineCode])
 
+  const dispatch = useAppDispatch()
+  const savedValues = useAppSelector((s) => s.templates.previewValues)
+
   const [values, setValues] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<'rendered' | 'raw'>('rendered')
   const [rendered, setRendered] = useState<string>('')
@@ -148,10 +153,10 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     if (!isOpen) return
     const initial: Record<string, string> = {}
     variables.forEach((v) => {
-      initial[v.name] = v.type === 'boolean' ? 'true' : ''
+      initial[v.name] = savedValues[v.name] ?? (v.type === 'boolean' ? 'true' : '')
     })
     setValues(initial)
-    setActiveTab('rendered')
+    setActiveTab('raw')
     void runPreview(initial)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -170,6 +175,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
 
   const handleValueChange = (name: string) => (value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }))
+    dispatch(setPreviewValues({ [name]: value }))
   }
 
   return (
@@ -199,28 +205,29 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                 </p>
 
                 {variables.length === 0 ? (
-                  <p className="template-preview__intro">No variables detected in this template.</p>
+                  <p className="template-preview__intro">No variables found.</p>
                 ) : (
                   <div className="template-preview__fields">
                     {variables.map((variable) =>
                       variable.type === 'boolean' ? (
-                        <ToggleButtonGroup
-                          key={variable.name}
-                          label={variable.name}
-                          selectionMode="single"
-                          disallowEmptySelection
-                          selectedKeys={[values[variable.name] ?? 'true']}
-                          size="medium"
-                          onSelectionChange={(keys) => {
-                            const [selected] = keys
-                            if (selected != null) {
-                              handleValueChange(variable.name)(String(selected))
-                            }
-                          }}
-                        >
-                          <ToggleButton id="true">True</ToggleButton>
-                          <ToggleButton id="false">False</ToggleButton>
-                        </ToggleButtonGroup>
+                        <div key={variable.name} className="template-preview__field-toggle">
+                          <ToggleButtonGroup
+                            label={variable.name}
+                            selectionMode="single"
+                            disallowEmptySelection
+                            selectedKeys={[values[variable.name] ?? 'true']}
+                            size="medium"
+                            onSelectionChange={(keys) => {
+                              const [selected] = keys
+                              if (selected != null) {
+                                handleValueChange(variable.name)(String(selected))
+                              }
+                            }}
+                          >
+                            <ToggleButton id="true">True</ToggleButton>
+                            <ToggleButton id="false">False</ToggleButton>
+                          </ToggleButtonGroup>
+                        </div>
                       ) : (
                         <TextField
                           key={variable.name}
