@@ -110,6 +110,20 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     }
   }
 
+  // A toggle field: keep its label hugging its buttons (the DS renders them as
+  // siblings, so without this wrapper the __fields flex gap sits between them).
+  &__field-toggle {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+    // Match the TextField label's xsmall vertical padding (DS default is larger)
+    .bcds-react-aria-ToggleButtonGroup--Label {
+      padding-top: var(--layout-padding-xsmall);
+      padding-bottom: var(--layout-padding-xsmall);
+    }
+  }
+
   &__field-text {
     width: 248px;
   }
@@ -122,7 +136,6 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
 
   &__tabs {
     align-self: flex-start;
-    margin-bottom: $spacing-sm;
   }
 
   &__output {
