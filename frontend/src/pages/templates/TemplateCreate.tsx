@@ -5,11 +5,13 @@ import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import TemplatePreviewModal from './TemplatePreviewModal'
 import '@/scss/components/templates.scss'
 
 const TemplateCreate: FC = () => {
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     channelCode: '' as string,
@@ -215,7 +217,12 @@ const TemplateCreate: FC = () => {
             <Button type="button" variant="secondary" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+            <Button
+              type="button"
+              variant="secondary"
+              onPress={() => setPreviewOpen(true)}
+              isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+            >
               Preview
             </Button>
             <Button type="submit" isDisabled={isSaveDisabled}>
@@ -224,6 +231,15 @@ const TemplateCreate: FC = () => {
           </div>
         </form>
       </div>
+
+      <TemplatePreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        body={formData.body}
+        subject={formData.subject}
+        channelCode={formData.channelCode as NotificationChannel}
+        engineCode={formData.engineCode as TemplateEngine}
+      />
     </div>
   )
 }

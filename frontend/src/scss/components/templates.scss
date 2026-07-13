@@ -1,3 +1,5 @@
+@import '../variables.scss';
+
 .desc-above {
   .bcds-react-aria-TextField--container {
     order: 1;
@@ -22,4 +24,140 @@
 // They are fixing it very soon
 .bcds-react-aria-Radio[data-selected][data-disabled]:before {
   border: 5px solid #d8d8d8;
+}
+
+/* Template preview modal */
+
+$preview-pane-height: 70vh; // Visible height of each pane
+$preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
+
+.template-preview {
+  display: block;
+  z-index: 1050;
+
+  &__backdrop {
+    z-index: 1040;
+    // No dimmed overlay behind the modal
+    background-color: transparent;
+  }
+
+  .modal-content {
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    padding: $spacing-md $preview-gutter;
+    padding-top: 1.5rem;
+  }
+
+  /* Two-pane body */
+
+  &__body {
+    display: flex;
+    height: $preview-pane-height;
+    padding: 0;
+  }
+
+  &__data {
+    flex: 0 0 41.6667%;
+    max-width: 41.6667%;
+    overflow-y: auto;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    padding-left: $preview-gutter;
+    padding-right: $preview-gutter;
+    border-right: 1px solid $border-default;
+  }
+
+  &__preview {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__preview-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: $preview-gutter $preview-gutter 0;
+  }
+
+  /* Shared text */
+
+  &__heading {
+    font-weight: 700;
+    margin-bottom: $spacing-xs;
+  }
+
+  &__intro {
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-lg;
+  }
+
+  /* Left pane: variable inputs */
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    // Keep toggle groups at their natural width instead of stretching
+    .bcds-react-aria-ToggleButtonGroup {
+      align-self: flex-start;
+    }
+  }
+
+  &__field-text {
+    width: 248px;
+  }
+
+  &__apply {
+    margin-top: $spacing-lg;
+  }
+
+  /* Right pane: rendered / raw tabs */
+
+  &__tabs {
+    align-self: flex-start;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__output {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: $spacing-lg;
+    border: 1px solid $border-default;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  &__error {
+    color: $danger-color;
+  }
+
+  &__placeholder {
+    color: $text-secondary;
+  }
+
+  /* Footer with Close button spanning divider to modal edge */
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: $spacing-md;
+    padding: $spacing-md $preview-gutter;
+    border-top: 1px solid $border-default;
+  }
+
+  &__close {
+    @include button-reset;
+
+    padding: $spacing-sm $spacing-md;
+    color: $dark-text;
+  }
 }

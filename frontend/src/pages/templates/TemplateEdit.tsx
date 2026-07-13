@@ -13,6 +13,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
+import TemplatePreviewModal from './TemplatePreviewModal'
 import '@/scss/components/templates.scss'
 
 interface TemplateEditProps {
@@ -26,6 +27,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     channelCode: NotificationChannel.EMAIL as string,
@@ -256,7 +258,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               <Button type="button" variant="secondary" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+              <Button
+                type="button"
+                variant="secondary"
+                onPress={() => setPreviewOpen(true)}
+                isDisabled={!formData.body.trim()}
+              >
                 Preview
               </Button>
               {!isReadOnly && (
@@ -268,6 +275,15 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
         </form>
       </div>
+
+      <TemplatePreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        body={formData.body}
+        subject={formData.subject}
+        channelCode={formData.channelCode as NotificationChannel}
+        engineCode={formData.engineCode as TemplateEngine}
+      />
     </div>
   )
 }
