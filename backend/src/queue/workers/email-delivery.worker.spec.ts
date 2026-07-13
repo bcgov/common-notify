@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import Bull from 'bull'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EmailDeliveryWorker } from './email-delivery.worker'
@@ -394,6 +394,114 @@ describe('EmailDeliveryWorker', () => {
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
         'Invalid email payload: body is missing or invalid',
       )
+    })
+
+    it('should render template email without requiring raw content body first', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Rendered Subject',
+        body: 'Rendered Body',
+        bodyType: 'html',
+      })
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-template-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {
+            templateId: 'template-uuid',
+            params: { firstName: 'Test' },
+          },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: {},
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-uuid' }),
+        { firstName: 'Test' },
+        undefined,
+      )
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            subject: 'Rendered Subject',
+            body: 'Rendered Body',
+          }),
+        }),
+      )
+    })
+
+    it('should surface missing personalisation error for template email before raw body validation', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockRejectedValue(
+        new BadRequestException('Missing personalisation for template ID template-uuid: firstName'),
+      )
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-template-missing',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {
+            templateId: 'template-uuid',
+            params: {},
+          },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: {},
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Missing personalisation for template ID template-uuid: firstName',
+      )
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
     })
 
     it('should throw error when notifyId is missing', async () => {

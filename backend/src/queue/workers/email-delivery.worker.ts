@@ -138,14 +138,6 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
-        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
-          throw new Error('Invalid email payload: subject is missing or invalid')
-        }
-
-        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
-          throw new Error('Invalid email payload: body is missing or invalid')
-        }
-
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
