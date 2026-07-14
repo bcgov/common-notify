@@ -1,0 +1,41 @@
+{{- if and .Values.frontend.enabled .Values.frontend.promtail.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "frontend.fullname" . }}-promtail-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "frontend.labels" . | nindent 4 }}
+data:
+  promtail-config.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 0
+
+    positions:
+      filename: /tmp/positions.yaml
+
+    clients:
+      - url: {{ .Values.frontend.promtail.lokiUrl }}
+        {{- if .Values.frontend.promtail.tenantId }}
+        tenant_id: {{ .Values.frontend.promtail.tenantId }}
+        {{- end }}
+        external_labels:
+          cluster: {{ .Values.frontend.promtail.cluster | default "silver" }}
+          {{- if .Values.frontend.promtail.environment }}
+          environment: {{ .Values.frontend.promtail.environment }}
+          {{- else }}
+          environment: {{ include "frontend.environment" . }}
+          {{- end }}
+
+    scrape_configs:
+      - job_name: {{ .Values.frontend.promtail.jobName | default (printf "frontend-%s-logs" (include "frontend.environment" .)) }}
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: {{ .Values.frontend.promtail.jobName | default (printf "frontend-%s-logs" (include "frontend.environment" .)) }}
+              app: frontend
+              namespace: {{ .Release.Namespace }}
+              __path__: /var/log/caddy/access.log
+{{- end }}

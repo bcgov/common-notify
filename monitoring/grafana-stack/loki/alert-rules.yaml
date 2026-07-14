@@ -1,0 +1,181 @@
+# Loki Alerting Rules for Common Notify
+# Deployed in f6bc3f-tools namespace
+# Alerts on critical log patterns across dev/test/prod environments
+
+groups:
+  - name: common-notify-errors
+    interval: 1m
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+        annotations:
+          summary: "High error rate detected in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} over the last 5 minutes"
+
+      # Critical error rate alert
+      - alert: CriticalErrorRate
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 50
+        for: 2m
+        labels:
+          severity: critical
+          service: common-notify
+        annotations:
+          summary: "CRITICAL: Very high error rate in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} - immediate attention required!"
+
+      # Database connection errors
+      - alert: DatabaseConnectionErrors
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [5m])) by (namespace) > 1
+        for: 3m
+        labels:
+          severity: critical
+          service: common-notify
+          component: database
+        annotations:
+          summary: "Database connection errors in {{ $labels.namespace }}"
+          description: "Database connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
+
+      # Redis connection errors
+      - alert: RedisConnectionErrors
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [5m])) by (namespace) > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: common-notify
+          component: redis
+        annotations:
+          summary: "Redis connection errors in {{ $labels.namespace }}"
+          description: "Redis connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
+
+      # API errors (500 status codes)
+      - alert: HighAPI500ErrorRate
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "500" [5m])) by (namespace) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+          component: api
+        annotations:
+          summary: "High rate of 500 errors in {{ $labels.namespace }}"
+          description: "API 500 error rate is {{ $value }} errors/sec in {{ $labels.namespace }}"
+
+      # Email sending failures
+      - alert: EmailSendingFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [5m])) by (namespace) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+          component: email
+        annotations:
+          summary: "Email sending failures in {{ $labels.namespace }}"
+          description: "Email sending failure rate is {{ $value }} failures/sec in {{ $labels.namespace }}"
+
+      # No logs received (service down)
+      - alert: NoLogsReceived
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"}[5m])) by (namespace, app) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: common-notify
+        annotations:
+          summary: "No logs received from {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "No logs have been received from {{ $labels.namespace}}/{{ $labels.app }} for 10 minutes - service may be down!"
+
+  - name: common-notify-performance
+    interval: 1m
+    rules:
+      # Slow API responses
+      - alert: SlowAPIResponses
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [5m])) by (namespace) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: common-notify
+          component: performance
+        annotations:
+          summary: "Slow API responses detected in {{ $labels.namespace }}"
+          description: "High rate of slow responses (>5s) detected in {{ $labels.namespace }}"
+
+      # High memory usage warnings in logs
+      - alert: HighMemoryUsageWarnings
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [5m])) by (namespace, app) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: common-notify
+          component: resources
+        annotations:
+          summary: "Memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "Application reporting memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
+
+  - name: common-notify-security
+    interval: 1m
+    rules:
+      # Authentication failures
+      - alert: HighAuthenticationFailureRate
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [5m])) by (namespace) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+          component: security
+        annotations:
+          summary: "High authentication failure rate in {{ $labels.namespace }}"
+          description: "Authentication failure rate is {{ $value }} failures/sec in {{ $labels.namespace }} - possible brute force attack"
+
+      # ClamAV virus detected
+      - alert: VirusDetected
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [5m])) by (namespace) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: common-notify
+          component: security
+        annotations:
+          summary: "VIRUS DETECTED in {{ $labels.namespace }}"
+          description: "ClamAV detected a virus in uploaded file in {{ $labels.namespace }} - immediate investigation required!"
+
+  - name: loki-operational
+    interval: 1m
+    rules:
+      # Loki ingestion lag
+      - alert: LokiIngestionLag
+        expr: |
+          sum(rate({namespace="f6bc3f-tools", app="loki"} |~ "(?i)(lag|delay|backlog)" [5m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+          service: loki
+          component: ingestion
+        annotations:
+          summary: "Loki ingestion lag detected"
+          description: "Loki is experiencing ingestion lag - logs may be delayed"
+
+      # Loki errors
+      - alert: LokiErrors
+        expr: |
+          sum(rate({namespace="f6bc3f-tools", app="loki"} |~ "(?i)(error|fail)" [5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "Loki errors detected"
+          description: "Loki is reporting errors ({{ $value }} errors/sec) - log aggregation may be impacted"

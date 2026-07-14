@@ -19,6 +19,7 @@ import { AdaptersModule } from './adapters'
 import { GcNotifyModule } from './api/gc-notify/gc-notify.module'
 import { ClamavService } from './services/clamav.service'
 import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
+import { LoggerModule } from './common/logger'
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
       envFilePath: ['.env', '.env.local'],
       load: [configuration],
     }),
+    LoggerModule,
     TerminusModule,
     DatabaseModule,
     QueueModule,

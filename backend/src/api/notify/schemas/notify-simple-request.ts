@@ -1,4 +1,4 @@
-import { IsObject, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { IsObject, IsOptional, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { NotifyEmailChannel } from './notify-email-channel'
@@ -8,15 +8,6 @@ import { ValidateTemplateOrContent } from './validators/template-or-content.vali
 
 @ValidateTemplateOrContent()
 export class NotifySimpleRequest {
-  @ApiPropertyOptional({
-    type: 'string',
-    format: 'uuid',
-    description: 'ID of the template to use for this notification',
-  })
-  @IsOptional()
-  @IsUUID()
-  templateId?: string
-
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional()
   @IsObject()
