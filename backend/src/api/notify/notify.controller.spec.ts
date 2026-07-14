@@ -110,6 +110,15 @@ describe('Notify Controllers', () => {
   let app: INestApplication
 
   beforeEach(async () => {
+    mockNotificationService.validateBusinessRules.mockResolvedValue([])
+    mockNotificationService.validateBulkRules.mockResolvedValue([])
+    mockNotificationService.parseBulkAddresses.mockReturnValue([
+      'alice@example.com',
+      'bob@example.com',
+    ])
+    mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
+    mockNotificationService.update.mockResolvedValue(undefined)
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
       controllers: [
@@ -283,6 +292,35 @@ describe('Notify Controllers', () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockNotificationService.validateBusinessRules).not.toHaveBeenCalled()
         expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      })
+
+      it('should return 400 and not create or queue when template params are invalid', async () => {
+        const templateId = '12345678-1234-4234-8234-123456789012'
+        mockNotificationService.validateBusinessRules.mockRejectedValueOnce(
+          new BadRequestException(
+            `Missing personalisation for template ID ${templateId}: firstName`,
+          ),
+        )
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            templateId,
+            params: {},
+            email: {
+              recipients: { to: ['test@example.com'] },
+            },
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body.statusCode).toBe(400)
+            expect(res.body.message).toBe(
+              `Missing personalisation for template ID ${templateId}: firstName`,
+            )
+          })
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       })
 
       it('should return a clear DTO error when attachment content is missing', async () => {

@@ -1,13 +1,14 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { NotFoundException } from '@nestjs/common'
+import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NotificationService } from './notification.service'
 import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { TemplatesService } from '../templates/templates.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 
 const mockRepository = {
@@ -32,6 +33,10 @@ const mockTenantsService = {
 
 const mockTemplatesRepository = {
   findById: vi.fn(),
+}
+
+const mockTemplatesService = {
+  renderTemplateContent: vi.fn(),
 }
 
 const mockNotificationPubSubService = {
@@ -72,6 +77,10 @@ describe('NotificationService', () => {
         {
           provide: TemplatesRepository,
           useValue: mockTemplatesRepository,
+        },
+        {
+          provide: TemplatesService,
+          useValue: mockTemplatesService,
         },
         {
           provide: NotificationPubSubService,
@@ -330,6 +339,11 @@ describe('NotificationService', () => {
     beforeEach(() => {
       mockTenantsService.findOne.mockResolvedValue(mockTenant)
       mockTemplatesRepository.findById.mockResolvedValue(null)
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Rendered Subject',
+        body: 'Rendered Body',
+        bodyType: 'markdown',
+      })
     })
 
     describe('tenant validation', () => {
@@ -739,6 +753,53 @@ describe('NotificationService', () => {
         const errors = await service.validateBusinessRules('tenant-123', request)
 
         expect(errors.some((e) => e.includes('not found'))).toBe(false)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          {},
+        )
+      })
+
+      it('should throw BadRequestException immediately when template params are missing', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+        mockTemplatesService.renderTemplateContent.mockRejectedValue(
+          new BadRequestException(
+            'Missing personalisation for template ID template-123: firstName',
+          ),
+        )
+
+        const request: any = {
+          templateId: 'template-123',
+          params: {},
+          email: { recipients: { to: ['test@example.com'] } },
+        }
+
+        await expect(service.validateBusinessRules('tenant-123', request)).rejects.toThrow(
+          'Missing personalisation for template ID template-123: firstName',
+        )
+      })
+
+      it('should validate SMS template params before queueing', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'SMS',
+        })
+
+        const request: any = {
+          templateId: 'template-123',
+          params: { code: '123456' },
+          sms: { recipients: { to: ['+12025551234'] } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { code: '123456' },
+        )
       })
 
       it('should validate template channel matches requested channel', async () => {
