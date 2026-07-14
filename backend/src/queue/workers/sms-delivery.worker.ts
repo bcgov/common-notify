@@ -89,13 +89,14 @@ export class SmsDeliveryWorker {
         }
 
         let resolvedPayload = payload
-        if (request?.templateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+        const smsTemplateId = payload.content?.templateId
+        if (smsTemplateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${smsTemplateId}`)
           try {
-            const template = await templatesRepository.findById(tenantId, request.templateId)
+            const template = await templatesRepository.findById(tenantId, smsTemplateId)
             if (!template) {
               throw new NotFoundException(
-                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+                `Template '${smsTemplateId}' not found for tenant '${tenantId}'`,
               )
             }
 

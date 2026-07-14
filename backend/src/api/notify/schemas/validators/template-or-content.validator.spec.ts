@@ -3,11 +3,15 @@ import { NotifySimpleRequest } from '../notify-simple-request'
 import { NotifyEmailChannel } from '../notify-email-channel'
 import { NotifySmsChannel } from '../notify-sms-channel'
 
+const TEMPLATE_ID = '550e8400-e29b-41d4-a716-446655440000'
+
 describe('TemplateOrContentValidator', () => {
   describe('validate', () => {
-    it('should accept request with templateId only', () => {
+    it('should accept an email channel with content.templateId only', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
+      request.email = new NotifyEmailChannel()
+      request.email.recipients = { to: ['test@example.com'] }
+      request.email.content = { templateId: TEMPLATE_ID }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
@@ -65,37 +69,37 @@ describe('TemplateOrContentValidator', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('should reject request with both templateId and email content', () => {
+    it('should reject an email channel whose content has both templateId and inline content', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
       request.email.recipients = {
         to: ['test@example.com'],
       }
       request.email.content = {
+        templateId: TEMPLATE_ID,
         subject: 'Test Subject',
         body: 'Test Body',
       }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('Request must provide either templateId OR content')
+      expect(result.error).toContain('content.templateId OR inline content')
     })
 
-    it('should reject request with both templateId and sms content', () => {
+    it('should reject an sms channel whose content has both templateId and a body', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.sms = new NotifySmsChannel()
       request.sms.recipients = {
         to: ['+16045551234'],
       }
       request.sms.content = {
+        templateId: TEMPLATE_ID,
         body: 'Test SMS',
       }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('Request must provide either templateId OR content')
+      expect(result.error).toContain('content.templateId OR inline content')
     })
 
     it('should reject request with neither templateId nor content', () => {
@@ -103,20 +107,19 @@ describe('TemplateOrContentValidator', () => {
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('Request must provide either templateId OR content')
+      expect(result.error).toContain('content.templateId OR inline content')
     })
 
-    it('should accept request with templateId but empty channels', () => {
+    it('should reject a channel that provides neither templateId nor inline content', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
       request.email.recipients = {
         to: ['test@example.com'],
       }
-      // No content
+      // No content at all
 
       const result = TemplateOrContentValidator.validate(request)
-      expect(result.valid).toBe(true)
+      expect(result.valid).toBe(false)
     })
 
     it('should accept request with email subject only (no body) when no templateId', () => {
@@ -145,28 +148,26 @@ describe('TemplateOrContentValidator', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('should reject request with templateId and email subject only', () => {
+    it('should reject an email channel with content.templateId and a subject only', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
       request.email.recipients = { to: ['test@example.com'] }
-      request.email.content = { subject: 'Test Subject' }
+      request.email.content = { templateId: TEMPLATE_ID, subject: 'Test Subject' }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('Request must provide either templateId OR content')
+      expect(result.error).toContain('content.templateId OR inline content')
     })
 
-    it('should reject request with templateId and email body only', () => {
+    it('should reject an email channel with content.templateId and a body only', () => {
       const request = new NotifySimpleRequest()
-      request.templateId = '550e8400-e29b-41d4-a716-446655440000'
       request.email = new NotifyEmailChannel()
       request.email.recipients = { to: ['test@example.com'] }
-      request.email.content = { body: 'Test Body' }
+      request.email.content = { templateId: TEMPLATE_ID, body: 'Test Body' }
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('Request must provide either templateId OR content')
+      expect(result.error).toContain('content.templateId OR inline content')
     })
   })
 })
