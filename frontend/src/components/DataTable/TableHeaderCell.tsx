@@ -1,39 +1,31 @@
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { FilterOption } from './DataTable'
+import { ColumnHeaderDropdown } from './ColumnHeaderDropdown'
 
 export interface TableHeaderCellProps extends ComponentPropsWithoutRef<'th'> {
   sortable?: boolean
   sortLabel?: string
+  sortType?: 'text' | 'numeric' | 'date'
   sortOrder?: 'asc' | 'desc' | null
-  onSort?: () => void
+  onSort?: (order: 'asc' | 'desc' | null) => void
+  filterOptions?: FilterOption[]
+  filterTitle?: string
+  activeFilterValues?: string[]
+  onFilter?: (values: string[]) => void
   children?: ReactNode
-}
-
-function SortIcon({ sortOrder }: { sortOrder?: 'asc' | 'desc' | null }) {
-  if (sortOrder === 'asc')
-    return (
-      <KeyboardArrowUpIcon
-        className="data-table__sort-icon data-table__sort-icon--active"
-        aria-hidden="true"
-      />
-    )
-  if (sortOrder === 'desc')
-    return (
-      <KeyboardArrowDownIcon
-        className="data-table__sort-icon data-table__sort-icon--active"
-        aria-hidden="true"
-      />
-    )
-  return <UnfoldMoreIcon className="data-table__sort-icon" aria-hidden="true" />
 }
 
 export function TableHeaderCell({
   sortable,
   sortLabel,
+  sortType,
   sortOrder,
   onSort,
+  filterOptions,
+  filterTitle,
+  activeFilterValues,
+  onFilter,
   children,
   ...props
 }: TableHeaderCellProps) {
@@ -45,28 +37,40 @@ export function TableHeaderCell({
         : 'none'
     : undefined
 
-  const sortName = sortLabel ?? (typeof children === 'string' ? children : undefined)
+  const hasDropdown = sortable || (filterOptions && filterOptions.length > 0)
+  const isFiltered = activeFilterValues && activeFilterValues.length > 0
 
   return (
     <th scope="col" aria-sort={ariaSort} {...props}>
-      {sortable ? (
-        <button
-          type="button"
-          className="data-table__sort-btn"
-          aria-label={
-            sortName != null
-              ? sortOrder === 'asc'
-                ? `Sort by ${sortName}, currently ascending`
-                : sortOrder === 'desc'
-                  ? `Sort by ${sortName}, currently descending`
-                  : `Sort by ${sortName}`
-              : undefined
-          }
-          onClick={onSort}
-        >
-          {children}
-          <SortIcon sortOrder={sortOrder} />
-        </button>
+      {hasDropdown ? (
+        <div className="data-table__header-cell">
+          <span className="data-table__header-label">{children}</span>
+          <ColumnHeaderDropdown
+            sortable={sortable}
+            sortType={sortType}
+            sortOrder={sortOrder ?? null}
+            onSort={onSort}
+            filterOptions={filterOptions}
+            filterTitle={filterTitle}
+            activeFilterValues={activeFilterValues ?? []}
+            onFilter={onFilter}
+          >
+            <button
+              type="button"
+              className="data-table__dropdown-btn"
+              aria-label={
+                sortLabel ??
+                (typeof children === 'string' ? `Column options for ${children}` : 'Column options')
+              }
+            >
+              {isFiltered ? (
+                <span className="data-table__filter-badge">{activeFilterValues!.length}</span>
+              ) : (
+                <KeyboardArrowDownIcon className="data-table__dropdown-icon" aria-hidden="true" />
+              )}
+            </button>
+          </ColumnHeaderDropdown>
+        </div>
       ) : (
         children
       )}

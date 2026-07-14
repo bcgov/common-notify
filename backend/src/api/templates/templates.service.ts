@@ -42,13 +42,18 @@ export class TemplatesService {
   async listTemplates(
     tenantId: string,
     parsedQuery: ParsedListQuery,
+    search?: string,
   ): Promise<PaginatedTemplateResponse> {
     // Extract pagination info from parsed query
     const page = parsedQuery.page
     const limit = parsedQuery.limit
 
     // Query templates using the parsed query (with filters and sorts applied)
-    const [templates, total] = await this.templatesRepository.findWithQuery(tenantId, parsedQuery)
+    const [templates, total] = await this.templatesRepository.findWithQuery(
+      tenantId,
+      parsedQuery,
+      search,
+    )
     return {
       data: templates.map((t) => this.toResponseDto(t)),
       count: total,
