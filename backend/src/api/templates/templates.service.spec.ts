@@ -375,6 +375,55 @@ describe('TemplatesService', () => {
       )
     })
 
+    it('should not require Mustache section item fields as top-level personalisation keys', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: '{{#isSubscribed}}Digest{{/isSubscribed}}',
+        body: `
+          Hello {{name}}
+          {{#articles}}
+          Article: {{title}}
+          By {{author}}
+          {{/articles}}
+          {{#categories}}
+          Category: {{label}}
+          {{/categories}}
+        `,
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: name, articles, categories, isSubscribed',
+      )
+    })
+
+    it('should allow Mustache section templates through validation when top-level keys are present', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: '{{#isSubscribed}}Digest{{/isSubscribed}}',
+        body: `
+          Hello {{name}}
+          {{#articles}}
+          Article: {{title}}
+          By {{author}}
+          {{/articles}}
+          {{#categories}}
+          Category: {{label}}
+          {{/categories}}
+        `,
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        name: 'Alice',
+        isSubscribed: true,
+        articles: [{ title: 'One', author: 'A' }],
+        categories: [{ label: 'News' }],
+      })
+
+      expect(result.subject).toBe('Digest')
+      expect(result.body).toContain('Hello Alice')
+      expect(result.bodyType).toBe('markdown')
+    })
+
     it('should validate MJML placeholders using existing MJML renderer syntax', async () => {
       const template: Template = {
         ...mockMjmlTemplate,

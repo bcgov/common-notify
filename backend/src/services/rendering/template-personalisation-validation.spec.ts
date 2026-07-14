@@ -122,6 +122,33 @@ describe('extractTemplatePersonalisationKeys', () => {
     expect(extractTemplatePersonalisationKeys(template)).toEqual(['items', 'isEmpty'])
   })
 
+  it('does not promote Mustache fields used only inside a section to top-level required keys', () => {
+    const template = makeTemplate({
+      engineCode: TemplateEngine.MUSTACHE,
+      body: '{{#articles}}Article: {{title}} By {{author}}{{/articles}}',
+    })
+
+    expect(extractTemplatePersonalisationKeys(template)).toEqual(['articles'])
+  })
+
+  it('keeps top-level Mustache fields required even if the same template also has section-scoped fields', () => {
+    const template = makeTemplate({
+      engineCode: TemplateEngine.MUSTACHE,
+      body: 'Hello {{name}} {{#articles}}{{title}}{{/articles}}',
+    })
+
+    expect(extractTemplatePersonalisationKeys(template)).toEqual(['name', 'articles'])
+  })
+
+  it('does not promote nested Mustache section fields to top-level required keys', () => {
+    const template = makeTemplate({
+      engineCode: TemplateEngine.MUSTACHE,
+      body: '{{#articles}}{{#tags}}{{name}}{{/tags}}{{/articles}}',
+    })
+
+    expect(extractTemplatePersonalisationKeys(template)).toEqual(['articles'])
+  })
+
   it('ignores Mustache closing tags', () => {
     const template = makeTemplate({
       engineCode: TemplateEngine.MUSTACHE,
@@ -153,6 +180,30 @@ describe('extractTemplatePersonalisationKeys', () => {
       'amount',
       'orderNumber',
       'status',
+    ])
+  })
+
+  it('returns Mustache top-level required keys in stable order without section-only fields', () => {
+    const template = makeTemplate({
+      engineCode: TemplateEngine.MUSTACHE,
+      body: `
+        Hello {{name}}
+        {{#articles}}
+        Article: {{title}}
+        By {{author}}
+        {{/articles}}
+        {{#categories}}
+        Category: {{label}}
+        {{/categories}}
+      `,
+      subject: '{{#isSubscribed}}Digest{{/isSubscribed}}',
+    })
+
+    expect(extractTemplatePersonalisationKeys(template)).toEqual([
+      'name',
+      'articles',
+      'categories',
+      'isSubscribed',
     ])
   })
 })

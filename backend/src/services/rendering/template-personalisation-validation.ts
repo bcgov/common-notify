@@ -1,4 +1,5 @@
 import Handlebars from 'handlebars'
+import Mustache from 'mustache'
 import type { Template } from '../../api/templates/entities/template.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -6,8 +7,8 @@ import { TemplateEngine } from '../../enum/template-engine.enum'
 const IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
 const HANDLEBARS_CONTROL_NAMES = new Set(['if', 'each', 'unless', 'with', 'else'])
 const LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?[^)]*)?\)\)/g
-const MUSTACHE_TAG_REGEX =
-  /\{\{(#|\^|&)?\s*([a-zA-Z_][a-zA-Z0-9_]*)(?:\.[^}\s]+)?\s*\}\}|\{\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)(?:\.[^}\s]+)?\s*\}\}\}/g
+
+type MustacheToken = [string, string, number?, number?, MustacheToken[]?]
 
 export function extractTemplatePersonalisationKeys(template: Template): string[] {
   const placeholders = new Set<string>()
@@ -187,15 +188,59 @@ function extractMustachePlaceholders(text?: string): string[] {
   }
 
   const placeholders = new Set<string>()
+  const tokens = Mustache.parse(text) as MustacheToken[]
 
-  for (const match of text.matchAll(MUSTACHE_TAG_REGEX)) {
-    const key = match[2] || match[3]
-    if (key) {
-      addPlaceholder(placeholders, key)
-    }
-  }
+  collectMustacheTokens(tokens, placeholders, 0)
 
   return [...placeholders]
+}
+
+function collectMustacheTokens(
+  tokens: MustacheToken[],
+  placeholders: Set<string>,
+  scopedDepth: number,
+): void {
+  for (const token of tokens) {
+    const [type, value, , , children] = token
+    const rootName = getScopedIdentifier(value)
+
+    switch (type) {
+      case 'name':
+      case '&':
+      case '{':
+        if (rootName && scopedDepth === 0) {
+          addPlaceholder(placeholders, rootName)
+        }
+        break
+      case '#':
+      case '^':
+        if (rootName && scopedDepth === 0) {
+          addPlaceholder(placeholders, rootName)
+        }
+        if (Array.isArray(children)) {
+          collectMustacheTokens(children, placeholders, scopedDepth + 1)
+        }
+        break
+      default:
+        break
+    }
+  }
+}
+
+function getScopedIdentifier(value?: string): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === '.' || trimmed.startsWith('@') || trimmed.startsWith('/')) {
+    return undefined
+  }
+
+  const normalized = trimmed.replace(/^\.\//, '')
+  const [root] = normalized.split('.')
+
+  return IDENTIFIER_REGEX.test(root) ? root : undefined
 }
 
 function addPlaceholders(target: Set<string>, values: string[]): void {
