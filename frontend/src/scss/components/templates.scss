@@ -94,6 +94,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     display: flex;
     flex-direction: column;
     padding: var(--layout-padding-large, 24px);
+    overflow-y: auto;
   }
 
   /* Shared text */
@@ -129,10 +130,15 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     flex-direction: column;
     align-items: flex-start;
 
-    // Match the TextField label's xsmall vertical padding (DS default is larger)
+    .bcds-react-aria-Switch {
+      padding-left: var(--layout-padding-small, 8px);
+      padding-top: var(--layout-padding-small, 8px);
+    }
+
     .bcds-react-aria-ToggleButtonGroup--Label {
-      padding-top: var(--layout-padding-xsmall);
-      padding-bottom: var(--layout-padding-xsmall);
+      display: flex;
+      padding: var(--layout-padding-small, 8px);
+      gap: var(--layout-padding-small, 8px);
     }
   }
 
@@ -159,8 +165,24 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     }
   }
 
+  &__field-date {
+    width: 248px;
+
+    // The DS DatePicker root stretches to fill this wrapper; keep its label
+    // stacked above the input and matching the bold TextField labels.
+    .bcds-react-aria-DatePicker--Label {
+      font-weight: 700;
+
+      // The appended "(required)" stays regular weight, like the other fields
+      &.required {
+        font-weight: 400;
+      }
+    }
+  }
+
   &__apply {
     margin-top: $spacing-lg;
+    margin-bottom: $spacing-lg;
   }
 
   /* Right pane: rendered / raw tabs */
@@ -170,9 +192,9 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
   }
 
   &__output {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
+    // Size to its content rather than stretching to the modal's bottom; the
+    // parent pane (__preview-main) scrolls if this grows past the modal height.
+    flex: 0 0 auto;
     padding: $spacing-lg;
     border: 1px solid $border-default;
     border-radius: 4px;
