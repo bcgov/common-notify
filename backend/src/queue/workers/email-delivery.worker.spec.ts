@@ -496,12 +496,26 @@ describe('EmailDeliveryWorker', () => {
         } as any,
         opts: { attempts: 3 } as any,
         attemptsMade: 0,
+        discard: vi.fn(),
       }
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
         'Missing personalisation for template ID template-uuid: firstName',
       )
       expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(job.discard).toHaveBeenCalledTimes(1)
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-template-missing',
+        'tenant-123',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+          errorReason: 'Missing personalisation for template ID template-uuid: firstName',
+        }),
+      )
+      expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
+        'notify-template-missing',
+        'Missing personalisation for template ID template-uuid: firstName',
+      )
     })
 
     it('should throw error when notifyId is missing', async () => {

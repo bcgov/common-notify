@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import Bull from 'bull'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { SmsDeliveryWorker } from './sms-delivery.worker'
@@ -307,6 +307,124 @@ describe('SmsDeliveryWorker', () => {
 
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
         'Invalid SMS payload: body is missing or invalid',
+      )
+    })
+
+    it('should render template SMS without requiring raw content body first', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-sms-uuid',
+        channelCode: 'SMS',
+        name: 'Stored SMS Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        body: 'Rendered SMS Body',
+        bodyType: 'markdown',
+      })
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-sms-template',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {
+            templateId: 'template-sms-uuid',
+            params: { code: '123456' },
+          },
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: {},
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-sms-uuid' }),
+        { code: '123456' },
+        undefined,
+      )
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            body: 'Rendered SMS Body',
+          }),
+        }),
+      )
+    })
+
+    it('should mark template SMS personalisation validation errors as failed without retry', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-sms-uuid',
+        channelCode: 'SMS',
+        name: 'Stored SMS Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockRejectedValue(
+        new BadRequestException('Missing personalisation for template ID template-sms-uuid: code'),
+      )
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-sms-template-missing',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {
+            templateId: 'template-sms-uuid',
+            params: {},
+          },
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: {},
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+        discard: vi.fn(),
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Missing personalisation for template ID template-sms-uuid: code',
+      )
+      expect(mockSmsAdapter.send).not.toHaveBeenCalled()
+      expect(job.discard).toHaveBeenCalledTimes(1)
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-sms-template-missing',
+        'tenant-123',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+          errorReason: 'Missing personalisation for template ID template-sms-uuid: code',
+        }),
+      )
+      expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
+        'notify-sms-template-missing',
+        'Missing personalisation for template ID template-sms-uuid: code',
       )
     })
 
