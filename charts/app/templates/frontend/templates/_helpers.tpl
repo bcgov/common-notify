@@ -40,4 +40,19 @@ app.kubernetes.io/name: {{ include "frontend.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+Determine environment from namespace
+*/}}
+{{- define "frontend.environment" -}}
+{{- if contains "-dev" .Release.Namespace -}}
+dev
+{{- else if contains "-test" .Release.Namespace -}}
+test
+{{- else if contains "-prod" .Release.Namespace -}}
+prod
+{{- else -}}
+unknown
+{{- end -}}
+{{- end }}
+
 

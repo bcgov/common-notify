@@ -13,6 +13,7 @@ import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-not
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
 import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
+import { StructuredLoggerService } from '../../common/logger'
 
 type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
   attachments?: SendEmailOptions['attachments']
@@ -81,8 +82,10 @@ export class EmailDeliveryWorker {
     emailAdapter: IEmailTransport,
     requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
+    structuredLogger?: StructuredLoggerService,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
+    const workerContext = EmailDeliveryWorker.name
 
     logger.log(`Registering email delivery worker processor (concurrency=${concurrency})`)
 
@@ -90,6 +93,7 @@ export class EmailDeliveryWorker {
     // Note: Don't await process() - it sets up listeners and never resolves
     emailQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId, tenantId, payload, request } = job.data
+      const startedAt = Date.now()
 
       logger.debug(`[${notifyId}] Processing email delivery job for tenant=${tenantId}`)
 
@@ -118,6 +122,9 @@ export class EmailDeliveryWorker {
             notificationService,
           )
         }
+
+        // Single delivery path: emit a structured lifecycle "start" event.
+        structuredLogger?.logNotificationStart(notifyId, tenantId, 'email', workerContext)
 
         // Validate job data
         if (!payload || typeof payload !== 'object') {
@@ -300,6 +307,14 @@ export class EmailDeliveryWorker {
           updatedBy: 'system',
         })
         logger.log(`[${notifyId}] Notification marked as COMPLETED`)
+        structuredLogger?.logNotificationSuccess(
+          notifyId,
+          tenantId,
+          'email',
+          result.externalId,
+          Date.now() - startedAt,
+          workerContext,
+        )
 
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
@@ -321,6 +336,14 @@ export class EmailDeliveryWorker {
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
+          structuredLogger?.logNotificationFailure(
+            notifyId,
+            tenantId,
+            'email',
+            error instanceof Error ? error : errorMessage,
+            Date.now() - startedAt,
+            workerContext,
+          )
         }
 
         // Re-throw to trigger BullMQ retry logic
@@ -332,6 +355,16 @@ export class EmailDeliveryWorker {
     emailQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId } = job.data
       logger.debug(`[${notifyId}] Email delivery job completed`)
+      structuredLogger?.logQueueOperation(
+        'complete',
+        emailQueue.name,
+        job.id?.toString(),
+        notifyId,
+        {
+          channel: 'email',
+          context: workerContext,
+        },
+      )
     })
 
     emailQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
@@ -339,6 +372,13 @@ export class EmailDeliveryWorker {
       logger.error(
         `[${notifyId}] Email delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
+      structuredLogger?.logQueueOperation('failed', emailQueue.name, job.id?.toString(), notifyId, {
+        channel: 'email',
+        context: workerContext,
+        error: err.message,
+        attemptsMade: job.attemptsMade,
+        maxAttempts: job.opts.attempts,
+      })
     })
 
     logger.log('Email delivery worker initialized')
