@@ -396,6 +396,53 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
+    it('should resolve a template-only email whose content has no inline subject/body', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: 'EMAIL' })
+      mockTemplatesService.renderTemplateContent.mockReturnValue({
+        subject: 'Rendered subject',
+        body: 'Rendered body',
+        bodyType: 'html',
+      })
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-tmpl-only',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-uuid' }, // template supplies subject/body
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      expect(mockTemplatesRepository.findById).toHaveBeenCalledWith('tenant-123', 'template-uuid')
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
+      expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+    })
+
     it('should throw error when notifyId is missing', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,

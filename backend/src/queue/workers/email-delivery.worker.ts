@@ -139,21 +139,26 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
-        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
-          throw new Error('Invalid email payload: subject is missing or invalid')
-        }
+        // Resolve template if the email content carries a templateId.
+        // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
+        const emailTemplateId = emailPayload.content?.templateId
 
-        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
-          throw new Error('Invalid email payload: body is missing or invalid')
+        // Inline subject/body are only required when the content is NOT template-based; a template
+        // supplies them during resolution below (and they're re-validated after rendering).
+        if (!emailTemplateId) {
+          if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+            throw new Error('Invalid email payload: subject is missing or invalid')
+          }
+
+          if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+            throw new Error('Invalid email payload: body is missing or invalid')
+          }
         }
 
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 
-        // Resolve template if the email content carries a templateId.
-        // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
-        const emailTemplateId = emailPayload.content?.templateId
         if (emailTemplateId) {
           logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
