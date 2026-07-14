@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import {
   Button,
+  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -191,7 +192,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title" id="template-preview-title">
-                Preview
+                Email Notification Preview
               </h5>
               <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
             </div>
@@ -201,7 +202,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
               <div className="template-preview__data">
                 <h6 className="template-preview__heading">Preview data</h6>
                 <p className="template-preview__intro">
-                  Provide values for all variables in your template.
+                  Enter values for all variables to view the rendered template.
                 </p>
 
                 {variables.length === 0 ? (
@@ -210,23 +211,16 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                   <div className="template-preview__fields">
                     {variables.map((variable) =>
                       variable.type === 'boolean' ? (
-                        <div key={variable.name} className="template-preview__field-toggle">
-                          <ToggleButtonGroup
-                            label={variable.name}
-                            selectionMode="single"
-                            disallowEmptySelection
-                            selectedKeys={[values[variable.name] ?? 'true']}
-                            size="medium"
-                            onSelectionChange={(keys) => {
-                              const [selected] = keys
-                              if (selected != null) {
-                                handleValueChange(variable.name)(String(selected))
-                              }
-                            }}
+                        <div key={variable.name} className="template-preview__field-switch">
+                          <span className="template-preview__switch-label">{variable.name}</span>
+                          <Switch
+                            isSelected={(values[variable.name] ?? 'true') === 'true'}
+                            onChange={(isSelected) =>
+                              handleValueChange(variable.name)(isSelected ? 'true' : 'false')
+                            }
                           >
-                            <ToggleButton id="true">True</ToggleButton>
-                            <ToggleButton id="false">False</ToggleButton>
-                          </ToggleButtonGroup>
+                            {(values[variable.name] ?? 'true') === 'true' ? 'True' : 'False'}
+                          </Switch>
                         </div>
                       ) : (
                         <TextField
@@ -235,6 +229,9 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                           label={variable.name}
                           value={values[variable.name] ?? ''}
                           onChange={handleValueChange(variable.name)}
+                          // The DS TextField omits `placeholder` from its types, but
+                          // react-aria's useTextField still forwards it to the input.
+                          {...({ placeholder: `Enter text...` } as { placeholder?: string })}
                         />
                       ),
                     )}
@@ -244,7 +241,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                 <div className="template-preview__apply">
                   <Button
                     type="button"
-                    variant="primary"
+                    variant="secondary"
                     onPress={() => {
                       setActiveTab('rendered')
                       void runPreview(values)
@@ -270,7 +267,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                       selectionMode="single"
                       disallowEmptySelection
                       selectedKeys={[activeTab]}
-                      size="medium"
+                      size="small"
                       onSelectionChange={(keys) => {
                         const [selected] = keys
                         if (selected != null) {
@@ -278,8 +275,12 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                         }
                       }}
                     >
-                      <ToggleButton id="rendered">Rendered Preview</ToggleButton>
-                      <ToggleButton id="raw">Raw Template</ToggleButton>
+                      <ToggleButton id="rendered" size="small">
+                        Rendered Preview
+                      </ToggleButton>
+                      <ToggleButton id="raw" size="small">
+                        Raw Template
+                      </ToggleButton>
                     </ToggleButtonGroup>
                   </div>
 
@@ -294,12 +295,6 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                       rendered
                     )}
                   </div>
-                </div>
-
-                <div className="template-preview__footer">
-                  <button type="button" className="template-preview__close" onClick={onClose}>
-                    Close
-                  </button>
                 </div>
               </div>
             </div>
