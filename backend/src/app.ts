@@ -29,7 +29,7 @@ export async function bootstrap() {
   ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
   // Add body parsers for form data. The JSON limit is raised above the 100KB
-  // default so a full-size bulk send (up to BULK_EMAIL_MAX_RECIPIENTS rows) fits.
+  // default so a full-size mail merge send (up to MAIL_MERGE_MAX_RECIPIENTS rows) fits.
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
   app.use(bodyParser.json({ limit: '10mb' }))
 
