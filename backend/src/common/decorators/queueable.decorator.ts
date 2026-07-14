@@ -128,9 +128,9 @@ async function handleEmailMerge(
 
   const recipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
 
-  // Enforce daily/annual EMAIL limits BEFORE accepting the bulk request (throws HTTP 429).
+  // Enforce daily/annual EMAIL limits BEFORE accepting the merge request (throws HTTP 429).
   await enforceLimits(ctx, apiKeyConsumerId, [
-    { channel: NotificationChannel.EMAIL, count: addresses.length },
+    { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
 
   // Persist the parent request (PENDING) for durability before queuing
@@ -144,9 +144,9 @@ async function handleEmailMerge(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
 
-  // Attribute accepted bulk emails against the API key's usage limits (non-fatal).
+  // Attribute accepted merge emails against the API key's usage limits (non-fatal).
   await recordAcceptedUsage(ctx, apiKeyConsumerId, [
-    { channel: NotificationChannel.EMAIL, count: addresses.length },
+    { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
