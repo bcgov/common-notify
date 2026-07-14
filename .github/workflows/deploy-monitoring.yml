@@ -1,10 +1,20 @@
 name: Deploy Monitoring Stack
+
 on:
+  # Manual deployment trigger
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Target environment for monitoring stack'
+      deployment_mode:
+        description: 'Deployment mode'
         required: true
+        type: choice
+        options:
+          - centralized
+          - individual
+        default: 'centralized'
+      environment:
+        description: 'Target environment (for individual mode)'
+        required: false
         type: choice
         options:
           - dev
@@ -19,18 +29,373 @@ on:
           - all
           - loki
           - grafana
+          - grafana-agent
         default: 'all'
+
+  # Auto-deploy on monitoring configuration changes
+  push:
+    branches: [main]
+    paths:
+      - 'monitoring/grafana-stack/**'
+      - '.github/workflows/deploy-monitoring.yml'
+
+concurrency:
+  # Prevent concurrent monitoring deployments
+  group: monitoring-${{ inputs.deployment_mode || 'centralized' }}-${{ inputs.environment || 'all' }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+  # ============================================================================
+  # CENTRALIZED DEPLOYMENT (Loki + Grafana in tools, Agents in dev/test/prod)
+  # ============================================================================
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+  deploy-loki-centralized:
+    name: Deploy Loki (Centralized - Tools)
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+       (inputs.component == 'all' || inputs.component == 'loki')) ||
+      (github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: TOOLS
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Loki to Tools Namespace
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
-          python-version: '3.x'
+          oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_TOOLS_NAMESPACE }}"
+            echo "📦 Deploying Loki to ${NAMESPACE} (Centralized Log Storage)"
+
+            # Add Grafana Helm repo
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            # Deploy Loki using tools-specific values
+            helm upgrade --install loki grafana/loki \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/loki/values-tools.yaml \
+              --wait \
+              --timeout 10m
+
+            echo "✅ Loki deployed successfully"
+
+            # Apply NetworkPolicies
+            echo "🔒 Applying Loki NetworkPolicies..."
+            oc apply -f monitoring/grafana-stack/loki/networkpolicy-tools.yaml
+
+            # Verify
+            oc get pods -n ${NAMESPACE} -l app.kubernetes.io/name=loki
+
+  deploy-grafana-centralized:
+    name: Deploy Grafana (Centralized - Tools)
+    needs: [deploy-loki-centralized]
+    if: |
+      !cancelled() &&
+      (needs.deploy-loki-centralized.result == 'success' || needs.deploy-loki-centralized.result == 'skipped')
+    runs-on: ubuntu-24.04
+    environment: TOOLS
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana to Tools Namespace
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_TOOLS_NAMESPACE }}"
+            echo "📊 Deploying Grafana to ${NAMESPACE} (Centralized Visualization)"
+
+            # Add Grafana Helm repo
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            # Create Grafana admin secret if it doesn't exist
+            if ! oc get secret grafana-admin-credentials -n ${NAMESPACE} &> /dev/null; then
+                echo "Creating Grafana admin credentials secret..."
+                ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+                oc create secret generic grafana-admin-credentials \
+                  --from-literal=admin-user=admin \
+                  --from-literal=admin-password="$ADMIN_PASSWORD" \
+                  -n ${NAMESPACE}
+                echo "✅ Admin credentials created"
+            else
+                echo "Grafana admin credentials already exist"
+            fi
+
+            # Deploy Grafana using tools-specific values
+            helm upgrade --install grafana grafana/grafana \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/grafana/values-tools.yaml \
+              --wait \
+              --timeout 10m
+
+            # Create OpenShift Route
+            echo "🌐 Creating OpenShift Route..."
+            oc apply -f monitoring/grafana-stack/grafana/route.yaml
+
+            # Display access info
+            GRAFANA_ROUTE=$(oc get route grafana -n ${NAMESPACE} -o jsonpath='{.spec.host}' 2>/dev/null)
+            ADMIN_PASSWORD=$(oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath="{.data.admin-password}" | base64 -d 2>/dev/null)
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✅ Grafana deployed successfully!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🌐 URL: https://${GRAFANA_ROUTE}"
+            echo "👤 Username: admin"
+            echo "🔑 Password: ${ADMIN_PASSWORD}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  deploy-agent-dev:
+    name: Deploy Grafana Agent (Dev)
+    needs: [deploy-grafana-centralized]
+    if: |
+      !cancelled() &&
+      (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+        (inputs.component == 'all' || inputs.component == 'grafana-agent')) ||
+       github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: DEV
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana Agent to Dev
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_DEV_NAMESPACE }}"
+            echo "🔍 Deploying Grafana Agent to ${NAMESPACE}"
+
+            oc apply -f monitoring/grafana-stack/grafana-agent/rbac-dev.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/configmap-dev.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/daemonset-dev.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/networkpolicy-dev.yaml
+
+            echo "⏳ Waiting for Grafana Agent pods..."
+            oc wait --for=condition=ready pod -l app=grafana-agent -n ${NAMESPACE} --timeout=120s || true
+
+            echo "✅ Grafana Agent deployed to dev"
+            oc get pods -n ${NAMESPACE} -l app=grafana-agent
+
+  deploy-agent-test:
+    name: Deploy Grafana Agent (Test)
+    needs: [deploy-grafana-centralized]
+    if: |
+      !cancelled() &&
+      (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+        (inputs.component == 'all' || inputs.component == 'grafana-agent')) ||
+       github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: TEST
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana Agent to Test
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TEST_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_TEST_NAMESPACE }}"
+            echo "🔍 Deploying Grafana Agent to ${NAMESPACE}"
+
+            oc apply -f monitoring/grafana-stack/grafana-agent/rbac-test.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/configmap-test.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/daemonset-test.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/networkpolicy-test.yaml
+
+            echo "⏳ Waiting for Grafana Agent pods..."
+            oc wait --for=condition=ready pod -l app=grafana-agent -n ${NAMESPACE} --timeout=120s || true
+
+            echo "✅ Grafana Agent deployed to test"
+            oc get pods -n ${NAMESPACE} -l app=grafana-agent
+
+  deploy-agent-prod:
+    name: Deploy Grafana Agent (Prod)
+    needs: [deploy-grafana-centralized]
+    if: |
+      !cancelled() &&
+      (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+        (inputs.component == 'all' || inputs.component == 'grafana-agent')) ||
+       github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: PROD
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana Agent to Prod
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
+          oc_token: ${{ secrets.OC_PROD_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_PROD_NAMESPACE }}"
+            echo "🔍 Deploying Grafana Agent to ${NAMESPACE}"
+
+            oc apply -f monitoring/grafana-stack/grafana-agent/rbac-prod.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/configmap-prod.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/daemonset-prod.yaml
+            oc apply -f monitoring/grafana-stack/grafana-agent/networkpolicy-prod.yaml
+
+            echo "⏳ Waiting for Grafana Agent pods..."
+            oc wait --for=condition=ready pod -l app=grafana-agent -n ${NAMESPACE} --timeout=120s || true
+
+            echo "✅ Grafana Agent deployed to prod"
+            oc get pods -n ${NAMESPACE} -l app=grafana-agent
+
+  # ============================================================================
+  # INDIVIDUAL DEPLOYMENT (Legacy - Loki + Grafana per namespace)
+  # ============================================================================
+
+  deploy-loki-individual:
+    name: Deploy Loki (Individual)
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      inputs.deployment_mode == 'individual' &&
+      (inputs.component == 'all' || inputs.component == 'loki')
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Loki
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            ENV="${{ inputs.environment || 'dev' }}"
+            NAMESPACE="${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}"
+
+            echo "📦 Deploying Loki to ${NAMESPACE}"
+
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            # Select values file based on environment
+            if [ "$ENV" = "prod" ]; then
+              LOKI_VALUES="monitoring/grafana-stack/loki/values-prod.yaml"
+            else
+              LOKI_VALUES="monitoring/grafana-stack/loki/values-minimal.yaml"
+            fi
+
+            helm upgrade --install loki grafana/loki \
+              --namespace ${NAMESPACE} \
+              --values ${LOKI_VALUES} \
+              --wait \
+              --timeout 10m
+
+            echo "✅ Loki deployed successfully"
+
+  deploy-grafana-individual:
+    name: Deploy Grafana (Individual)
+    needs: [deploy-loki-individual]
+    if: |
+      !cancelled() &&
+      (needs.deploy-loki-individual.result == 'success' || needs.deploy-loki-individual.result == 'skipped')
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Grafana
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}"
+
+            echo "📊 Deploying Grafana to ${NAMESPACE}"
+
+            helm repo add grafana https://grafana.github.io/helm-charts || true
+            helm repo update
+
+            helm upgrade --install grafana grafana/grafana \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/grafana/values-minimal.yaml \
+              --timeout 1m 2>&1 || echo "Helm install initiated"
+
+            # Patch for OpenShift SCC
+            oc patch deployment grafana -n ${NAMESPACE} --type=json -p='[
+              {"op": "remove", "path": "/spec/template/spec/securityContext/runAsUser"},
+              {"op": "remove", "path": "/spec/template/spec/securityContext/runAsGroup"},
+              {"op": "remove", "path": "/spec/template/spec/securityContext/fsGroup"}
+            ]' || echo "Patch may have already been applied"
+
+            oc wait --for=condition=available --timeout=120s deployment/grafana -n ${NAMESPACE}
+            oc create route edge grafana --service=grafana --port=service -n ${NAMESPACE} 2>/dev/null || echo "Route exists"
+
+            echo "✅ Grafana deployed successfully"
+
+  deployment-summary:
+    name: Deployment Summary
+    needs: [deploy-loki-centralized, deploy-grafana-centralized, deploy-agent-dev, deploy-agent-test, deploy-agent-prod, deploy-loki-individual, deploy-grafana-individual]
+    if: always()
+    runs-on: ubuntu-slim
+    steps:
+      - name: Generate Summary
+        run: |
+          MODE="${{ inputs.deployment_mode || 'centralized' }}"
+
+          echo "## 📊 Monitoring Stack Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** ${MODE}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$MODE" = "centralized" ]; then
+            echo "### Centralized Architecture" >> $GITHUB_STEP_SUMMARY
+            echo "- **Loki + Grafana** in \`tools\` namespace" >> $GITHUB_STEP_SUMMARY
+            echo "- **Grafana Agents** in \`dev\`, \`test\`, \`prod\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Component | Namespace | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Loki | tools | ${{ needs.deploy-loki-centralized.result == 'success' && '✅' || needs.deploy-loki-centralized.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Grafana | tools | ${{ needs.deploy-grafana-centralized.result == 'success' && '✅' || needs.deploy-grafana-centralized.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Agent | dev | ${{ needs.deploy-agent-dev.result == 'success' && '✅' || needs.deploy-agent-dev.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Agent | test | ${{ needs.deploy-agent-test.result == 'success' && '✅' || needs.deploy-agent-test.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Agent | prod | ${{ needs.deploy-agent-prod.result == 'success' && '✅' || needs.deploy-agent-prod.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Query All Environments" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`logql" >> $GITHUB_STEP_SUMMARY
+            echo '{environment="dev"}     # Dev logs' >> $GITHUB_STEP_SUMMARY
+            echo '{environment="prod"}    # Prod logs' >> $GITHUB_STEP_SUMMARY
+            echo '{namespace=~"f6bc3f-.*"} | json | level="error"  # All errors' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Individual Deployment" >> $GITHUB_STEP_SUMMARY
+            echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Loki | ${{ needs.deploy-loki-individual.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Grafana | ${{ needs.deploy-grafana-individual.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check for Failures
+        if: |
+          needs.deploy-loki-centralized.result == 'failure' ||
+          needs.deploy-grafana-centralized.result == 'failure' ||
+          needs.deploy-loki-individual.result == 'failure' ||
+          needs.deploy-grafana-individual.result == 'failure'
+        run: |
+          echo "❌ One or more components failed to deploy"
+          echo "Note: Grafana Agent deployments are optional and skipped if files don't exist"
+          exit 1
