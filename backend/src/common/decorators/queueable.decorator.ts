@@ -15,7 +15,6 @@ import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stor
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
 import type { ApiKeyUsageService } from '../../api/api-keys/api-key-usage.service'
-import { NotificationChannel } from '../../enum/notification-channel.enum'
 
 /**
  * Context required by the Queueable decorator.
