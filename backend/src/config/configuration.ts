@@ -108,7 +108,7 @@ export default () => {
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
-      // Number of recipients per bulk-send delivery batch
+      // Number of recipients per mail merge delivery batch
       batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
       emailDeliveryWorkerConcurrency: parseInt(
         process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',

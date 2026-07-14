@@ -57,10 +57,10 @@ export class NotificationRequestDetailService {
   }
 
   /**
-   * Create pending request detail records for one batch of a bulk email send.
+   * Create pending request detail records for one batch of a mail merge email send.
    * Each record is tagged with the shared batchId so a delivery worker can scope updates to its batch.
    */
-  async createBulkPending(
+  async createEmailMergePending(
     notificationRequestId: string,
     batchId: string,
     addresses: string[],

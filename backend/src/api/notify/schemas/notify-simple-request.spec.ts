@@ -382,9 +382,7 @@ describe('NotifySimpleRequest', () => {
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
-      expect(Object.keys(instance).sort()).toEqual(
-        ['email', 'msgApp', 'params', 'sms', 'templateId'].sort(),
-      )
+      expect(Object.keys(instance).sort()).toEqual(['email', 'msgApp', 'params', 'sms'].sort())
     })
 
     it('should handle deeply nested params', async () => {
@@ -526,12 +524,11 @@ describe('NotifySimpleRequest', () => {
   })
 
   describe('Template ID Validation', () => {
-    it('should accept valid UUID templateId', async () => {
+    it('should accept a valid UUID content.templateId', async () => {
       const data = {
-        templateId: '550e8400-e29b-41d4-a716-446655440000',
         email: {
           recipients: { to: ['test@example.com'] },
-          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          content: { templateId: '550e8400-e29b-41d4-a716-446655440000' },
         },
       }
 
@@ -539,26 +536,24 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.templateId).toBe('550e8400-e29b-41d4-a716-446655440000')
+      expect(instance.email?.content?.templateId).toBe('550e8400-e29b-41d4-a716-446655440000')
     })
 
-    it('should reject invalid UUID templateId', async () => {
+    it('should reject an invalid UUID content.templateId', async () => {
       const data = {
-        templateId: 'not-a-uuid',
         email: {
           recipients: { to: ['test@example.com'] },
-          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
+          content: { templateId: 'not-a-uuid' },
         },
       }
 
       const instance = plainToInstance(NotifySimpleRequest, data)
       const errors = await validate(instance)
 
-      const templateIdErrors = errors.filter((err) => err.property === 'templateId')
-      expect(templateIdErrors.length).toBeGreaterThan(0)
+      expect(errors.length).toBeGreaterThan(0)
     })
 
-    it('should allow templateId to be optional', async () => {
+    it('should allow content.templateId to be optional', async () => {
       const data = {
         email: {
           recipients: { to: ['test@example.com'] },
@@ -570,7 +565,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.templateId).toBeUndefined()
+      expect(instance.email?.content?.templateId).toBeUndefined()
     })
   })
 

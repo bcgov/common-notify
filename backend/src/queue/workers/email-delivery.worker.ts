@@ -1,7 +1,7 @@
 import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
-import { DeliveryJobPayload, BulkEmailJobData } from '../queue.types'
+import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -102,16 +102,17 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
-        // Bulk batch: resolve the template once, then render + send per recipient individually.
-        if (job.data.bulk && job.data.bulkEmail && job.data.batchId) {
-          return await EmailDeliveryWorker.processBulkBatch(
+        // Mail merge batch: resolve the template once, then render + send per recipient individually.
+        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
+          return await EmailDeliveryWorker.processMailMergeBatch(
             job.data.batchId,
-            job.data.bulkEmail,
+            job.data.mailMergeData,
             notifyId,
             tenantId,
             logger,
             templatesRepository,
             templatesService,
+            inlineRenderingService,
             emailAdapter,
             requestDetailService,
             notificationService,
@@ -138,27 +139,33 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
-        if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
-          throw new Error('Invalid email payload: subject is missing or invalid')
-        }
+        // Resolve template if the email content carries a templateId.
+        // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
+        const emailTemplateId = emailPayload.content?.templateId
 
-        if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
-          throw new Error('Invalid email payload: body is missing or invalid')
+        // Inline subject/body are only required when the content is NOT template-based; a template
+        // supplies them during resolution below (and they're re-validated after rendering).
+        if (!emailTemplateId) {
+          if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+            throw new Error('Invalid email payload: subject is missing or invalid')
+          }
+
+          if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+            throw new Error('Invalid email payload: body is missing or invalid')
+          }
         }
 
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 
-        // Resolve template if templateId is provided in the original request
-        // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
-        if (request?.templateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+        if (emailTemplateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
-            const template = await templatesRepository.findById(tenantId, request.templateId)
+            const template = await templatesRepository.findById(tenantId, emailTemplateId)
             if (!template) {
               throw new NotFoundException(
-                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+                `Template '${emailTemplateId}' not found for tenant '${tenantId}'`,
               )
             }
 
@@ -338,7 +345,7 @@ export class EmailDeliveryWorker {
   }
 
   /**
-   * Process one batch of a bulk email send.
+   * Process one batch of a mail merge email send.
    *
    * Resolves the template ONCE and renders it ONCE with the global params (no per-recipient
    * personalization), then calls the email adapter once per individual address reusing that
@@ -347,46 +354,77 @@ export class EmailDeliveryWorker {
    * already-delivered addresses; only systemic errors (e.g. template not found) throw to trigger
    * a BullMQ retry of the whole batch.
    */
-  private static async processBulkBatch(
+  private static async processMailMergeBatch(
     batchId: string,
-    bulkEmail: BulkEmailJobData,
+    mailMergeData: MailMergeJobData,
     notifyId: string,
     tenantId: string,
     logger: Logger,
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
     emailAdapter: IEmailTransport,
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { templateId, params, addresses } = bulkEmail
+    const { content, params, recipients } = mailMergeData
+    const templateId = content?.templateId
+    const hasInlineContent = !!(content && (content.subject || content.body))
+
+    // A mail merge send renders from exactly one source: a server template or inline content.
+    if (templateId && hasInlineContent) {
+      throw new Error('Mail merge requires either a templateId or inline content, not both')
+    }
+    if (!templateId && !hasInlineContent) {
+      throw new Error('Mail merge requires either a templateId or inline content')
+    }
 
     // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
-    const template = await templatesRepository.findById(tenantId, templateId)
-    if (!template) {
-      throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
-    }
-    if (template.channelCode !== 'EMAIL') {
-      throw new Error(`Template '${templateId}' is not an EMAIL template`)
+    const template = templateId ? await templatesRepository.findById(tenantId, templateId) : null
+    if (templateId) {
+      if (!template) {
+        throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+      }
+      if (template.channelCode !== 'EMAIL') {
+        throw new Error(`Template '${templateId}' is not an EMAIL template`)
+      }
     }
 
-    logger.debug(`[${notifyId}] Processing bulk batch ${batchId}: ${addresses.length} recipient(s)`)
+    // Inline content uses handlebars by default so mail-merge variables are substituted per recipient.
+    const inlineContent = content
+      ? { ...content, renderer: content.renderer ?? ('handlebars' as const) }
+      : null
 
-    // Render the template once with the shared global params; content is identical for every address
-    const rendered = await templatesService.renderTemplateContent(template, params || {})
+    logger.debug(
+      `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
+    )
 
     let sent = 0
     let failed = 0
 
-    for (const address of addresses) {
+    for (const recipient of recipients) {
       try {
+        // Merge global params with per-recipient params; per-recipient takes precedence
+        const mergedParams = { ...(params || {}), ...recipient.params }
+
+        let subject: string | undefined
+        let body: string
+        let bodyType: 'text' | 'markdown' | 'html' | undefined
+        if (template) {
+          const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = rendered.bodyType
+        } else {
+          const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = inlineContent!.bodyType
+        }
+
         const emailPayload = {
-          recipients: { to: [address] },
-          content: {
-            subject: rendered.subject,
-            body: rendered.body,
-            bodyType: rendered.bodyType,
-          },
+          recipients: { to: [recipient.address] },
+          content: { subject, body, bodyType },
         }
 
         const result = await EmailDeliveryWorker.sendEmail(
@@ -396,20 +434,30 @@ export class EmailDeliveryWorker {
           emailAdapter,
         )
 
-        await requestDetailService.markRecipientSent(notifyId, batchId, address, result.externalId)
+        await requestDetailService.markRecipientSent(
+          notifyId,
+          batchId,
+          recipient.address,
+          result.externalId,
+        )
         sent++
       } catch (recipientError) {
         const errorMessage =
           recipientError instanceof Error ? recipientError.message : String(recipientError)
         logger.error(
-          `[${notifyId}] Bulk recipient send failed (batch=${batchId}, address=${address}): ${errorMessage}`,
+          `[${notifyId}] Mail merge recipient send failed (batch=${batchId}, address=${recipient.address}): ${errorMessage}`,
         )
-        await requestDetailService.markRecipientFailed(notifyId, batchId, address, errorMessage)
+        await requestDetailService.markRecipientFailed(
+          notifyId,
+          batchId,
+          recipient.address,
+          errorMessage,
+        )
         failed++
       }
     }
 
-    logger.log(`[${notifyId}] Bulk batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+    logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
 
     // Reconcile the parent request once no recipients remain pending across all batches.
     // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
@@ -430,7 +478,7 @@ export class EmailDeliveryWorker {
         updatedBy: 'email-delivery-worker',
       })
       logger.log(
-        `[${notifyId}] All bulk batches complete; parent marked ${finalStatus.toUpperCase()}`,
+        `[${notifyId}] All mail merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
       )
     }
 
