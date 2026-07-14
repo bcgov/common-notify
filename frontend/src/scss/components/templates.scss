@@ -151,8 +151,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     padding: var(--layout-padding-xsmall) var(--layout-padding-none);
   }
 
-  &__switch-label::after,
-  &__field-text .bcds-react-aria-TextField--Label::after {
+  &__switch-label::after {
     content: ' (required)';
     font-weight: 400;
   }
@@ -162,6 +161,11 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
 
     .bcds-react-aria-TextField--Label {
       font-weight: 700;
+
+      // The DS-appended "(required)" stays regular weight
+      &.required {
+        font-weight: 400;
+      }
     }
   }
 
@@ -173,7 +177,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     .bcds-react-aria-DatePicker--Label {
       font-weight: 700;
 
-      // The appended "(required)" stays regular weight, like the other fields
+      // The appended "(required)" stays regular weight
       &.required {
         font-weight: 400;
       }

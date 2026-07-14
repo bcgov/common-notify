@@ -247,6 +247,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                           label={variable.name}
                           value={values[variable.name] ?? ''}
                           onChange={handleValueChange(variable.name)}
+                          isRequired
                           // The DS TextField omits `placeholder` from its types, but
                           // react-aria's useTextField still forwards it to the input.
                           {...({ placeholder: `Enter text...` } as { placeholder?: string })}
