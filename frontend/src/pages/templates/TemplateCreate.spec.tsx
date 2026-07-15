@@ -30,24 +30,56 @@ vi.mock('@/components/PageHeading', () => ({
 
 vi.mock('@bcgov/design-system-react-components', async () => {
   const React = await import('react')
+  type RadioOptionProps = {
+    value: string
+    checked?: boolean
+    onSelect?: (value: string) => void
+    disabled?: boolean
+  }
+  type NestedRadioChildProps = {
+    value?: string
+    children?: ReactNode
+  }
 
   const Button = ({
+    className,
     children,
+    isIconButton,
     onClick,
     onPress,
+    size,
     type,
     isDisabled,
+    variant,
+    ...props
   }: {
+    className?: string
     children: ReactNode
+    isIconButton?: boolean
     onClick?: () => void
     onPress?: () => void
+    size?: string
     type?: 'button' | 'submit'
     isDisabled?: boolean
-  }) => (
-    <button disabled={isDisabled} onClick={onClick ?? onPress} type={type ?? 'button'}>
-      {children}
-    </button>
-  )
+    variant?: string
+    [key: string]: unknown
+  }) => {
+    void isIconButton
+    void size
+    void variant
+
+    return (
+      <button
+        className={className}
+        disabled={isDisabled}
+        onClick={onClick ?? onPress}
+        {...props}
+        type={type ?? 'button'}
+      >
+        {children}
+      </button>
+    )
+  }
 
   const TextField = ({
     label,
@@ -55,16 +87,24 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     onChange,
     description,
     errorMessage,
+    isRequired,
+    placeholder,
   }: {
     label: ReactNode
     value: string
     onChange: (value: string) => void
     description?: string
     errorMessage?: string
+    isRequired?: boolean
+    placeholder?: string
   }) => (
     <label>
-      {label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      {isRequired ? `${label} (required)` : label}
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
       {description ? <span>{description}</span> : null}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </label>
@@ -95,6 +135,36 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     </label>
   )
 
+  const enhanceRadioChildren = (
+    children: ReactNode,
+    value: string,
+    onChange: (value: string) => void,
+    isDisabled?: boolean,
+  ): ReactNode =>
+    React.Children.map(children, (child) => {
+      if (!React.isValidElement<NestedRadioChildProps>(child)) {
+        return child
+      }
+
+      const childProps = child.props
+
+      if (typeof childProps.value === 'string') {
+        return React.cloneElement(child as React.ReactElement<RadioOptionProps>, {
+          checked: childProps.value === value,
+          onSelect: onChange,
+          disabled: isDisabled,
+        })
+      }
+
+      if (childProps.children !== undefined) {
+        return React.cloneElement(child, {
+          children: enhanceRadioChildren(childProps.children, value, onChange, isDisabled),
+        })
+      }
+
+      return child
+    })
+
   const RadioGroup = ({
     label,
     value,
@@ -102,6 +172,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children,
     errorMessage,
     isDisabled,
+    isRequired,
   }: {
     label: ReactNode
     value: string
@@ -109,23 +180,22 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     children: ReactNode
     errorMessage?: string
     isDisabled?: boolean
+    isRequired?: boolean
   }) => (
     <fieldset disabled={isDisabled}>
-      <legend>{label}</legend>
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child, {
-              checked: child.props.value === value,
-              onSelect: onChange,
-              disabled: isDisabled,
-            })
-          : child,
-      )}
+      <legend>{isRequired ? `${label} (required)` : label}</legend>
+      {enhanceRadioChildren(children, value, onChange, isDisabled)}
       {errorMessage ? <span>{errorMessage}</span> : null}
     </fieldset>
   )
 
-  return { Button, Radio, RadioGroup, TextField }
+  const TooltipTrigger = ({ children }: { children: ReactNode }) => <>{children}</>
+
+  const Tooltip = ({ children }: { children: ReactNode }) => <span>{children}</span>
+
+  const SvgInfoIcon = () => <svg aria-hidden="true" />
+
+  return { Button, Radio, RadioGroup, SvgInfoIcon, TextField, Tooltip, TooltipTrigger }
 })
 
 describe('TemplateCreate', () => {
@@ -138,6 +208,76 @@ describe('TemplateCreate', () => {
     render(<TemplateCreate />)
 
     expect(screen.queryByText('Body type')).toBeNull()
+  })
+
+  it('shows the Figma template title placeholder', () => {
+    render(<TemplateCreate />)
+
+    expect(screen.getByPlaceholderText('Type a template title')).toBeTruthy()
+  })
+
+  it('keeps preview disabled and shows inline errors for missing required fields', async () => {
+    const { container } = render(<TemplateCreate />)
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: 'Missing fields template' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+    expect(screen.getAllByText('Please select an option to continue.')).toHaveLength(2)
+    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
+  })
+
+  it('enables save after entering a title and still requires the remaining fields on submit', () => {
+    render(<TemplateCreate />)
+
+    const saveButton = screen.getByRole('button', { name: 'Save' })
+    const titleInput = screen.getByPlaceholderText('Type a template title')
+
+    expect(saveButton).toBeDisabled()
+
+    fireEvent.change(titleInput, {
+      target: { value: 'Email template' },
+    })
+    expect(saveButton).not.toBeDisabled()
+
+    fireEvent.click(saveButton)
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+  })
+
+  it('shows an inline required error for email subject when email is selected', () => {
+    render(<TemplateCreate />)
+
+    fireEvent.change(screen.getByPlaceholderText('Type a template title'), {
+      target: { value: 'Email template' },
+    })
+    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Handlebars'))
+    fireEvent.change(screen.getByLabelText('Template body (required)'), {
+      target: { value: 'Hello {{name}}' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(createTemplateMock).not.toHaveBeenCalled()
+    expect(
+      screen.getByText('Use a subject line that clearly describes the email content.'),
+    ).toBeTruthy()
+    expect(screen.getByText('This field is required.')).toBeTruthy()
+  })
+
+  it('renders all syntax tooltip triggers', () => {
+    render(<TemplateCreate />)
+
+    expect(screen.getByRole('button', { name: 'About Handlebars syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About Mustache syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About GC Notify legacy syntax' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

@@ -1,0 +1,165 @@
+# Grafana - Visualization & Dashboards (Centralized Tools Environment)
+# Deployment: f6bc3f-tools namespace
+# Purpose: Query logs from Loki, display dashboards for ALL environments (dev/test/prod)
+# Resource Profile: Centralized - handles queries from multiple environments
+
+# Admin credentials from OpenShift Secret
+# The secret is created separately in secret.yaml
+admin:
+  existingSecret: grafana-admin-credentials
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Persistence for dashboards
+# Disabled due to storage quota limits in tools namespace (5Gi total, all used by Loki)
+persistence:
+  enabled: false
+  # storageClassName: netapp-file-standard
+  # size: 2Gi
+
+# Resources for centralized deployment
+# Note: CPU request reduced to fit within tools namespace quota (50m remaining after Loki)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 256Mi
+
+# Datasources - Pre-configure Loki in tools namespace
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      # Loki datasource (centralized in tools namespace)
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 5000
+          derivedFields:
+            # Extract notificationId from logs for easy linking
+            - datasourceUid: Loki
+              matcherRegex: '"notificationId":"([^"]+)"'
+              name: NotificationID
+              url: ''
+      # Loki Alerting (Ruler API)
+      - name: Loki Alerting
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        jsonData:
+          manageAlerts: true
+          alertmanagerUid: alertmanager
+
+# Dashboard providers - Load dashboards from ConfigMaps
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: 'Common Notify'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Pre-load dashboards
+# Dashboards are loaded from JSON files in the monitoring/dashboards directory
+dashboards:
+  default: {}
+
+# Sidecar for auto-loading dashboards from ConfigMaps
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folder: /tmp/dashboards
+    defaultFolderName: "Common Notify"
+    searchNamespace: f6bc3f-tools
+    provider:
+      foldersFromFilesStructure: false
+    resource: configmap
+
+# Grafana configuration
+grafana.ini:
+  server:
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+    serve_from_sub_path: false
+
+  users:
+    allow_sign_up: false
+
+  auth.anonymous:
+    enabled: false
+
+  log:
+    mode: console
+    level: info
+
+  # Enable multi-tenancy features
+  explore:
+    enabled: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress/Route - Disabled (using separate Route manifest)
+ingress:
+  enabled: false
+
+# Plugins to install
+plugins:
+  - grafana-piechart-panel
+  - grafana-clock-panel
+
+# Security context - OpenShift compatible (let OpenShift assign UIDs)
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: null
+  runAsUser: null
+  runAsGroup: null
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  runAsGroup: null
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Disable init containers for OpenShift compatibility
+initChownData:
+  enabled: false
+
+downloadDashboards:
+  enabled: false
+
+# Explicitly override default security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+
+# Environment variables
+env:
+  TZ: America/Vancouver
+
+# RBAC - Use OpenShift defaults
+rbac:
+  create: false
+  pspEnabled: false
+  namespaced: true
+
+serviceAccount:
+  create: false  # Use default OpenShift service account

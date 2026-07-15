@@ -1,7 +1,16 @@
-import { IsString, IsOptional, IsEnum } from 'class-validator'
+import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
 export class NotifyContent {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'ID of the template to render this content from. Mutually exclusive with inline content.',
+  })
+  @IsOptional()
+  @IsUUID()
+  templateId?: string
+
   @ApiPropertyOptional({
     description: 'Content body (subject for email, message for SMS)',
   })

@@ -1,12 +1,59 @@
 import { useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Button, TextField, RadioGroup, Radio } from '@bcgov/design-system-react-components'
+import {
+  Button,
+  TextField,
+  RadioGroup,
+  Radio,
+  Tooltip,
+  TooltipTrigger,
+  SvgInfoIcon,
+} from '@bcgov/design-system-react-components'
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import TemplatePreviewModal from './TemplatePreviewModal'
 import '@/scss/components/templates.scss'
+
+const REQUIRED_FIELD_ERROR = 'This field is required.'
+const SYNTAX_TOOLTIPS = [
+  {
+    value: TemplateEngine.HANDLEBARS,
+    label: 'Handlebars',
+    tooltipLabel: 'About Handlebars syntax',
+    tooltipText:
+      'A templating language that uses placeholders (e.g., {{firstName}}) and supports helpers, conditions, and loops for creating dynamic content.',
+  },
+  {
+    value: TemplateEngine.MUSTACHE,
+    label: 'Mustache',
+    tooltipLabel: 'About Mustache syntax',
+    tooltipText:
+      'A logic-less templating language that uses placeholders (e.g., {{firstName}}) to insert dynamic values into templates.',
+  },
+  {
+    value: TemplateEngine.LEGACY_GC_NOTIFY,
+    label: 'GC Notify (legacy)',
+    tooltipLabel: 'About GC Notify legacy syntax',
+    tooltipText:
+      'Legacy syntax used by GC Notify templates. Select this when importing or editing templates created with GC Notify.',
+  },
+  {
+    value: TemplateEngine.MJML,
+    label: 'MJML',
+    tooltipLabel: 'About MJML syntax',
+    tooltipText:
+      'A markup language for building responsive HTML emails that render consistently across email clients.',
+  },
+] as const
+
+const RequiredLabel = ({ text }: { text: string }) => (
+  <span className="template-form__required-label">
+    <span className="template-form__required-label-text">{text}</span>
+    <span className="template-form__required-label-indicator">(required)</span>
+  </span>
+)
 
 const TemplateCreate: FC = () => {
   const navigate = useNavigate()
@@ -43,7 +90,7 @@ const TemplateCreate: FC = () => {
       body: '',
     }
     if (!formData.name.trim()) {
-      errors.name = ' '
+      errors.name = REQUIRED_FIELD_ERROR
     }
     if (!formData.channelCode) {
       errors.channelCode = 'Please select an option to continue.'
@@ -52,10 +99,10 @@ const TemplateCreate: FC = () => {
       errors.engineCode = 'Please select an option to continue.'
     }
     if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
-      errors.subject = ' '
+      errors.subject = REQUIRED_FIELD_ERROR
     }
     if (!formData.body.trim()) {
-      errors.body = ' '
+      errors.body = REQUIRED_FIELD_ERROR
     }
     setFormErrors(errors)
     return !Object.values(errors).some(Boolean)
@@ -91,42 +138,35 @@ const TemplateCreate: FC = () => {
   }
 
   return (
-    <div>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="template-form-page">
+      <div className="template-form-page__content">
         <PageHeading title="Create reusable template" />
-        <form onSubmit={handleSave}>
-          <div className="mb-4 desc-above">
+        <form className="template-form" noValidate onSubmit={handleSave}>
+          <div className="template-form__section template-form__section--title">
             <TextField
-              label={
-                (
-                  <>
-                    <strong>Template title</strong> (required)
-                  </>
-                ) as any
-              }
+              label="Template title"
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
               onChange={handleFieldChange('name')}
-              style={{ maxWidth: '400px' }}
+              {...({ placeholder: 'Type a template title' } as any)}
+              className="template-form__field"
+              size="small"
+              isRequired
               isInvalid={!!formErrors.name}
               errorMessage={formErrors.name}
             />
           </div>
 
-          <div className="mb-4">
+          <div className="template-form__section template-form__section--template-type">
             <RadioGroup
-              label={
-                (
-                  <>
-                    <strong>Template type</strong> (required)
-                  </>
-                ) as any
-              }
+              className="template-form__radio-group"
+              label={(<RequiredLabel text="Template type" />) as unknown as string}
               value={formData.channelCode}
               onChange={(value) => {
                 setFormData((prev) => ({ ...prev, channelCode: value }))
                 setFormErrors((prev) => ({ ...prev, channelCode: '' }))
               }}
+              aria-required="true"
               isInvalid={!!formErrors.channelCode}
               errorMessage={formErrors.channelCode}
             >
@@ -139,15 +179,27 @@ const TemplateCreate: FC = () => {
             </RadioGroup>
           </div>
 
-          <div className="mb-4 error-after-label">
+          {formData.channelCode === NotificationChannel.EMAIL && (
+            <div className="template-form__section template-form__section--subject">
+              <TextField
+                label="Subject line of the email"
+                description="Use a subject line that clearly describes the email content."
+                value={formData.subject}
+                onChange={handleFieldChange('subject')}
+                className="template-form__field template-form__field--full"
+                size="small"
+                isRequired
+                isInvalid={!!formErrors.subject}
+                errorMessage={formErrors.subject}
+              />
+            </div>
+          )}
+
+          <div className="template-form__section template-form__section--syntax-type error-after-label">
             <RadioGroup
-              label={
-                (
-                  <>
-                    <strong>Template engine</strong> (required)
-                  </>
-                ) as any
-              }
+              className="template-form__radio-group"
+              label={(<RequiredLabel text="Syntax type" />) as unknown as string}
+              description="Choose the syntax used for dynamic variables and placeholders in this template."
               value={formData.engineCode}
               onChange={(value) => {
                 setFormData((prev) => ({
@@ -159,61 +211,52 @@ const TemplateCreate: FC = () => {
                   engineCode: '',
                 }))
               }}
+              aria-required="true"
               isInvalid={!!formErrors.engineCode}
               errorMessage={formErrors.engineCode}
             >
-              <Radio key="handlebars" value={TemplateEngine.HANDLEBARS}>
-                Handlebars
-              </Radio>
-              <Radio key="mustache" value={TemplateEngine.MUSTACHE}>
-                Mustache
-              </Radio>
-              <Radio key="legacy" value={TemplateEngine.LEGACY_GC_NOTIFY}>
-                Legacy GC Notify
-              </Radio>
-              <Radio key="mjml" value={TemplateEngine.MJML}>
-                MJML
-              </Radio>
+              {SYNTAX_TOOLTIPS.map((option) => (
+                <div className="template-form__syntax-option" key={option.value}>
+                  <Radio value={option.value}>{option.label}</Radio>
+                  <TooltipTrigger>
+                    <Button
+                      aria-label={option.tooltipLabel}
+                      className="template-form__syntax-tooltip-trigger"
+                      isIconButton
+                      size="xsmall"
+                      type="button"
+                      variant="tertiary"
+                    >
+                      <SvgInfoIcon />
+                    </Button>
+                    <Tooltip placement="left">{option.tooltipText}</Tooltip>
+                  </TooltipTrigger>
+                </div>
+              ))}
             </RadioGroup>
           </div>
 
-          {formData.channelCode === NotificationChannel.EMAIL && (
-            <div className="mb-4 desc-above">
-              <TextField
-                label={
-                  (
-                    <>
-                      <strong>Subject line of the email</strong> (required)
-                    </>
-                  ) as any
-                }
-                description="Use a subject line that clearly describes the email content."
-                value={formData.subject}
-                onChange={handleFieldChange('subject')}
-                style={{ width: '100%' }}
-                isInvalid={!!formErrors.subject}
-                errorMessage={formErrors.subject}
-              />
-            </div>
-          )}
-
-          <div className="mb-4">
-            <label htmlFor="body" className="bcds-react-aria-TextField--Label">
-              <strong>Template body</strong> (required)
+          <div className="template-form__section template-form__section--body">
+            <label
+              htmlFor="body"
+              className="bcds-react-aria-TextField--Label template-form__body-label"
+            >
+              <RequiredLabel text="Template body" />
             </label>
             <textarea
+              aria-label="Template body (required)"
               id="body"
-              className={`form-control${formErrors.body ? ' is-invalid' : ''}`}
+              placeholder="Type the template body here"
+              className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
               value={formData.body}
               onChange={(e) => handleFieldChange('body')(e.target.value)}
-              style={{ width: '100%', height: '16rem' }}
             />
             {formErrors.body && (
               <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
             )}
           </div>
 
-          <div className="d-flex justify-content-end gap-2">
+          <div className="template-form__actions d-flex justify-content-end gap-2">
             <Button type="button" variant="secondary" onClick={handleCancel}>
               Cancel
             </Button>

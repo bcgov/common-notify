@@ -19,7 +19,7 @@ export class TemplateOrRendererConstraint implements ValidatorConstraintInterfac
   validate(value: unknown): boolean {
     const channel = value as any
 
-    const hasTemplateId = !!channel.templateId
+    const hasTemplateId = !!channel.content?.templateId
     const hasRenderer = !!channel.content?.renderer
 
     // Cannot use both templateId and renderer

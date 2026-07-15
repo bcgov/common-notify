@@ -9,12 +9,12 @@ export type RenderingStrategy = 'template' | 'inline'
 
 /**
  * Determines whether to use template-based or inline rendering
- * @returns 'template' if templateId is specified, 'inline' if content.renderer is specified
+ * @returns 'template' if content.templateId is specified, 'inline' if content.renderer is specified
  */
 export function getRenderingStrategy(
   channel: NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel,
 ): RenderingStrategy | null {
-  if (channel.templateId) {
+  if (channel.content?.templateId) {
     return 'template'
   }
 

@@ -11,10 +11,10 @@ import type { NotifyMsgAppChannel } from './schemas/notify-msg-app-channel'
 describe('Rendering Strategy', () => {
   describe('getRenderingStrategy', () => {
     describe('for email channel', () => {
-      it('should return template when templateId is provided', () => {
+      it('should return template when content.templateId is provided', () => {
         const channel: NotifyEmailChannel = {
-          templateId: 'template-123',
           recipients: { to: ['test@example.com'] },
+          content: { templateId: 'template-123' },
         }
 
         const result = getRenderingStrategy(channel)
@@ -37,7 +37,7 @@ describe('Rendering Strategy', () => {
         expect(result).toBe('inline')
       })
 
-      it('should return null when neither templateId nor content.renderer provided', () => {
+      it('should return null when neither content.templateId nor content.renderer provided', () => {
         const channel: NotifyEmailChannel = {
           recipients: { to: ['test@example.com'] },
         }
@@ -47,11 +47,11 @@ describe('Rendering Strategy', () => {
         expect(result).toBeNull()
       })
 
-      it('should prefer templateId over inline content', () => {
+      it('should prefer content.templateId over inline content', () => {
         const channel: NotifyEmailChannel = {
-          templateId: 'template-123',
           recipients: { to: ['test@example.com'] },
           content: {
+            templateId: 'template-123',
             subject: 'Test Subject',
             body: 'Test body',
             renderer: 'handlebars',
@@ -79,10 +79,10 @@ describe('Rendering Strategy', () => {
     })
 
     describe('for SMS channel', () => {
-      it('should return template when templateId is provided', () => {
+      it('should return template when content.templateId is provided', () => {
         const channel: NotifySmsChannel = {
-          templateId: 'template-456',
           recipients: { to: ['+12025551234'] },
+          content: { templateId: 'template-456' },
         }
 
         const result = getRenderingStrategy(channel)
@@ -104,7 +104,7 @@ describe('Rendering Strategy', () => {
         expect(result).toBe('inline')
       })
 
-      it('should return null when neither templateId nor content.renderer provided', () => {
+      it('should return null when neither content.templateId nor content.renderer provided', () => {
         const channel: NotifySmsChannel = {
           recipients: { to: ['+12025551234'] },
         }
@@ -114,11 +114,11 @@ describe('Rendering Strategy', () => {
         expect(result).toBeNull()
       })
 
-      it('should prefer templateId over inline content', () => {
+      it('should prefer content.templateId over inline content', () => {
         const channel: NotifySmsChannel = {
-          templateId: 'template-456',
           recipients: { to: ['+12025551234'] },
           content: {
+            templateId: 'template-456',
             body: 'Test SMS',
             renderer: 'mustache',
           },
@@ -131,10 +131,10 @@ describe('Rendering Strategy', () => {
     })
 
     describe('for msgApp channel', () => {
-      it('should return template when templateId is provided', () => {
+      it('should return template when content.templateId is provided', () => {
         const channel: NotifyMsgAppChannel = {
-          templateId: 'template-789',
           recipients: { to: ['user-123'] },
+          content: { templateId: 'template-789' },
         }
 
         const result = getRenderingStrategy(channel)
@@ -156,9 +156,10 @@ describe('Rendering Strategy', () => {
         expect(result).toBe('inline')
       })
 
-      it('should return null when neither templateId nor content.renderer provided', () => {
+      it('should return null when neither content.templateId nor content.renderer provided', () => {
         const channel: NotifyMsgAppChannel = {
           recipients: { to: ['user-123'] },
+          content: {},
         }
 
         const result = getRenderingStrategy(channel)
@@ -168,8 +169,8 @@ describe('Rendering Strategy', () => {
 
       it('should handle empty recipients with template', () => {
         const channel: NotifyMsgAppChannel = {
-          templateId: 'template-789',
           recipients: { to: [] },
+          content: { templateId: 'template-789' },
         }
 
         const result = getRenderingStrategy(channel)
@@ -193,11 +194,11 @@ describe('Rendering Strategy', () => {
     })
 
     describe('edge cases', () => {
-      it('should handle undefined templateId', () => {
+      it('should handle undefined content.templateId', () => {
         const channel: NotifyEmailChannel = {
-          templateId: undefined,
           recipients: { to: ['test@example.com'] },
           content: {
+            templateId: undefined,
             subject: 'Test',
             body: 'Body',
             renderer: 'handlebars',
@@ -209,11 +210,11 @@ describe('Rendering Strategy', () => {
         expect(result).toBe('inline')
       })
 
-      it('should handle empty string templateId as falsy', () => {
+      it('should handle empty string content.templateId as falsy', () => {
         const channel: NotifyEmailChannel = {
-          templateId: '' as any,
           recipients: { to: ['test@example.com'] },
           content: {
+            templateId: '' as any,
             subject: 'Test',
             body: 'Body',
             renderer: 'handlebars',
@@ -252,7 +253,7 @@ describe('Rendering Strategy', () => {
       })
 
       it('should handle all different renderer types', () => {
-        const renderers = ['handlebars', 'mustache', 'legacy-gc-notify', 'mjml'] as const
+        const renderers = ['handlebars', 'mustache', 'legacy_gc_notify', 'mjml'] as const
 
         for (const renderer of renderers) {
           const channel: NotifyEmailChannel = {
@@ -288,10 +289,10 @@ describe('Rendering Strategy', () => {
       expect(result).toBe(true)
     })
 
-    it('should return false when templateId is specified', () => {
+    it('should return false when content.templateId is specified', () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-123',
         recipients: { to: ['test@example.com'] },
+        content: { templateId: 'template-123' },
       }
 
       const result = isInlineRendering(channel)
@@ -309,11 +310,11 @@ describe('Rendering Strategy', () => {
       expect(result).toBe(false)
     })
 
-    it('should prefer templateId over inline rendering when both specified', () => {
+    it('should prefer content.templateId over inline rendering when both specified', () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-123',
         recipients: { to: ['test@example.com'] },
         content: {
+          templateId: 'template-123',
           subject: 'Test',
           body: 'Body',
           renderer: 'handlebars',
@@ -355,10 +356,10 @@ describe('Rendering Strategy', () => {
   })
 
   describe('isTemplateBasedRendering', () => {
-    it('should return true when templateId is specified', () => {
+    it('should return true when content.templateId is specified', () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-123',
         recipients: { to: ['test@example.com'] },
+        content: { templateId: 'template-123' },
       }
 
       const result = isTemplateBasedRendering(channel)
@@ -391,11 +392,11 @@ describe('Rendering Strategy', () => {
       expect(result).toBe(false)
     })
 
-    it('should prefer templateId when both specified', () => {
+    it('should prefer content.templateId when both specified', () => {
       const channel: NotifyEmailChannel = {
-        templateId: 'template-123',
         recipients: { to: ['test@example.com'] },
         content: {
+          templateId: 'template-123',
           subject: 'Test',
           body: 'Body',
           renderer: 'handlebars',
@@ -409,8 +410,8 @@ describe('Rendering Strategy', () => {
 
     it('should work with SMS channel', () => {
       const channel: NotifySmsChannel = {
-        templateId: 'template-456',
         recipients: { to: ['+12025551234'] },
+        content: { templateId: 'template-456' },
       }
 
       const result = isTemplateBasedRendering(channel)
@@ -420,8 +421,8 @@ describe('Rendering Strategy', () => {
 
     it('should work with msgApp channel', () => {
       const channel: NotifyMsgAppChannel = {
-        templateId: 'template-789',
         recipients: { to: ['user-123'] },
+        content: { templateId: 'template-789' },
       }
 
       const result = isTemplateBasedRendering(channel)
@@ -447,7 +448,7 @@ describe('Rendering Strategy', () => {
   describe('consistency between functions', () => {
     it('should have isInlineRendering and isTemplateBasedRendering be mutually exclusive', () => {
       const testCases = [
-        { templateId: 'template-123' },
+        { content: { templateId: 'template-123' } },
         { content: { renderer: 'handlebars' } },
         {},
       ]
@@ -463,7 +464,7 @@ describe('Rendering Strategy', () => {
 
     it('should return true for exactly one of three functions (or null for all)', () => {
       const testCases = [
-        { templateId: 'template-123' },
+        { content: { templateId: 'template-123' } },
         { content: { renderer: 'handlebars' } },
         {},
       ]
