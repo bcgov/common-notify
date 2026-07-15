@@ -125,6 +125,19 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [rendered, setRendered] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Whether a valid render has been generated; when false the Rendered tab
+  // shows a "Preview unavailable" placeholder instead of stale/empty output.
+  const [hasApplied, setHasApplied] = useState(false)
+  // Whether to surface per-field errors on empty required inputs.
+  const [showErrors, setShowErrors] = useState(false)
+
+  // Booleans always carry a value; text/date variables must be filled in.
+  const requiredVariables = variables.filter((v) => v.type !== 'boolean')
+  const isMissing = (name: string) => !(values[name] ?? '').trim()
+  const missingCount = requiredVariables.filter((v) => isMissing(v.name)).length
+  const hasMissing = missingCount > 0
+  // Enable Apply once the user has entered a value (or nothing is required).
+  const canApply = requiredVariables.length === 0 || missingCount < requiredVariables.length
 
   const runPreview = async (vals: Record<string, string>) => {
     const params: Record<string, string> = {}
@@ -162,7 +175,18 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     })
     setValues(initial)
     setActiveTab('raw')
-    void runPreview(initial)
+    setShowErrors(false)
+    // Only render a preview when every required value is present; otherwise the
+    // Rendered tab shows the "Preview unavailable" placeholder until applied.
+    const missing = variables.some((v) => v.type !== 'boolean' && !(initial[v.name] ?? '').trim())
+    if (missing) {
+      setHasApplied(false)
+      setRendered('')
+      setError(null)
+    } else {
+      setHasApplied(true)
+      void runPreview(initial)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
@@ -235,23 +259,31 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                               handleValueChange(variable.name)(date ? date.toString() : '')
                             }
                             isRequired
+                            isInvalid={showErrors && isMissing(variable.name)}
+                            errorMessage="Enter a value to generate the preview"
                             hideTimeZone
                             size="medium"
                             showFormatHelpText={false}
                           />
                         </div>
                       ) : (
-                        <TextField
-                          key={variable.name}
-                          className="template-preview__field-text"
-                          label={variable.name}
-                          value={values[variable.name] ?? ''}
-                          onChange={handleValueChange(variable.name)}
-                          isRequired
-                          // The DS TextField omits `placeholder` from its types, but
-                          // react-aria's useTextField still forwards it to the input.
-                          {...({ placeholder: `Enter text...` } as { placeholder?: string })}
-                        />
+                        // Wrap rather than pass `className` to TextField: the DS
+                        // spreads props over its own `bcds-react-aria-TextField`
+                        // class, so a className here would strip it and break the
+                        // `[data-invalid]` red border.
+                        <div key={variable.name} className="template-preview__field-text">
+                          <TextField
+                            label={variable.name}
+                            value={values[variable.name] ?? ''}
+                            onChange={handleValueChange(variable.name)}
+                            isRequired
+                            isInvalid={showErrors && isMissing(variable.name)}
+                            errorMessage="Enter a value to generate the preview"
+                            // The DS TextField omits `placeholder` from its types, but
+                            // react-aria's useTextField still forwards it to the input.
+                            {...({ placeholder: `Enter text...` } as { placeholder?: string })}
+                          />
+                        </div>
                       ),
                     )}
                   </div>
@@ -263,9 +295,17 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                     variant="secondary"
                     onPress={() => {
                       setActiveTab('rendered')
-                      void runPreview(values)
+                      if (hasMissing) {
+                        // Surface field errors and keep the preview unavailable.
+                        setShowErrors(true)
+                        setHasApplied(false)
+                      } else {
+                        setShowErrors(false)
+                        setHasApplied(true)
+                        void runPreview(values)
+                      }
                     }}
-                    isDisabled={loading}
+                    isDisabled={loading || !canApply}
                   >
                     {loading ? 'Applying...' : 'Apply to Preview'}
                   </Button>
@@ -303,9 +343,24 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                     </ToggleButtonGroup>
                   </div>
 
-                  <div className="template-preview__output">
+                  <div
+                    className={
+                      activeTab === 'rendered' && !hasApplied
+                        ? 'template-preview__output template-preview__output--disabled'
+                        : 'template-preview__output'
+                    }
+                  >
                     {activeTab === 'raw' ? (
                       body
+                    ) : !hasApplied ? (
+                      <span className="template-preview__unavailable">
+                        <span className="template-preview__unavailable-title">
+                          Preview unavailable.
+                        </span>
+                        <span className="template-preview__unavailable-desc">
+                          Provide values for all variables to view the rendered template.
+                        </span>
+                      </span>
                     ) : error ? (
                       <span className="template-preview__error">{error}</span>
                     ) : loading ? (

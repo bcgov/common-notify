@@ -156,8 +156,16 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     font-weight: 400;
   }
 
+  // Capped-width wrapper: the DS field fills it at 100% (so the invalid icon sits
+  // correctly inside the input) while the field grows with the pane up to a
+  // stable maximum. 269px matches the error-state field width.
   &__field-text {
-    width: 248px;
+    width: 100%;
+    max-width: 269px;
+
+    .bcds-react-aria-TextField {
+      width: 100%;
+    }
 
     .bcds-react-aria-TextField--Label {
       font-weight: 700;
@@ -170,7 +178,12 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
   }
 
   &__field-date {
-    width: 248px;
+    width: 100%;
+    max-width: 269px;
+
+    .bcds-react-aria-DatePicker {
+      width: 100%;
+    }
 
     // The DS DatePicker root stretches to fill this wrapper; keep its label
     // stacked above the input and matching the bold TextField labels.
@@ -204,6 +217,27 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     border-radius: 4px;
     white-space: pre-wrap;
     word-break: break-word;
+
+    // Disabled/empty state shown before a valid preview has been applied
+    &--disabled {
+      background-color: var(--surface-color-background-gray, #f2f2f2);
+    }
+  }
+
+  // "Preview unavailable" placeholder shown in the Rendered tab before Apply
+  &__unavailable {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+
+  &__unavailable-title {
+    font-weight: 700;
+    color: $text-secondary;
+  }
+
+  &__unavailable-desc {
+    color: $text-secondary;
   }
 
   &__error {
