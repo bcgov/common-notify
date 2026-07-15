@@ -97,6 +97,26 @@ backend:
     timeout: 30000
     #-- fail closed when ClamAV is disabled or unavailable
     failClosed: false
+  #-- File attachments storage configuration
+  attachments:
+    #-- directory where attachments will be stored
+    storageDir: /app/attachments
+    #-- PersistentVolumeClaim configuration for attachment storage
+    pvc:
+      #-- enable or disable PVC for attachment storage
+      enabled: true
+      #-- use shared PVC across all PRs (recommended to save storage)
+      shared: true
+      #-- force creation of shared PVC (only needed once per namespace)
+      createShared: false
+      #-- size of the PVC (storage capacity) - only used when creating new PVC
+      size: 3Gi
+      #-- storage class name (leave empty for default)
+      storageClassName: netapp-file-standard
+  #-- Loki logging configuration
+  loki:
+    #-- Loki endpoint URL for winston-loki transport
+    url: ~
   #-- S3-compatible attachment storage configuration for ObjectScale/MinIO
   s3:
     #-- S3-compatible endpoint
@@ -176,3 +196,30 @@ frontend:
   pdb:
     enabled: false # enable it in PRODUCTION for having pod disruption budget.
     minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+
+  #-- Promtail sidecar configuration for log shipping to Loki
+  promtail:
+    #-- enable or disable Promtail sidecar
+    enabled: false
+    #-- Promtail Docker image
+    image: grafana/promtail
+    #-- Promtail image tag
+    tag: 2.9.3
+    #-- Loki endpoint URL
+    lokiUrl: http://loki.f6bc3f-tools.svc.cluster.local:3100/loki/api/v1/push
+    #-- Loki tenant ID (optional)
+    tenantId: ~
+    #-- Cluster label
+    cluster: silver
+    #-- Environment label (auto-detected from namespace if not set)
+    environment: ~
+    #-- Job name for logs (auto-generated if not set)
+    jobName: ~
+    #-- Resource requests and limits for Promtail sidecar
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

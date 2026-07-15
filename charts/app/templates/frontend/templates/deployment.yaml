@@ -29,12 +29,23 @@ spec:
         runAsNonRoot: true
       containers:
         - name: {{ include "frontend.fullname" . }}
+          {{- if .Values.frontend.promtail.enabled }}
+          command:
+            - /bin/sh
+            - -c
+            - exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tee -a /var/log/caddy/access.log
+          {{- end }}
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
           image: "{{ .Values.global.registry | default "ghcr.io" }}/{{.Values.global.repository}}/frontend:{{ .Values.global.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ default "Always" .Values.frontend.imagePullPolicy }}
+          {{- if .Values.frontend.promtail.enabled }}
+          env:
+            - name: CADDY_LOG_OUTPUT
+              value: "file:/var/log/caddy/access.log"
+          {{- end }}
           env:
             - name: BACKEND_URL
               value: "http://{{ .Release.Name }}-backend"
@@ -132,11 +143,42 @@ spec:
               mountPath: /data
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.frontend.promtail.enabled }}
+            - name: shared-logs
+              mountPath: /var/log/caddy
+            {{- end }}
+        {{- if .Values.frontend.promtail.enabled }}
+        - name: promtail
+          image: {{ .Values.frontend.promtail.image }}:{{ .Values.frontend.promtail.tag }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/promtail/promtail-config.yaml
+          volumeMounts:
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: shared-logs
+              mountPath: /var/log/caddy
+              readOnly: true
+          resources:
+            requests:
+              cpu: {{ .Values.frontend.promtail.resources.requests.cpu }}
+              memory: {{ .Values.frontend.promtail.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.frontend.promtail.resources.limits.cpu }}
+              memory: {{ .Values.frontend.promtail.resources.limits.memory }}
+        {{- end }}
       volumes:
         - name: data
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- if .Values.frontend.promtail.enabled }}
+        - name: shared-logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: {{ include "frontend.fullname" . }}-promtail-config
+        {{- end }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

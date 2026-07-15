@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { ModuleRef } from '@nestjs/core'
 import { AppModule } from './app.module'
-import { customLogger } from './common/logger.config'
+import { StructuredLoggerService } from './common/logger'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { VersioningType, ValidationPipe } from '@nestjs/common'
@@ -17,14 +17,19 @@ import { JwtGuard } from './common/guards/auth.jwt-guard'
  */
 export async function bootstrap() {
   const app: NestExpressApplication = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: customLogger,
+    // Buffer early bootstrap logs until the DI-provided logger is installed below.
+    bufferLogs: true,
   })
+
+  // Route all framework and application logging through the structured logger
+  // so every `new Logger(context)` call ships JSON to Loki via winston.
+  app.useLogger(app.get(StructuredLoggerService))
 
   // Store ModuleRef globally for decorator access (used by @Queueable)
   ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
   // Add body parsers for form data. The JSON limit is raised above the 100KB
-  // default so a full-size bulk send (up to BULK_EMAIL_MAX_RECIPIENTS rows) fits.
+  // default so a full-size mail merge send (up to MAIL_MERGE_MAX_RECIPIENTS rows) fits.
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
   app.use(bodyParser.json({ limit: '10mb' }))
 

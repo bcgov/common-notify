@@ -26,7 +26,7 @@ describe('IngestionWorker', () => {
 
     mockRequestDetailService = {
       createPending: vi.fn().mockResolvedValue(undefined),
-      createBulkPending: vi.fn().mockResolvedValue(undefined),
+      createEmailMergePending: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -757,19 +757,21 @@ describe('IngestionWorker', () => {
           mockClamavService,
         )
 
-        const addresses = ['alice@example.com', 'bob@example.com']
+        const recipients = [
+          { address: 'alice@example.com', params: {} },
+          { address: 'bob@example.com', params: {} },
+        ]
         const job: Partial<Bull.Job<IngestionJobPayload>> = {
           data: {
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
-              name: 'Test Bulk',
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: { key: 'val' },
-              addresses,
+              recipients,
             },
           },
         }
@@ -777,11 +779,11 @@ describe('IngestionWorker', () => {
         const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(1)
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledWith(
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
-          addresses,
+          ['alice@example.com', 'bob@example.com'],
           'tenant-bulk',
         )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
@@ -789,15 +791,20 @@ describe('IngestionWorker', () => {
           expect.objectContaining({
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
-            bulk: true,
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
-            bulkEmail: expect.objectContaining({ addresses }),
+            mailMergeData: expect.objectContaining({ recipients }),
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
             removeOnComplete: true,
             removeOnFail: false,
             attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
           }),
         )
         expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
@@ -828,12 +835,15 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
-              name: 'Multi Batch',
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: {},
-              addresses: ['a@example.com', 'b@example.com', 'c@example.com'],
+              recipients: [
+                { address: 'a@example.com', params: {} },
+                { address: 'b@example.com', params: {} },
+                { address: 'c@example.com', params: {} },
+              ],
             },
           },
         }
@@ -842,19 +852,30 @@ describe('IngestionWorker', () => {
 
         // 3 addresses, batchSize=2 → 2 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
-        expect(mockRequestDetailService.createBulkPending).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-multi-EMAIL-0',
-            bulkEmail: expect.objectContaining({ addresses: ['a@example.com', 'b@example.com'] }),
+            mailMergeData: expect.objectContaining({
+              recipients: [
+                { address: 'a@example.com', params: {} },
+                { address: 'b@example.com', params: {} },
+              ],
+            }),
           }),
           expect.anything(),
         )
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({
+            channel: NotificationChannel.EMAIL,
+            mailMerge: true,
             batchId: 'notify-bulk-multi-EMAIL-1',
-            bulkEmail: expect.objectContaining({ addresses: ['c@example.com'] }),
+            mailMergeData: expect.objectContaining({
+              recipients: [{ address: 'c@example.com', params: {} }],
+            }),
           }),
           expect.anything(),
         )
@@ -862,7 +883,10 @@ describe('IngestionWorker', () => {
 
       it('should default to batchSize 100 when not configured', async () => {
         // mockConfigService.get returns undefined for queue.batchSize → defaults to 100
-        const addresses = Array.from({ length: 150 }, (_, i) => `user${i}@example.com`)
+        const recipients = Array.from({ length: 150 }, (_, i) => ({
+          address: `user${i}@example.com`,
+          params: {},
+        }))
 
         await IngestionWorker.initialize(
           mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
@@ -880,12 +904,11 @@ describe('IngestionWorker', () => {
             tenantId: 'tenant-bulk',
             request: {} as any,
             requestedAt: new Date().toISOString(),
-            bulk: true,
-            bulkEmail: {
-              name: 'Default Batch Size',
+            mailMerge: true,
+            mailMergeData: {
               templateId: 'template-uuid',
               params: {},
-              addresses,
+              recipients,
             },
           },
         }

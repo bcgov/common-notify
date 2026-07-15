@@ -25,7 +25,7 @@ import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
-import { BulkEmailRequest } from './schemas/bulk-email-request'
+import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import {
   CancelNotificationDto,
@@ -33,6 +33,7 @@ import {
 } from './schemas/cancel-or-reschedule.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
@@ -74,18 +75,6 @@ export class NotifySimpleController {
   }
 
   @Version('1')
-  @Post('bulk')
-  @HttpCode(202)
-  @Queueable(QueueName.INGESTION)
-  bulkSendEmail(
-    @Req() _req: any,
-    @Body() _body: BulkEmailRequest,
-  ): Promise<NotificationAcceptanceResponse> {
-    // Detection, validation, and queuing of the bulk payload are handled by the @Queueable decorator
-    return undefined as any
-  }
-
-  @Version('1')
   @Post()
   @HttpCode(202)
   @UseGuards(SmsChannelFeatureFlagGuard)
@@ -102,13 +91,11 @@ export class NotifySimpleController {
   @Version('1')
   @Post('email')
   @HttpCode(202)
-  @Queueable(QueueName.INGESTION)
+  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,
-    @Body() _body: NotifySimpleRequest,
+    @Body() _body: NotifyEmailChannel,
   ): Promise<NotificationAcceptanceResponse> {
-    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
-    // Implementation provided by @Queueable decorator
     return undefined as any
   }
 
