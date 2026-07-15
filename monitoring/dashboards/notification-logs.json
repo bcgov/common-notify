@@ -1,0 +1,236 @@
+{
+  "dashboard": {
+    "title": "Common Notify - Notification Logs",
+    "uid": "common-notify-logs",
+    "tags": ["common-notify", "loki", "logs"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "title": "Recent Notification Logs",
+        "type": "logs",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 12
+        },
+        "id": 1,
+        "targets": [
+          {
+            "expr": "{namespace=\"f6bc3f-dev\", app=\"common-notify\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "title": "Log Volume Over Time",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "id": 2,
+        "targets": [
+          {
+            "expr": "sum(count_over_time({namespace=\"f6bc3f-dev\", app=\"common-notify\"} [1m]))",
+            "refId": "A",
+            "legendFormat": "Total Logs"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        }
+      },
+      {
+        "title": "Logs by Level",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "id": 3,
+        "targets": [
+          {
+            "expr": "sum by (level) (count_over_time({namespace=\"f6bc3f-dev\", app=\"common-notify\"} | json | level != \"\" [1m]))",
+            "refId": "A",
+            "legendFormat": "{{level}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        }
+      },
+      {
+        "title": "Notifications by Status",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "id": 4,
+        "targets": [
+          {
+            "expr": "sum by (status) (count_over_time({namespace=\"f6bc3f-dev\", app=\"common-notify\"} | json | status != \"\" [1m]))",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        }
+      },
+      {
+        "title": "Notifications by Channel",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "id": 5,
+        "targets": [
+          {
+            "expr": "sum by (channel) (count_over_time({namespace=\"f6bc3f-dev\", app=\"common-notify\"} | json | channel != \"\" [1m]))",
+            "refId": "A",
+            "legendFormat": "{{channel}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        }
+      },
+      {
+        "title": "Error Logs",
+        "type": "logs",
+        "gridPos": {
+          "x": 0,
+          "y": 28,
+          "w": 24,
+          "h": 8
+        },
+        "id": 6,
+        "targets": [
+          {
+            "expr": "{namespace=\"f6bc3f-dev\", app=\"common-notify\"} | json | level=\"error\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "title": "Failed Notifications",
+        "type": "logs",
+        "gridPos": {
+          "x": 0,
+          "y": 36,
+          "w": 24,
+          "h": 8
+        },
+        "id": 7,
+        "targets": [
+          {
+            "expr": "{namespace=\"f6bc3f-dev\", app=\"common-notify\"} | json | status=\"failed\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "constant",
+          "current": {
+            "value": "f6bc3f-dev",
+            "text": "f6bc3f-dev"
+          },
+          "query": "f6bc3f-dev"
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

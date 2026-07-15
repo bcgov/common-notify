@@ -408,6 +408,7 @@ describe('EmailDeliveryWorker', () => {
         bodyType: 'html',
       })
 
+    it('should resolve a template-only email whose content has no inline subject/body', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
@@ -436,6 +437,29 @@ describe('EmailDeliveryWorker', () => {
           attempt: 0,
         } as any,
         opts: { attempts: 3 } as any,
+      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: 'EMAIL' })
+      mockTemplatesService.renderTemplateContent.mockReturnValue({
+        subject: 'Rendered subject',
+        body: 'Rendered body',
+        bodyType: 'html',
+      })
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-tmpl-only',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-uuid' }, // template supplies subject/body
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        } as any,
         attemptsMade: 0,
       }
 
@@ -456,7 +480,6 @@ describe('EmailDeliveryWorker', () => {
         }),
       )
     })
-
     it('should surface missing personalisation error for template email before raw body validation', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'template-uuid',
@@ -485,15 +508,14 @@ describe('EmailDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
           request: {
-            templateId: 'template-uuid',
             params: {},
           },
           payload: {
             recipients: { to: ['test@example.com'] },
-            content: {},
+            content: { templateId: 'template-uuid' },
           },
           attempt: 0,
-        } as any,
+        } as DeliveryJobPayload,
         opts: { attempts: 3 } as any,
         attemptsMade: 0,
         discard: vi.fn(),
@@ -502,6 +524,7 @@ describe('EmailDeliveryWorker', () => {
       await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
         'Missing personalisation for template ID template-uuid: firstName',
       )
+
       expect(mockEmailAdapter.send).not.toHaveBeenCalled()
       expect(job.discard).toHaveBeenCalledTimes(1)
       expect(mockNotificationService.update).toHaveBeenCalledWith(
@@ -517,7 +540,6 @@ describe('EmailDeliveryWorker', () => {
         'Missing personalisation for template ID template-uuid: firstName',
       )
     })
-
     it('should throw error when notifyId is missing', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
@@ -1219,13 +1241,12 @@ describe('EmailDeliveryWorker', () => {
           data: {
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
-            bulk: true,
+            mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
-            bulkEmail: {
-              name: 'Test Bulk',
-              templateId: 'template-uuid',
+            mailMergeData: {
+              content: { templateId: 'template-uuid' },
               params: {},
-              addresses,
+              recipients: addresses.map((address) => ({ address, params: {} })),
             },
             channel: NotificationChannel.EMAIL,
             request: {},
@@ -1262,6 +1283,32 @@ describe('EmailDeliveryWorker', () => {
           'bob@example.com',
           'ext-123',
         )
+      })
+
+      it('should render inline content per recipient when no templateId is given', async () => {
+        mockInlineRenderingService.renderEmail.mockResolvedValue({
+          subject: 'Hi',
+          body: 'Dear Alice',
+        })
+
+        const job = makeBulkJob(['alice@example.com'], {
+          mailMergeData: {
+            content: { subject: 'Hi', body: 'Dear {{firstname}}', bodyType: 'text' },
+            params: {},
+            recipients: [{ address: 'alice@example.com', params: { firstname: 'Alice' } }],
+          },
+        } as Partial<DeliveryJobPayload>)
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
+        // Template path not used; inline renderer is invoked with merged params (handlebars default)
+        expect(mockTemplatesService.renderTemplateContent).not.toHaveBeenCalled()
+        expect(mockInlineRenderingService.renderEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ renderer: 'handlebars', body: 'Dear {{firstname}}' }),
+          { firstname: 'Alice' },
+        )
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
       })
 
       it('should mark parent COMPLETED when all recipients sent and no pending remain', async () => {
@@ -1372,13 +1419,13 @@ describe('EmailDeliveryWorker', () => {
         expect(mockEmailAdapter.send).not.toHaveBeenCalled()
       })
 
-      it('should resolve template once and reuse rendered content for all addresses', async () => {
+      it('should resolve template once and render content per recipient', async () => {
         const job = makeBulkJob(['a@example.com', 'b@example.com', 'c@example.com'])
 
         await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
         expect(mockTemplatesRepository.findById).toHaveBeenCalledTimes(1)
-        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(3)
         expect(mockEmailAdapter.send).toHaveBeenCalledTimes(3)
       })
     })

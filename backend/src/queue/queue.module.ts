@@ -1,4 +1,4 @@
-import { Module, OnModuleInit, Inject, Logger, forwardRef } from '@nestjs/common'
+import { Module, OnModuleInit, Inject, Logger, Optional, forwardRef } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -31,6 +31,7 @@ import { AttachmentResolverService } from '../api/notify/services/attachment-res
 import { ClamavService } from '../services/clamav.service'
 import { AttachmentModule } from '../api/attachment/attachment.module'
 import { AttachmentService } from '../api/attachment/attachment.service'
+import { StructuredLoggerService } from '../common/logger'
 
 /**
  * Queue Module
@@ -233,6 +234,7 @@ export class QueueModule implements OnModuleInit {
     private readonly clamavService?: ClamavService,
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
+    @Optional() private readonly structuredLogger?: StructuredLoggerService,
   ) {}
 
   async onModuleInit() {
@@ -286,6 +288,7 @@ export class QueueModule implements OnModuleInit {
         this.emailAdapter,
         this.notificationRequestDetailService,
         emailConcurrency,
+        this.structuredLogger,
       )
       this.logger.log('Email delivery worker initialization started')
 
@@ -305,6 +308,7 @@ export class QueueModule implements OnModuleInit {
         this.smsAdapter,
         this.notificationRequestDetailService,
         smsConcurrency,
+        this.structuredLogger,
       )
       this.logger.log('SMS delivery worker initialization started')
 

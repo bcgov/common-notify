@@ -115,6 +115,14 @@ spec:
                   key: {{ .Values.backend.s3.secretKeySecretKey | quote }}
             - name: RELEASE_NAME
               value: {{ .Release.Name | quote }}
+            - name: NODE_ENV
+              value: "production"
+            - name: LOKI_URL
+              value: {{ .Values.backend.loki.url | default "http://loki.f6bc3f-tools.svc.cluster.local:3100" | quote }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: INSTANCE_LABEL
+              value: {{ .Release.Name | quote }}
             - name: GATEWAY_OAUTH2_TOKEN_URL
               valueFrom:
                 secretKeyRef:

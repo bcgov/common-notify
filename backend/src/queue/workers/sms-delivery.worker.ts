@@ -9,6 +9,7 @@ import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
+import { StructuredLoggerService } from '../../common/logger'
 
 /**
  * SMS Delivery Worker
@@ -62,8 +63,10 @@ export class SmsDeliveryWorker {
     smsAdapter: ISmsTransport,
     requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
+    structuredLogger?: StructuredLoggerService,
   ): Promise<void> {
     const logger = new Logger(SmsDeliveryWorker.name)
+    const workerContext = SmsDeliveryWorker.name
 
     logger.log(`Registering SMS delivery worker processor (concurrency=${concurrency})`)
 
@@ -71,6 +74,7 @@ export class SmsDeliveryWorker {
     // Note: Don't await process() - it sets up listeners and never resolves
     smsQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId, tenantId, payload, request } = job.data
+      const startedAt = Date.now()
 
       logger.debug(`[${notifyId}] Processing SMS delivery job for tenant=${tenantId}`)
 
@@ -83,6 +87,9 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
+        // Emit a structured lifecycle "start" event.
+        structuredLogger?.logNotificationStart(notifyId, tenantId, 'sms', workerContext)
+
         // Validate job data
         if (!payload || typeof payload !== 'object') {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
@@ -93,13 +100,14 @@ export class SmsDeliveryWorker {
         }
 
         let resolvedPayload = payload
-        if (request?.templateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+        const smsTemplateId = payload.content?.templateId
+        if (smsTemplateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${smsTemplateId}`)
           try {
-            const template = await templatesRepository.findById(tenantId, request.templateId)
+            const template = await templatesRepository.findById(tenantId, smsTemplateId)
             if (!template) {
               throw new NotFoundException(
-                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+                `Template '${smsTemplateId}' not found for tenant '${tenantId}'`,
               )
             }
 
@@ -196,6 +204,14 @@ export class SmsDeliveryWorker {
           updatedBy: 'system',
         })
         logger.log(`[${notifyId}] Notification marked as COMPLETED`)
+        structuredLogger?.logNotificationSuccess(
+          notifyId,
+          tenantId,
+          'sms',
+          result.externalId,
+          Date.now() - startedAt,
+          workerContext,
+        )
 
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
@@ -231,6 +247,14 @@ export class SmsDeliveryWorker {
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
           )
+          structuredLogger?.logNotificationFailure(
+            notifyId,
+            tenantId,
+            'sms',
+            error instanceof Error ? error : errorMessage,
+            Date.now() - startedAt,
+            workerContext,
+          )
         }
 
         // Re-throw to trigger BullMQ retry logic
@@ -242,6 +266,10 @@ export class SmsDeliveryWorker {
     smsQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId } = job.data
       logger.debug(`[${notifyId}] SMS delivery job completed`)
+      structuredLogger?.logQueueOperation('complete', smsQueue.name, job.id?.toString(), notifyId, {
+        channel: 'sms',
+        context: workerContext,
+      })
     })
 
     smsQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
@@ -249,6 +277,13 @@ export class SmsDeliveryWorker {
       logger.error(
         `[${notifyId}] SMS delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
+      structuredLogger?.logQueueOperation('failed', smsQueue.name, job.id?.toString(), notifyId, {
+        channel: 'sms',
+        context: workerContext,
+        error: err.message,
+        attemptsMade: job.attemptsMade,
+        maxAttempts: job.opts.attempts,
+      })
     })
 
     logger.log('SMS delivery worker initialized')

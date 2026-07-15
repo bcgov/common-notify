@@ -560,10 +560,9 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
           email: {
             recipients: { to: ['test@example.com'] },
-            // Missing required content
+            content: { templateId: 'template-123' },
           },
         }
 
@@ -636,10 +635,9 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
           sms: {
             recipients: { to: ['+12025551234'] },
-            // Missing required content
+            content: { templateId: 'template-123' },
           },
         }
 
@@ -711,10 +709,9 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
           msgApp: {
             recipients: { to: ['user-123'] },
-            // Missing required content
+            content: { templateId: 'template-123' },
           },
         }
 
@@ -730,8 +727,10 @@ describe('NotificationService', () => {
         mockTemplatesRepository.findById.mockResolvedValue(null)
 
         const request: any = {
-          templateId: 'missing-template',
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'missing-template' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -746,8 +745,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -809,8 +810,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          sms: { recipients: { to: ['+12025551234'] } },
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -825,8 +828,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -841,8 +846,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          sms: { recipients: { to: ['+12025551234'] } },
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -857,8 +864,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          msgApp: { recipients: { to: ['user-123'] } },
+          msgApp: {
+            recipients: { to: ['user-123'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -870,8 +879,10 @@ describe('NotificationService', () => {
         mockTemplatesRepository.findById.mockRejectedValue(new Error('Database error'))
 
         const request: any = {
-          templateId: 'template-123',
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
@@ -1050,8 +1061,10 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
