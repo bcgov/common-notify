@@ -119,11 +119,10 @@ describe('Notify Controllers', () => {
 
   beforeEach(async () => {
     mockNotificationService.validateBusinessRules.mockResolvedValue([])
-    mockNotificationService.validateBulkRules.mockResolvedValue([])
-    mockNotificationService.parseBulkAddresses.mockReturnValue([
-      'alice@example.com',
-      'bob@example.com',
-    ])
+    mockNotificationService.validateMailMergeRules.mockResolvedValue([])
+    mockNotificationService.parseMailMergeRecipients.mockReturnValue(
+      ['alice@example.com', 'bob@example.com'].map((address) => ({ address, params: {} })),
+    )
     mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
     mockNotificationService.update.mockResolvedValue(undefined)
 
@@ -313,11 +312,11 @@ describe('Notify Controllers', () => {
         await request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
-            templateId,
-            params: {},
             email: {
               recipients: { to: ['test@example.com'] },
+              content: { templateId },
             },
+            params: {},
           })
           .expect(400)
           .expect((res) => {

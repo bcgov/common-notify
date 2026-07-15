@@ -396,18 +396,6 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
-    it('should render template email without requiring raw content body first', async () => {
-      mockTemplatesRepository.findById.mockResolvedValue({
-        id: 'template-uuid',
-        channelCode: 'EMAIL',
-        name: 'Stored Email Template',
-      })
-      mockTemplatesService.renderTemplateContent.mockResolvedValue({
-        subject: 'Rendered Subject',
-        body: 'Rendered Body',
-        bodyType: 'html',
-      })
-
     it('should resolve a template-only email whose content has no inline subject/body', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
@@ -421,24 +409,12 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
-        data: {
-          notifyId: 'notify-template-123',
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.EMAIL,
-          request: {
-            templateId: 'template-uuid',
-            params: { firstName: 'Test' },
-          },
-          payload: {
-            recipients: { to: ['test@example.com'] },
-            content: {},
-          },
-          attempt: 0,
-        } as any,
-        opts: { attempts: 3 } as any,
-      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: 'EMAIL' })
-      mockTemplatesService.renderTemplateContent.mockReturnValue({
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
         subject: 'Rendered subject',
         body: 'Rendered body',
         bodyType: 'html',
@@ -449,10 +425,12 @@ describe('EmailDeliveryWorker', () => {
           notifyId: 'notify-tmpl-only',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
-          request: {},
+          request: {
+            params: { firstName: 'Test' },
+          },
           payload: {
             recipients: { to: ['test@example.com'] },
-            content: { templateId: 'template-uuid' }, // template supplies subject/body
+            content: { templateId: 'template-uuid' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -466,6 +444,7 @@ describe('EmailDeliveryWorker', () => {
       const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
       expect(result.success).toBe(true)
+      expect(mockTemplatesRepository.findById).toHaveBeenCalledWith('tenant-123', 'template-uuid')
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'template-uuid' }),
         { firstName: 'Test' },
@@ -474,12 +453,13 @@ describe('EmailDeliveryWorker', () => {
       expect(mockEmailAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
           content: expect.objectContaining({
-            subject: 'Rendered Subject',
-            body: 'Rendered Body',
+            subject: 'Rendered subject',
+            body: 'Rendered body',
           }),
         }),
       )
     })
+
     it('should surface missing personalisation error for template email before raw body validation', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'template-uuid',

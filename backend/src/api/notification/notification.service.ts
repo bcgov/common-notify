@@ -473,25 +473,6 @@ export class NotificationService {
         } else if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
           await this.templatesService.renderTemplateContent(template as any, request.params ?? {})
         }
-
-          const shouldValidateTemplatePersonalisation =
-            (templateChannelCode === 'EMAIL' && !!request.email?.recipients) ||
-            (templateChannelCode === 'SMS' && !!request.sms?.recipients)
-
-          if (shouldValidateTemplatePersonalisation) {
-            try {
-              await this.templatesService.renderTemplateContent(
-                template as any,
-                request.params ?? {},
-              )
-            } catch (error) {
-              if (error instanceof BadRequestException) {
-                throw error
-              }
-              throw error
-            }
-          }
-        }
       } catch (error) {
         if (error instanceof BadRequestException) {
           throw error

@@ -772,9 +772,11 @@ describe('NotificationService', () => {
         )
 
         const request: any = {
-          templateId: 'template-123',
           params: {},
-          email: { recipients: { to: ['test@example.com'] } },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         await expect(service.validateBusinessRules('tenant-123', request)).rejects.toThrow(
@@ -789,9 +791,11 @@ describe('NotificationService', () => {
         })
 
         const request: any = {
-          templateId: 'template-123',
           params: { code: '123456' },
-          sms: { recipients: { to: ['+12025551234'] } },
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { templateId: 'template-123' },
+          },
         }
 
         const errors = await service.validateBusinessRules('tenant-123', request)
