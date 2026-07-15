@@ -148,7 +148,7 @@ const Layout: FC<Props> = ({ children }) => {
       <TenantSelectionModal />
       <div className="layout-container">
         <div className="layout-header">
-          <Header title={'BC Notify'}>
+          <Header title={'Notify'}>
             <div className="layout-header-nav">
               <div className="layout-header-user">
                 <TenantSwitcher />
