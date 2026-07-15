@@ -68,6 +68,7 @@ async function enforceLimits(
   if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
   await ctx.apiKeyUsageService.assertWithinLimits(apiKeyConsumerId, entries)
 }
+
 /**
  * Map a NotificationChannel to the NotifySimpleRequest property key used to wrap a bare
  * single-channel route body.
@@ -127,7 +128,7 @@ async function handleEmailMerge(
 
   const recipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
 
-  // Enforce daily/annual EMAIL limits BEFORE accepting the merge request (throws HTTP 429).
+  // Enforce daily/annual EMAIL limits BEFORE accepting the bulk request (throws HTTP 429).
   await enforceLimits(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
@@ -143,7 +144,7 @@ async function handleEmailMerge(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
 
-  // Attribute accepted merge emails against the API key's usage limits (non-fatal).
+  // Attribute accepted bulk emails against the API key's usage limits (non-fatal).
   await recordAcceptedUsage(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
