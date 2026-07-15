@@ -221,6 +221,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     // Disabled/empty state shown before a valid preview has been applied
     &--disabled {
       background-color: var(--surface-color-background-gray, #f2f2f2);
+      color: $text-disabled;
     }
   }
 
@@ -233,11 +234,11 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
 
   &__unavailable-title {
     font-weight: 700;
-    color: $text-secondary;
+    color: $text-disabled;
   }
 
   &__unavailable-desc {
-    color: $text-secondary;
+    color: $text-disabled;
   }
 
   &__error {
@@ -245,6 +246,6 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
   }
 
   &__placeholder {
-    color: $text-secondary;
+    color: $text-disabled;
   }
 }
