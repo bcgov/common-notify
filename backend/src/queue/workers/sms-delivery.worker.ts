@@ -95,12 +95,28 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
+        if (
+          !payload.recipients ||
+          !payload.recipients.to ||
+          !Array.isArray(payload.recipients.to) ||
+          payload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
+        }
+
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 
         let resolvedPayload = payload
         const smsTemplateId = payload.content?.templateId
+        if (
+          !smsTemplateId &&
+          (!payload.content?.body || typeof payload.content.body !== 'string')
+        ) {
+          throw new Error('Invalid SMS payload: body is missing or invalid')
+        }
+
         if (smsTemplateId) {
           logger.debug(`[${notifyId}] Resolving template: ${smsTemplateId}`)
           try {
@@ -162,15 +178,6 @@ export class SmsDeliveryWorker {
             )
             throw renderError
           }
-        }
-
-        if (
-          !resolvedPayload.recipients ||
-          !resolvedPayload.recipients.to ||
-          !Array.isArray(resolvedPayload.recipients.to) ||
-          resolvedPayload.recipients.to.length === 0
-        ) {
-          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
         if (!resolvedPayload.content?.body || typeof resolvedPayload.content.body !== 'string') {

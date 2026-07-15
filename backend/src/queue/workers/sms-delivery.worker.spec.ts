@@ -338,12 +338,11 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           request: {
-            templateId: 'template-sms-uuid',
             params: { code: '123456' },
           },
           payload: {
             recipients: { to: ['+16135551234'] },
-            content: {},
+            content: { templateId: 'template-sms-uuid' },
           },
           attempt: 0,
         } as any,
@@ -395,12 +394,11 @@ describe('SmsDeliveryWorker', () => {
           tenantId: 'tenant-123',
           channel: NotificationChannel.SMS,
           request: {
-            templateId: 'template-sms-uuid',
             params: {},
           },
           payload: {
             recipients: { to: ['+16135551234'] },
-            content: {},
+            content: { templateId: 'template-sms-uuid' },
           },
           attempt: 0,
         } as any,
