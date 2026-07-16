@@ -132,9 +132,9 @@ jobs:
     if: needs.deploys.outputs.triggered == 'true'
     needs: [deploys]
     uses: ./.github/workflows/.tests.yml
-    secrets:
-      E2E_TEST_CLIENT_ID: ${{ secrets.E2E_TEST_CLIENT_ID }}
-      E2E_TEST_CLIENT_SECRET: ${{ secrets.E2E_TEST_CLIENT_SECRET }}
+    # inherit so the load job can reach OC creds (OC_DEV_TOKEN/NAMESPACE) for the
+    # email-sink toggle and LOAD_TEST_API_KEY for gateway auth, alongside E2E_* secrets.
+    secrets: inherit
 
   results:
     name: PR Results

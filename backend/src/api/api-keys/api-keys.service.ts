@@ -103,4 +103,62 @@ export class ApiKeysService {
     )
     return saved
   }
+
+  /**
+   * Load-test-only: bind an API key to a dedicated throwaway load-test tenant,
+   * creating that tenant on first use. No JWT / CSTAR membership check.
+   *
+   * Callable ONLY when loadtest.autobindEnabled is true (guarded upstream). Exists so
+   * a load test running against an ephemeral PR dev environment can authenticate
+   * without a manual binding step. Idempotent.
+   */
+  async autoBindApiKeyForLoadTest(
+    credentialIdentifier: string,
+    consumerId: string,
+  ): Promise<ApiKeyConsumer> {
+    const LOADTEST_SLUG = 'loadtest-tenant'
+    const now = new Date()
+
+    let tenant = await this.tenantRepository.findOne({ where: { slug: LOADTEST_SLUG } })
+    if (!tenant) {
+      // `status` column has a DB default of 'active' and is insert:false on the entity.
+      tenant = await this.tenantRepository.save(
+        this.tenantRepository.create({
+          externalId: 'loadtest',
+          name: 'Load Test Tenant',
+          slug: LOADTEST_SLUG,
+          isDeleted: false,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
+      this.logger.warn(`[LOADTEST] Created load-test tenant ${tenant.id}`)
+    }
+
+    const existing = await this.apiKeyConsumerRepository.findOne({
+      where: { credentialIdentifier },
+    })
+    if (existing) {
+      if (existing.tenantId !== tenant.id) {
+        existing.tenantId = tenant.id
+        existing.updatedAt = now
+        await this.apiKeyConsumerRepository.save(existing)
+      }
+      return existing
+    }
+
+    const mapping = this.apiKeyConsumerRepository.create({
+      credentialIdentifier,
+      consumerId: consumerId || undefined,
+      tenantId: tenant.id,
+      boundByIdirGuid: 'loadtest-autobind',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const saved = await this.apiKeyConsumerRepository.save(mapping)
+    this.logger.warn(
+      `[LOADTEST] Auto-bound credential ${credentialIdentifier} to load-test tenant ${tenant.id}`,
+    )
+    return saved
+  }
 }

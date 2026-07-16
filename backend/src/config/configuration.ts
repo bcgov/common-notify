@@ -86,6 +86,14 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
+    // Load-test-only switches. MUST stay false outside ephemeral PR dev environments.
+    // When enabled, the api-key bind endpoint self-binds the calling key to a
+    // throwaway load-test tenant without a user JWT / CSTAR membership check, so a
+    // load test can authenticate without a manual binding step.
+    loadtest: {
+      autobindEnabled: process.env.LOADTEST_AUTOBIND_ENABLED === 'true',
+    },
+
     // S3-compatible object storage
     s3: {
       endpoint: process.env.S3_ENDPOINT,
