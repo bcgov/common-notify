@@ -201,7 +201,7 @@ vi.mock('@bcgov/design-system-react-components', async () => {
 describe('TemplateCreate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    createTemplateMock.mockResolvedValue({})
+    createTemplateMock.mockResolvedValue({ id: 'new-template-123' })
   })
 
   it('does not show body type choices', () => {
@@ -346,6 +346,34 @@ describe('TemplateCreate', () => {
       engineCode: 'handlebars',
       subject: 'Welcome {{name}}',
       body: '# Hello {{name}}',
+    })
+  })
+
+  it('navigates to the new template edit page after create', async () => {
+    render(<TemplateCreate />)
+
+    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Handlebars'))
+
+    const [titleInput, subjectInput, bodyTextarea] = screen.getAllByRole('textbox')
+
+    fireEvent.change(titleInput, {
+      target: { value: 'welcome template' },
+    })
+    fireEvent.change(subjectInput, {
+      target: { value: 'Welcome {{name}}' },
+    })
+    fireEvent.change(bodyTextarea, {
+      target: { value: '# Hello {{name}}' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith({
+        to: '/template-edit/$templateId',
+        params: { templateId: 'new-template-123' },
+      })
     })
   })
 })
