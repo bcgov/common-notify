@@ -25,6 +25,7 @@ import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
+import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import {
   CancelNotificationDto,
@@ -32,11 +33,22 @@ import {
 } from './schemas/cancel-or-reschedule.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
+import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
+import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { AttachmentProcessingService } from './services/attachment-processing.service'
+import { AttachmentValidationService } from './services/attachment-validation.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
+import { WebhookService } from '../webhook/webhook.service'
+import {
+  CallbackRegistrationRequest,
+  CallbackRegistrationResponse,
+  CallbackRegistrationUpdateRequest,
+} from '../webhook/schemas/callback-registration.dto'
 
 // Note: All endpoints except NotifySimpleController.simpleSend are
 // placeholders and return 501 Not Implemented. This is intentional to allow incremental
@@ -55,6 +67,10 @@ export class NotifySimpleController {
   constructor(
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
+    readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
+    readonly notificationRequestDetailService: NotificationRequestDetailService,
+    readonly apiKeyUsageService: ApiKeyUsageService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -77,13 +93,11 @@ export class NotifySimpleController {
   @Version('1')
   @Post('email')
   @HttpCode(202)
-  @Queueable(QueueName.INGESTION)
+  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,
-    @Body() _body: NotifySimpleRequest,
+    @Body() _body: NotifyEmailChannel,
   ): Promise<NotificationAcceptanceResponse> {
-    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
-    // Implementation provided by @Queueable decorator
     return undefined as any
   }
 
@@ -263,6 +277,10 @@ export class NotifySimpleFrontendController {
   constructor(
     private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
+    readonly attachmentValidationService: AttachmentValidationService,
+    readonly attachmentProcessingService: AttachmentProcessingService,
+    readonly notificationRequestDetailService: NotificationRequestDetailService,
+    readonly apiKeyUsageService: ApiKeyUsageService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -293,6 +311,10 @@ export class NotifySimpleFrontendController {
     const simpleController = new NotifySimpleController(
       this.notifyService,
       this.notificationService,
+      this.attachmentValidationService,
+      this.attachmentProcessingService,
+      this.notificationRequestDetailService,
+      this.apiKeyUsageService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)
@@ -336,7 +358,10 @@ export class NotifyEventController {
 @Controller('notify')
 @UseGuards(NotifyServiceGuard)
 export class NotifyController {
-  constructor(private readonly notifyService: NotifyService) {}
+  constructor(
+    private readonly notifyService: NotifyService,
+    private readonly webhookService: WebhookService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -367,23 +392,42 @@ export class NotifyController {
 
   @Version('1')
   @Post('registerCallback')
-  @HttpCode(501)
-  registerCallback(@Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(201)
+  registerCallback(
+    @Req() _req: any,
+    @Body() body: CallbackRegistrationRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.create(tenantId, body)
   }
 
   @Version('1')
   @Patch('registerCallback/:callbackId')
-  @HttpCode(501)
-  updateCallback(@Param('callbackId') _callbackId: string, @Body() _body: any) {
-    return this.notifyService.notImplemented()
+  @HttpCode(200)
+  updateCallback(
+    @Req() _req: any,
+    @Param('callbackId') callbackId: string,
+    @Body() body: CallbackRegistrationUpdateRequest,
+  ): Promise<CallbackRegistrationResponse> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.update(tenantId, callbackId, body)
   }
 
   @Version('1')
   @Delete('registerCallback/:callbackId')
-  @HttpCode(501)
-  deleteCallback(@Param('callbackId') _callbackId: string) {
-    return this.notifyService.notImplemented()
+  @HttpCode(204)
+  deleteCallback(@Req() _req: any, @Param('callbackId') callbackId: string): Promise<void> {
+    const tenantId = _req?.tenant?.id || null
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID not found')
+    }
+    return this.webhookService.delete(tenantId, callbackId)
   }
 }
 

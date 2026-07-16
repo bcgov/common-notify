@@ -10,10 +10,49 @@ import {
 import { UpdateNotificationRequestDto } from './schemas/update-notification-request'
 import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { ListQueryDto } from '../../common/query/list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
+import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
+
+const notificationListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {
+    createdAt: 'notification.createdAt',
+    updatedAt: 'notification.updatedAt',
+    status: 'notification.status',
+    channelCode: 'notification.channelCode',
+  },
+  filterableFields: {
+    status: {
+      column: 'notification.status',
+      valueType: 'string',
+      operators: ['eq', 'ne', 'in'],
+    },
+    channelCode: {
+      column: 'notification.channelCode',
+      valueType: 'string',
+      operators: ['eq', 'in', 'isnull'],
+    },
+    createdAt: {
+      column: 'notification.createdAt',
+      valueType: 'date',
+      operators: ['gte', 'lte'],
+    },
+    createdBy: {
+      column: 'notification.createdBy',
+      valueType: 'string',
+      operators: ['eq', 'like', 'isnull'],
+    },
+  },
+  defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
+}
 
 @Injectable()
 export class NotificationService {
@@ -87,7 +126,31 @@ export class NotificationService {
   /**
    * Extract channel code, recipients, and delayed send time from notification payload
    */
-  private extractChannelAndRecipients(payload: NotifySimpleRequest | undefined): {
+  /**
+   * Extract channel code, recipients, and delayed send time from a mail merge email payload. Mail merge
+   * sends are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
+   * (mirroring how simple sends store their recipients on the parent request).
+   */
+  private extractMailMergeChannelAndRecipients(payload: NotifySimpleRequest): {
+    channel: string | null
+    recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
+    delayedSendTime: Date | null
+  } {
+    const email = payload.email
+    const delayedSendTime = email?.delayedSend ? new Date(email.delayedSend) : null
+    const parsed = this.parseMailMergeRecipients(email?.recipients?.mergeArray ?? [])
+    const addresses = parsed.map((r) => r.address)
+    return {
+      channel: 'EMAIL',
+      recipients: addresses.length > 0 ? { email: addresses } : null,
+      delayedSendTime:
+        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+    }
+  }
+
+  private extractChannelAndRecipients(
+    payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
+  ): {
     channel: string | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
@@ -148,8 +211,14 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload
-    const { channel, recipients, delayedSendTime } = this.extractChannelAndRecipients(dto.payload)
+    // Extract channel, recipients, and delayed send time from payload. Mail-merge sends (email
+    // recipients given as `mergeArray`) take a dedicated extractor since the addressees live in the
+    // merge rows rather than to/cc/bcc.
+    const { channel, recipients, delayedSendTime } = Array.isArray(
+      dto.payload?.email?.recipients?.mergeArray,
+    )
+      ? this.extractMailMergeChannelAndRecipients(dto.payload as NotifySimpleRequest)
+      : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
       tenantId: dto.tenantId,
@@ -170,59 +239,142 @@ export class NotificationService {
     return fullNotification || saved
   }
 
+  /**
+   * Validate a mail merge request's business rules: the template must exist for the tenant and
+   * every row's email address must be well-formed. Returns a bounded list of error strings
+   * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
+   */
+  async validateMailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
+    const errors: string[] = []
+
+    const email = dto.email
+    const mergeArray = email?.recipients?.mergeArray ?? []
+    const templateId = email?.content?.templateId
+    const hasInlineContent = !!(email?.content && (email.content.subject || email.content.body))
+
+    const tenant = await this.tenantsService.findOne(tenantId)
+    if (!tenant) {
+      errors.push(`Tenant '${tenantId}' not found`)
+      return errors
+    }
+    if (tenant.status !== 'active') {
+      errors.push(`Tenant is not active (status: ${tenant.status})`)
+    }
+
+    // A merge renders from exactly one source: a server template or inline content.
+    if (templateId && hasInlineContent) {
+      errors.push(
+        'Request must provide either a templateId or inline content (subject/body), not both',
+      )
+    } else if (templateId) {
+      const template = await this.templatesRepository.findById(tenantId, templateId)
+      if (!template) {
+        errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)
+      } else if (template.channelCode !== 'EMAIL') {
+        errors.push(`Template '${templateId}' is not an EMAIL template`)
+      }
+    } else if (!hasInlineContent) {
+      errors.push('Request must provide either a templateId or inline content (subject/body)')
+    }
+
+    if (email?.delayedSend) {
+      const scheduledTime = new Date(email.delayedSend).getTime()
+      const now = Date.now()
+      if (scheduledTime <= now) {
+        errors.push(`delayedSend must be in the future`)
+      } else if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
+        errors.push(`delayedSend must be within 10 days from now`)
+      }
+    }
+
+    const header = mergeArray[0] ?? []
+    if ((header[0] ?? '').trim().toLowerCase() !== 'to') {
+      errors.push(`The first column of the header row must be "to"`)
+      return errors
+    }
+
+    const seen = new Map<string, number>()
+    for (let i = 1; i < mergeArray.length; i++) {
+      if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+        errors.push(
+          `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`,
+        )
+        break
+      }
+      const address = (mergeArray[i]?.[0] ?? '').trim()
+      if (!address) {
+        errors.push(`Row ${i}: email address is missing`)
+      } else if (!isEmail(address)) {
+        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+      } else {
+        const normalised = address.toLowerCase()
+        const firstSeen = seen.get(normalised)
+        if (firstSeen !== undefined) {
+          errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
+        } else {
+          seen.set(normalised, i)
+        }
+      }
+    }
+
+    return errors
+  }
+
+  /**
+   * Parse the mergeArray into per-recipient data. Returns one entry per data row containing
+   * the recipient address (from the "to" column) and any extra columns as template params.
+   * Per-recipient params take precedence over global params when rendering.
+   */
+  parseMailMergeRecipients(
+    mergeArray: string[][],
+  ): Array<{ address: string; params: Record<string, unknown> }> {
+    const header = mergeArray[0] ?? []
+    return mergeArray.slice(1).map((row) => {
+      const address = (row[0] ?? '').trim()
+      const params: Record<string, unknown> = {}
+      for (let i = 1; i < header.length; i++) {
+        const key = (header[i] ?? '').trim()
+        if (key) params[key] = row[i] ?? ''
+      }
+      return { address, params }
+    })
+  }
+
   async findAll(
     tenantExternalId: string,
-    page: number = 1,
-    limit: number = 10,
-    status?: string,
+    query: ListQueryDto,
   ): Promise<PaginatedNotificationResponse> {
-    // Ensure page and limit are valid
-    const pageNum = Math.max(1, page)
-    const limitNum = Math.min(Math.max(1, limit), 100) // Cap at 100 to prevent abuse
+    const parsedQuery = parseListQuery(query, notificationListQueryConfig)
 
-    const skip = (pageNum - 1) * limitNum
-
-    // Build where clause - include status filter and tenantId
-    const where: any = {}
-
-    // Look up tenant by external ID and get internal ID
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {
-      // Return empty result if tenant not found
       this.logger.warn(`Tenant not found with external ID: ${tenantExternalId}`)
       return {
         data: [],
         count: 0,
-        page: pageNum,
-        limit: limitNum,
+        page: parsedQuery.page,
+        limit: parsedQuery.limit,
         totalPages: 0,
       }
     }
     this.logger.debug(
       `Found tenant: ID=${tenant.id}, name=${tenant.name}, externalId=${tenant.externalId}`,
     )
-    where.tenantId = tenant.id
+    const queryBuilder = this.notificationRepository
+      .createQueryBuilder('notification')
+      .leftJoinAndSelect('notification.tenant', 'tenant')
+      .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
 
-    if (status && status !== 'all') {
-      where.status = status
-    }
+    applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
+    const [notifications, total] = await queryBuilder.getManyAndCount()
 
-    // Get both the data and total count
-    const [notifications, total] = await this.notificationRepository.findAndCount({
-      where,
-      relations: ['tenant'],
-      skip,
-      take: limitNum,
-      order: { createdAt: 'DESC' },
-    })
-
-    const totalPages = Math.ceil(total / limitNum)
+    const totalPages = Math.ceil(total / parsedQuery.limit)
 
     return {
       data: notifications.map((n) => this.mapToDto(n)),
       count: total,
-      page: pageNum,
-      limit: limitNum,
+      page: parsedQuery.page,
+      limit: parsedQuery.limit,
       totalPages,
     }
   }
@@ -263,7 +415,7 @@ export class NotificationService {
 
     // Fetch and return updated record
     const updated = await this.findOne(id, tenantId)
-    this.logger.log(`Updated notification request: ${id}`, { status: dto.status })
+    this.logger.log(`Updated notification request: ${id} (status=${dto.status})`)
     // Publish updated record to Redis so all pods can push updated entry to connected SSE clients
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
     return updated
@@ -283,7 +435,10 @@ export class NotificationService {
    * @param request The NotifySimpleRequest to validate
    * @returns Array of validation error messages (empty if valid)
    */
-  async validateBusinessRules(tenantId: string, request: NotifySimpleRequest): Promise<string[]> {
+  async validateBusinessRules(
+    tenantId: string,
+    request: NotifySimpleRequest | ProcessedNotifySimpleRequest,
+  ): Promise<string[]> {
     const errors: string[] = []
 
     // Verify tenant exists and is active
@@ -297,30 +452,22 @@ export class NotificationService {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
-    // Validate template if templateId is provided
-    if (request.templateId) {
+    // Validate each channel's template. templateId lives in the channel's content, so each channel
+    // is validated against its own expected channel code.
+    const validateChannelTemplate = async (
+      templateId: string,
+      expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
+    ): Promise<void> => {
       try {
-        const template = await this.templatesRepository.findById(tenantId, request.templateId)
+        const template = await this.templatesRepository.findById(tenantId, templateId)
         if (!template) {
           errors.push(
-            `Template '${request.templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
+            `Template '${templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
           )
-        } else {
-          // Verify template has required channel codes for requested channels
-          const requestedChannels = []
-          if (request.email?.recipients) requestedChannels.push('EMAIL')
-          if (request.sms?.recipients) requestedChannels.push('SMS')
-          if (request.msgApp?.recipients) requestedChannels.push('MSGAPP')
-
-          const templateChannelCode = template.channelCode
-
-          for (const channel of requestedChannels) {
-            if (templateChannelCode !== channel) {
-              errors.push(
-                `Template '${request.templateId}' has channel code '${templateChannelCode}' but requested channel is '${channel}'.`,
-              )
-            }
-          }
+        } else if (template.channelCode !== expectedChannelCode) {
+          errors.push(
+            `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
+          )
         }
       } catch (error) {
         errors.push(
@@ -328,6 +475,14 @@ export class NotificationService {
         )
       }
     }
+
+    const emailTemplateId = request.email?.content?.templateId
+    const smsTemplateId = request.sms?.content?.templateId
+    const msgAppTemplateId = request.msgApp?.content?.templateId
+
+    if (emailTemplateId) await validateChannelTemplate(emailTemplateId, 'EMAIL')
+    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS')
+    if (msgAppTemplateId) await validateChannelTemplate(msgAppTemplateId, 'MSGAPP')
 
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.to?.length ?? 0
@@ -348,7 +503,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides subject/body)
-      if (!request.templateId) {
+      if (!emailTemplateId) {
         if (!request.email.content?.subject?.trim()) {
           errors.push('Email subject cannot be empty')
         }
@@ -386,7 +541,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides body)
-      if (!request.templateId) {
+      if (!smsTemplateId) {
         if (!request.sms.content?.body?.trim()) {
           errors.push('SMS body cannot be empty')
         }
@@ -409,7 +564,7 @@ export class NotificationService {
       }
 
       // Only validate content if not using a template (template provides body)
-      if (!request.templateId) {
+      if (!msgAppTemplateId) {
         if (!request.msgApp.content?.body?.trim()) {
           errors.push('MsgApp body cannot be empty')
         }

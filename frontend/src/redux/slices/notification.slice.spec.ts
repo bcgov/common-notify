@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import reducer, { setPage, setStatusFilter } from './notification.slice'
+import reducer, { setPage, setFilter } from './notification.slice'
 import { fetchNotifications } from '../thunks/notification.thunks'
 import { NotificationStatus } from '@/enum/notification-status.enum'
 
 describe('notificationSlice', () => {
-  it('resets page to 1 when the status filter changes', () => {
+  it('resets page to 1 and stores values when a column filter changes', () => {
     const state = reducer(
       {
         items: [],
-        statusFilter: 'all',
+        sortBy: null,
+        sortOrder: null,
+        filters: {},
         page: 4,
         limit: 10,
         count: 0,
@@ -17,10 +19,10 @@ describe('notificationSlice', () => {
         error: null,
         hasLoaded: false,
       },
-      setStatusFilter(NotificationStatus.COMPLETED),
+      setFilter({ field: 'status', values: [NotificationStatus.COMPLETED] }),
     )
 
-    expect(state.statusFilter).toBe(NotificationStatus.COMPLETED)
+    expect(state.filters.status).toEqual([NotificationStatus.COMPLETED])
     expect(state.page).toBe(1)
   })
 

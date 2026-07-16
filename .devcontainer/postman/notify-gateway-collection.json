@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "9c2fb158-079f-4845-9bf2-2aef932aeac2",
+    "_postman_id": "ed2fe247-5f25-4a4a-bac2-c875d8507a0e",
     "name": "Notify Gateway API",
     "description": "Postman collection for testing the Notify API Gateway (Dev Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "9083839"
+    "_exporter_id": "56292162"
   },
   "item": [
     {
@@ -69,7 +69,9 @@
             },
             "url": {
               "raw": "{{keycloak_url}}/auth/realms/{{keycloak_realm}}/protocol/openid-connect/token",
-              "host": ["{{keycloak_url}}"],
+              "host": [
+                "{{keycloak_url}}"
+              ],
               "path": [
                 "auth",
                 "realms",
@@ -146,7 +148,9 @@
             },
             "url": {
               "raw": "{{kong_token_url}}",
-              "host": ["{{kong_token_url}}"]
+              "host": [
+                "{{kong_token_url}}"
+              ]
             },
             "description": "Get an OAuth2 access token from Kong's OAuth2 plugin (DEV environment with Kong).\n\n**Prerequisites:**\n1. Kong is running in DEV environment\n2. Load .env.notify-dev.json as environment\n3. Set kong_token_url environment variable\n4. Kong seed script has created test credentials\n\n**Default Test Credentials (from kong-seed.sh):**\n- Client A: client_id=test-client-a, secret=test-client-secret-a-12345678901234567890\n- Client B: client_id=test-client-b, secret=test-client-secret-b-98765432109876543210\n- Client C: client_id=test-client-c, secret=test-client-secret-c-11111111111111111111\n\nThe token will be automatically saved to `{{jwt_token}}` for use in API requests."
           },
@@ -164,8 +168,15 @@
             "header": [],
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/code-tables",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "code-tables"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "code-tables"
+              ]
             },
             "description": "Retrieve all code tables (notification statuses, channels, event types) via the API Gateway.\n\n**How to use:**\n1. Go to Authorization tab\n2. Click **\"Get New Access Token\"** button\n3. A browser will open for you to login to Keycloak\n4. After login, click \"Use Token\"\n5. Send the request"
           },
@@ -178,8 +189,16 @@
             "header": [],
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/code-tables/notification-status",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "code-tables", "notification-status"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "code-tables",
+                "notification-status"
+              ]
             },
             "description": "Retrieve notification status code table via the API Gateway."
           },
@@ -192,8 +211,16 @@
             "header": [],
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/code-tables/channels",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "code-tables", "channels"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "code-tables",
+                "channels"
+              ]
             },
             "description": "Retrieve notification channels code table via the API Gateway."
           },
@@ -206,8 +233,16 @@
             "header": [],
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/code-tables/event-types",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "code-tables", "event-types"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "code-tables",
+                "event-types"
+              ]
             },
             "description": "Retrieve event types code table via the API Gateway."
           },
@@ -217,25 +252,52 @@
           "name": "Notification Request - List",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant-1}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{gateway_url}}/api/v1/frontend/notification_request",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "notification_request"],
+              "raw": "{{gateway_url}}/api/v1/frontend/notification_request?tenantId={{tenant-1}}&page=1&limit=10&sort=-createdAt,status&filter=status:eq:completed&filter=createdAt:gte:2026-01-01T00:00:00.000Z",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "notification_request"
+              ],
               "query": [
                 {
-                  "key": "skip",
-                  "value": "0",
-                  "disabled": true
+                  "key": "tenantId",
+                  "value": "{{tenant-1}}"
                 },
                 {
-                  "key": "take",
-                  "value": "10",
-                  "disabled": true
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "-createdAt,status"
+                },
+                {
+                  "key": "filter",
+                  "value": "status:eq:completed"
+                },
+                {
+                  "key": "filter",
+                  "value": "createdAt:gte:2026-01-01T00:00:00.000Z"
                 }
               ]
             },
-            "description": "Retrieve list of notification requests via the API Gateway."
+            "description": "Retrieve list of notification requests via the API Gateway. Optional query params support `sort` (comma-separated fields) and repeatable `filter` values in `field:operator:value` format."
           },
           "response": []
         }
@@ -313,7 +375,9 @@
             "type": "text/javascript",
             "packages": {},
             "requests": {},
-            "exec": [""]
+            "exec": [
+              ""
+            ]
           }
         },
         {
@@ -322,7 +386,9 @@
             "type": "text/javascript",
             "packages": {},
             "requests": {},
-            "exec": [""]
+            "exec": [
+              ""
+            ]
           }
         }
       ]
@@ -330,281 +396,6 @@
     {
       "name": "API Endpoints",
       "item": [
-        {
-          "name": "GC Notify (Passthrough)",
-          "item": [
-            {
-              "name": "GC Notify - Send Email",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/email",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "notifications", "email"]
-                },
-                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Send Email Attachment",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\",\n    \"attachment\": {\n        \"file\": \"JVBERi0xLjcNCiW1tbW1DQoxIDAgb2JqDQo8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvTGFuZyhlbikgL1N0cnVjdFRyZWVSb290IDE1IDAgUi9NYXJrSW5mbzw8L01hcmtlZCB0cnVlPj4vTWV0YWRhdGEgMjcgMCBSL1ZpZXdlclByZWZlcmVuY2VzIDI4IDAgUj4+DQplbmRvYmoNCjIgMCBvYmoNCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWyAzIDAgUl0gPj4NCmVuZG9iag0KMyAwIG9iag0KPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFIvRjIgMTIgMCBSPj4vRXh0R1N0YXRlPDwvR1MxMCAxMCAwIFIvR1MxMSAxMSAwIFI+Pi9Qcm9jU2V0Wy9QREYvVGV4dC9JbWFnZUIvSW1hZ2VDL0ltYWdlSV0gPj4vTWVkaWFCb3hbIDAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIvR3JvdXA8PC9UeXBlL0dyb3VwL1MvVHJhbnNwYXJlbmN5L0NTL0RldmljZVJHQj4+L1RhYnMvUy9TdHJ1Y3RQYXJlbnRzIDA+Pg0KZW5kb2JqDQo0IDAgb2JqDQo8PC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDIwNj4+DQpzdHJlYW0NCnicjY5Li8JAEITvA/Mf6qhCku7JYxIYGjaTKCt6EAMexIMHN6cN+/j/sK0uC3raPnRTVNH1Idt/nCeEkG3jawfKNudpxOwyJfFlLoK2i/i0hlK6TsMOhEq3bxy+LtYcFpisaQdrsiVDjeHNGtYQgeFdSq6Epzr16rxraLVnwvitHzHeJf/KlTXHoBW51LneZSFVIC6jeD1VKUkTKO8aSQrVLRO7Vuq/YN4XcsKwtqZXlp01/4V2z9DMRVo+QN9Q74AzzB9a0G8jfgDYy0DUDQplbmRzdHJlYW0NCmVuZG9iag0KNSAwIG9iag0KPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTAvQmFzZUZvbnQvQkNERUVFK0FwdG9zL0VuY29kaW5nL0lkZW50aXR5LUgvRGVzY2VuZGFudEZvbnRzIDYgMCBSL1RvVW5pY29kZSAyMyAwIFI+Pg0KZW5kb2JqDQo2IDAgb2JqDQpbIDcgMCBSXSANCmVuZG9iag0KNyAwIG9iag0KPDwvQmFzZUZvbnQvQkNERUVFK0FwdG9zL1N1YnR5cGUvQ0lERm9udFR5cGUyL1R5cGUvRm9udC9DSURUb0dJRE1hcC9JZGVudGl0eS9EVyAxMDAwL0NJRFN5c3RlbUluZm8gOCAwIFIvRm9udERlc2NyaXB0b3IgOSAwIFIvVyAyNSAwIFI+Pg0KZW5kb2JqDQo4IDAgb2JqDQo8PC9PcmRlcmluZyhJZGVudGl0eSkgL1JlZ2lzdHJ5KEFkb2JlKSAvU3VwcGxlbWVudCAwPj4NCmVuZG9iag0KOSAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RFRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2MS9NYXhXaWR0aCAxNjgyL0ZvbnRXZWlnaHQgNDAwL1hIZWlnaHQgMjUwL1N0ZW1WIDU2L0ZvbnRCQm94WyAtNTAwIC0yODIgMTE4MiA5MzldIC9Gb250RmlsZTIgMjQgMCBSPj4NCmVuZG9iag0KMTAgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9jYSAxPj4NCmVuZG9iag0KMTEgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9DQSAxPj4NCmVuZG9iag0KMTIgMCBvYmoNCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1RydWVUeXBlL05hbWUvRjIvQmFzZUZvbnQvQkNERkVFK0FwdG9zL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZy9Gb250RGVzY3JpcHRvciAxMyAwIFIvRmlyc3RDaGFyIDMyL0xhc3RDaGFyIDMyL1dpZHRocyAyNiAwIFI+Pg0KZW5kb2JqDQoxMyAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RGRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2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ZCI/Pjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IjMuMS03MDEiPgo8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgo8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiAgeG1sbnM6cGRmPSJodHRwOi8vbnMuYWRvYmUuY29tL3BkZi8xLjMvIj4KPC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iPgo8ZGM6Y3JlYXRvcj48cmRmOlNlcT48cmRmOmxpPkJhcnJldHQgRmFsazwvcmRmOmxpPjwvcmRmOlNlcT48L2RjOmNyZWF0b3I+PC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iPgo8eG1wOkNyZWF0b3JUb29sPk1pY3Jvc29mdCBXb3JkPC94bXA6Q3JlYXRvclRvb2w+PHhtcDpDcmVhdGVEYXRlPjIwMjYtMDUtMDRUMTc6Mzg6NDkrMDA6MDA8L3htcDpDcmVhdGVEYXRlPjx4bXA6TW9kaWZ5RGF0ZT4yMDI2LTA1LTA0VDE3OjM4OjQ5KzAwOjAwPC94bXA6TW9kaWZ5RGF0ZT48L3JkZjpEZXNjcmlwdGlvbj4KPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIj4KPHhtcE1NOkRvY3VtZW50SUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkRvY3VtZW50SUQ+PHhtcE1NOkluc3RhbmNlSUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkluc3RhbmNlSUQ+PC9yZGY6RGVzY3JpcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAo8L3JkZjpSREY+PC94OnhtcG1ldGE+PD94cGFja2V0IGVuZD0idyI/Pg0KZW5kc3RyZWFtDQplbmRvYmoNCjI4IDAgb2JqDQo8PC9EaXNwbGF5RG9jVGl0bGUgdHJ1ZT4+DQplbmRvYmoNCjI5IDAgb2JqDQo8PC9UeXBlL1hSZWYvU2l6ZSAyOS9XWyAxIDQgMl0gL1Jvb3QgMSAwIFIvSW5mbyAxNCAwIFIvSURbPDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPjwwOUFCMzRCMkUyQTRGMDQ2QTg5MTVFMjUwRjFGQTNBQj5dIC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDEwNT4+DQpzdHJlYW0NCnicLcy9FUBAEATguT/niCR6kMjkqqIGdXhEFKEEsUwHKjhnxwb7vbe7s0CqGFXqFfAxk0tQj2ACmcgi2J5w6AaykVvIuPMjoNPPGpoYYokjivyXWcrlXuJhF8pCaFqykkPoTuAFYjsOcw0KZW5kc3RyZWFtDQplbmRvYmoNCnhyZWYNCjAgMzANCjAwMDAwMDAwMTUgNjU1MzUgZg0KMDAwMDAwMDAxNyAwMDAwMCBuDQowMDAwMDAwMTYzIDAwMDAwIG4NCjAwMDAwMDAyMTkgMDAwMDAgbg0KMDAwMDAwMDQ5NyAwMDAwMCBuDQowMDAwMDAwNzc3IDAwMDAwIG4NCjAwMDAwMDA5MDUgMDAwMDAgbg0KMDAwMDAwMDkzMyAwMDAwMCBuDQowMDAwMDAxMDg4IDAwMDAwIG4NCjAwMDAwMDExNjEgMDAwMDAgbg0KMDAwMDAwMTM5OCAwMDAwMCBuDQowMDAwMDAxNDUyIDAwMDAwIG4NCjAwMDAwMDE1MDYgMDAwMDAgbg0KMDAwMDAwMTY3MyAwMDAwMCBuDQowMDAwMDAxOTExIDAwMDAwIG4NCjAwMDAwMDAwMTYgNjU1MzUgZg0KMDAwMDAwMDAxNyA2NTUzNSBmDQowMDAwMDAwMDE4IDY1NTM1IGYNCjAwMDAwMDAwMTkgNjU1MzUgZg0KMDAwMDAwMDAyMCA2NTUzNSBmDQowMDAwMDAwMDIxIDY1NTM1IGYNCjAwMDAwMDAwMjIgNjU1MzUgZg0KMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAyNDc3IDAwMDAwIG4NCjAwMDAwMDI4MjYgMDAwMDAgbg0KMDAwMDAxMDU0MiAwMDAwMCBuDQowMDAwMDEwNjYyIDAwMDAwIG4NCjAwMDAwMTA2ODkgMDAwMDAgbg0KMDAwMDAxMzc3NyAwMDAwMCBuDQowMDAwMDEzODIyIDAwMDAwIG4NCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gPj4NCnN0YXJ0eHJlZg0KMTQxMjgNCiUlRU9GDQp4cmVmDQowIDANCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gL1ByZXYgMTQxMjgvWFJlZlN0bSAxMzgyMj4+DQpzdGFydHhyZWYNCjE0ODg1DQolJUVPRg==\",\n        \"filename\": \"your_custom_filename.pdf\",\n        \"sending_method\": \"attach\"\n    }\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/email",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "notifications", "email"]
-                },
-                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Send SMS",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"phone_number\": \"{{recipient_phone}}\",\n  \"template_id\": \"{{gc_notify_sms_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/sms",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "notifications", "sms"]
-                },
-                "description": "Send an SMS notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_sms_template_id` to a valid SMS template ID"
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Send Bulk",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Test Bulk Job\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"rows\": [\n    [\"email address\", \"name\"],\n    [\"{{recipient_email}}\", \"Test User\"]\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/bulk",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "notifications", "bulk"]
-                },
-                "description": "Send a bulk batch of notifications via GC Notify passthrough. Rows must include a header row followed by data rows (max 50,000 recipients)."
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Get Notifications",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "notifications"],
-                  "query": [
-                    {
-                      "key": "template_type",
-                      "value": "email",
-                      "disabled": true
-                    },
-                    {
-                      "key": "status",
-                      "value": "delivered",
-                      "disabled": true
-                    },
-                    {
-                      "key": "reference",
-                      "value": "",
-                      "disabled": true
-                    }
-                  ]
-                },
-                "description": "List notifications from GC Notify. Optional query params: `template_type` (email|sms), `status`, `reference`, `older_than`, `include_jobs`."
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Get Notification by ID",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/notifications/{{gc_notify_notification_id}}",
-                  "host": ["{{gateway_url}}"],
-                  "path": [
-                    "api",
-                    "gcnotify",
-                    "v2",
-                    "notifications",
-                    "{{gc_notify_notification_id}}"
-                  ]
-                },
-                "description": "Get a specific notification by ID from GC Notify. Set `gc_notify_notification_id` to the notification UUID returned by a previous Send response."
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Get Templates",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/templates",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "templates"],
-                  "query": [
-                    {
-                      "key": "type",
-                      "value": "email",
-                      "disabled": true
-                    }
-                  ]
-                },
-                "description": "List all templates from your GC Notify account. Optional query param: `type` (email|sms)."
-              },
-              "response": []
-            },
-            {
-              "name": "GC Notify - Get Template by ID",
-              "request": {
-                "auth": {
-                  "type": "noauth"
-                },
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{gateway_url}}/api/gcnotify/v2/template/{{gc_notify_template_id}}",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "gcnotify", "v2", "template", "{{gc_notify_template_id}}"]
-                },
-                "description": "Get a specific template by ID from your GC Notify account. Set `gc_notify_template_id` to the template UUID."
-              },
-              "response": []
-            }
-          ]
-        },
         {
           "name": "Templates",
           "item": [
@@ -625,8 +416,14 @@
                 "header": [],
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates?page=1&limit=10",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates"],
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ],
                   "query": [
                     {
                       "key": "page",
@@ -658,15 +455,22 @@
                 "method": "GET",
                 "header": [
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates", ""]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    ""
+                  ]
                 },
                 "description": "Get a specific notification template"
               },
@@ -674,6 +478,62 @@
             },
             {
               "name": "Notify - Create Template - Handlebars",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"BC Parks Adventure Ready v6\",\n  \"description\": \"Complex Handlebars template for BC Parks pass activation and camping recommendations\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Your BC Parks Pass is Ready - {{parksCount}} Parks Await, {{userName}}!\",\n  \"bodyType\": \"markdown\",\n  \"body\": \"# Your BC Parks Pass is Ready - {{parksCount}} Parks Await, {{userName}}!\\n\\nHowdy {{userName}}!\\n\\nWelcome to the British Columbia Parks Adventure Network! Your annual pass has been activated and you're ready to explore some of the most beautiful parks in Canada.\\n\\n---\\n\\n## YOUR BC PARKS PASS\\n\\n| Property | Details |\\n|----------|----------|\\n| **Pass Type** | {{passType}} |\\n| **Validity** | {{passYear}} |\\n| **Status** | ACTIVE |\\n\\n{{#if isGoldPass}}\\n### Gold Member Benefits\\n- Unlimited day-use entry to all BC Parks\\n- Reserved parking at premium locations\\n- 15% discount on camping fees\\n- Exclusive access to backcountry areas\\n\\n{{else if isSilverPass}}\\n### Silver Member Benefits\\n- Day-use entry to all BC Parks\\n- 10% discount on camping fees\\n- Access to select backcountry areas\\n\\n{{else}}\\n### Standard Pass Benefits\\n- Day-use entry to most BC Parks\\n- Standard camping rates apply\\n\\n{{/if}}\\n\\n---\\n\\n## FEATURED BC PARKS ({{featuredCount}})\\n\\n{{#each featuredParks}}\\n{{#if this.parkName}}\\n### {{#if this.region}}{{this.parkName}} — {{this.region}}{{else}}{{this.parkName}}{{/if}}\\n\\n{{this.description}}\\n\\n{{#if this.difficulty}}**Difficulty Level:** {{this.difficulty}}/5{{/if}}\\n\\n{{#if this.activities}}\\n**Activities Available:**\\n{{#each this.activities}}\\n- {{this}}\\n{{/each}}\\n{{/if}}\\n\\n{{#if this.campgroundsAvailable}}\\n**Campsites:** {{this.availableSites}}/{{this.totalSites}} Available\\n{{#if this.isFull}}\\nAlmost full!\\n{{else if this.isGettingFull}}\\nGetting full, book soon!\\n{{else}}\\nPlenty of spots available!\\n{{/if}}\\n{{/if}}\\n\\n{{#if this.beachAccess}}\\nBeach Access Available\\n{{/if}}\\n\\n---\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## SEASONAL RECOMMENDATIONS\\n\\n{{#if isSummerSeason}}\\n### Summer Adventures\\nPerfect time for high-elevation hikes! Check out:\\n{{#each summerRecommendations}}\\n- **{{this.parkName}}** — {{this.reason}}\\n{{/each}}\\n\\n{{else if isFallSeason}}\\n### Fall Foliage Season\\nWitness the stunning autumn colors at these parks:\\n{{#each fallRecommendations}}\\n- **{{this.parkName}}** (Peak foliage: {{this.peakDate}})\\n{{/each}}\\n\\n{{else if isWinterSeason}}\\n### Winter Wonderland\\nSnowshoeing and backcountry skiing destinations:\\n{{#each winterRecommendations}}\\n- **{{this.parkName}}** (Elevation: {{this.elevation}}m)\\n{{/each}}\\n\\n{{else if isSpringSeasonSeason}}\\n### Spring Blooms\\nWildflowers and wildlife viewing at their best:\\n{{#each springRecommendations}}\\n- **{{this.parkName}}** (Best viewing time: {{this.bloomDate}})\\n{{/each}}\\n{{/if}}\\n\\n---\\n\\n## POPULAR ROUTES FROM {{userCity}}\\n\\n{{#each nearestParks}}\\n{{#if this.parkName}}\\n### {{this.parkName}}\\n\\n| Info | Details |\\n|------|----------|\\n| Distance | {{this.distance}} km |\\n| Drive Time | {{this.driveTime}} minutes |\\n| Road Conditions | {{this.roadConditions}} |\\n{{#if this.winterClosure}}| Winter Closure | {{this.closureMonths}} |{{/if}}\\n| Accessible | {{#if this.wheelchairAccessible}}Yes{{else}}No{{/if}} |\\n{{#if this.petFriendly}}| Pet-Friendly | Yes |{{/if}}\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## WILDLIFE SPOTTING GUIDE\\n\\n{{#each wildlife}}\\n{{#if this.species}}\\n### {{this.species}}{{#if this.endangered}} — ENDANGERED{{/if}}\\n\\n- **Habitat:** {{this.habitat}}\\n- **Best Viewing Season:** {{this.season}}\\n{{#if this.highDanger}}\\n> **CAUTION:** Keep 100m+ distance, carry bear spray\\n{{/if}}\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## YOUR TRIP CHECKLIST\\n\\nBefore heading out, make sure you have:\\n\\n{{#each tripChecklist}}\\n{{#if this.essential}}\\n- [x] **{{this.item}}** ← ESSENTIAL\\n{{else}}\\n- [ ] {{this.item}}\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## CHALLENGE: VISIT 10 PARKS BY {{challengeDeadline}}\\n\\n{{#if userChallengeProgress}}\\n**Your Progress:** {{userChallengeProgress}}/10 Parks Visited\\n\\n{{#if challengeCompleted}}\\n### CONGRATULATIONS!\\nYou've completed the challenge and earned:\\n- {{challengeReward}}\\n- Certificate of Exploration\\n- Exclusive BC Parks merchandise\\n\\n{{else if challengeHalfway}}\\nYou're **over halfway there**! Keep pushing to reach 10 parks!\\n\\n{{else}}\\n**Great start!** Keep exploring!\\n\\n{{/if}}\\n{{else}}\\n**Get started!** Visit your first park this weekend!\\n\\n{{/if}}\\n\\n---\\n\\n## IMPORTANT REMINDERS\\n\\n{{#if weatherAlerts}}\\n### WEATHER ALERTS\\n{{#each weatherAlerts}}\\n> **{{this.alertType}}** in {{this.affectedArea}}\\n> {{this.alertMessage}}\\n\\n{{/each}}\\n{{/if}}\\n\\n{{#if closedParks}}\\n### TEMPORARILY CLOSED PARKS\\n{{#each closedParks}}\\n- **{{this.parkName}}** — {{this.reason}}\\n  - Expected reopening: {{this.reopenDate}}\\n\\n{{/each}}\\n{{/if}}\\n\\n{{#if hasReservations}}\\n**Active Reservations:** You have {{reservationCount}} camping booking(s).\\nManage your bookings at: [discovercamping.ca](https://www.discovercamping.ca)\\n{{/if}}\\n\\n{{#if isLocalResident}}\\n> As a BC resident, you have access to exclusive provincial discounts at participating parks!\\n\\n{{/if}}\\n\\n{{#if isFirstTimeUser}}\\n> Welcome to the BC Parks community! Join our online forum at [parks.bc.ca/community](https://parks.bc.ca/community) to share photos and tips with other adventurers!\\n\\n{{/if}}\\n\\n---\\n\\n## Explore. Discover. Protect.\\n\\nThat's the BC Parks way!\\n\\n**Happy Trails,**\\n*The BC Parks Team*\\n\\n---\\n\\n> **P.S.** — Remember to practice **Leave No Trace** principles to keep our parks pristine for future generations!\",\n  \"engineCode\": \"handlebars\"\n}"
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/templates",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ]
+                },
+                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+              },
+              "response": []
+            },
+            {
+              "name": "Notify - Create Template - Simple Email Merge",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Save the created template id so the email merge send route can reference it.",
+                      "if (pm.response.code === 201) {",
+                      "    const json = pm.response.json();",
+                      "    if (json && json.id) {",
+                      "        pm.environment.set('email_merge_template_id', json.id);",
+                      "        console.log('Saved email_merge_template_id =', json.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "auth": {
                   "type": "bearer",
@@ -693,21 +553,27 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"BC Parks Adventure Ready v6\",\n  \"description\": \"Complex Handlebars template for BC Parks pass activation and camping recommendations\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Your BC Parks Pass is Ready - {{parksCount}} Parks Await, {{userName}}!\",\n  \"bodyType\": \"markdown\",\n  \"body\": \"# Your BC Parks Pass is Ready - {{parksCount}} Parks Await, {{userName}}!\\n\\nHowdy {{userName}}!\\n\\nWelcome to the British Columbia Parks Adventure Network! Your annual pass has been activated and you're ready to explore some of the most beautiful parks in Canada.\\n\\n---\\n\\n## YOUR BC PARKS PASS\\n\\n| Property | Details |\\n|----------|----------|\\n| **Pass Type** | {{passType}} |\\n| **Validity** | {{passYear}} |\\n| **Status** | ACTIVE |\\n\\n{{#if isGoldPass}}\\n### Gold Member Benefits\\n- Unlimited day-use entry to all BC Parks\\n- Reserved parking at premium locations\\n- 15% discount on camping fees\\n- Exclusive access to backcountry areas\\n\\n{{else if isSilverPass}}\\n### Silver Member Benefits\\n- Day-use entry to all BC Parks\\n- 10% discount on camping fees\\n- Access to select backcountry areas\\n\\n{{else}}\\n### Standard Pass Benefits\\n- Day-use entry to most BC Parks\\n- Standard camping rates apply\\n\\n{{/if}}\\n\\n---\\n\\n## FEATURED BC PARKS ({{featuredCount}})\\n\\n{{#each featuredParks}}\\n{{#if this.parkName}}\\n### {{#if this.region}}{{this.parkName}} — {{this.region}}{{else}}{{this.parkName}}{{/if}}\\n\\n{{this.description}}\\n\\n{{#if this.difficulty}}**Difficulty Level:** {{this.difficulty}}/5{{/if}}\\n\\n{{#if this.activities}}\\n**Activities Available:**\\n{{#each this.activities}}\\n- {{this}}\\n{{/each}}\\n{{/if}}\\n\\n{{#if this.campgroundsAvailable}}\\n**Campsites:** {{this.availableSites}}/{{this.totalSites}} Available\\n{{#if this.isFull}}\\nAlmost full!\\n{{else if this.isGettingFull}}\\nGetting full, book soon!\\n{{else}}\\nPlenty of spots available!\\n{{/if}}\\n{{/if}}\\n\\n{{#if this.beachAccess}}\\nBeach Access Available\\n{{/if}}\\n\\n---\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## SEASONAL RECOMMENDATIONS\\n\\n{{#if isSummerSeason}}\\n### Summer Adventures\\nPerfect time for high-elevation hikes! Check out:\\n{{#each summerRecommendations}}\\n- **{{this.parkName}}** — {{this.reason}}\\n{{/each}}\\n\\n{{else if isFallSeason}}\\n### Fall Foliage Season\\nWitness the stunning autumn colors at these parks:\\n{{#each fallRecommendations}}\\n- **{{this.parkName}}** (Peak foliage: {{this.peakDate}})\\n{{/each}}\\n\\n{{else if isWinterSeason}}\\n### Winter Wonderland\\nSnowshoeing and backcountry skiing destinations:\\n{{#each winterRecommendations}}\\n- **{{this.parkName}}** (Elevation: {{this.elevation}}m)\\n{{/each}}\\n\\n{{else if isSpringSeasonSeason}}\\n### Spring Blooms\\nWildflowers and wildlife viewing at their best:\\n{{#each springRecommendations}}\\n- **{{this.parkName}}** (Best viewing time: {{this.bloomDate}})\\n{{/each}}\\n{{/if}}\\n\\n---\\n\\n## POPULAR ROUTES FROM {{userCity}}\\n\\n{{#each nearestParks}}\\n{{#if this.parkName}}\\n### {{this.parkName}}\\n\\n| Info | Details |\\n|------|----------|\\n| Distance | {{this.distance}} km |\\n| Drive Time | {{this.driveTime}} minutes |\\n| Road Conditions | {{this.roadConditions}} |\\n{{#if this.winterClosure}}| Winter Closure | {{this.closureMonths}} |{{/if}}\\n| Accessible | {{#if this.wheelchairAccessible}}Yes{{else}}No{{/if}} |\\n{{#if this.petFriendly}}| Pet-Friendly | Yes |{{/if}}\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## WILDLIFE SPOTTING GUIDE\\n\\n{{#each wildlife}}\\n{{#if this.species}}\\n### {{this.species}}{{#if this.endangered}} — ENDANGERED{{/if}}\\n\\n- **Habitat:** {{this.habitat}}\\n- **Best Viewing Season:** {{this.season}}\\n{{#if this.highDanger}}\\n> **CAUTION:** Keep 100m+ distance, carry bear spray\\n{{/if}}\\n\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## YOUR TRIP CHECKLIST\\n\\nBefore heading out, make sure you have:\\n\\n{{#each tripChecklist}}\\n{{#if this.essential}}\\n- [x] **{{this.item}}** ← ESSENTIAL\\n{{else}}\\n- [ ] {{this.item}}\\n{{/if}}\\n{{/each}}\\n\\n---\\n\\n## CHALLENGE: VISIT 10 PARKS BY {{challengeDeadline}}\\n\\n{{#if userChallengeProgress}}\\n**Your Progress:** {{userChallengeProgress}}/10 Parks Visited\\n\\n{{#if challengeCompleted}}\\n### CONGRATULATIONS!\\nYou've completed the challenge and earned:\\n- {{challengeReward}}\\n- Certificate of Exploration\\n- Exclusive BC Parks merchandise\\n\\n{{else if challengeHalfway}}\\nYou're **over halfway there**! Keep pushing to reach 10 parks!\\n\\n{{else}}\\n**Great start!** Keep exploring!\\n\\n{{/if}}\\n{{else}}\\n**Get started!** Visit your first park this weekend!\\n\\n{{/if}}\\n\\n---\\n\\n## IMPORTANT REMINDERS\\n\\n{{#if weatherAlerts}}\\n### WEATHER ALERTS\\n{{#each weatherAlerts}}\\n> **{{this.alertType}}** in {{this.affectedArea}}\\n> {{this.alertMessage}}\\n\\n{{/each}}\\n{{/if}}\\n\\n{{#if closedParks}}\\n### TEMPORARILY CLOSED PARKS\\n{{#each closedParks}}\\n- **{{this.parkName}}** — {{this.reason}}\\n  - Expected reopening: {{this.reopenDate}}\\n\\n{{/each}}\\n{{/if}}\\n\\n{{#if hasReservations}}\\n**Active Reservations:** You have {{reservationCount}} camping booking(s).\\nManage your bookings at: [discovercamping.ca](https://www.discovercamping.ca)\\n{{/if}}\\n\\n{{#if isLocalResident}}\\n> As a BC resident, you have access to exclusive provincial discounts at participating parks!\\n\\n{{/if}}\\n\\n{{#if isFirstTimeUser}}\\n> Welcome to the BC Parks community! Join our online forum at [parks.bc.ca/community](https://parks.bc.ca/community) to share photos and tips with other adventurers!\\n\\n{{/if}}\\n\\n---\\n\\n## Explore. Discover. Protect.\\n\\nThat's the BC Parks way!\\n\\n**Happy Trails,**\\n*The BC Parks Team*\\n\\n---\\n\\n> **P.S.** — Remember to practice **Leave No Trace** principles to keep our parks pristine for future generations!\",\n  \"engineCode\": \"handlebars\"\n}"
+                  "raw": "{\n  \"name\": \"Email Merge Test Template\",\n  \"description\": \"Handlebars template for email merge testing with per-recipient params (firstName, lastName) and global param (eventName)\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Hello {{firstName}}\",\n  \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n  \"engineCode\": \"handlebars\"\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ]
                 },
-                "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
+                "description": "Create a Handlebars EMAIL template using per-recipient params (`firstName`, `lastName`) and the global param (`eventName`). The test script saves the returned template id into the `email_merge_template_id` environment variable so the \"Notify - Simple Send Email Merge\" request can use it."
               },
               "response": []
             },
@@ -732,8 +598,8 @@
                     "type": "text"
                   },
                   {
-                    "key": "x-tenant-id",
-                    "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
                     "type": "text"
                   }
                 ],
@@ -743,8 +609,14 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ]
                 },
                 "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
               },
@@ -782,8 +654,14 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ]
                 },
                 "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
               },
@@ -816,8 +694,14 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates"
+                  ]
                 },
                 "description": "Create a new notification template. Variables are auto-detected from {{variable}} placeholders in subject and body."
               },
@@ -850,8 +734,15 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates", "template-id-123"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "template-id-123"
+                  ]
                 },
                 "description": "Update an existing template. Creates a new version. Only include fields to update."
               },
@@ -884,7 +775,9 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/99444188-6ef4-4fff-97dc-dbedf9dd41e5/preview",
-                  "host": ["{{gateway_url}}"],
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
                   "path": [
                     "api",
                     "v1",
@@ -924,7 +817,9 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/a7836587-8fa1-4075-8823-2aa27819e63d/preview",
-                  "host": ["{{gateway_url}}"],
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
                   "path": [
                     "api",
                     "v1",
@@ -964,7 +859,9 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/ebbe1739-71bf-44ec-bb7d-f978816ab173/preview",
-                  "host": ["{{gateway_url}}"],
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
                   "path": [
                     "api",
                     "v1",
@@ -1004,7 +901,9 @@
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/8ba11b27-97e7-423c-a9bf-3ba12bfa5466/preview",
-                  "host": ["{{gateway_url}}"],
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
                   "path": [
                     "api",
                     "v1",
@@ -1034,8 +933,15 @@
                 "header": [],
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/template-id-123",
-                  "host": ["{{gateway_url}}"],
-                  "path": ["api", "v1", "templates", "template-id-123"]
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "templates",
+                    "template-id-123"
+                  ]
                 },
                 "description": "Soft-delete a template (sets archived_at timestamp). Returns 204 No Content."
               },
@@ -1047,15 +953,70 @@
           "name": "CSTAR",
           "item": [
             {
+              "name": "Bind Tenant to API Key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{tenant-1-api-key}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "",
+                    "value": "",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"cstarTenantId\": \"{{tenant-1}}\" }",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/api/v1/service/api-key/bind",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "service",
+                    "api-key",
+                    "bind"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "Tenants",
               "request": {
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "https://cstar-dev.apps.silver.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
+                  "raw": "https://cstar-test.apps.gold.devops.gov.bc.ca/api/v1/users/:ssoUserId/tenants",
                   "protocol": "https",
-                  "host": ["cstar-dev", "apps", "silver", "devops", "gov", "bc", "ca"],
-                  "path": ["api", "v1", "users", ":ssoUserId", "tenants"],
+                  "host": [
+                    "cstar-test",
+                    "apps",
+                    "gold",
+                    "devops",
+                    "gov",
+                    "bc",
+                    "ca"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    ":ssoUserId",
+                    "tenants"
+                  ],
                   "variable": [
                     {
                       "key": "ssoUserId",
@@ -1070,6 +1031,11 @@
           "auth": {
             "type": "oauth2",
             "oauth2": [
+              {
+                "key": "clientId",
+                "value": "{{frontend_client_id}}",
+                "type": "string"
+              },
               {
                 "key": "refreshRequestParams",
                 "value": [],
@@ -1106,11 +1072,6 @@
                 "type": "string"
               },
               {
-                "key": "clientId",
-                "value": "{{frontend_client_id}}",
-                "type": "string"
-              },
-              {
                 "key": "authUrl",
                 "value": "{{keycloak_url}}/auth/realms/standard/protocol/openid-connect/auth",
                 "type": "string"
@@ -1139,7 +1100,9 @@
                 "type": "text/javascript",
                 "packages": {},
                 "requests": {},
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
             },
             {
@@ -1148,8 +1111,686 @@
                 "type": "text/javascript",
                 "packages": {},
                 "requests": {},
-                "exec": [""]
+                "exec": [
+                  ""
+                ]
               }
+            }
+          ]
+        },
+        {
+          "name": "GC Notify",
+          "item": [
+            {
+              "name": "GC Notify - Send Email",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{notify_template_id}}\",\n  \"personalisation\": {\n    \"firstName\": \"Test User\",\n    \"orderNumber\": \"12345\",\n    \"amount\": \"49.99\",\n    \"status\": \"yes\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/email",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "email"
+                  ]
+                },
+                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send Email Attachment",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\",\n    \"attachment\": {\n        \"file\": \"JVBERi0xLjcNCiW1tbW1DQoxIDAgb2JqDQo8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvTGFuZyhlbikgL1N0cnVjdFRyZWVSb290IDE1IDAgUi9NYXJrSW5mbzw8L01hcmtlZCB0cnVlPj4vTWV0YWRhdGEgMjcgMCBSL1ZpZXdlclByZWZlcmVuY2VzIDI4IDAgUj4+DQplbmRvYmoNCjIgMCBvYmoNCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWyAzIDAgUl0gPj4NCmVuZG9iag0KMyAwIG9iag0KPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFIvRjIgMTIgMCBSPj4vRXh0R1N0YXRlPDwvR1MxMCAxMCAwIFIvR1MxMSAxMSAwIFI+Pi9Qcm9jU2V0Wy9QREYvVGV4dC9JbWFnZUIvSW1hZ2VDL0ltYWdlSV0gPj4vTWVkaWFCb3hbIDAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIvR3JvdXA8PC9UeXBlL0dyb3VwL1MvVHJhbnNwYXJlbmN5L0NTL0RldmljZVJHQj4+L1RhYnMvUy9TdHJ1Y3RQYXJlbnRzIDA+Pg0KZW5kb2JqDQo0IDAgb2JqDQo8PC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDIwNj4+DQpzdHJlYW0NCnicjY5Li8JAEITvA/Mf6qhCku7JYxIYGjaTKCt6EAMexIMHN6cN+/j/sK0uC3raPnRTVNH1Idt/nCeEkG3jawfKNudpxOwyJfFlLoK2i/i0hlK6TsMOhEq3bxy+LtYcFpisaQdrsiVDjeHNGtYQgeFdSq6Epzr16rxraLVnwvitHzHeJf/KlTXHoBW51LneZSFVIC6jeD1VKUkTKO8aSQrVLRO7Vuq/YN4XcsKwtqZXlp01/4V2z9DMRVo+QN9Q74AzzB9a0G8jfgDYy0DUDQplbmRzdHJlYW0NCmVuZG9iag0KNSAwIG9iag0KPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTAvQmFzZUZvbnQvQkNERUVFK0FwdG9zL0VuY29kaW5nL0lkZW50aXR5LUgvRGVzY2VuZGFudEZvbnRzIDYgMCBSL1RvVW5pY29kZSAyMyAwIFI+Pg0KZW5kb2JqDQo2IDAgb2JqDQpbIDcgMCBSXSANCmVuZG9iag0KNyAwIG9iag0KPDwvQmFzZUZvbnQvQkNERUVFK0FwdG9zL1N1YnR5cGUvQ0lERm9udFR5cGUyL1R5cGUvRm9udC9DSURUb0dJRE1hcC9JZGVudGl0eS9EVyAxMDAwL0NJRFN5c3RlbUluZm8gOCAwIFIvRm9udERlc2NyaXB0b3IgOSAwIFIvVyAyNSAwIFI+Pg0KZW5kb2JqDQo4IDAgb2JqDQo8PC9PcmRlcmluZyhJZGVudGl0eSkgL1JlZ2lzdHJ5KEFkb2JlKSAvU3VwcGxlbWVudCAwPj4NCmVuZG9iag0KOSAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RFRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2MS9NYXhXaWR0aCAxNjgyL0ZvbnRXZWlnaHQgNDAwL1hIZWlnaHQgMjUwL1N0ZW1WIDU2L0ZvbnRCQm94WyAtNTAwIC0yODIgMTE4MiA5MzldIC9Gb250RmlsZTIgMjQgMCBSPj4NCmVuZG9iag0KMTAgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9jYSAxPj4NCmVuZG9iag0KMTEgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9DQSAxPj4NCmVuZG9iag0KMTIgMCBvYmoNCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1RydWVUeXBlL05hbWUvRjIvQmFzZUZvbnQvQkNERkVFK0FwdG9zL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZy9Gb250RGVzY3JpcHRvciAxMyAwIFIvRmlyc3RDaGFyIDMyL0xhc3RDaGFyIDMyL1dpZHRocyAyNiAwIFI+Pg0KZW5kb2JqDQoxMyAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RGRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2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ZCI/Pjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IjMuMS03MDEiPgo8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgo8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiAgeG1sbnM6cGRmPSJodHRwOi8vbnMuYWRvYmUuY29tL3BkZi8xLjMvIj4KPC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iPgo8ZGM6Y3JlYXRvcj48cmRmOlNlcT48cmRmOmxpPkJhcnJldHQgRmFsazwvcmRmOmxpPjwvcmRmOlNlcT48L2RjOmNyZWF0b3I+PC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iPgo8eG1wOkNyZWF0b3JUb29sPk1pY3Jvc29mdCBXb3JkPC94bXA6Q3JlYXRvclRvb2w+PHhtcDpDcmVhdGVEYXRlPjIwMjYtMDUtMDRUMTc6Mzg6NDkrMDA6MDA8L3htcDpDcmVhdGVEYXRlPjx4bXA6TW9kaWZ5RGF0ZT4yMDI2LTA1LTA0VDE3OjM4OjQ5KzAwOjAwPC94bXA6TW9kaWZ5RGF0ZT48L3JkZjpEZXNjcmlwdGlvbj4KPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIj4KPHhtcE1NOkRvY3VtZW50SUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkRvY3VtZW50SUQ+PHhtcE1NOkluc3RhbmNlSUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkluc3RhbmNlSUQ+PC9yZGY6RGVzY3JpcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAo8L3JkZjpSREY+PC94OnhtcG1ldGE+PD94cGFja2V0IGVuZD0idyI/Pg0KZW5kc3RyZWFtDQplbmRvYmoNCjI4IDAgb2JqDQo8PC9EaXNwbGF5RG9jVGl0bGUgdHJ1ZT4+DQplbmRvYmoNCjI5IDAgb2JqDQo8PC9UeXBlL1hSZWYvU2l6ZSAyOS9XWyAxIDQgMl0gL1Jvb3QgMSAwIFIvSW5mbyAxNCAwIFIvSURbPDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPjwwOUFCMzRCMkUyQTRGMDQ2QTg5MTVFMjUwRjFGQTNBQj5dIC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDEwNT4+DQpzdHJlYW0NCnicLcy9FUBAEATguT/niCR6kMjkqqIGdXhEFKEEsUwHKjhnxwb7vbe7s0CqGFXqFfAxk0tQj2ACmcgi2J5w6AaykVvIuPMjoNPPGpoYYokjivyXWcrlXuJhF8pCaFqykkPoTuAFYjsOcw0KZW5kc3RyZWFtDQplbmRvYmoNCnhyZWYNCjAgMzANCjAwMDAwMDAwMTUgNjU1MzUgZg0KMDAwMDAwMDAxNyAwMDAwMCBuDQowMDAwMDAwMTYzIDAwMDAwIG4NCjAwMDAwMDAyMTkgMDAwMDAgbg0KMDAwMDAwMDQ5NyAwMDAwMCBuDQowMDAwMDAwNzc3IDAwMDAwIG4NCjAwMDAwMDA5MDUgMDAwMDAgbg0KMDAwMDAwMDkzMyAwMDAwMCBuDQowMDAwMDAxMDg4IDAwMDAwIG4NCjAwMDAwMDExNjEgMDAwMDAgbg0KMDAwMDAwMTM5OCAwMDAwMCBuDQowMDAwMDAxNDUyIDAwMDAwIG4NCjAwMDAwMDE1MDYgMDAwMDAgbg0KMDAwMDAwMTY3MyAwMDAwMCBuDQowMDAwMDAxOTExIDAwMDAwIG4NCjAwMDAwMDAwMTYgNjU1MzUgZg0KMDAwMDAwMDAxNyA2NTUzNSBmDQowMDAwMDAwMDE4IDY1NTM1IGYNCjAwMDAwMDAwMTkgNjU1MzUgZg0KMDAwMDAwMDAyMCA2NTUzNSBmDQowMDAwMDAwMDIxIDY1NTM1IGYNCjAwMDAwMDAwMjIgNjU1MzUgZg0KMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAyNDc3IDAwMDAwIG4NCjAwMDAwMDI4MjYgMDAwMDAgbg0KMDAwMDAxMDU0MiAwMDAwMCBuDQowMDAwMDEwNjYyIDAwMDAwIG4NCjAwMDAwMTA2ODkgMDAwMDAgbg0KMDAwMDAxMzc3NyAwMDAwMCBuDQowMDAwMDEzODIyIDAwMDAwIG4NCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gPj4NCnN0YXJ0eHJlZg0KMTQxMjgNCiUlRU9GDQp4cmVmDQowIDANCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gL1ByZXYgMTQxMjgvWFJlZlN0bSAxMzgyMj4+DQpzdGFydHhyZWYNCjE0ODg1DQolJUVPRg==\",\n        \"filename\": \"your_custom_filename.pdf\",\n        \"sending_method\": \"attach\"\n    }\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/email",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "email"
+                  ]
+                },
+                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send SMS",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone_number\": \"{{recipient_phone}}\",\n  \"template_id\": \"{{gc_notify_sms_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/sms",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "sms"
+                  ]
+                },
+                "description": "Send an SMS notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_sms_template_id` to a valid SMS template ID"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send Bulk",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Test Bulk Job\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"rows\": [\n    [\"email address\", \"name\"],\n    [\"{{recipient_email}}\", \"Test User\"]\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/bulk",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "bulk"
+                  ]
+                },
+                "description": "Send a bulk batch of notifications via GC Notify passthrough. Rows must include a header row followed by data rows (max 50,000 recipients)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notifications",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "template_type",
+                      "value": "email",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "delivered",
+                      "disabled": true
+                    },
+                    {
+                      "key": "reference",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List notifications from GC Notify. Optional query params: `template_type` (email|sms), `status`, `reference`, `older_than`, `include_jobs`."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notification by ID",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/{{gc_notify_notification_id}}",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "{{gc_notify_notification_id}}"
+                  ]
+                },
+                "description": "Get a specific notification by ID from GC Notify. Set `gc_notify_notification_id` to the notification UUID returned by a previous Send response."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Templates",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text",
+                    "disabled": true
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/templates",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "templates"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "email",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List all templates from your GC Notify account. Optional query param: `type` (email|sms)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Template by ID",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/template/{{gc_notify_template_id}}",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "template",
+                    "{{gc_notify_template_id}}"
+                  ]
+                },
+                "description": "Get a specific template by ID from your GC Notify account. Set `gc_notify_template_id` to the template UUID."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "GC Notify (Passthrough)",
+          "item": [
+            {
+              "name": "GC Notify - Send Email",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{tenant-1-api-key}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"firstName\": \"Test User\",\n    \"orderNumber\": \"12345\",\n    \"amount\": \"49.99\",\n    \"status\": \"yes\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/email",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "notifications",
+                    "email"
+                  ]
+                },
+                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send Email Attachment",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email_address\": \"{{recipient_email}}\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\",\n    \"attachment\": {\n        \"file\": \"JVBERi0xLjcNCiW1tbW1DQoxIDAgb2JqDQo8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvTGFuZyhlbikgL1N0cnVjdFRyZWVSb290IDE1IDAgUi9NYXJrSW5mbzw8L01hcmtlZCB0cnVlPj4vTWV0YWRhdGEgMjcgMCBSL1ZpZXdlclByZWZlcmVuY2VzIDI4IDAgUj4+DQplbmRvYmoNCjIgMCBvYmoNCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWyAzIDAgUl0gPj4NCmVuZG9iag0KMyAwIG9iag0KPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFIvRjIgMTIgMCBSPj4vRXh0R1N0YXRlPDwvR1MxMCAxMCAwIFIvR1MxMSAxMSAwIFI+Pi9Qcm9jU2V0Wy9QREYvVGV4dC9JbWFnZUIvSW1hZ2VDL0ltYWdlSV0gPj4vTWVkaWFCb3hbIDAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIvR3JvdXA8PC9UeXBlL0dyb3VwL1MvVHJhbnNwYXJlbmN5L0NTL0RldmljZVJHQj4+L1RhYnMvUy9TdHJ1Y3RQYXJlbnRzIDA+Pg0KZW5kb2JqDQo0IDAgb2JqDQo8PC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDIwNj4+DQpzdHJlYW0NCnicjY5Li8JAEITvA/Mf6qhCku7JYxIYGjaTKCt6EAMexIMHN6cN+/j/sK0uC3raPnRTVNH1Idt/nCeEkG3jawfKNudpxOwyJfFlLoK2i/i0hlK6TsMOhEq3bxy+LtYcFpisaQdrsiVDjeHNGtYQgeFdSq6Epzr16rxraLVnwvitHzHeJf/KlTXHoBW51LneZSFVIC6jeD1VKUkTKO8aSQrVLRO7Vuq/YN4XcsKwtqZXlp01/4V2z9DMRVo+QN9Q74AzzB9a0G8jfgDYy0DUDQplbmRzdHJlYW0NCmVuZG9iag0KNSAwIG9iag0KPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTAvQmFzZUZvbnQvQkNERUVFK0FwdG9zL0VuY29kaW5nL0lkZW50aXR5LUgvRGVzY2VuZGFudEZvbnRzIDYgMCBSL1RvVW5pY29kZSAyMyAwIFI+Pg0KZW5kb2JqDQo2IDAgb2JqDQpbIDcgMCBSXSANCmVuZG9iag0KNyAwIG9iag0KPDwvQmFzZUZvbnQvQkNERUVFK0FwdG9zL1N1YnR5cGUvQ0lERm9udFR5cGUyL1R5cGUvRm9udC9DSURUb0dJRE1hcC9JZGVudGl0eS9EVyAxMDAwL0NJRFN5c3RlbUluZm8gOCAwIFIvRm9udERlc2NyaXB0b3IgOSAwIFIvVyAyNSAwIFI+Pg0KZW5kb2JqDQo4IDAgb2JqDQo8PC9PcmRlcmluZyhJZGVudGl0eSkgL1JlZ2lzdHJ5KEFkb2JlKSAvU3VwcGxlbWVudCAwPj4NCmVuZG9iag0KOSAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RFRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2MS9NYXhXaWR0aCAxNjgyL0ZvbnRXZWlnaHQgNDAwL1hIZWlnaHQgMjUwL1N0ZW1WIDU2L0ZvbnRCQm94WyAtNTAwIC0yODIgMTE4MiA5MzldIC9Gb250RmlsZTIgMjQgMCBSPj4NCmVuZG9iag0KMTAgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9jYSAxPj4NCmVuZG9iag0KMTEgMCBvYmoNCjw8L1R5cGUvRXh0R1N0YXRlL0JNL05vcm1hbC9DQSAxPj4NCmVuZG9iag0KMTIgMCBvYmoNCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1RydWVUeXBlL05hbWUvRjIvQmFzZUZvbnQvQkNERkVFK0FwdG9zL0VuY29kaW5nL1dpbkFuc2lFbmNvZGluZy9Gb250RGVzY3JpcHRvciAxMyAwIFIvRmlyc3RDaGFyIDMyL0xhc3RDaGFyIDMyL1dpZHRocyAyNiAwIFI+Pg0KZW5kb2JqDQoxMyAwIG9iag0KPDwvVHlwZS9Gb250RGVzY3JpcHRvci9Gb250TmFtZS9CQ0RGRUUrQXB0b3MvRmxhZ3MgMzIvSXRhbGljQW5nbGUgMC9Bc2NlbnQgOTM5L0Rlc2NlbnQgLTI4Mi9DYXBIZWlnaHQgOTM5L0F2Z1dpZHRoIDU2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ZCI/Pjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IjMuMS03MDEiPgo8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgo8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiAgeG1sbnM6cGRmPSJodHRwOi8vbnMuYWRvYmUuY29tL3BkZi8xLjMvIj4KPC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iPgo8ZGM6Y3JlYXRvcj48cmRmOlNlcT48cmRmOmxpPkJhcnJldHQgRmFsazwvcmRmOmxpPjwvcmRmOlNlcT48L2RjOmNyZWF0b3I+PC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iPgo8eG1wOkNyZWF0b3JUb29sPk1pY3Jvc29mdCBXb3JkPC94bXA6Q3JlYXRvclRvb2w+PHhtcDpDcmVhdGVEYXRlPjIwMjYtMDUtMDRUMTc6Mzg6NDkrMDA6MDA8L3htcDpDcmVhdGVEYXRlPjx4bXA6TW9kaWZ5RGF0ZT4yMDI2LTA1LTA0VDE3OjM4OjQ5KzAwOjAwPC94bXA6TW9kaWZ5RGF0ZT48L3JkZjpEZXNjcmlwdGlvbj4KPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIj4KPHhtcE1NOkRvY3VtZW50SUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkRvY3VtZW50SUQ+PHhtcE1NOkluc3RhbmNlSUQ+dXVpZDpCMjM0QUIwOS1BNEUyLTQ2RjAtQTg5MS01RTI1MEYxRkEzQUI8L3htcE1NOkluc3RhbmNlSUQ+PC9yZGY6RGVzY3JpcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAo8L3JkZjpSREY+PC94OnhtcG1ldGE+PD94cGFja2V0IGVuZD0idyI/Pg0KZW5kc3RyZWFtDQplbmRvYmoNCjI4IDAgb2JqDQo8PC9EaXNwbGF5RG9jVGl0bGUgdHJ1ZT4+DQplbmRvYmoNCjI5IDAgb2JqDQo8PC9UeXBlL1hSZWYvU2l6ZSAyOS9XWyAxIDQgMl0gL1Jvb3QgMSAwIFIvSW5mbyAxNCAwIFIvSURbPDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPjwwOUFCMzRCMkUyQTRGMDQ2QTg5MTVFMjUwRjFGQTNBQj5dIC9GaWx0ZXIvRmxhdGVEZWNvZGUvTGVuZ3RoIDEwNT4+DQpzdHJlYW0NCnicLcy9FUBAEATguT/niCR6kMjkqqIGdXhEFKEEsUwHKjhnxwb7vbe7s0CqGFXqFfAxk0tQj2ACmcgi2J5w6AaykVvIuPMjoNPPGpoYYokjivyXWcrlXuJhF8pCaFqykkPoTuAFYjsOcw0KZW5kc3RyZWFtDQplbmRvYmoNCnhyZWYNCjAgMzANCjAwMDAwMDAwMTUgNjU1MzUgZg0KMDAwMDAwMDAxNyAwMDAwMCBuDQowMDAwMDAwMTYzIDAwMDAwIG4NCjAwMDAwMDAyMTkgMDAwMDAgbg0KMDAwMDAwMDQ5NyAwMDAwMCBuDQowMDAwMDAwNzc3IDAwMDAwIG4NCjAwMDAwMDA5MDUgMDAwMDAgbg0KMDAwMDAwMDkzMyAwMDAwMCBuDQowMDAwMDAxMDg4IDAwMDAwIG4NCjAwMDAwMDExNjEgMDAwMDAgbg0KMDAwMDAwMTM5OCAwMDAwMCBuDQowMDAwMDAxNDUyIDAwMDAwIG4NCjAwMDAwMDE1MDYgMDAwMDAgbg0KMDAwMDAwMTY3MyAwMDAwMCBuDQowMDAwMDAxOTExIDAwMDAwIG4NCjAwMDAwMDAwMTYgNjU1MzUgZg0KMDAwMDAwMDAxNyA2NTUzNSBmDQowMDAwMDAwMDE4IDY1NTM1IGYNCjAwMDAwMDAwMTkgNjU1MzUgZg0KMDAwMDAwMDAyMCA2NTUzNSBmDQowMDAwMDAwMDIxIDY1NTM1IGYNCjAwMDAwMDAwMjIgNjU1MzUgZg0KMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAyNDc3IDAwMDAwIG4NCjAwMDAwMDI4MjYgMDAwMDAgbg0KMDAwMDAxMDU0MiAwMDAwMCBuDQowMDAwMDEwNjYyIDAwMDAwIG4NCjAwMDAwMTA2ODkgMDAwMDAgbg0KMDAwMDAxMzc3NyAwMDAwMCBuDQowMDAwMDEzODIyIDAwMDAwIG4NCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gPj4NCnN0YXJ0eHJlZg0KMTQxMjgNCiUlRU9GDQp4cmVmDQowIDANCnRyYWlsZXINCjw8L1NpemUgMzAvUm9vdCAxIDAgUi9JbmZvIDE0IDAgUi9JRFs8MDlBQjM0QjJFMkE0RjA0NkE4OTE1RTI1MEYxRkEzQUI+PDA5QUIzNEIyRTJBNEYwNDZBODkxNUUyNTBGMUZBM0FCPl0gL1ByZXYgMTQxMjgvWFJlZlN0bSAxMzgyMj4+DQpzdGFydHhyZWYNCjE0ODg1DQolJUVPRg==\",\n        \"filename\": \"your_custom_filename.pdf\",\n        \"sending_method\": \"attach\"\n    }\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/email",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "notifications",
+                    "email"
+                  ]
+                },
+                "description": "Send an email notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_template_id` to a valid template ID in your GC Notify account\n4. Set `recipient_email` to the target email address"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send SMS",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone_number\": \"{{recipient_phone}}\",\n  \"template_id\": \"{{gc_notify_sms_template_id}}\",\n  \"personalisation\": {\n    \"name\": \"Test User\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/sms",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "notifications",
+                    "sms"
+                  ]
+                },
+                "description": "Send an SMS notification via GC Notify passthrough.\n\n**Prerequisites:**\n1. Get a JWT/OAuth2 token (Authentication folder)\n2. Set `gc_notify_api_key` to your GC Notify API key\n3. Set `gc_notify_sms_template_id` to a valid SMS template ID"
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Send Bulk",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Test Bulk Job\",\n  \"template_id\": \"{{gc_notify_template_id}}\",\n  \"rows\": [\n    [\"email address\", \"name\"],\n    [\"{{recipient_email}}\", \"Test User\"]\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications/bulk",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "notifications",
+                    "bulk"
+                  ]
+                },
+                "description": "Send a bulk batch of notifications via GC Notify passthrough. Rows must include a header row followed by data rows (max 50,000 recipients)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notifications",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/notifications",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "template_type",
+                      "value": "email",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "delivered",
+                      "disabled": true
+                    },
+                    {
+                      "key": "reference",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List notifications from GC Notify. Optional query params: `template_type` (email|sms), `status`, `reference`, `older_than`, `include_jobs`."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Notification by ID",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify/v2/notifications/{{gc_notify_notification_id}}",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify",
+                    "v2",
+                    "notifications",
+                    "{{gc_notify_notification_id}}"
+                  ]
+                },
+                "description": "Get a specific notification by ID from GC Notify. Set `gc_notify_notification_id` to the notification UUID returned by a previous Send response."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Templates",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/templates",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "templates"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "email",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List all templates from your GC Notify account. Optional query param: `type` (email|sms)."
+              },
+              "response": []
+            },
+            {
+              "name": "GC Notify - Get Template by ID",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "ApiKey-v1 {{gc_notify_api_key}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{gateway_url}}/gcnotify-passthrough/v2/template/{{gc_notify_template_id}}",
+                  "host": [
+                    "{{gateway_url}}"
+                  ],
+                  "path": [
+                    "gcnotify-passthrough",
+                    "v2",
+                    "template",
+                    "{{gc_notify_template_id}}"
+                  ]
+                },
+                "description": "Get a specific template by ID from your GC Notify account. Set `gc_notify_template_id` to the template UUID."
+              },
+              "response": []
             }
           ]
         },
@@ -1174,8 +1815,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1185,8 +1826,241 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Email Merge",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": {\n    \"mergeArray\": [\n      [\"to\", \"firstName\", \"lastName\"],\n      [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n      [\"test@example.com\", \"Bob\", \"Jones\"]\n    ]\n  },\n  \"content\": {\n    \"templateId\": \"{{email_merge_template_id}}\"\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple/email",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple",
+                "email"
+              ]
+            },
+            "description": "Send a mail-merge email. The `recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Merge",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\n      \"mergeArray\": [\n        [\"to\", \"firstName\", \"lastName\"],\n        [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n        [\"test@example.com\", \"Bob\", \"Jones\"]\n      ]\n    },\n    \"content\": {\n      \"templateId\": \"{{email_merge_template_id}}\"\n    }\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
+            },
+            "description": "Same mail-merge as \"Notify - Email Merge\", but sent through the base multi-channel route (`/api/v1/notifysimple`) like the other Simple Send routes — the mail-merge payload is wrapped in the `email` object. The `email.recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` become per-recipient template params and override any matching key in the global `params`.\n\n**Setup:**\n1. Run \"Notify - Create Template - Simple Email Merge\" first — its test script automatically saves the template id into `email_merge_template_id`, which this request uses.\n2. Set `recipient_email` to the target email address.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Merge (Inline Content)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": {\n    \"mergeArray\": [\n      [\"to\", \"firstName\", \"lastName\"],\n      [\"{{recipient_email}}\", \"Alice\", \"Smith\"],\n      [\"test@example.com\", \"Bob\", \"Jones\"]\n    ]\n  },\n  \"content\": {\n    \"subject\": \"Hello {{firstName}}\",\n    \"body\": \"Test email merge\\nName: {{firstName}} {{lastName}}\\nEvent: {{eventName}}\\n\",\n    \"bodyType\": \"text\",\n    \"renderer\": \"handlebars\"\n  },\n  \"params\": {\n    \"eventName\": \"Annual Conference 2026\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple/email",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple",
+                "email"
+              ]
+            },
+            "description": "Same mail-merge as \"Notify - Simple Send Email Merge\", but supplies the template inline via `content` instead of referencing `templateId`. The `recipients.mergeArray` contains a header row followed by one data row per recipient — extra columns beyond `\"to\"` (here `firstName`, `lastName`) become per-recipient params, while `params` holds global params (`eventName`). The inline `content` mirrors the \"Email Merge Test Template\" (subject `Hello {{firstName}}`, Handlebars body, `bodyType` text).\n\n**Setup:** Set `recipient_email` to the target email address. No template creation step is required.\n\n**Tip — test without sending real email:** stub the adapter call in `EmailDeliveryWorker.sendEmail` (backend/src/queue/workers/email-delivery.worker.ts) so it returns a fake result instead of calling `emailAdapter.send`."
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Attachment",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"SGVsbG8hICBUZXN0IGF0dGFjaG1lbnQgZnJvbSBOb3RpZnkuCg==\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
+            },
+            "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email Attachment Virus",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"attachments\": [\n    {\n      \"content\": \"WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=\",\n      \"filename\": \"test.txt\",\n      \"mimeType\": \"text/plain\"\n    }],\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\",\n        \"body\": \"This is a test notification\",\n        \"bodyType\": \"html\",\n        \"encoding\": \"string\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1213,8 +2087,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1224,8 +2098,14 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1252,8 +2132,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "20e1da22-2e44-4fbd-ab50-64f825110f56",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1263,8 +2143,14 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1291,8 +2177,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1302,8 +2188,14 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1330,19 +2222,25 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4637d8f7-1587-4fe5-aa80-725f360ac418",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"templateId\": \"3dfe0442-1f24-4763-9885-5aa088693f33\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
+              "raw": "{\n  \"templateId\": \"a982bb71-3271-47cb-bbbf-b9a10315031f\",\n  \"params\": {\n    \"userName\": \"Sarah\",\n    \"parksCount\": 47,\n    \"passType\": \"Gold\",\n    \"isGoldPass\": true,\n    \"isSilverPass\": false,\n    \"passYear\": \"2026\",\n    \"featuredCount\": 3,\n    \"isSummerSeason\": true,\n    \"isFallSeason\": false,\n    \"isWinterSeason\": false,\n    \"isSpringSeasonSeason\": false,\n    \"userCity\": \"Vancouver\",\n    \"userChallengeProgress\": 6,\n    \"challengeCompleted\": false,\n    \"challengeHalfway\": true,\n    \"challengeReward\": \"BC Parks Explorer Badge\",\n    \"challengeDeadline\": \"2026-12-31\",\n    \"hasReservations\": true,\n    \"reservationCount\": 2,\n    \"isLocalResident\": true,\n    \"isFirstTimeUser\": false,\n    \"featuredParks\": [\n        {\n        \"parkName\": \"Garibaldi Provincial Park\",\n        \"region\": \"Squamish-Whistler\",\n        \"description\": \"Alpine meadows and pristine lakes offering stunning mountain vistas and excellent hiking trails.\",\n        \"difficulty\": 3,\n        \"activities\": [\"Hiking\", \"Camping\", \"Photography\", \"Wildlife Viewing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 75,\n        \"totalSites\": 200,\n        \"isFull\": false,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Joffre Lakes Provincial Park\",\n        \"region\": \"Pemberton\",\n        \"description\": \"Three connected turquoise lakes surrounded by glaciers and wildflower meadows.\",\n        \"difficulty\": 2,\n        \"activities\": [\"Hiking\", \"Photography\", \"Picnicking\"],\n        \"campgroundsAvailable\": false,\n        \"beachAccess\": false\n        },\n        {\n        \"parkName\": \"Cathedral Provincial Park\",\n        \"region\": \"Keremeos\",\n        \"description\": \"Subalpine wilderness with dramatic granite peaks and pristine backcountry camping.\",\n        \"difficulty\": 4,\n        \"activities\": [\"Backpacking\", \"Mountaineering\", \"Rock Climbing\"],\n        \"campgroundsAvailable\": true,\n        \"availableSites\": 12,\n        \"totalSites\": 30,\n        \"isFull\": true,\n        \"isGettingFull\": false,\n        \"beachAccess\": false\n        }\n    ],\n    \"summerRecommendations\": [\n        {\n        \"parkName\": \"Mount Robson Provincial Park\",\n        \"reason\": \"Peak season for backcountry hiking with clear alpine views and excellent weather\"\n        },\n        {\n        \"parkName\": \"Strathcona Provincial Park\",\n        \"reason\": \"High alpine meadows in full bloom with accessible day hikes and camping\"\n        },\n        {\n        \"parkName\": \"Wells Gray Provincial Park\",\n        \"reason\": \"Waterfalls, lakes and river valleys perfect for families and experienced hikers\"\n        }\n    ],\n    \"fallRecommendations\": [],\n    \"winterRecommendations\": [],\n    \"springRecommendations\": [],\n    \"nearestParks\": [\n        {\n        \"parkName\": \"Lynn Headwaters Regional Park\",\n        \"distance\": 25,\n        \"driveTime\": 45,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Cultus Lake Provincial Park\",\n        \"distance\": 85,\n        \"driveTime\": 90,\n        \"roadConditions\": \"Excellent\",\n        \"winterClosure\": false,\n        \"wheelchairAccessible\": true,\n        \"petFriendly\": true\n        },\n        {\n        \"parkName\": \"Golden Ears Provincial Park\",\n        \"distance\": 60,\n        \"driveTime\": 75,\n        \"roadConditions\": \"Good\",\n        \"winterClosure\": true,\n        \"closureMonths\": \"November to April\",\n        \"wheelchairAccessible\": false,\n        \"petFriendly\": true\n        }\n    ],\n    \"wildlife\": [\n        {\n        \"species\": \"Black Bear\",\n        \"endangered\": false,\n        \"habitat\": \"Forested areas and alpine meadows\",\n        \"season\": \"June to September\",\n        \"highDanger\": true\n        },\n        {\n        \"species\": \"Mountain Goat\",\n        \"endangered\": false,\n        \"habitat\": \"Alpine peaks and rocky terrain\",\n        \"season\": \"Year-round\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Marbled Murrelet\",\n        \"endangered\": true,\n        \"habitat\": \"Old-growth forest\",\n        \"season\": \"April to August\",\n        \"highDanger\": false\n        },\n        {\n        \"species\": \"Pika\",\n        \"endangered\": false,\n        \"habitat\": \"Rocky alpine areas above treeline\",\n        \"season\": \"June to October\",\n        \"highDanger\": false\n        }\n    ],\n    \"tripChecklist\": [\n        {\n        \"item\": \"Water bottle (2-3 liters)\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Waterproof jacket and pants\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Proper hiking boots with good traction\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"First aid kit\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Bear spray or bells\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Map and compass or GPS device\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"High-energy snacks\",\n        \"essential\": true\n        },\n        {\n        \"item\": \"Sunscreen and insect repellent\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Camera or binoculars\",\n        \"essential\": false\n        },\n        {\n        \"item\": \"Headlamp or flashlight\",\n        \"essential\": false\n        }\n    ],\n    \"weatherAlerts\": [\n        {\n        \"alertType\": \"High Wind Warning\",\n        \"affectedArea\": \"Whistler and surrounding peaks\",\n        \"alertMessage\": \"Winds expected to reach 60+ km/h. Trail conditions may be hazardous.\"\n        }\n    ],\n    \"closedParks\": [\n        {\n        \"parkName\": \"Stein Valley Nlaka'pamux Heritage Park\",\n        \"reason\": \"Bridge maintenance and trail repairs\",\n        \"reopenDate\": \"2026-06-15\"\n        }\n    ]\n    },\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Test Notification from Simple Send\"\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1369,8 +2267,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "16a347c7-2c1d-4c56-be84-b1529419f525",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1380,8 +2278,14 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1414,8 +2318,15 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/email",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "email"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple",
+                "email"
+              ]
             },
             "description": "Send a simple multi-channel notification"
           },
@@ -1449,9 +2360,15 @@
             "url": {
               "raw": "http://localhost:3000/api/v1/notifyevent",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notifyevent"]
+              "path": [
+                "api",
+                "v1",
+                "notifyevent"
+              ]
             },
             "description": "Send notification using event type configuration"
           },
@@ -1485,9 +2402,16 @@
             "url": {
               "raw": "http://localhost:3000/api/v1/notifyevent/preview",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notifyevent", "preview"]
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "preview"
+              ]
             },
             "description": "Preview resolved notification payloads without sending"
           },
@@ -1511,9 +2435,16 @@
             "url": {
               "raw": "http://localhost:3000/api/v1/notifyevent/types",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notifyevent", "types"]
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "types"
+              ]
             },
             "description": "Get list of available notification event types"
           },
@@ -1537,9 +2468,17 @@
             "url": {
               "raw": "http://localhost:3000/api/v1/notifyevent/types/welcome-email",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notifyevent", "types", "welcome-email"]
+              "path": [
+                "api",
+                "v1",
+                "notifyevent",
+                "types",
+                "welcome-email"
+              ]
             },
             "description": "Get a specific notification event type"
           },
@@ -1559,17 +2498,34 @@
               ]
             },
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify?limit=10",
+              "raw": "http://localhost:3000/api/v1/notification_request?limit=10&sort=createdAt",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notify"],
+              "path": [
+                "api",
+                "v1",
+                "notification_request"
+              ],
               "query": [
                 {
                   "key": "limit",
                   "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt"
                 }
               ]
             },
@@ -1595,16 +2551,39 @@
             "url": {
               "raw": "http://localhost:3000/api/v1/notify/status/12345",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "3000",
-              "path": ["api", "v1", "notify", "status", "12345"]
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "status",
+                "12345"
+              ]
             },
             "description": "Get status of a specific notification"
           },
           "response": []
         },
         {
-          "name": "Notify - Register Callback",
+          "name": "Notify - Register Callback (Teams webhook)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.callbackId) {",
+                  "  pm.collectionVariables.set('callback_id', res.callbackId);",
+                  "  console.log('Saved callbackId:', res.callbackId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "bearer",
@@ -1622,20 +2601,35 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook\",\n  \"events\": [\"notification.sent\", \"notification.failed\"]\n}"
+              "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"channelType\": [\"email\", \"sms\"],\n  \"trigger\": [\"success\", \"failure\"],\n  \"webhookType\": \"teams\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback"
+              ]
             },
-            "description": "Register a callback webhook for notification events"
+            "description": "Register a callback webhook.\n\n**Setup:**\n1. Go to https://webhook.site, copy your unique URL, set it as `webhook_url` collection variable.\n2. Send a notification (e.g. Simple Send Email).\n3. Watch the POST arrive at webhook.site with `X-Webhook-Signature` header if secret is set.\n\n**Fields:**\n- `url`: HTTPS URL to receive POST requests (required)\n- `channelType`: filter by channel — `email`, `sms`, `msgApp`. Omit to receive all.\n- `trigger`: `success` fires on COMPLETED, `failure` fires on FAILED. Omit to receive all.\n- `secret`: Optional. If provided, each POST includes `X-Webhook-Signature: sha256=<hmac>`.\n- `headers`: Optional key/value pairs merged into every outbound POST.\n- `active`: true/false to enable/disable without deleting.\n\n**callbackId is auto-saved to `{{callback_id}}` collection variable.**"
           },
           "response": []
         },
@@ -1658,20 +2652,36 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/webhook/updated\",\n  \"events\": [\"notification.sent\"]\n}"
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback",
+                "{{callback_id}}"
+              ]
             },
-            "description": "Update a registered callback"
+            "description": "Partial update of an existing callback. Only include fields to change.\n\nExample: disable without deleting by setting `\"active\": false`."
           },
           "response": []
         },
@@ -1689,15 +2699,27 @@
               ]
             },
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "http://localhost:3000/api/v1/notify/registerCallback/callback-id-123",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "v1", "notify", "registerCallback", "callback-id-123"]
+              "raw": "{{gateway_url}}/api/v1/notify/registerCallback/{{callback_id}}",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notify",
+                "registerCallback",
+                "{{callback_id}}"
+              ]
             },
-            "description": "Delete a registered callback"
+            "description": "Permanently remove a registered callback. Returns 204 No Content on success."
           },
           "response": []
         },
@@ -1722,8 +2744,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1733,8 +2755,15 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/316297c7-1a55-4c0c-8a18-3281b7e16108",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "316297c7-1a55-4c0c-8a18-3281b7e16108"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple",
+                "316297c7-1a55-4c0c-8a18-3281b7e16108"
+              ]
             },
             "description": "Cancel a notification that hasn't been delivered yet (service-to-service endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to cancel (set {{notification_id}} variable)\n- Token must have service-to-service credentials\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Response:**\nReturns the updated notification with status changed to 'cancelled'"
           },
@@ -1761,8 +2790,8 @@
                 "type": "text"
               },
               {
-                "key": "x-tenant-id",
-                "value": "4f8bcc15-027d-40bf-aa7f-44e8124f9410",
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
                 "type": "text"
               }
             ],
@@ -1772,8 +2801,15 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/notifysimple/316297c7-1a55-4c0c-8a18-3281b7e16108",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "notifysimple", "316297c7-1a55-4c0c-8a18-3281b7e16108"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple",
+                "316297c7-1a55-4c0c-8a18-3281b7e16108"
+              ]
             },
             "description": "Reschedule a notification to a new delivery time (service-to-service endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to reschedule (set {{notification_id}} variable)\n- Token must have service-to-service credentials\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Request Parameters:**\n- `scheduledTime`: ISO 8601 datetime (must be in the future)\n\n**Response:**\nReturns the updated notification with delayedSendTime changed to the new scheduledTime"
           },
@@ -1806,8 +2842,16 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/notifysimple/{{notification_id}}",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "notifysimple", "{{notification_id}}"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "notifysimple",
+                "{{notification_id}}"
+              ]
             },
             "description": "Cancel a notification that hasn't been delivered yet (frontend endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to cancel (set {{notification_id}} variable)\n- Token must have NOTIFY_ADMIN role\n- Token must be a frontend user token\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Response:**\nReturns the updated notification with status changed to 'cancelled' and updatedBy set to the authenticated user ID"
           },
@@ -1840,8 +2884,16 @@
             },
             "url": {
               "raw": "{{gateway_url}}/api/v1/frontend/notifysimple/{{notification_id}}",
-              "host": ["{{gateway_url}}"],
-              "path": ["api", "v1", "frontend", "notifysimple", "{{notification_id}}"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "frontend",
+                "notifysimple",
+                "{{notification_id}}"
+              ]
             },
             "description": "Reschedule a notification to a new delivery time (frontend endpoint).\n\n**Prerequisites:**\n- `notification_id`: UUID of the notification to reschedule (set {{notification_id}} variable)\n- Token must have NOTIFY_ADMIN role\n- Token must be a frontend user token\n\n**Allowed Statuses:**\n- pending\n- accepted\n- scheduled\n\n**Request Parameters:**\n- `scheduledTime`: ISO 8601 datetime (must be in the future)\n\n**Response:**\nReturns the updated notification with delayedSendTime changed to the new scheduledTime and updatedBy set to the authenticated user ID"
           },
@@ -1874,8 +2926,15 @@
             },
             "url": {
               "raw": "{{gateway_url}}/ches/api/v1/email",
-              "host": ["{{gateway_url}}"],
-              "path": ["ches", "api", "v1", "email"]
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "ches",
+                "api",
+                "v1",
+                "email"
+              ]
             },
             "description": "Send an email using Bearer token authentication (OAuth2 or JWT) via CHES compatibility endpoint.\n\n**Prerequisites:**\n1. Get a token using:\n   - \"Get JWT Token (Client Credentials)\" for Keycloak (dev env)\n   - \"Get OAuth2 Token (Kong - Local)\" for Kong-based dev\n2. Token will be automatically used in Authorization header\n\n**Usage:**\n- For DEV with Keycloak: Load .env.notify-dev.json\n- For LOCAL with Kong: Load .env.notify-local.json with Kong token endpoint\n\n**Email Body Parameters:**\n- `from`: Sender email address (required)\n- `to`: Array of recipient email addresses (required)\n- `cc`: Array of CC recipients (optional)\n- `bcc`: Array of BCC recipients (optional)\n- `subject`: Email subject (required)\n- `body`: Email body content (required)\n- `bodyType`: Format of body - \"text\" or \"html\"\n- `encoding`: Character encoding (optional)\n- `priority`: Email priority - \"low\", \"normal\", \"high\"\n- `attachments`: Array of attachment objects (optional)\n- `tag`: Tag for categorizing email (optional)\n- `delayTs`: ISO 8601 datetime to delay sending (optional)\n- `mergeData`: Object for template variable substitution (optional)"
           },
@@ -1940,6 +2999,16 @@
     {
       "key": "gc_notify_notification_id",
       "value": ""
+    },
+    {
+      "key": "webhook_url",
+      "value": "https://webhook.site/YOUR-UNIQUE-ID-HERE",
+      "description": "Paste your webhook.site URL here (or any HTTPS URL). Must be HTTPS."
+    },
+    {
+      "key": "callback_id",
+      "value": "",
+      "description": "Auto-populated by Register Callback test script. Used by Update/Delete Callback requests."
     }
   ]
 }

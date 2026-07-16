@@ -45,8 +45,6 @@ const FeatureFlagAdmin: FC = () => {
     try {
       await dispatch(updateFeatureFlag({ id, enabled: !currentEnabled })).unwrap()
       showSuccessToast('Feature flag updated successfully')
-      // Refetch all flags after update
-      dispatch(fetchAllFeatureFlags())
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : 'Failed to update feature flag')
     } finally {

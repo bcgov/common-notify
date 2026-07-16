@@ -8,11 +8,18 @@ import { TableHeader } from './TableHeader'
 import { TableHeaderCell } from './TableHeaderCell'
 import { TableRow } from './TableRow'
 
+export interface FilterOption {
+  label: string
+  value: string
+}
+
 export interface TableColumn<T> {
   key: keyof T & string
   label: string
   sortable?: boolean
   sortLabel?: string
+  sortType?: 'text' | 'numeric' | 'date'
+  filterOptions?: FilterOption[]
   width?: string
   render?: (value: unknown, row: T) => ReactNode
   className?: string
@@ -26,6 +33,9 @@ export interface TableProps<T> {
   sortBy?: string
   sortOrder?: 'asc' | 'desc' | null
   onSort?: (key: string, order: 'asc' | 'desc' | null) => void
+  // Filtering
+  activeFilters?: Record<string, string[]>
+  onFilter?: (key: string, values: string[]) => void
   // Pagination
   currentPage?: number
   pageSize?: number
@@ -81,16 +91,10 @@ export function DataTable<T extends object>({
   size = 'md',
   className = '',
   footerContent,
+  activeFilters,
+  onFilter,
 }: TableProps<T>) {
   data = data ?? []
-  // Cycle through sort options null -> asc -> desc -> null for the key
-  function handleSort(key: string) {
-    let order: 'asc' | 'desc' | null
-    if (sortBy !== key || sortOrder == null) order = 'asc'
-    else if (sortOrder === 'asc') order = 'desc'
-    else order = null
-    onSort?.(key, order)
-  }
 
   const showEmpty = !isLoading && (isEmpty || data.length === 0)
 
@@ -158,8 +162,13 @@ export function DataTable<T extends object>({
                 style={col.width ? { width: col.width } : undefined}
                 sortable={col.sortable}
                 sortLabel={col.sortLabel}
+                sortType={col.sortType}
                 sortOrder={sortBy === col.key ? sortOrder : null}
-                onSort={col.sortable ? () => handleSort(col.key) : undefined}
+                onSort={col.sortable ? (order) => onSort?.(col.key, order) : undefined}
+                filterOptions={col.filterOptions}
+                filterTitle={`Filter by ${col.label}`}
+                activeFilterValues={activeFilters?.[col.key]}
+                onFilter={col.filterOptions ? (values) => onFilter?.(col.key, values) : undefined}
               >
                 {col.label}
               </TableHeaderCell>

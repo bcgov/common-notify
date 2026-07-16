@@ -77,12 +77,46 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate DEV-only gateway configuration
+      - name: Generate DEV gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV only - this will remove TEST/PROD routes until they are re-approved
+          # Generate DEV - this will remove TEST/PROD routes until they are re-approved
           api-gateway/scripts/generate-gateway-for-stage.sh dev
-      - name: Apply DEV gateway config (removes TEST/PROD temporarily)
+
+      - name: Add open PR routes (path-based routing)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find all open PRs to preserve their routes (path-based routing on same tag as DEV)
+          OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
+
+          if [ -z "$OPEN_PRS" ]; then
+            echo "No open PRs found - applying DEV config only"
+            exit 0
+          fi
+
+          echo "Found open PRs: $OPEN_PRS"
+          echo "Generating PR configs to preserve routes alongside DEV..."
+
+          # Start with DEV config
+          cp api-gateway/generated/gw-active-services.yaml api-gateway/generated/gw-dev-with-prs.yaml
+
+          # Generate and append each open PR config
+          for PR_NUM in $OPEN_PRS; do
+            echo "Adding PR-${PR_NUM} routes..."
+            chmod +x api-gateway/scripts/generate-gateway-config.sh
+            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
+
+            # Append PR config to combined file
+            echo "---" >> api-gateway/generated/gw-dev-with-prs.yaml
+            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-dev-with-prs.yaml
+          done
+
+          # Use combined file for apply
+          mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
+          echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
+
+      - name: Apply DEV gateway config (with open PRs)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -92,8 +126,9 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply DEV only - TEST and PROD routes will be removed until re-approved
-          echo "⚠️  Applying DEV config only - TEST and PROD routes will be temporarily removed"
+          # Apply DEV + open PRs - TEST and PROD routes will be removed until re-approved
+          # All share tag ns.gw-fe8c5.dev but use path-based routing for isolation
+          echo "✅ Applying DEV config (with open PR routes) - TEST and PROD routes will be temporarily removed"
           gwa apply -i api-gateway/generated/gw-active-services.yaml
 
   deploy-dev:
@@ -259,13 +294,6 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
             echo "✓ Tag v$NEW_VERSION does not exist"
           fi
-
-      - name: Commit Version Bump
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          git add frontend/package.json
-          git commit -m "chore(release): bump version to ${{ steps.bump_version.outputs.version }} [skip ci]"
-          git push origin main
 
       - name: Create Git Tag
         if: steps.check_tag.outputs.exists == 'false'

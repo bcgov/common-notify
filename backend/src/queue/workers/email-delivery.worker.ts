@@ -1,14 +1,23 @@
 import { Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
-import { DeliveryJobPayload } from '../queue.types'
+import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
+import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
+import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
+import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { IEmailTransport } from '../../adapters'
+import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
+import { StructuredLoggerService } from '../../common/logger'
+
+type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
+  attachments?: SendEmailOptions['attachments']
+}
 
 /**
  * Email Delivery Worker
@@ -26,6 +35,30 @@ import { IEmailTransport } from '../../adapters'
  */
 export class EmailDeliveryWorker {
   private readonly logger = new Logger(EmailDeliveryWorker.name)
+
+  private static normalizeTemplateBodyType(
+    bodyType: 'text' | 'markdown' | 'html' | undefined,
+  ): 'markdown' | undefined {
+    if (bodyType === 'markdown' || bodyType === 'text') {
+      return 'markdown'
+    }
+
+    return undefined
+  }
+
+  private static hasAttachmentReferences(
+    attachments: unknown,
+  ): attachments is NonNullable<ProcessedNotifyEmailChannel['attachments']> {
+    return (
+      Array.isArray(attachments) &&
+      attachments.every(
+        (attachment) =>
+          attachment &&
+          typeof attachment === 'object' &&
+          typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
+      )
+    )
+  }
 
   /**
    * Initialize the email delivery worker on a queue
@@ -45,10 +78,14 @@ export class EmailDeliveryWorker {
     templatesRepository: TemplatesRepository,
     templatesService: TemplatesService,
     inlineRenderingService: InlineRenderingService,
+    attachmentResolverService: AttachmentResolverService,
     emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
+    structuredLogger?: StructuredLoggerService,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
+    const workerContext = EmailDeliveryWorker.name
 
     logger.log(`Registering email delivery worker processor (concurrency=${concurrency})`)
 
@@ -56,6 +93,7 @@ export class EmailDeliveryWorker {
     // Note: Don't await process() - it sets up listeners and never resolves
     emailQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId, tenantId, payload, request } = job.data
+      const startedAt = Date.now()
 
       logger.debug(`[${notifyId}] Processing email delivery job for tenant=${tenantId}`)
 
@@ -68,34 +106,84 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
+        // Mail merge batch: resolve the template once, then render + send per recipient individually.
+        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
+          return await EmailDeliveryWorker.processMailMergeBatch(
+            job.data.batchId,
+            job.data.mailMergeData,
+            notifyId,
+            tenantId,
+            logger,
+            templatesRepository,
+            templatesService,
+            inlineRenderingService,
+            emailAdapter,
+            requestDetailService,
+            notificationService,
+          )
+        }
+
+        // Single delivery path: emit a structured lifecycle "start" event.
+        structuredLogger?.logNotificationStart(notifyId, tenantId, 'email', workerContext)
+
         // Validate job data
         if (!payload || typeof payload !== 'object') {
           throw new Error('Invalid delivery job: email payload is missing or invalid')
         }
 
         // Cast payload to email channel type for type safety
-        let emailPayload = payload as NotifyEmailChannel
+        let emailPayload = payload as
+          | NotifyEmailChannel
+          | ProcessedNotifyEmailChannel
+          | ResolvedEmailDeliveryPayload
 
-        // Resolve template if templateId is provided in the original request
+        if (
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
+          !Array.isArray(emailPayload.recipients.to) ||
+          emailPayload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid email payload: recipient email address is missing or invalid')
+        }
+
+        // Resolve template if the email content carries a templateId.
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
-        if (request?.templateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${request.templateId}`)
+        const emailTemplateId = emailPayload.content?.templateId
+
+        // Inline subject/body are only required when the content is NOT template-based; a template
+        // supplies them during resolution below (and they're re-validated after rendering).
+        if (!emailTemplateId) {
+          if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
+            throw new Error('Invalid email payload: subject is missing or invalid')
+          }
+
+          if (!emailPayload.content?.body || typeof emailPayload.content.body !== 'string') {
+            throw new Error('Invalid email payload: body is missing or invalid')
+          }
+        }
+
+        if ((job.attemptsMade ?? 0) > 0) {
+          await requestDetailService.resetForRetry(notifyId)
+        }
+
+        if (emailTemplateId) {
+          logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
-            const template = await templatesRepository.findById(tenantId, request.templateId)
+            const template = await templatesRepository.findById(tenantId, emailTemplateId)
             if (!template) {
               throw new NotFoundException(
-                `Template '${request.templateId}' not found for tenant '${tenantId}'`,
+                `Template '${emailTemplateId}' not found for tenant '${tenantId}'`,
               )
             }
 
             // Merge template content into email payload if channel matches
             if (template.channelCode === 'EMAIL') {
               // Render the template with personalisation data from request.params
-              // Use request's bodyType if provided, otherwise template's default
+              // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
                 request.params || {},
-                emailPayload.content?.bodyType,
+                EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
 
               emailPayload = {
@@ -160,11 +248,44 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: body is missing or invalid')
         }
 
+        if (
+          emailPayload.attachments &&
+          !EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)
+        ) {
+          throw new Error('Invalid processed email attachment reference payload')
+        }
+
+        if (EmailDeliveryWorker.hasAttachmentReferences(emailPayload.attachments)) {
+          if (!attachmentResolverService) {
+            throw new Error(
+              'AttachmentResolverService is not available to resolve stored email attachments',
+            )
+          }
+
+          logger.debug(
+            `[${notifyId}] Resolving stored email attachments: ${JSON.stringify({
+              tenantId,
+              storedAttachmentCount: emailPayload.attachments.length,
+            })}`,
+          )
+
+          const resolvedAttachments = await attachmentResolverService.resolveEmailAttachments(
+            tenantId,
+            emailPayload.attachments,
+          )
+
+          emailPayload = {
+            ...emailPayload,
+            attachments: resolvedAttachments as SendEmailOptions['attachments'],
+          } as ResolvedEmailDeliveryPayload
+        }
+
         // Update status to SENDING (only after all validations pass)
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
@@ -177,12 +298,23 @@ export class EmailDeliveryWorker {
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
 
+        // Request has made it to the smtp gateway, update request detail records as sent
+        await requestDetailService.markSent(notifyId, result.externalId)
+
         // Update status to COMPLETED
         await notificationService.update(notifyId, tenantId, {
           status: NotificationStatus.COMPLETED,
           updatedBy: 'system',
         })
         logger.log(`[${notifyId}] Notification marked as COMPLETED`)
+        structuredLogger?.logNotificationSuccess(
+          notifyId,
+          tenantId,
+          'email',
+          result.externalId,
+          Date.now() - startedAt,
+          workerContext,
+        )
 
         return { success: true, externalId: result.externalId, provider: result.provider }
       } catch (error) {
@@ -200,8 +332,17 @@ export class EmailDeliveryWorker {
             updatedBy: 'system',
             errorReason: errorMessage,
           })
+          await requestDetailService.markFailed(notifyId, errorMessage)
           logger.error(
             `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
+          )
+          structuredLogger?.logNotificationFailure(
+            notifyId,
+            tenantId,
+            'email',
+            error instanceof Error ? error : errorMessage,
+            Date.now() - startedAt,
+            workerContext,
           )
         }
 
@@ -214,6 +355,16 @@ export class EmailDeliveryWorker {
     emailQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
       const { notifyId } = job.data
       logger.debug(`[${notifyId}] Email delivery job completed`)
+      structuredLogger?.logQueueOperation(
+        'complete',
+        emailQueue.name,
+        job.id?.toString(),
+        notifyId,
+        {
+          channel: 'email',
+          context: workerContext,
+        },
+      )
     })
 
     emailQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
@@ -221,9 +372,157 @@ export class EmailDeliveryWorker {
       logger.error(
         `[${notifyId}] Email delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
+      structuredLogger?.logQueueOperation('failed', emailQueue.name, job.id?.toString(), notifyId, {
+        channel: 'email',
+        context: workerContext,
+        error: err.message,
+        attemptsMade: job.attemptsMade,
+        maxAttempts: job.opts.attempts,
+      })
     })
 
     logger.log('Email delivery worker initialized')
+  }
+
+  /**
+   * Process one batch of a mail merge email send.
+   *
+   * Resolves the template ONCE and renders it ONCE with the global params (no per-recipient
+   * personalization), then calls the email adapter once per individual address reusing that
+   * rendered content. Per-recipient results update that recipient's detail row. Individual
+   * recipient failures are recorded but do NOT throw, so a batch retry will not re-send
+   * already-delivered addresses; only systemic errors (e.g. template not found) throw to trigger
+   * a BullMQ retry of the whole batch.
+   */
+  private static async processMailMergeBatch(
+    batchId: string,
+    mailMergeData: MailMergeJobData,
+    notifyId: string,
+    tenantId: string,
+    logger: Logger,
+    templatesRepository: TemplatesRepository,
+    templatesService: TemplatesService,
+    inlineRenderingService: InlineRenderingService,
+    emailAdapter: IEmailTransport,
+    requestDetailService: NotificationRequestDetailService,
+    notificationService: NotificationService,
+  ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
+    const { content, params, recipients } = mailMergeData
+    const templateId = content?.templateId
+    const hasInlineContent = !!(content && (content.subject || content.body))
+
+    // A mail merge send renders from exactly one source: a server template or inline content.
+    if (templateId && hasInlineContent) {
+      throw new Error('Mail merge requires either a templateId or inline content, not both')
+    }
+    if (!templateId && !hasInlineContent) {
+      throw new Error('Mail merge requires either a templateId or inline content')
+    }
+
+    // Resolve the template once for the whole batch (systemic error if missing/wrong channel)
+    const template = templateId ? await templatesRepository.findById(tenantId, templateId) : null
+    if (templateId) {
+      if (!template) {
+        throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
+      }
+      if (template.channelCode !== 'EMAIL') {
+        throw new Error(`Template '${templateId}' is not an EMAIL template`)
+      }
+    }
+
+    // Inline content uses handlebars by default so mail-merge variables are substituted per recipient.
+    const inlineContent = content
+      ? { ...content, renderer: content.renderer ?? ('handlebars' as const) }
+      : null
+
+    logger.debug(
+      `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
+    )
+
+    let sent = 0
+    let failed = 0
+
+    for (const recipient of recipients) {
+      try {
+        // Merge global params with per-recipient params; per-recipient takes precedence
+        const mergedParams = { ...(params || {}), ...recipient.params }
+
+        let subject: string | undefined
+        let body: string
+        let bodyType: 'text' | 'markdown' | 'html' | undefined
+        if (template) {
+          const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = rendered.bodyType
+        } else {
+          const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
+          subject = rendered.subject
+          body = rendered.body
+          bodyType = inlineContent!.bodyType
+        }
+
+        const emailPayload = {
+          recipients: { to: [recipient.address] },
+          content: { subject, body, bodyType },
+        }
+
+        const result = await EmailDeliveryWorker.sendEmail(
+          emailPayload as any,
+          logger,
+          notifyId,
+          emailAdapter,
+        )
+
+        await requestDetailService.markRecipientSent(
+          notifyId,
+          batchId,
+          recipient.address,
+          result.externalId,
+        )
+        sent++
+      } catch (recipientError) {
+        const errorMessage =
+          recipientError instanceof Error ? recipientError.message : String(recipientError)
+        logger.error(
+          `[${notifyId}] Mail merge recipient send failed (batch=${batchId}, address=${recipient.address}): ${errorMessage}`,
+        )
+        await requestDetailService.markRecipientFailed(
+          notifyId,
+          batchId,
+          recipient.address,
+          errorMessage,
+        )
+        failed++
+      }
+    }
+
+    logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+
+    // Reconcile the parent request once no recipients remain pending across all batches.
+    // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+    const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
+    if (pendingRemaining === 0) {
+      const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
+      const sentRemaining = await requestDetailService.countByStatus(notifyId, 'sent')
+      let finalStatus: NotificationStatus
+      if (failedRemaining === 0) {
+        finalStatus = NotificationStatus.COMPLETED
+      } else if (sentRemaining > 0) {
+        finalStatus = NotificationStatus.PARTIALLY_COMPLETED
+      } else {
+        finalStatus = NotificationStatus.FAILED
+      }
+      await notificationService.update(notifyId, tenantId, {
+        status: finalStatus,
+        updatedBy: 'email-delivery-worker',
+      })
+      logger.log(
+        `[${notifyId}] All mail merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
+      )
+    }
+
+    return { success: true, batchId, sent, failed }
   }
 
   /**
@@ -235,17 +534,26 @@ export class EmailDeliveryWorker {
    * @returns Promise with send result
    */
   private static async sendEmail(
-    payload: NotifyEmailChannel,
+    payload: NotifyEmailChannel | ProcessedNotifyEmailChannel | ResolvedEmailDeliveryPayload,
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
   ): Promise<{ externalId: string; provider: string }> {
-    logger.debug(`[${notifyId}] Sending email via ${emailAdapter.name} adapter`)
+    const attachmentCount = Array.isArray((payload as { attachments?: unknown[] }).attachments)
+      ? ((payload as { attachments?: unknown[] }).attachments?.length ?? 0)
+      : 0
+
+    logger.debug(
+      `[${notifyId}] Sending email via ${emailAdapter.name} adapter: ${JSON.stringify({
+        attachmentCount,
+      })}`,
+    )
 
     const result = await emailAdapter.send(payload as any)
 
     return {
-      externalId: result.messageId || `${emailAdapter.name}-${Date.now()}`,
+      externalId:
+        result.messageId || result.providerResponse || `${emailAdapter.name}-${Date.now()}`,
       provider: emailAdapter.name,
     }
   }

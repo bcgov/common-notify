@@ -14,10 +14,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /health
+      - ${PATH_PREFIX}/health
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -27,10 +27,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/health
+      - ${PATH_PREFIX}/api/health
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -45,10 +45,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /ches/api/v1/email
+      - ${PATH_PREFIX}/ches/api/v1/email
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -58,10 +58,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifysimple
+      - ${PATH_PREFIX}/api/v1/notifysimple
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -71,10 +71,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/notifysimple/[^/]+
+      - ~${PATH_PREFIX}/api/v1/notifysimple/[^/]+
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -84,10 +84,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/frontend/notifysimple/[^/]+
+      - ~${PATH_PREFIX}/api/v1/frontend/notifysimple/[^/]+
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -97,10 +97,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent
+      - ${PATH_PREFIX}/api/v1/notifyevent
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -110,10 +110,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent/preview
+      - ${PATH_PREFIX}/api/v1/notifyevent/preview
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -123,10 +123,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notifyevent/types
+      - ${PATH_PREFIX}/api/v1/notifyevent/types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -136,11 +136,11 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify
+      - ${PATH_PREFIX}/api/v1/notify
     methods:
       - GET
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -150,10 +150,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify/status
+      - ${PATH_PREFIX}/api/v1/notify/status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -163,12 +163,12 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notify/registerCallback
+      - ${PATH_PREFIX}/api/v1/notify/registerCallback
     methods:
       - POST
       - PATCH
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -178,13 +178,13 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/templates
+      - ${PATH_PREFIX}/api/v1/templates
     methods:
       - GET
       - POST
       - PATCH
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -194,10 +194,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/feature-flags
+      - ${PATH_PREFIX}/api/v1/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -207,23 +207,29 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  # GC Notify-compatible routes: sub-paths/shapes mirror the real GC Notify v2 API
+  # exactly (https://documentation.notification.canada.ca/en/apispec.html). Kept
+  # under a /gcnotify prefix (no /api) so this traffic stays unambiguous in logs,
+  # metrics, and Kong dashboards - migrating GC Notify integrations only need to
+  # set their baseUrl to {hostname}/gcnotify, a one-line config change, not a code
+  # change.
   - name: ${ROUTE_PREFIX}gcnotify-notifications-list
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications
+      - ${PATH_PREFIX}/gcnotify/v2/notifications
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -233,10 +239,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/email
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/email
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -246,10 +252,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/sms
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/sms
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -259,10 +265,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/bulk
+      - ${PATH_PREFIX}/gcnotify/v2/notifications/bulk
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -272,10 +278,13 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/notifications/*
+      # Regex, not a literal prefix - matches a single path segment so it doesn't
+      # shadow the literal /gcnotify/v2/notifications/email|sms|bulk routes above
+      # (Kong matches literal paths before regex paths).
+      - ~${PATH_PREFIX}/gcnotify/v2/notifications/[^/]+
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -285,10 +294,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/templates
+      - ${PATH_PREFIX}/gcnotify/v2/templates
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -298,10 +307,106 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/gcnotify/v2/template/*
+      - ~${PATH_PREFIX}/gcnotify/v2/template/[^/]+
     methods:
       - GET
-    strip_path: false
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  # gcnotify-passthrough/v2 routes: same GC Notify-compatible operations as gcnotify/v2
+  # but served to clients that have not yet been onboarded to the Notify tenant system.
+  # ApiKeyGuard (format-only) validates Authorization header shape in backend and forwards
+  # the original header directly to GC Notify. No Kong key-auth on these routes because
+  # passthrough uses GC Notify-managed API keys, not Kong-managed credentials.
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-list
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-email
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/email
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-sms
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/sms
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notifications-bulk
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/bulk
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-notification-by-id
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/gcnotify-passthrough/v2/notifications/[^/]+
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-templates-list
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/gcnotify-passthrough/v2/templates
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+  - name: ${ROUTE_PREFIX}gcnotify-passthrough-template-by-id
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/gcnotify-passthrough/v2/template/[^/]+
+    methods:
+      - GET
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -320,10 +425,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables
+      - ${PATH_PREFIX}/api/v1/code-tables
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -334,10 +439,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -349,10 +454,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/notification-status
+      - ${PATH_PREFIX}/api/v1/code-tables/notification-status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -363,10 +468,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/notification-status
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/notification-status
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -378,10 +483,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/channels
+      - ${PATH_PREFIX}/api/v1/code-tables/channels
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -392,10 +497,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/channels
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/channels
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -407,10 +512,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/event-types
+      - ${PATH_PREFIX}/api/v1/code-tables/event-types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -421,10 +526,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/event-types
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/event-types
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -436,10 +541,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/code-tables/feature-flags
+      - ${PATH_PREFIX}/api/v1/code-tables/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -451,10 +556,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/code-tables/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/code-tables/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -466,10 +571,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/notification_request
+      - ${PATH_PREFIX}/api/v1/notification_request
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -480,10 +585,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/notification_request
+      - ${PATH_PREFIX}/api/v1/frontend/notification_request
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -494,100 +599,55 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/notification_request/events
+      - ${PATH_PREFIX}/api/v1/frontend/notification_request/events
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: false
     response_buffering: false
 
-  # /api/v1/frontend/admin/clients/link-to-tenants (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-link-to-tenants
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/link-to-tenants
-    methods:
-      - POST
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/admin/clients/mappings (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-mappings-get
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/mappings
-    methods:
-      - GET
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/admin/clients/mappings/:id/toggle-active (frontend admin only)
-  - name: ${ROUTE_PREFIX}admin-clients-mappings-toggle
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - /api/v1/frontend/admin/clients/mappings/
-    methods:
-      - PATCH
-    strip_path: false
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
   # /api/v1/frontend/admin/tenants (frontend admin only - get all tenants)
-  - name: ${ROUTE_PREFIX}admin-tenants-list
+  - name: ${ROUTE_PREFIX}admin-tenants-list-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/admin/tenants
+      - ${PATH_PREFIX}/api/v1/admin/tenants
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/users/me (upsert current user)
-  - name: ${ROUTE_PREFIX}admin-users-upsert
+  - name: ${ROUTE_PREFIX}admin-users-upsert-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/users/me
+      - ${PATH_PREFIX}/api/v1/frontend/users/me
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/users (get all users)
-  - name: ${ROUTE_PREFIX}admin-users-list
+  - name: ${ROUTE_PREFIX}admin-users-list-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/users
+      - ${PATH_PREFIX}/api/v1/frontend/users
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -597,30 +657,30 @@ routes:
   # AUTH ROUTES (authenticated users)
   # ============================================================================
   # /api/v1/frontend/auth/tenants (get user's CSTAR tenants)
-  - name: ${ROUTE_PREFIX}auth-tenants
+  - name: ${ROUTE_PREFIX}auth-tenants-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/auth/tenants
+      - ${PATH_PREFIX}/api/v1/frontend/auth/tenants
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/auth/tenants/:tenantId/roles (get user's roles in tenant)
-  - name: ${ROUTE_PREFIX}auth-tenant-roles
+  - name: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~/api/v1/frontend/auth/tenants/[^/]+/roles
+      - ~${PATH_PREFIX}/api/v1/frontend/auth/tenants/[^/]+/roles
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -630,60 +690,60 @@ routes:
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-list
+  - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags (create)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-create
+  - name: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (update)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-update
+  - name: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags/
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags/
     methods:
       - PATCH
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
     response_buffering: true
 
   # /api/v1/frontend/admin/feature-flags/:id (delete)
-  - name: ${ROUTE_PREFIX}admin-feature-flags-delete
+  - name: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/admin/feature-flags/
+      - ${PATH_PREFIX}/api/v1/frontend/admin/feature-flags/
     methods:
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -695,10 +755,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates
+      - ${PATH_PREFIX}/api/v1/frontend/templates
     methods:
       - GET
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -710,10 +770,10 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates
+      - ${PATH_PREFIX}/api/v1/frontend/templates
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
     request_buffering: true
@@ -725,12 +785,12 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates/*
+      - ~${PATH_PREFIX}/api/v1/frontend/templates/*
     methods:
       - GET
       - POST
       - DELETE
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v1
     request_buffering: true
@@ -742,12 +802,76 @@ routes:
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - /api/v1/frontend/templates/*/preview
+      - ~${PATH_PREFIX}/api/v1/frontend/templates/*/preview
     methods:
       - POST
-    strip_path: false
+    strip_path: true
     https_redirect_status_code: 426
     path_handling: v1
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
+  # API KEY MANAGEMENT ROUTES
+  # ============================================================================
+  # /api/v1/service/api-key/bind
+  # Binds an API key to a CSTAR tenant.
+  # Requires: X-API-KEY header (validated by Kong) AND Authorization: Bearer <jwt>
+  # Kong validates the API key and forwards x-credential-identifier to the backend.
+  # The backend uses the JWT to verify CSTAR tenant membership before storing the mapping.
+  - name: ${ROUTE_PREFIX}api-key-bind
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/service/api-key/bind
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/api-key-usage (frontend variant - usage, history, threshold)
+  # Called by the Notify web app with a frontend user JWT (never a service API key).
+  # Kong prefix-matches this base path, so it also covers /history (GET) and
+  # /threshold (PATCH). The backend enforces exact method+path and CSTAR roles.
+  #
+  # NOTE: This must be declared BEFORE the /api/v1/frontend/admin/api-key-usage route
+  # is NOT a concern here because Kong matches the longest/most-specific prefix, and
+  # the admin route lives under a different path segment (/frontend/admin/...).
+  - name: ${ROUTE_PREFIX}api-key-usage-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/api-key-usage
+    methods:
+      - GET
+      - PATCH
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/api-key-usage (admin variant - all tenants' usage)
+  # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Same jwt-keycloak plugin
+  # as the other frontend admin routes. Kong prefix-matches, so PATCH also covers
+  # /api/v1/frontend/admin/api-key-usage/limits.
+  - name: ${ROUTE_PREFIX}admin-api-key-usage-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/api-key-usage
+    methods:
+      - GET
+      - PATCH
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
     request_buffering: true
     response_buffering: true
 
@@ -755,40 +879,58 @@ plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS
   # ============================================================================
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-bind
+    config:
+      hide_credentials: false
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
+    config:
       allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
       run_on_preflight: true
       iss_key_grace_period: 10
       maximum_expiration: 0
@@ -806,196 +948,292 @@ plugins:
       consumer_match: true
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+      consumer_match_ignore_not_found: true
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-types
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
-
+  # GC Notify clients authenticate with a single credential, sent the same way real
+  # GC Notify expects it: `Authorization: ApiKey-v1 {key}`. They aren't expected to
+  # also send a separate X-API-KEY header. pre-function extracts the key from that
+  # header into X-API-KEY (which key-auth below is configured to validate, same as
+  # every other route in this file) before key-auth's access phase runs - pre-function
+  # plugins run first by Kong's plugin priority ordering. The original Authorization
+  # header is left untouched so passthrough mode can still forward it to real GC
+  # Notify. NOT YET VALIDATED against a live Kong instance - confirm this works
+  # against the BC Gov-managed gateway (plugin availability/ordering) before merging.
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+  - name: pre-function
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      access:
+        - |
+          local auth = kong.request.get_header("authorization")
+          if auth then
+            local key = auth:match("^%s*ApiKey%-v1%s+(.+)$")
+            if key then
+              ngx.req.set_header("X-API-KEY", key)
+            end
+          end
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
   # ============================================================================
   # SERVICE & FRONTEND PLUGINS
   # Each route appears twice: once for service tokens, once for frontend tokens
   # ============================================================================
 
   # Code Tables - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables - Frontend Token
   - name: jwt-keycloak
@@ -1026,32 +1264,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Status - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Status - Frontend Token
   - name: jwt-keycloak
@@ -1082,32 +1305,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Channels - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Channels - Frontend Token
   - name: jwt-keycloak
@@ -1138,32 +1346,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Event Types - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Code Tables Event Types - Frontend Token
   - name: jwt-keycloak
@@ -1194,32 +1387,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Notification Request - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: false
 
   # Notification Request - Frontend Token
   - name: jwt-keycloak
@@ -1249,67 +1427,11 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
 
-  # Admin Clients Link to Tenants - Frontend Admin Token
+  # Notification Request Events - Frontend Token
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-clients-link-to-tenants
-    config:
-      allowed_iss:
-        - ${FRONTEND_KEYCLOAK_ISSUER}
-      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
-      run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: true
-
-  # Admin Clients Mappings Get - Frontend Admin Token
-  - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}admin-clients-mappings-get
-    config:
-      allowed_iss:
-        - ${FRONTEND_KEYCLOAK_ISSUER}
-      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
-      run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: true
-
-  # Admin Clients Mappings Toggle - Frontend Admin Token
-  - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}admin-clients-mappings-toggle
+    route: ${ROUTE_PREFIX}notification-request-events-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1337,7 +1459,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-tenants-list
+    route: ${ROUTE_PREFIX}admin-tenants-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1365,7 +1487,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-upsert
+    route: ${ROUTE_PREFIX}admin-users-upsert-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1393,7 +1515,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-users-list
+    route: ${ROUTE_PREFIX}admin-users-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1424,7 +1546,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-list
+    route: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1452,7 +1574,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-create
+    route: ${ROUTE_PREFIX}admin-feature-flags-create-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1480,7 +1602,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-update
+    route: ${ROUTE_PREFIX}admin-feature-flags-update-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1508,7 +1630,7 @@ plugins:
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}admin-feature-flags-delete
+    route: ${ROUTE_PREFIX}admin-feature-flags-delete-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1535,11 +1657,80 @@ plugins:
   # ============================================================================
   # FEATURE FLAG CLIENT & CODE-TABLES PLUGINS
   # ============================================================================
-  # Feature Flags - Frontend Token (authenticated users)
+  # Feature Flags - Service Token
+  - name: key-auth
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config:
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
+      run_on_preflight: true
+
+  # Feature Flags Frontend - Frontend Token (authenticated users)
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}feature-flags
+    route: ${ROUTE_PREFIX}feature-flags-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Auth Tenants - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}auth-tenants-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Auth Tenant Roles - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}auth-tenant-roles-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
@@ -1564,32 +1755,17 @@ plugins:
       consumer_match_ignore_not_found: true
 
   # Code Tables Feature Flags - Service Token
-  - name: jwt-keycloak
+  - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    protocols: [http, https]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
     config:
-      allowed_iss:
-        - ${KEYCLOAK_ISSUER}
-      allowed_aud: ${ALLOWED_AUDIENCE}
+      hide_credentials: true
+      key_in_body: false
+      key_in_header: true
+      key_names: ["X-API-KEY"]
       run_on_preflight: true
-      iss_key_grace_period: 10
-      maximum_expiration: 0
-      algorithm: RS256
-      claims_to_verify:
-        - exp
-      uri_param_names:
-        - jwt
-      cookie_names: []
-      scope: null
-      roles: null
-      realm_roles: null
-      client_roles: null
-      anonymous: null
-      consumer_match: true
-      consumer_match_claim: azp
-      consumer_match_claim_custom_id: true
-      consumer_match_ignore_not_found: true
 
   # Code Tables Feature Flags - Frontend Token
   - name: jwt-keycloak
@@ -1647,6 +1823,34 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
 
+  # Templates Frontend - Create
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates-frontend-create
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
   # Templates Frontend - Get by ID, Update, Delete
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
@@ -1680,6 +1884,62 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-preview
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # API Key Usage Frontend - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-usage-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin API Key Usage Frontend - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-api-key-usage-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}

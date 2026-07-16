@@ -11,10 +11,10 @@ export enum TemplateEngine {
   HANDLEBARS = 'handlebars',
   MUSTACHE = 'mustache',
   LEGACY_GC_NOTIFY = 'legacy_gc_notify',
+  MJML = 'mjml',
 }
 
 export enum TemplateBodyType {
-  HTML = 'html',
   MARKDOWN = 'markdown',
 }
 
@@ -25,7 +25,7 @@ export interface TemplateResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
-  bodyType: TemplateBodyType
+  bodyType?: TemplateBodyType
   engineCode: TemplateEngine
   version: number
   active: boolean
@@ -54,18 +54,20 @@ export interface GetTemplatesResponse {
  * @throws Error if fetch fails
  */
 export async function getTemplates(
-  tenantId: string,
   page: number = 1,
   limit: number = 10,
   search?: string,
+  sort?: string,
+  filter?: string[],
 ): Promise<PaginatedTemplateResponse> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/templates', {
-      tenantId,
-      page: String(page),
-      limit: String(limit),
-      ...(search ? { search } : {}),
-    })
+    const qs = new URLSearchParams()
+    qs.set('page', String(page))
+    qs.set('limit', String(limit))
+    if (search) qs.set('search', search)
+    if (sort) qs.set('sort', sort)
+    if (filter && filter.length > 0) filter.forEach((f) => qs.append('filter', f))
+    const params = generateApiParameters(`/api/v1/frontend/templates?${qs.toString()}`)
     return await get<PaginatedTemplateResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError

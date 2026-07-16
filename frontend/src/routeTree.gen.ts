@@ -9,19 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as NotificationEventsRouteImport } from './routes/notification-events'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
-import { Route as DistributionListsRouteImport } from './routes/distribution-lists'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TemplatesTemplateIdRouteImport } from './routes/templates/$templateId'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
+import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
-import { Route as AdminClientsRouteImport } from './routes/admin/clients'
 
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -32,24 +34,9 @@ const TemplateCreateRoute = TemplateCreateRouteImport.update({
   path: '/template-create',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationEventsRoute = NotificationEventsRouteImport.update({
-  id: '/notification-events',
-  path: '/notification-events',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
   id: '/not-authorized',
   path: '/not-authorized',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DistributionListsRoute = DistributionListsRouteImport.update({
-  id: '/distribution-lists',
-  path: '/distribution-lists',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -62,14 +49,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TemplatesTemplateIdRoute = TemplatesTemplateIdRouteImport.update({
-  id: '/$templateId',
-  path: '/$templateId',
-  getParentRoute: () => TemplatesRoute,
-} as any)
 const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   id: '/template-edit/$templateId',
   path: '/template-edit/$templateId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsageRoute = AdminUsageRouteImport.update({
+  id: '/admin/usage',
+  path: '/admin/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
@@ -77,116 +64,98 @@ const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   path: '/admin/feature-flags',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminClientsRoute = AdminClientsRouteImport.update({
-  id: '/admin/clients',
-  path: '/admin/clients',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
-  '/admin/clients': typeof AdminClientsRoute
+  '/templates': typeof TemplatesRoute
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
-  '/admin/clients': typeof AdminClientsRoute
+  '/templates': typeof TemplatesRoute
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/distribution-lists': typeof DistributionListsRoute
   '/not-authorized': typeof NotAuthorizedRoute
-  '/notification-events': typeof NotificationEventsRoute
-  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
-  '/templates': typeof TemplatesRouteWithChildren
-  '/admin/clients': typeof AdminClientsRoute
+  '/templates': typeof TemplatesRoute
+  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
-  '/templates/$templateId': typeof TemplatesTemplateIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
-    | '/admin/clients'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
-    | '/admin/clients'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
-    | '/distribution-lists'
     | '/not-authorized'
-    | '/notification-events'
-    | '/settings'
     | '/template-create'
     | '/templates'
-    | '/admin/clients'
+    | '/usage'
     | '/admin/feature-flags'
+    | '/admin/usage'
     | '/template-edit/$templateId'
-    | '/templates/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  DistributionListsRoute: typeof DistributionListsRoute
   NotAuthorizedRoute: typeof NotAuthorizedRoute
-  NotificationEventsRoute: typeof NotificationEventsRoute
-  SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
-  TemplatesRoute: typeof TemplatesRouteWithChildren
-  AdminClientsRoute: typeof AdminClientsRoute
+  TemplatesRoute: typeof TemplatesRoute
+  UsageRoute: typeof UsageRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminUsageRoute: typeof AdminUsageRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -201,32 +170,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplateCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notification-events': {
-      id: '/notification-events'
-      path: '/notification-events'
-      fullPath: '/notification-events'
-      preLoaderRoute: typeof NotificationEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/not-authorized': {
       id: '/not-authorized'
       path: '/not-authorized'
       fullPath: '/not-authorized'
       preLoaderRoute: typeof NotAuthorizedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/distribution-lists': {
-      id: '/distribution-lists'
-      path: '/distribution-lists'
-      fullPath: '/distribution-lists'
-      preLoaderRoute: typeof DistributionListsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -243,18 +191,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/templates/$templateId': {
-      id: '/templates/$templateId'
-      path: '/$templateId'
-      fullPath: '/templates/$templateId'
-      preLoaderRoute: typeof TemplatesTemplateIdRouteImport
-      parentRoute: typeof TemplatesRoute
-    }
     '/template-edit/$templateId': {
       id: '/template-edit/$templateId'
       path: '/template-edit/$templateId'
       fullPath: '/template-edit/$templateId'
       preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/usage': {
+      id: '/admin/usage'
+      path: '/admin/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/feature-flags': {
@@ -264,39 +212,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/clients': {
-      id: '/admin/clients'
-      path: '/admin/clients'
-      fullPath: '/admin/clients'
-      preLoaderRoute: typeof AdminClientsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
-
-interface TemplatesRouteChildren {
-  TemplatesTemplateIdRoute: typeof TemplatesTemplateIdRoute
-}
-
-const TemplatesRouteChildren: TemplatesRouteChildren = {
-  TemplatesTemplateIdRoute: TemplatesTemplateIdRoute,
-}
-
-const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
-  TemplatesRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  DistributionListsRoute: DistributionListsRoute,
   NotAuthorizedRoute: NotAuthorizedRoute,
-  NotificationEventsRoute: NotificationEventsRoute,
-  SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
-  TemplatesRoute: TemplatesRouteWithChildren,
-  AdminClientsRoute: AdminClientsRoute,
+  TemplatesRoute: TemplatesRoute,
+  UsageRoute: UsageRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminUsageRoute: AdminUsageRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
 }
 export const routeTree = rootRouteImport

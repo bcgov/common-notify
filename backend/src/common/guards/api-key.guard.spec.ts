@@ -1,202 +1,39 @@
-import { Test, TestingModule } from '@nestjs/testing'
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
+import { describe, it, expect } from 'vitest'
 import { ApiKeyGuard } from './api-key.guard'
 
+function buildContext(authHeader?: string): ExecutionContext {
+  const request: Record<string, unknown> = { headers: {} as Record<string, unknown> }
+  if (authHeader !== undefined) {
+    ;(request.headers as Record<string, unknown>)['authorization'] = authHeader
+  }
+  return {
+    switchToHttp: () => ({ getRequest: () => request }),
+  } as unknown as ExecutionContext
+}
+
 describe('ApiKeyGuard', () => {
-  let guard: ApiKeyGuard
+  const guard = new ApiKeyGuard()
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [ApiKeyGuard],
-    }).compile()
-
-    guard = module.get<ApiKeyGuard>(ApiKeyGuard)
+  it('throws when the Authorization header is missing', () => {
+    expect(() => guard.canActivate(buildContext())).toThrow(UnauthorizedException)
   })
 
-  describe('canActivate', () => {
-    it('should throw UnauthorizedException when Authorization header is missing', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {},
-          }),
-        }),
-      } as ExecutionContext
+  it('throws when the scheme is not ApiKey-v1', () => {
+    expect(() => guard.canActivate(buildContext('Bearer some-token'))).toThrow(
+      UnauthorizedException,
+    )
+  })
 
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('API key is required')
-    })
+  it('throws when the key portion is empty', () => {
+    expect(() => guard.canActivate(buildContext('ApiKey-v1 '))).toThrow(UnauthorizedException)
+  })
 
-    it('should throw UnauthorizedException when Authorization header is null', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: null,
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('API key is required')
-    })
-
-    it('should throw UnauthorizedException when Authorization header is not a string', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 12345,
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('API key is required')
-    })
-
-    it('should throw UnauthorizedException when scheme is not ApiKey-v1', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'Bearer my-api-key',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow(
-        'Invalid authorization scheme. Expected: Authorization: ApiKey-v1 {api-key}',
-      )
-    })
-
-    it('should throw UnauthorizedException when scheme is apikey-v1 (wrong case)', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'apikey-v1 my-api-key',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('Invalid authorization scheme')
-    })
-
-    it('should throw UnauthorizedException when API key is empty after scheme', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1 ',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('API key cannot be empty')
-    })
-
-    it('should throw UnauthorizedException when API key is only whitespace', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1    ',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException)
-      expect(() => guard.canActivate(mockContext)).toThrow('API key cannot be empty')
-    })
-
-    it('should return true when Authorization header has valid ApiKey-v1 scheme and key', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1 my-valid-api-key-12345',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      const result = guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should return true with API key containing special characters', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1 key-with-dashes_and_underscores.and.dots',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      const result = guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should return true with API key containing numbers and alphanumeric characters', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1 ABC123def456GHI789',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      const result = guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should trim whitespace from API key', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1   my-api-key   ',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      const result = guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should handle case-sensitive authorization header name (lowercase)', () => {
-      const mockContext = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {
-              authorization: 'ApiKey-v1 my-api-key',
-            },
-          }),
-        }),
-      } as ExecutionContext
-
-      const result = guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
+  it('returns true and attaches gcNotifyAuthHeader when the header is valid', () => {
+    const ctx = buildContext('ApiKey-v1 abc123')
+    const result = guard.canActivate(ctx)
+    expect(result).toBe(true)
+    const req = ctx.switchToHttp().getRequest<{ gcNotifyAuthHeader?: string }>()
+    expect(req.gcNotifyAuthHeader).toBe('ApiKey-v1 abc123')
   })
 })

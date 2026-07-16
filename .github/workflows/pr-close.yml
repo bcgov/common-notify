@@ -46,15 +46,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config (dev+test+prod only)
+      - name: Generate gateway config (dev+test+prod + other open PRs)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate combined services file with dev+test+prod (excludes PR)
-          # Note: This restores all three environments. If main is mid-deployment,
-          # the next deployment step will correct the state.
+          # Generate combined services file with dev+test+prod
           api-gateway/scripts/generate-gateway-for-stage.sh prod
 
-      - name: Remove PR service by applying permanent services
+          # Find OTHER open PRs (exclude the one being closed)
+          CURRENT_PR=${{ github.event.number }}
+          OTHER_OPEN_PRS=$(gh pr list --state open --json number --jq '.[] | select(.number != '$CURRENT_PR') | .number')
+
+          if [ -z "$OTHER_OPEN_PRS" ]; then
+            echo "No other open PRs - applying DEV+TEST+PROD only"
+            exit 0
+          fi
+
+          echo "Found other open PRs: $OTHER_OPEN_PRS"
+          echo "Preserving their routes alongside DEV+TEST+PROD..."
+
+          # Append each OTHER open PR config
+          for PR_NUM in $OTHER_OPEN_PRS; do
+            echo "Adding PR-${PR_NUM} routes..."
+            chmod +x api-gateway/scripts/generate-gateway-config.sh
+            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
+
+            # Append PR config
+            echo "---" >> api-gateway/generated/gw-active-services.yaml
+            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-active-services.yaml
+          done
+
+          echo "✅ Combined DEV+TEST+PROD + ${OTHER_OPEN_PRS} open PR(s)"
+
+      - name: Remove this PR's routes (preserve other open PRs)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -70,8 +95,9 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply permanent services (dev+test+prod) - this will remove PR service
-          echo "✅ Removing PR service by applying DEV+TEST+PROD config"
+          # Apply permanent services + other open PRs
+          # This removes the CLOSED PR but preserves other open PR routes
+          echo "✅ Removing PR-${{ github.event.number }} routes (preserving other open PRs)"
           gwa apply -i api-gateway/generated/gw-active-services.yaml
 
       - name: Wait for PR service deletion

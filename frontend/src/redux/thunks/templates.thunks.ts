@@ -12,8 +12,26 @@ export const fetchTemplates = createAsyncThunk<
     const state = getState()
     const tenantId = state.tenant.selectedTenant?.id
     if (!tenantId) return { data: [], count: 0, page: 1, limit: 15, totalPages: 0 }
-    const { page, limit, search } = state.templates
-    return await getTemplates(tenantId, page, limit, search || undefined)
+    const { page, limit, search, sortBy, sortOrder, filters } = state.templates
+
+    const sort =
+      sortBy != null && sortOrder != null
+        ? sortOrder === 'desc'
+          ? `-${sortBy}`
+          : sortBy
+        : undefined
+
+    const filter = Object.entries(filters)
+      .filter(([, values]) => values.length > 0)
+      .map(([field, values]) => `${field}:in:${values.join('|')}`)
+
+    return await getTemplates(
+      page,
+      limit,
+      search || undefined,
+      sort,
+      filter.length > 0 ? filter : undefined,
+    )
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load templates')
   }

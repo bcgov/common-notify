@@ -40,13 +40,59 @@ export class ClamavService implements OnModuleInit {
   private readonly port: number
   private readonly timeout: number
   private readonly enabled: boolean
+  private readonly failClosed: boolean
   private isHealthy = false
 
-  constructor(private configService: ConfigService) {
-    this.host = this.configService.get('CLAMAV_HOST', 'localhost')
-    this.port = parseInt(this.configService.get('CLAMAV_PORT', '3310'), 10)
-    this.timeout = parseInt(this.configService.get('CLAMAV_TIMEOUT', '30000'), 10)
-    this.enabled = this.configService.get('CLAMAV_ENABLED', true) !== 'false'
+  constructor(private readonly configService: ConfigService) {
+    this.host = this.getStringConfig('clamav.host', 'CLAMAV_HOST', 'localhost')
+    this.port = this.getNumberConfig('clamav.port', 'CLAMAV_PORT', 3310)
+    this.timeout = this.getNumberConfig('clamav.timeout', 'CLAMAV_TIMEOUT', 30000)
+    this.enabled = this.getBooleanConfig('clamav.enabled', 'CLAMAV_ENABLED', true)
+    this.failClosed = this.getBooleanConfig('clamav.failClosed', 'CLAMAV_FAIL_CLOSED', false)
+  }
+
+  private getRawConfigValue<T>(configKey: string, envKey: string): T | undefined {
+    const configValue = this.configService.get<T>(configKey)
+    if (configValue !== undefined) {
+      return configValue
+    }
+
+    return this.configService.get<T>(envKey)
+  }
+
+  private getStringConfig(configKey: string, envKey: string, defaultValue: string): string {
+    return this.getRawConfigValue<string>(configKey, envKey) ?? defaultValue
+  }
+
+  private getNumberConfig(configKey: string, envKey: string, defaultValue: number): number {
+    const value = this.getRawConfigValue<number | string>(configKey, envKey)
+
+    if (typeof value === 'number') {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      const parsed = parseInt(value, 10)
+      if (!Number.isNaN(parsed)) {
+        return parsed
+      }
+    }
+
+    return defaultValue
+  }
+
+  private getBooleanConfig(configKey: string, envKey: string, defaultValue: boolean): boolean {
+    const value = this.getRawConfigValue<boolean | string>(configKey, envKey)
+
+    if (typeof value === 'boolean') {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true'
+    }
+
+    return defaultValue
   }
 
   /**
@@ -113,6 +159,12 @@ export class ClamavService implements OnModuleInit {
    */
   async scanBuffer(buffer: Buffer, filename?: string): Promise<ScanResult> {
     if (!this.enabled) {
+      if (this.failClosed) {
+        const error = new Error('ClamAV scanning is disabled while fail-closed mode is enabled')
+        this.logger.error(error.message)
+        throw error
+      }
+
       this.logger.debug('ClamAV scanning disabled, skipping scan')
       return {
         isInfected: false,
@@ -122,6 +174,12 @@ export class ClamavService implements OnModuleInit {
     }
 
     if (!this.isHealthy) {
+      if (this.failClosed) {
+        const error = new Error('ClamAV is unavailable while fail-closed mode is enabled')
+        this.logger.error(error.message)
+        throw error
+      }
+
       this.logger.warn('ClamAV is not healthy, skipping scan')
       return {
         isInfected: false,
@@ -134,10 +192,23 @@ export class ClamavService implements OnModuleInit {
       const socket = net.createConnection(
         { host: this.host, port: this.port, timeout: this.timeout },
         () => {
-          // Send INSTREAM command followed by buffer
-          socket.write(`INSTREAM\n`)
-          socket.write(buffer)
-          socket.write('\0')
+          // clamd INSTREAM protocol requires null-terminated command and chunked payload.
+          // Format: zINSTREAM\0 + [len(4 bytes BE) + chunk]* + len(0)
+          const chunks: Buffer[] = [Buffer.from('zINSTREAM\0')]
+          const chunkSize = 64 * 1024
+
+          for (let offset = 0; offset < buffer.length; offset += chunkSize) {
+            const chunk = buffer.subarray(offset, Math.min(offset + chunkSize, buffer.length))
+            const lengthPrefix = Buffer.alloc(4)
+            lengthPrefix.writeUInt32BE(chunk.length, 0)
+            chunks.push(lengthPrefix, chunk)
+          }
+
+          const terminator = Buffer.alloc(4)
+          terminator.writeUInt32BE(0, 0)
+          chunks.push(terminator)
+
+          socket.end(Buffer.concat(chunks))
         },
       )
 
@@ -150,6 +221,7 @@ export class ClamavService implements OnModuleInit {
       socket.on('end', () => {
         try {
           const result = this.parseResponse(response, filename)
+          this.isHealthy = true
           resolve(result)
         } catch (error) {
           reject(error)
@@ -158,6 +230,7 @@ export class ClamavService implements OnModuleInit {
 
       socket.on('error', (error) => {
         socket.destroy()
+        this.isHealthy = false
         this.logger.error(
           `ClamAV scan error for ${filename || 'buffer'}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         )
@@ -166,6 +239,7 @@ export class ClamavService implements OnModuleInit {
 
       socket.on('timeout', () => {
         socket.destroy()
+        this.isHealthy = false
         const timeoutError = new Error('ClamAV scan timeout')
         this.logger.error(`ClamAV scan timeout for ${filename || 'buffer'}: ${this.timeout}ms`)
         reject(timeoutError)
@@ -187,6 +261,13 @@ export class ClamavService implements OnModuleInit {
       .map((l) => l.trim())
       .filter((l) => l.length > 0)
 
+    const errorLine = lines.find((line) =>
+      /UNKNOWN COMMAND|\bERROR\b|INSTREAM size limit exceeded/i.test(line),
+    )
+    if (errorLine) {
+      throw new Error(`ClamAV returned error response: ${errorLine}`)
+    }
+
     const viruses: string[] = []
     let isInfected = false
 
@@ -203,7 +284,9 @@ export class ClamavService implements OnModuleInit {
     }
 
     if (!isInfected && !lines.some((l) => l.includes('OK'))) {
-      this.logger.debug(`Unexpected ClamAV response for ${filename || 'buffer'}: ${response}`)
+      throw new Error(
+        `Unexpected ClamAV response for ${filename || 'buffer'}: ${response || '<empty response>'}`,
+      )
     }
 
     const scannedAt = new Date()
@@ -230,12 +313,14 @@ export class ClamavService implements OnModuleInit {
    */
   getStatus(): {
     enabled: boolean
+    failClosed: boolean
     healthy: boolean
     host: string
     port: number
   } {
     return {
       enabled: this.enabled,
+      failClosed: this.failClosed,
       healthy: this.isHealthy,
       host: this.host,
       port: this.port,

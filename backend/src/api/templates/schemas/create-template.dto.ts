@@ -61,11 +61,11 @@ export class CreateTemplateDto {
   engineCode?: TemplateEngine
 
   /**
-   * Body content type for rendering: text (plain), markdown (markdown→HTML), html (raw HTML)
-   * Defaults to 'html'
+   * Body content type for rendering: markdown (markdown→HTML)
+   * Optional for MJML templates; ignored when engineCode is MJML
    * @example "markdown"
    */
   @IsOptional()
-  @IsEnum(['text', 'markdown', 'html'])
-  bodyType?: 'text' | 'markdown' | 'html'
+  @IsEnum(['markdown'])
+  bodyType?: 'markdown'
 }

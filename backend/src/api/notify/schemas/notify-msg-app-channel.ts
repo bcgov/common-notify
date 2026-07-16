@@ -1,8 +1,9 @@
-import { IsString, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
+import { IsString, IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
+import { NotifyAttachment } from './notify-attachment'
 import { NotifyMsgAppRecipients } from './notify-msg-app-recipients'
 import { NotifyContent } from './notify-content'
 
@@ -17,6 +18,13 @@ export class NotifyMsgAppChannel {
   @ValidateNested()
   @Type(() => NotifyContent)
   content: NotifyContent
+
+  @ApiPropertyOptional({ type: [NotifyAttachment] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NotifyAttachment)
+  attachments?: NotifyAttachment[]
 
   @ApiPropertyOptional() @IsOptional() @IsString() from?: string
 
@@ -33,11 +41,6 @@ export class NotifyMsgAppChannel {
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  templateId?: string
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()

@@ -24,6 +24,7 @@ describe('ClamavService', () => {
                 CLAMAV_PORT: '3310',
                 CLAMAV_TIMEOUT: '5000',
                 CLAMAV_ENABLED: 'false', // Disable ClamAV in tests
+                CLAMAV_FAIL_CLOSED: 'false',
               }
               return config[key] || defaultValue
             }),
@@ -93,9 +94,71 @@ describe('ClamavService', () => {
     it('should return service status', () => {
       const status = service.getStatus()
       expect(status).toHaveProperty('enabled')
+      expect(status).toHaveProperty('failClosed')
       expect(status).toHaveProperty('healthy')
       expect(status).toHaveProperty('host')
       expect(status).toHaveProperty('port')
+    })
+  })
+
+  describe('fail-closed mode', () => {
+    it('should throw when ClamAV is disabled and fail-closed mode is enabled', async () => {
+      const strictModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          ClamavService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: vi.fn((key: string, defaultValue?: any) => {
+                const config = {
+                  CLAMAV_HOST: 'localhost',
+                  CLAMAV_PORT: '3310',
+                  CLAMAV_TIMEOUT: '5000',
+                  CLAMAV_ENABLED: 'false',
+                  CLAMAV_FAIL_CLOSED: 'true',
+                }
+                return config[key] || defaultValue
+              }),
+            },
+          },
+        ],
+      }).compile()
+
+      const strictService = strictModule.get<ClamavService>(ClamavService)
+
+      await expect(strictService.scanBuffer(Buffer.from('x'), 'test.txt')).rejects.toThrow(
+        'ClamAV scanning is disabled while fail-closed mode is enabled',
+      )
+    })
+
+    it('should skip unavailable ClamAV when fail-closed mode is disabled', async () => {
+      const strictModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          ClamavService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: vi.fn((key: string, defaultValue?: any) => {
+                const config = {
+                  CLAMAV_HOST: 'localhost',
+                  CLAMAV_PORT: '3310',
+                  CLAMAV_TIMEOUT: '5000',
+                  CLAMAV_ENABLED: 'false',
+                  CLAMAV_FAIL_CLOSED: 'false',
+                }
+                return config[key] || defaultValue
+              }),
+            },
+          },
+        ],
+      }).compile()
+
+      const strictService = strictModule.get<ClamavService>(ClamavService)
+
+      await expect(strictService.scanBuffer(Buffer.from('x'), 'test.txt')).resolves.toMatchObject({
+        isInfected: false,
+        viruses: [],
+      })
     })
   })
 

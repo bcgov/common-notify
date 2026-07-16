@@ -255,6 +255,54 @@ describe('ChesEmailTransport', () => {
       })
     })
 
+    it('includes attachments in the CHES payload with preserved content type', async () => {
+      mockConfig()
+
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'token-123',
+              expires_in: 300,
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              messages: [{ msgId: 'msg-456', to: ['user@example.com'] }],
+              txId: 'tx-789',
+            }),
+        })
+
+      await transport.send({
+        to: 'user@example.com',
+        subject: 'Attachment Test',
+        body: 'Hello',
+        attachments: [
+          {
+            filename: 'hello.txt',
+            content: Buffer.from('hello world'),
+            contentType: 'text/plain',
+            sendingMethod: 'attach',
+          },
+        ],
+      })
+
+      const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit]
+      const bodyStr = typeof init?.body === 'string' ? init.body : ''
+      const emailBody = JSON.parse(bodyStr) as Record<string, any>
+      expect(emailBody.attachments).toEqual([
+        {
+          content: Buffer.from('hello world').toString('base64'),
+          contentType: 'text/plain',
+          encoding: 'base64',
+          filename: 'hello.txt',
+        },
+      ])
+    })
+
     it('handles text body type', async () => {
       mockConfig()
 
@@ -326,6 +374,42 @@ describe('ChesEmailTransport', () => {
       const emailBody = JSON.parse(bodyStr) as Record<string, unknown>
       expect(emailBody.bodyType).toBe('html')
       expect(String(emailBody.body)).toContain('<h1>')
+    })
+
+    it('does not pass raw HTML through markdown rendering', async () => {
+      mockConfig()
+
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'token-123',
+              expires_in: 300,
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              messages: [{ msgId: 'msg-md', to: ['user@example.com'] }],
+              txId: 'tx-md',
+            }),
+        })
+
+      await transport.send({
+        to: 'user@example.com',
+        subject: 'Markdown Email',
+        body: 'Hello <script>alert(1)</script>\n\n<div>safe?</div>',
+        bodyType: 'markdown',
+      })
+
+      const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit]
+      const bodyStr = typeof init?.body === 'string' ? init.body : ''
+      const emailBody = JSON.parse(bodyStr) as Record<string, unknown>
+      expect(String(emailBody.body)).not.toContain('<script>')
+      expect(String(emailBody.body)).not.toContain('<div>safe?</div>')
+      expect(String(emailBody.body)).toContain('&lt;script&gt;')
     })
 
     it('uses custom from address when provided', async () => {

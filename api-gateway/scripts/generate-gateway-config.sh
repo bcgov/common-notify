@@ -44,10 +44,14 @@ generate_env_config() {
 
   # Load environment variables
   export RELEASE_NAME=$release
-  export ENVIRONMENT=$env
+  # Load env file first (it may define ENVIRONMENT for PR)
   set -a
   source "$ENV_FILE"
   set +a
+  # Only set ENVIRONMENT if not already defined by env file
+  if [ -z "$ENVIRONMENT" ]; then
+    export ENVIRONMENT=$env
+  fi
 
   # Generate config from template
   mkdir -p "${SCRIPT_DIR}/generated"

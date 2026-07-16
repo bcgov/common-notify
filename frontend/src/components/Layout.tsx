@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
 import { Footer, Header } from '@bcgov/design-system-react-components'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchCstarTenants, fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
@@ -10,7 +10,11 @@ import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
 import { APP_VERSION } from '@/utils/version'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import UserService from '@/service/user-service'
+import { SsoRole } from '@/enum/sso-role.enum'
 import Sidebar from './Sidebar'
+import { CstarRole } from '@/enum/cstar-role.enum'
 
 type Props = {
   children: React.ReactNode
@@ -19,12 +23,18 @@ type Props = {
 const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const tenantError = useAppSelector((state) => state.cstar.error)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const showTenantModal = useAppSelector((state) => state.tenant.showTenantModal)
   const rolesLoading = useAppSelector((state) => state.user.rolesLoading)
+  const rolesError = useAppSelector((state) => state.user.rolesError)
+  const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
+  const userCurrent = useAppSelector((state) => state.user.current)
+  const { canEdit, hasRole } = useCstarRoles()
+  const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
 
   // Track which tenants we've already fetched roles for in this session
   const rolesFetchedRef = useRef<Set<string>>(new Set())
@@ -40,9 +50,67 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
+    // Wait until the user record has been upserted so roles can be stored
+    if (!userCurrent) {
+      return
+    }
+
     rolesFetchedRef.current.add(selectedTenant.id)
     dispatch(fetchCstarRoles({ tenantId: selectedTenant.id }))
-  }, [selectedTenant?.id, dispatch])
+  }, [selectedTenant?.id, userCurrent, dispatch])
+
+  useEffect(() => {
+    // Enforce tenant-level authorization after roles fetch completes.
+    // If user has no roles in selected tenant (or roles lookup fails), show not-authorized.
+    if (!selectedTenant?.id) {
+      return
+    }
+
+    if (!rolesFetchedRef.current.has(selectedTenant.id) || rolesLoading) {
+      return
+    }
+
+    if (location.pathname === '/not-authorized') {
+      return
+    }
+
+    const hasNoRoles = Array.isArray(cstarRoles) && cstarRoles.length === 0
+    if (rolesError || hasNoRoles) {
+      navigate({ to: '/not-authorized' })
+      return
+    }
+
+    // Viewers may open a template in read-only mode (/template-edit/:id), but
+    // only editors/admins may create one (/template-create).
+    const isTemplateCreateRoute = location.pathname === '/template-create'
+    if (isTemplateCreateRoute && !canEdit) {
+      navigate({ to: '/templates' })
+      return
+    }
+
+    // Settings is restricted to NOTIFY_OPERATIONS_ADMIN.
+    if (location.pathname === '/settings' && !isOperationsAdmin) {
+      navigate({ to: '/not-authorized' })
+      return
+    }
+
+    // Feature Flags is open to NOTIFY_OPERATIONS_ADMIN as well as NOTIFY_ADMIN.
+    if (
+      location.pathname === '/admin/feature-flags' &&
+      !UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+    ) {
+      navigate({ to: '/not-authorized' })
+    }
+  }, [
+    selectedTenant?.id,
+    rolesLoading,
+    rolesError,
+    cstarRoles,
+    canEdit,
+    isOperationsAdmin,
+    location.pathname,
+    navigate,
+  ])
 
   // Block rendering while we're fetching roles for the selected tenant
   // This ensures authorization checks have the correct roles loaded

@@ -55,4 +55,13 @@ export class UpdateTemplateDto extends PartialType(CreateTemplateDto) {
   @IsOptional()
   @IsEnum(TemplateEngine)
   engineCode?: TemplateEngine
+
+  /**
+   * Body content type for rendering
+   * Optional for MJML templates; ignored when engineCode is MJML
+   * @example "markdown"
+   */
+  @IsOptional()
+  @IsEnum(['markdown'])
+  bodyType?: 'markdown'
 }
