@@ -13,6 +13,7 @@ import {
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import Breadcrumb from '@/components/Breadcrumb'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'This field is required.'
@@ -138,6 +139,13 @@ const TemplateCreate: FC = () => {
   return (
     <div className="template-form-page">
       <div className="template-form-page__content">
+        <Breadcrumb
+          items={[
+            { label: 'Home', to: '/dashboard' },
+            { label: 'Templates', to: '/templates' },
+            { label: 'Create reusable template' },
+          ]}
+        />
         <PageHeading title="Create reusable template" />
         <form className="template-form" noValidate onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">

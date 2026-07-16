@@ -9,6 +9,7 @@ const createTemplateMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('@/api/templates.api', async () => {
@@ -202,6 +203,17 @@ describe('TemplateCreate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     createTemplateMock.mockResolvedValue({})
+  })
+
+  it('renders the create breadcrumb with links and a current-page item', () => {
+    render(<TemplateCreate />)
+
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates')
+    expect(
+      screen.getByText('Create reusable template', { selector: '[aria-current="page"]' }),
+    ).toBeTruthy()
   })
 
   it('does not show body type choices', () => {

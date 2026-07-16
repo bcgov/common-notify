@@ -19,6 +19,7 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import Breadcrumb from '@/components/Breadcrumb'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
@@ -177,6 +178,13 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   return (
     <div className="template-form-page">
       <div className="template-form-page__content">
+        <Breadcrumb
+          items={[
+            { label: 'Home', to: '/dashboard' },
+            { label: 'Templates', to: '/templates' },
+            { label: isReadOnly ? 'View reusable template' : 'Edit reusable template' },
+          ]}
+        />
         <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form className="template-form" noValidate onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">

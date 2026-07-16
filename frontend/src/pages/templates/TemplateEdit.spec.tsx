@@ -11,6 +11,7 @@ const useCstarRolesMock = vi.fn(() => ({ primaryRole: 'NOTIFY_ADMIN' }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('@/api/templates.api', async () => {
@@ -233,6 +234,20 @@ describe('TemplateEdit', () => {
     updateTemplateMock.mockResolvedValue({})
   })
 
+  it('renders the edit breadcrumb with links and a current-page item', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Edit reusable template', { selector: '[aria-current="page"]' }),
+      ).toBeTruthy()
+    })
+
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates')
+  })
+
   it('does not show body type choices', async () => {
     getTemplateByIdMock.mockResolvedValue(template)
 
@@ -284,6 +299,9 @@ describe('TemplateEdit', () => {
       expect(screen.getByRole('heading', { name: 'View reusable template' })).toBeTruthy()
     })
 
+    expect(
+      screen.getByText('View reusable template', { selector: '[aria-current="page"]' }),
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
   })
