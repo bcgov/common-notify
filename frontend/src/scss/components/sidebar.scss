@@ -66,20 +66,15 @@
     border-radius: 6px;
     text-decoration: none;
     color: $dark-text;
+    border: none;
+    background: transparent;
+    font: inherit;
+    width: 100%;
 
     cursor: pointer;
     transition:
       background-color 0.2s ease,
       color 0.2s ease;
-
-    // reset button styling in the sidebar (button is used for accessibility)
-    &:is(button) {
-      width: 100%;
-      background: none;
-      border: none;
-      font: inherit;
-      text-align: left;
-    }
 
     &:hover {
       background-color: rgba($primary-color, 0.08);
@@ -87,7 +82,8 @@
 
     &.active {
       background-color: rgba($primary-color, 0.15);
-      color: $primary-color;
+      border-radius: var(--layout-borderRadius-medium, 4px);
+      background: var(--surface-color-background-lightBlue, #f1f8fe);
       font-weight: 500;
     }
   }
@@ -133,21 +129,15 @@
     flex-direction: column;
   }
 
-  &__menu-toggle {
-    position: relative;
-
-    &.expanded {
-      .sidebar__menu-arrow {
-        transform: rotate(180deg);
-      }
-    }
-  }
-
   &__menu-arrow {
     margin-left: auto;
     display: flex;
     transition: transform 0.2s ease;
     color: $dark-text;
+
+    &.expanded {
+      transform: rotate(180deg);
+    }
   }
 
   &__submenu {

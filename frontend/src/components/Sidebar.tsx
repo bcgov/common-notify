@@ -20,6 +20,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import { CstarRole } from '@/enum/cstar-role.enum'
+import { Button } from '~/@bcgov/design-system-react-components'
 
 const navItems = [
   {
@@ -117,19 +118,22 @@ const Sidebar: FC = () => {
         })}
         {isAdmin && (
           <div className="sidebar__menu-group">
-            <button
-              onClick={() => setAdminExpanded(!adminExpanded)}
-              className={`sidebar__item sidebar__menu-toggle ${adminExpanded ? 'expanded' : ''}`}
-              title={collapsed ? adminItems.label : ''}
+            <Button
+              variant="link"
+              className="sidebar__item"
+              onPress={() => setAdminExpanded(!adminExpanded)}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 {adminItems.icon}
               </span>
               <span className="sidebar__label">{adminItems.label}</span>
-              <span className="sidebar__menu-arrow" aria-hidden="true">
+              <span
+                className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
+                aria-hidden="true"
+              >
                 <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
               </span>
-            </button>
+            </Button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
                 {isAdmin && (
@@ -160,12 +164,12 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <button type="button" className="sidebar__item" title={collapsed ? 'Help' : ''}>
+        <Button variant="link" className="sidebar__item">
           <span className="sidebar__icon" aria-hidden="true">
             <HelpOutlineOutlinedIcon />
           </span>
           <span className="sidebar__label">Help</span>
-        </button>
+        </Button>
 
         {/* Bottom section */}
         <div className="sidebar__bottom">
@@ -184,17 +188,12 @@ const Sidebar: FC = () => {
           )}
 
           {/* Logout */}
-          <button
-            type="button"
-            className="sidebar__item"
-            onClick={handleLogout}
-            title={collapsed ? 'Logout' : ''}
-          >
+          <Button variant="link" className="sidebar__item" onPress={handleLogout}>
             <span className="sidebar__icon" aria-hidden="true">
               <LogoutOutlinedIcon />
             </span>
             <span className="sidebar__label">Logout</span>
-          </button>
+          </Button>
         </div>
       </div>
     </aside>
