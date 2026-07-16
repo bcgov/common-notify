@@ -176,14 +176,14 @@ grafana.ini:
     allow_sign_up: true
     auto_login: false
     client_id: system:serviceaccount:f6bc3f-tools:grafana
-    client_secret: $__file{/var/run/secrets/kubernetes.io/serviceaccount/token}
+    client_secret: ""
     scopes: user:info user:check-access
     auth_url: https://oauth-openshift.apps.silver.devops.gov.bc.ca/oauth/authorize
     token_url: https://oauth-openshift.apps.silver.devops.gov.bc.ca/oauth/token
     api_url: https://oauth-openshift.apps.silver.devops.gov.bc.ca/oauth/userinfo
     tls_skip_verify_insecure: false
+    use_pkce: true
     # Map OpenShift roles to Grafana roles
-    # Users with 'admin' role in namespace become Grafana Admins
     role_attribute_path: contains(groups[*], 'system:cluster-admins') && 'Admin' || 'Viewer'
 
 # Service configuration
@@ -233,6 +233,12 @@ securityContext:
 # Environment variables
 env:
   TZ: America/Vancouver
+  GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: grafana-oauth-secret
+        key: client-secret
+        optional: true
 
 # RBAC - Required for OAuth integration
 rbac:
