@@ -14,7 +14,7 @@ import { ConfigService } from '@nestjs/config'
 import { UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
-import { BindApiKeyDto } from './dto/bind-api-key.dto'
+import { BindApiKeyDto } from './schemas/bind-api-key.dto'
 import { JwtOrLoadtestBindGuard } from '../../common/guards/jwt-or-loadtest-bind.guard'
 
 @ApiTags('api-keys')
