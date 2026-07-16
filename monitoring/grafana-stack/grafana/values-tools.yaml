@@ -68,35 +68,35 @@ alerting:
             settings:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
-              title: '{{ template "default.title" . }}'
-              message: |-
-                {{ if gt (len .Alerts.Firing) 0 }}
-                **🔴 FIRING ALERTS ({{ len .Alerts.Firing }})**
-                {{ range .Alerts.Firing }}
+              title: 'Grafana Alert Notification'
+              message: |
+                {{ `{{ if gt (len .Alerts.Firing) 0 }}` }}
+                **🔴 FIRING ALERTS ({{ `{{ len .Alerts.Firing }}` }})**
+                {{ `{{ range .Alerts.Firing }}` }}
                 ---
-                **Alert:** {{ .Labels.alertname }}
-                **Severity:** {{ .Labels.severity | toUpper }}
-                **Namespace:** {{ .Labels.namespace }}
-                **Service:** {{ .Labels.service }}
-                {{ if .Labels.app }}**App:** {{ .Labels.app }}{{ end }}
+                **Alert:** {{ `{{ .Labels.alertname }}` }}
+                **Severity:** {{ `{{ .Labels.severity }}` }}
+                **Namespace:** {{ `{{ .Labels.namespace }}` }}
+                **Service:** {{ `{{ .Labels.service }}` }}
+                {{ `{{ if .Labels.app }}` }}**App:** {{ `{{ .Labels.app }}{{ end }}` }}
 
-                **Summary:** {{ .Annotations.summary }}
-                {{ if .Annotations.description }}**Description:** {{ .Annotations.description }}{{ end }}
+                **Summary:** {{ `{{ .Annotations.summary }}` }}
+                {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
 
-                **Status:** Firing for {{ .StartsAt | since }}
-                [View in Grafana]({{ .GeneratorURL }})
-                {{ end }}
-                {{ end }}
+                **Status:** Firing for {{ `{{ .StartsAt | since }}` }}
+                [View in Grafana]({{ `{{ .GeneratorURL }}` }})
+                {{ `{{ end }}` }}
+                {{ `{{ end }}` }}
 
-                {{ if gt (len .Alerts.Resolved) 0 }}
-                **✅ RESOLVED ALERTS ({{ len .Alerts.Resolved }})**
-                {{ range .Alerts.Resolved }}
+                {{ `{{ if gt (len .Alerts.Resolved) 0 }}` }}
+                **✅ RESOLVED ALERTS ({{ `{{ len .Alerts.Resolved }}` }})**
+                {{ `{{ range .Alerts.Resolved }}` }}
                 ---
-                **Alert:** {{ .Labels.alertname }}
-                **Namespace:** {{ .Labels.namespace }}
-                **Resolved at:** {{ .EndsAt }}
-                {{ end }}
-                {{ end }}
+                **Alert:** {{ `{{ .Labels.alertname }}` }}
+                **Namespace:** {{ `{{ .Labels.namespace }}` }}
+                **Resolved at:** {{ `{{ .EndsAt }}` }}
+                {{ `{{ end }}` }}
+                {{ `{{ end }}` }}
             disableResolveMessage: false
 
   policies.yaml:
