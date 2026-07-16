@@ -75,6 +75,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     channelCode: NotificationChannel.EMAIL as string,
@@ -115,6 +116,18 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setFormErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const handleCopyTemplateId = async () => {
+    if (!template?.id) return
+
+    try {
+      await navigator.clipboard.writeText(template.id)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      showErrorToast('Failed to copy template ID')
+    }
   }
 
   const validate = (): boolean => {
@@ -181,6 +194,16 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       <div className="template-form-page__content">
         <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
         <form className="template-form" noValidate onSubmit={handleSave}>
+          <div className="template-form__section template-form__section--title">
+            <span className="bcds-react-aria-TextField--Label">API data: Template ID</span>
+            <span className="bcds-react-aria-TextField--Description">{template.id}</span>
+            <div>
+              <Button type="button" variant="secondary" onClick={handleCopyTemplateId}>
+                {copied ? 'Copied' : 'Copy template ID to clipboard'}
+              </Button>
+            </div>
+          </div>
+
           <div className="template-form__section template-form__section--title">
             <TextField
               label="Template title"

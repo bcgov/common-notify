@@ -113,7 +113,7 @@ const TemplateCreate: FC = () => {
     if (!validate()) return
     setSaving(true)
     try {
-      await createTemplate({
+      const template = await createTemplate({
         name: formData.name,
         channelCode: formData.channelCode as NotificationChannel,
         engineCode: formData.engineCode as TemplateEngine,
@@ -121,7 +121,7 @@ const TemplateCreate: FC = () => {
         body: formData.body,
       })
       showSuccessToast('Template created successfully')
-      navigate({ to: '/templates' })
+      navigate({ to: '/template-edit/$templateId', params: { templateId: template.id } })
     } catch (error) {
       if ((error as any).status === 409) {
         setFormErrors((prev) => ({ ...prev, name: (error as Error).message }))
