@@ -194,7 +194,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
         <form className="template-form" noValidate onSubmit={handleSave}>
           <div className="template-form__section template-form__section--title">
             <span className="bcds-react-aria-TextField--Label">API data: Template ID</span>
-            <code>{template.id}</code>
+            <span className="bcds-react-aria-TextField--Description">{template.id}</span>
             <div>
               <Button type="button" variant="secondary" onClick={handleCopyTemplateId}>
                 {copied ? 'Copied' : 'Copy template ID to clipboard'}
