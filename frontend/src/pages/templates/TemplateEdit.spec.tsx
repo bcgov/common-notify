@@ -305,7 +305,7 @@ describe('TemplateEdit', () => {
     expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
   })
 
-  it('shows the template ID and copies it to the clipboard', async () => {
+  it('shows the inline template ID row and copies it to the clipboard', async () => {
     render(<TemplateEdit templateId="template-123" />)
 
     await waitFor(() => {
@@ -314,7 +314,7 @@ describe('TemplateEdit', () => {
 
     expect(screen.getByText('template-123')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy template ID' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy template ID to clipboard' }))
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('template-123')
