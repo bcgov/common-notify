@@ -29,6 +29,7 @@ import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
+import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { WebhookService } from '../../api/webhook/webhook.service'
@@ -142,6 +143,10 @@ describe('Notify Controllers', () => {
         { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: WebhookService, useValue: mockWebhookService },
+        {
+          provide: ApiKeyUsageService,
+          useValue: { recordUsage: vi.fn(), assertWithinLimits: vi.fn() },
+        },
       ],
     })
       .overrideGuard(NotifyServiceGuard)

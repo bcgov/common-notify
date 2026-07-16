@@ -11,6 +11,7 @@ import { SsoRole } from '@/enum/sso-role.enum'
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
@@ -31,6 +32,11 @@ const navItems = [
     to: '/templates',
     icon: <FolderOutlinedIcon />,
   },
+  {
+    label: 'Usage & Limits',
+    to: '/usage',
+    icon: <SpeedOutlinedIcon />,
+  },
 ]
 
 const adminItems = {
@@ -41,6 +47,10 @@ const adminItems = {
       label: 'Feature Flags',
       to: '/admin/feature-flags',
     },
+    {
+      label: 'Usage & Limits',
+      to: '/admin/usage',
+    },
   ],
 } as const
 
@@ -49,9 +59,14 @@ const Sidebar: FC = () => {
   const [adminExpanded, setAdminExpanded] = useState(false)
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
+  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const { hasRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+
+  // Determine which menu items to show based on roles
+  // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
+  const showUsage = cstarTenants.length > 0
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -81,9 +96,8 @@ const Sidebar: FC = () => {
         {navItems.map((item) => {
           const shouldShow =
             (item.label === 'Dashboard' && hasTenantRole) ||
-            (item.label === 'Notification Events' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Distribution Lists' && hasTenantRole) ||
+            (item.label === 'Usage & Limits' && showUsage) ||
             (item.label === 'Settings' && isOperationsAdmin)
 
           return shouldShow ? (
@@ -125,6 +139,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Feature Flags</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/usage"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">Usage &amp; Limits</span>
                   </Link>
                 )}
               </div>

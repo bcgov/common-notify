@@ -37,6 +37,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
+import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
@@ -69,6 +70,7 @@ export class NotifySimpleController {
     readonly attachmentValidationService: AttachmentValidationService,
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
+    readonly apiKeyUsageService: ApiKeyUsageService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -278,6 +280,7 @@ export class NotifySimpleFrontendController {
     readonly attachmentValidationService: AttachmentValidationService,
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
+    readonly apiKeyUsageService: ApiKeyUsageService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -311,6 +314,7 @@ export class NotifySimpleFrontendController {
       this.attachmentValidationService,
       this.attachmentProcessingService,
       this.notificationRequestDetailService,
+      this.apiKeyUsageService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)
