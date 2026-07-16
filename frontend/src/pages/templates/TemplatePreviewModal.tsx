@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import {
   Button,
-  DatePicker,
   Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
 } from '@bcgov/design-system-react-components'
-import { parseDate } from '@internationalized/date'
 import { previewTemplateBody, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPreviewValues } from '@/redux/slices/templates.slice'
@@ -23,7 +21,7 @@ interface TemplatePreviewModalProps {
   engineCode: TemplateEngine
 }
 
-type VariableType = 'text' | 'boolean' | 'date'
+type VariableType = 'text' | 'boolean'
 
 interface DetectedVariable {
   name: string
@@ -41,9 +39,7 @@ const IDENTIFIER = /^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
  */
 function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
   const found = new Map<string, VariableType>()
-  const addVar = (name: string, requested: VariableType) => {
-    // No great way to detect date variables, just check for 'date' inside the variable name
-    const type: VariableType = requested === 'text' && /date/i.test(name) ? 'date' : requested
+  const addVar = (name: string, type: VariableType) => {
     const existing = found.get(name)
     if (existing === undefined) {
       found.set(name, type)
@@ -131,7 +127,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   // Whether to surface per-field errors on empty required inputs.
   const [showErrors, setShowErrors] = useState(false)
 
-  // Booleans always carry a value; text/date variables must be filled in.
+  // Booleans always carry a value; text variables must be filled in.
   const requiredVariables = variables.filter((v) => v.type !== 'boolean')
   const isMissing = (name: string) => !(values[name] ?? '').trim()
   const missingCount = requiredVariables.filter((v) => isMissing(v.name)).length
@@ -249,22 +245,6 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                           >
                             {(values[variable.name] ?? 'true') === 'true' ? 'True' : 'False'}
                           </Switch>
-                        </div>
-                      ) : variable.type === 'date' ? (
-                        <div key={variable.name} className="template-preview__field-date">
-                          <DatePicker
-                            label={variable.name}
-                            value={values[variable.name] ? parseDate(values[variable.name]) : null}
-                            onChange={(date) =>
-                              handleValueChange(variable.name)(date ? date.toString() : '')
-                            }
-                            isRequired
-                            isInvalid={showErrors && isMissing(variable.name)}
-                            errorMessage="Enter a value to generate the preview"
-                            hideTimeZone
-                            size="medium"
-                            showFormatHelpText={false}
-                          />
                         </div>
                       ) : (
                         // Wrap rather than pass `className` to TextField: the DS

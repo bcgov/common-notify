@@ -349,26 +349,6 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     }
   }
 
-  &__field-date {
-    width: 100%;
-    max-width: 269px;
-
-    .bcds-react-aria-DatePicker {
-      width: 100%;
-    }
-
-    // The DS DatePicker root stretches to fill this wrapper; keep its label
-    // stacked above the input and matching the bold TextField labels.
-    .bcds-react-aria-DatePicker--Label {
-      font-weight: 700;
-
-      // The appended "(required)" stays regular weight
-      &.required {
-        font-weight: 400;
-      }
-    }
-  }
-
   &__apply {
     margin-top: $spacing-lg;
     margin-bottom: $spacing-lg;
