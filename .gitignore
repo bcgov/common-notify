@@ -431,6 +431,8 @@ api-gateway/generated/
 
 # Claude Code local preferences
 .claude/
+
+# Mac
 monitoring/grafana-admin-credentials.txt
 
 # Mac files
