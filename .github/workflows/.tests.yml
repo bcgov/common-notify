@@ -106,6 +106,12 @@ jobs:
   load-tests-backend:
     name: Load (backend ingress)
     runs-on: ubuntu-24.04
+    # Sized for: rollouts (~6m) + ramp (3×RAMP_SECONDS + 15s) + overhead.
+    # Raise this if you increase RAMP_SECONDS for longer/soak runs.
+    timeout-minutes: 45
+    permissions:
+      pull-requests: write # post the load-test summary as a PR comment
+      contents: read
     env:
       # Backend Deployment name = <helm release>-backend, release == repo-<PR>.
       DEPLOYMENT: ${{ github.event.repository.name }}-${{ inputs.target }}-backend
@@ -152,6 +158,41 @@ jobs:
           TARGET_RPS: ${{ vars.LOAD_TEST_TARGET_RPS || '50' }}
         with:
           path: ./tests/load/backend-test.js
+
+      # 3a. Persist the run's results (summary.json + summary.md) as an artifact.
+      - name: Upload load-test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-summary
+          path: |
+            summary.json
+            summary.md
+          retention-days: 14
+          if-no-files-found: warn
+
+      # 3b. Upsert a single sticky PR comment with the key metrics.
+      - name: Comment load-test summary on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.target }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ ! -f summary.md ]; then
+            echo "No summary.md produced (k6 may not have started); skipping PR comment."
+            exit 0
+          fi
+          marker='<!-- load-test-report -->'
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@summary.md >/dev/null
+            echo "Updated existing load-test comment ($id)."
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@summary.md >/dev/null
+            echo "Created load-test comment."
+          fi
 
       # 4. ALWAYS restore: remove the sink + auto-bind overrides so the deployment
       #    reverts to its real email adapter, even if the ramp failed or was cancelled.

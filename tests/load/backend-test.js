@@ -92,3 +92,66 @@ export default function () {
     console.error(`notifysimple failed: HTTP ${res.status} ${String(res.body).slice(0, 200)}`)
   }
 }
+
+// Emit a durable, human-readable report at end of test.
+// Marker on the first line lets the CI step upsert a single sticky PR comment.
+const REPORT_MARKER = '<!-- load-test-report -->'
+
+export function handleSummary(data) {
+  const m = data.metrics || {}
+  const val = (metric, field) =>
+    m[metric] && m[metric].values && m[metric].values[field] != null
+      ? m[metric].values[field]
+      : undefined
+  const ms = (v) => (v == null ? 'n/a' : `${Number(v).toFixed(0)} ms`)
+  const rate = (v) => (v == null ? 'n/a' : `${(Number(v) * 100).toFixed(2)}%`)
+  const n = (v, d = 0) => (v == null ? 'n/a' : Number(v).toFixed(d))
+
+  const reqCount = val('http_reqs', 'count')
+  const reqRate = val('http_reqs', 'rate')
+  const avg = val('http_req_duration', 'avg')
+  const p90 = val('http_req_duration', 'p(90)')
+  const p95 = val('http_req_duration', 'p(95)') ?? val('accept_latency_ms', 'p(95)')
+  const maxd = val('http_req_duration', 'max')
+  const errRate = val('ingress_errors', 'rate') ?? val('http_req_failed', 'rate')
+  const checksRate = val('checks', 'rate')
+
+  const thresholds = []
+  for (const [name, metric] of Object.entries(m)) {
+    if (metric.thresholds) {
+      for (const [expr, res] of Object.entries(metric.thresholds)) {
+        thresholds.push(`${res.ok ? '✅' : '❌'} \`${name}: ${expr}\``)
+      }
+    }
+  }
+  const allOk = thresholds.length > 0 && thresholds.every((t) => t.startsWith('✅'))
+
+  const md = [
+    REPORT_MARKER,
+    '## 🚀 Backend ingress load test',
+    '',
+    `**Result:** ${allOk ? '✅ thresholds passed' : '❌ thresholds failed'}`,
+    '',
+    '| Metric | Value |',
+    '| --- | --- |',
+    `| Accepts (total) | ${n(reqCount)} |`,
+    `| Throughput | ${n(reqRate, 1)} req/s |`,
+    `| Accept latency (avg) | ${ms(avg)} |`,
+    `| Accept latency (p90) | ${ms(p90)} |`,
+    `| Accept latency (p95) | ${ms(p95)} |`,
+    `| Accept latency (max) | ${ms(maxd)} |`,
+    `| Error rate | ${rate(errRate)} |`,
+    `| Checks passed | ${rate(checksRate)} |`,
+    '',
+    '**Thresholds**',
+    ...(thresholds.length ? thresholds.map((t) => `- ${t}`) : ['- (none)']),
+    '',
+    `_Target: \`${BACKEND_URL}\` · peak ${TARGET_RPS} req/s · email delivery sunk to the log adapter._`,
+  ].join('\n')
+
+  return {
+    'summary.json': JSON.stringify(data, null, 2),
+    'summary.md': md,
+    stdout: `\n${md}\n`,
+  }
+}
