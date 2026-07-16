@@ -21,6 +21,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import Breadcrumb from '@/components/Breadcrumb'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import '@/scss/components/templates.scss'
 
@@ -87,6 +88,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
+  const bodyTextareaRef = useAutoGrowingTextArea(formData.body)
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -288,6 +290,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 <RequiredLabel text="Template body" />
               </label>
               <textarea
+                ref={bodyTextareaRef}
                 aria-label="Template body (required)"
                 id="body"
                 placeholder="Type the template body here"

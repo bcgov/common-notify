@@ -14,6 +14,7 @@ import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templ
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import Breadcrumb from '@/components/Breadcrumb'
+import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'This field is required.'
@@ -123,6 +124,9 @@ const TemplateCreate: FC = () => {
   const templateBodyPlaceholder =
     SYNTAX_TYPE_BODY_PLACEHOLDERS[formData.engineCode as TemplateEngine] ??
     DEFAULT_TEMPLATE_BODY_PLACEHOLDER
+  const bodyTextareaRef = useAutoGrowingTextArea(formData.body, {
+    measurementText: formData.engineCode ? templateBodyPlaceholder : undefined,
+  })
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -302,6 +306,7 @@ const TemplateCreate: FC = () => {
                 <RequiredLabel text="Template body" />
               </label>
               <textarea
+                ref={bodyTextareaRef}
                 aria-label="Template body (required)"
                 id="body"
                 placeholder={templateBodyPlaceholder}
