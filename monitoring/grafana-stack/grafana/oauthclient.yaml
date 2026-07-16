@@ -1,0 +1,11 @@
+---
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: grafana-oauth-client
+# The secret is a random string used for OAuth handshake
+# This will be generated and stored in the grafana-oauth-secret
+secret: ""
+redirectURIs:
+  - https://grafana-f6bc3f-tools.apps.silver.devops.gov.bc.ca/login/generic_oauth
+grantMethod: prompt
