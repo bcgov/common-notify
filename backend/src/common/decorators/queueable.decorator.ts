@@ -14,6 +14,7 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
+import type { ApiKeyUsageService } from '../../api/api-keys/api-key-usage.service'
 
 /**
  * Context required by the Queueable decorator.
@@ -24,9 +25,49 @@ export interface QueueableContext {
   attachmentValidationService: AttachmentValidationService
   attachmentProcessingService: AttachmentProcessingService
   notificationPubSubService?: NotificationPubSubService
+  apiKeyUsageService?: ApiKeyUsageService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
+/**
+ * Attribute accepted notifications against the authenticating API key's usage limits.
+ * Non-fatal: usage tracking must never block or fail an accepted send. Skipped when the
+ * request has no bound API key (e.g. no credential on the request) or the service is absent.
+ */
+async function recordAcceptedUsage(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  entries: Array<{ channel: string; count: number }>,
+): Promise<void> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+  const logger = new Logger('Queueable[usage]')
+  for (const { channel, count } of entries) {
+    if (count <= 0) continue
+    try {
+      await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+    } catch (error) {
+      logger.warn(
+        `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+  }
+}
+
+/**
+ * Enforce the API key's daily/annual limits BEFORE a send is accepted. Throws HTTP 429 if any
+ * channel would exceed its limit. Unlike usage recording this is NOT swallowed — a rejected
+ * request must fail. Skipped when there is no bound API key or the service is absent (fail-open).
+ */
+async function enforceLimits(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  entries: Array<{ channel: string; count: number }>,
+): Promise<void> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+  await ctx.apiKeyUsageService.assertWithinLimits(apiKeyConsumerId, entries)
+}
 /**
  * Map a NotificationChannel to the NotifySimpleRequest property key used to wrap a bare
  * single-channel route body.
@@ -69,6 +110,7 @@ async function handleEmailMerge(
   queueName: QueueName,
   tenantId: string,
   dto: NotifySimpleRequest,
+  apiKeyConsumerId: string | undefined,
 ) {
   const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
 
@@ -85,6 +127,11 @@ async function handleEmailMerge(
 
   const recipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
 
+  // Enforce daily/annual EMAIL limits BEFORE accepting the merge request (throws HTTP 429).
+  await enforceLimits(ctx, apiKeyConsumerId, [
+    { channel: NotificationChannel.EMAIL, count: recipients.length },
+  ])
+
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
     tenantId,
@@ -95,6 +142,11 @@ async function handleEmailMerge(
   logger.debug(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
+
+  // Attribute accepted merge emails against the API key's usage limits (non-fatal).
+  await recordAcceptedUsage(ctx, apiKeyConsumerId, [
+    { channel: NotificationChannel.EMAIL, count: recipients.length },
+  ])
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
   const updateSvc = ctx.notificationPubSubService
@@ -299,6 +351,7 @@ export function Queueable(
             queueName,
             tenantId,
             payload,
+            req?.apiKeyConsumerId,
           )
         }
 
@@ -324,6 +377,22 @@ export function Queueable(
             errors: businessErrors,
           })
         }
+
+        // Primary (to) recipient count per channel — used for both limit enforcement and usage.
+        const usageEntries = [
+          {
+            channel: NotificationChannel.EMAIL,
+            count: processedPayload.email?.recipients?.to?.length ?? 0,
+          },
+          {
+            channel: NotificationChannel.SMS,
+            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+          },
+        ]
+
+        // Enforce daily/annual limits BEFORE accepting. Throws HTTP 429 if the request would
+        // exceed a limit, rejecting the whole request before any record is created.
+        await enforceLimits(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
 
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         // This is synchronous and required to succeed.
@@ -379,6 +448,9 @@ export function Queueable(
         if (processedPayload.email) channels.push('email')
         if (processedPayload.sms) channels.push('sms')
         if (processedPayload.msgApp) channels.push('msgApp')
+
+        // Attribute accepted notifications against the API key's usage limits (non-fatal).
+        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =

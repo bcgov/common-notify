@@ -102,6 +102,10 @@ export class NotifyServiceGuard implements CanActivate {
     request.tenant = tenant
     request.tenantId = tenant.id
     request.tenantExternalId = tenant.externalId
+    // The bound API key (api_key_consumer) that authenticated this request.
+    // Used downstream to attribute notification usage against the key's limits.
+    request.apiKeyConsumerId = mapping.id
+    request.credentialIdentifier = credentialIdentifier
 
     this.logger.debug(
       `✓ Service-to-service request authorized. Tenant: "${tenant.name}" (${tenant.id})`,

@@ -19,6 +19,9 @@ import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
+import { ApiKeyLimit } from './api/api-keys/entities/api-key-limit.entity'
+import { ApiKeyUsage } from './api/api-keys/entities/api-key-usage.entity'
+import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
@@ -58,6 +61,9 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         WebhookDeliveryLog,
         WebhookTypeCode,
         ApiKeyConsumer,
+        ApiKeyLimit,
+        ApiKeyUsage,
+        ApiKeyLimitAlert,
         AttachmentEntity,
       ],
       synchronize: false, // Use Flyway for migrations

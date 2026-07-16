@@ -212,6 +212,44 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
       expect(result.body).toBe('Dear Alice,\n\nWelcome Alice!')
     })
 
+    it('should use default text when placeholder uses ?? and key is missing', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Default Fallback',
+          type: 'email',
+          subject: 'Order ((orderNumber??unknown)) Confirmation',
+          body: 'Status: ((status??submitted for review))',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.subject).toBe('Order unknown Confirmation')
+      expect(result.body).toBe('Status: submitted for review')
+    })
+
+    it('should prefer personalisation value over ?? default text', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Default Override',
+          type: 'email',
+          subject: 'Order ((orderNumber??unknown)) Confirmation',
+          body: 'Status: ((status??submitted for review))',
+          active: true,
+        },
+        personalisation: { orderNumber: 'ABC-123', status: 'approved' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.subject).toBe('Order ABC-123 Confirmation')
+      expect(result.body).toBe('Status: approved')
+    })
+
     it('should handle empty personalisation', async () => {
       const context: RenderContext = {
         template: {
@@ -378,6 +416,23 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
       const result = await renderer.renderSms(context)
 
       expect(result.body).toBe('Alice: Hello - 123')
+    })
+
+    it('should support ?? default placeholders in SMS', async () => {
+      const context: RenderContext & { personalisation: Record<string, string> } = {
+        template: {
+          id: 'template-1',
+          name: 'SMS Default',
+          type: 'sms',
+          body: 'Hi ((firstName??there)), status: ((status??pending))',
+          active: true,
+        },
+        personalisation: {},
+      }
+
+      const result = await renderer.renderSms(context)
+
+      expect(result.body).toBe('Hi there, status: pending')
     })
 
     it('should be a Promise', async () => {

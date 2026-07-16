@@ -8,8 +8,41 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
+import { ApiKeyLimit } from './entities/api-key-limit.entity'
+import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+
+/**
+ * Default notification limits applied per channel when an API key is first bound.
+ * Mirrors the seed values in migration V40.
+ */
+const DEFAULT_LIMITS: Array<{
+  channelCode: string
+  rateLimitPerMinute: number
+  dailyLimit: number
+  annualLimit: number
+}> = [
+  {
+    channelCode: NotificationChannel.EMAIL,
+    rateLimitPerMinute: 1000,
+    dailyLimit: 100000,
+    annualLimit: 20000000,
+  },
+  {
+    channelCode: NotificationChannel.SMS,
+    rateLimitPerMinute: 1000,
+    dailyLimit: 10000,
+    annualLimit: 100000,
+  },
+]
+
+/** Channels that receive default alert configuration on bind. */
+const ALERT_CHANNELS: string[] = [NotificationChannel.EMAIL, NotificationChannel.SMS]
+
+/** Default warning threshold (percent of a limit) for a newly bound key. */
+const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
 @Injectable()
 export class ApiKeysService {
@@ -18,10 +51,52 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKeyConsumer)
     private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
+    @InjectRepository(ApiKeyLimit)
+    private readonly apiKeyLimitRepository: Repository<ApiKeyLimit>,
+    @InjectRepository(ApiKeyLimitAlert)
+    private readonly apiKeyLimitAlertRepository: Repository<ApiKeyLimitAlert>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
     private readonly cstarApiClient: CstarApiClient,
   ) {}
+
+  /**
+   * Ensure an API key has its default per-channel limit rows AND alert configuration.
+   * Idempotent: existing rows are left untouched (ON CONFLICT DO NOTHING), so re-binding
+   * never clobbers customized limits or thresholds.
+   */
+  private async ensureDefaults(apiKeyConsumerId: string): Promise<void> {
+    await this.apiKeyLimitRepository
+      .createQueryBuilder()
+      .insert()
+      .into(ApiKeyLimit)
+      .values(
+        DEFAULT_LIMITS.map((limit) => ({
+          ...limit,
+          apiKeyConsumerId,
+          createdBy: 'system',
+          updatedBy: 'system',
+        })),
+      )
+      .orIgnore()
+      .execute()
+
+    await this.apiKeyLimitAlertRepository
+      .createQueryBuilder()
+      .insert()
+      .into(ApiKeyLimitAlert)
+      .values(
+        ALERT_CHANNELS.map((channelCode) => ({
+          apiKeyConsumerId,
+          channelCode,
+          warnThresholdPercent: DEFAULT_WARN_THRESHOLD_PERCENT,
+          createdBy: 'system',
+          updatedBy: 'system',
+        })),
+      )
+      .orIgnore()
+      .execute()
+  }
 
   /**
    * Bind an API key to a CSTAR tenant.
@@ -78,6 +153,8 @@ export class ApiKeysService {
         this.logger.debug(
           `API key ${credentialIdentifier} is already bound to tenant ${tenant.id} — idempotent`,
         )
+        // Self-heal: ensure default limits and alert config exist even if a previous bind missed them.
+        await this.ensureDefaults(existing.id)
         return existing
       }
       this.logger.warn(
@@ -98,8 +175,12 @@ export class ApiKeysService {
     })
 
     const saved = await this.apiKeyConsumerRepository.save(mapping)
+
+    // Seed default per-channel limits and alert config for the newly onboarded API key.
+    await this.ensureDefaults(saved.id)
+
     this.logger.log(
-      `API key ${credentialIdentifier} bound to tenant "${tenant.name}" (${tenant.id}) by user ${idirUserGuid}`,
+      `API key ${credentialIdentifier} bound to tenant "${tenant.name}" (${tenant.id}) by user ${idirUserGuid} with default limits`,
     )
     return saved
   }
