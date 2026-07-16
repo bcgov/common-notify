@@ -10,9 +10,9 @@ SECRET_NAME="grafana-oauth-secret"
 
 echo "Creating OAuth secret for Grafana..."
 
-# Get the ServiceAccount token
+# Get the ServiceAccount token (using modern command)
 echo "Extracting ServiceAccount token..."
-TOKEN=$(oc sa get-token ${SERVICE_ACCOUNT} -n ${NAMESPACE})
+TOKEN=$(oc create token ${SERVICE_ACCOUNT} -n ${NAMESPACE} --duration=8760h)
 
 if [ -z "$TOKEN" ]; then
     echo "ERROR: Could not get ServiceAccount token"
