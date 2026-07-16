@@ -30,6 +30,7 @@ interface TemplateEditProps {
 }
 
 const REQUIRED_FIELD_ERROR = 'This field is required.'
+
 const SYNTAX_TOOLTIPS = [
   {
     value: TemplateEngine.HANDLEBARS,
@@ -72,9 +73,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   const navigate = useNavigate()
   const { primaryRole } = useCstarRoles()
   const isReadOnly = primaryRole === CstarRole.NOTIFY_VIEWER
+
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
+
   const [formData, setFormData] = useState({
     name: '',
     channelCode: NotificationChannel.EMAIL as string,
@@ -82,19 +86,23 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
     subject: '',
     body: '',
   })
+
   const [formErrors, setFormErrors] = useState({
     name: '',
     engineCode: '',
     subject: '',
     body: '',
   })
+
   const bodyTextareaRef = useAutoGrowingTextArea(formData.body)
 
   useEffect(() => {
     const fetchTemplate = async () => {
       setLoading(true)
+
       try {
         const data = await getTemplateById(templateId)
+
         setTemplate(data)
         setFormData({
           name: data.name,
@@ -114,46 +122,91 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
   }, [templateId])
 
   const handleFieldChange = (field: string) => (value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    setFormErrors((prev) => ({ ...prev, [field]: '' }))
+    setFormData((previous) => ({
+      ...previous,
+      [field]: value,
+    }))
+
+    setFormErrors((previous) => ({
+      ...previous,
+      [field]: '',
+    }))
+  }
+
+  const handleCopyTemplateId = async () => {
+    if (!template?.id) return
+
+    try {
+      await navigator.clipboard.writeText(template.id)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      showErrorToast('Failed to copy template ID')
+    }
   }
 
   const validate = (): boolean => {
-    const errors = { name: '', engineCode: '', subject: '', body: '' }
+    const errors = {
+      name: '',
+      engineCode: '',
+      subject: '',
+      body: '',
+    }
+
     if (!formData.name.trim()) {
       errors.name = REQUIRED_FIELD_ERROR
     }
+
     if (!formData.engineCode) {
       errors.engineCode = 'Please select an option to continue.'
     }
-    if (formData.channelCode === NotificationChannel.EMAIL && !formData.subject.trim()) {
+
+    if (
+      formData.channelCode === NotificationChannel.EMAIL &&
+      !formData.subject.trim()
+    ) {
       errors.subject = REQUIRED_FIELD_ERROR
     }
+
     if (!formData.body.trim()) {
       errors.body = REQUIRED_FIELD_ERROR
     }
+
     setFormErrors(errors)
+
     return !Object.values(errors).some(Boolean)
   }
 
-  const handleSave = async (e: React.SyntheticEvent) => {
-    e.preventDefault()
+  const handleSave = async (event: React.SyntheticEvent) => {
+    event.preventDefault()
+
     if (!validate()) return
+
     setSaving(true)
+
     try {
       await updateTemplate(templateId, {
         name: formData.name,
         engineCode: formData.engineCode as TemplateEngine,
-        subject: formData.channelCode === NotificationChannel.EMAIL ? formData.subject : undefined,
+        subject:
+          formData.channelCode === NotificationChannel.EMAIL
+            ? formData.subject
+            : undefined,
         body: formData.body,
       })
+
       showSuccessToast('Template saved successfully')
       navigate({ to: '/templates' })
     } catch (error) {
-      if ((error as any).status === 409) {
-        setFormErrors((prev) => ({ ...prev, name: (error as Error).message }))
+      if ((error as { status?: number }).status === 409) {
+        setFormErrors((previous) => ({
+          ...previous,
+          name: error instanceof Error ? error.message : 'Template name already exists',
+        }))
       } else {
-        showErrorToast(error instanceof Error ? error.message : 'Failed to save template')
+        showErrorToast(
+          error instanceof Error ? error.message : 'Failed to save template',
+        )
       }
     } finally {
       setSaving(false)
@@ -185,13 +238,47 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             items={[
               { label: 'Home', to: '/dashboard' },
               { label: 'Templates', to: '/templates' },
-              { label: isReadOnly ? 'View reusable template' : 'Edit reusable template' },
+              {
+                label: isReadOnly
+                  ? 'View reusable template'
+                  : 'Edit reusable template',
+              },
             ]}
           />
-          <PageHeading title={isReadOnly ? 'View reusable template' : 'Edit reusable template'} />
+
+          <PageHeading
+            title={
+              isReadOnly
+                ? 'View reusable template'
+                : 'Edit reusable template'
+            }
+          />
         </div>
+
         <form className="template-form" noValidate onSubmit={handleSave}>
           <div className="template-form__questions">
+            <div className="template-form__section template-form__section--api-data">
+              <span className="bcds-react-aria-TextField--Label">
+                API data: Template ID
+              </span>
+
+              <span className="bcds-react-aria-TextField--Description">
+                {template.id}
+              </span>
+
+              <div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCopyTemplateId}
+                >
+                  {copied
+                    ? 'Copied'
+                    : 'Copy template ID to clipboard'}
+                </Button>
+              </div>
+            </div>
+
             <div className="template-form__section template-form__section--title">
               <TextField
                 label="Template title"
@@ -203,7 +290,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 size="small"
                 isRequired
                 isDisabled={isReadOnly}
-                isInvalid={!!formErrors.name}
+                isInvalid={Boolean(formErrors.name)}
                 errorMessage={formErrors.name}
               />
             </div>
@@ -211,16 +298,24 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             <div className="template-form__section template-form__section--template-type">
               <RadioGroup
                 className="template-form__radio-group"
-                label={(<RequiredLabel text="Template type" />) as unknown as string}
+                label={
+                  (<RequiredLabel text="Template type" />) as unknown as string
+                }
                 value={formData.channelCode}
-                onChange={(value) => setFormData((prev) => ({ ...prev, channelCode: value }))}
+                onChange={(value) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    channelCode: value,
+                  }))
+                }
                 aria-required="true"
                 isDisabled
               >
-                <Radio key="email" value={NotificationChannel.EMAIL}>
+                <Radio value={NotificationChannel.EMAIL}>
                   Email
                 </Radio>
-                <Radio key="sms" value={NotificationChannel.SMS}>
+
+                <Radio value={NotificationChannel.SMS}>
                   SMS
                 </Radio>
               </RadioGroup>
@@ -237,7 +332,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                   size="small"
                   isRequired
                   isDisabled={isReadOnly}
-                  isInvalid={!!formErrors.subject}
+                  isInvalid={Boolean(formErrors.subject)}
                   errorMessage={formErrors.subject}
                 />
               </div>
@@ -246,24 +341,36 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             <div className="template-form__section template-form__section--syntax-type error-after-label">
               <RadioGroup
                 className="template-form__radio-group"
-                label={(<RequiredLabel text="Syntax type" />) as unknown as string}
+                label={
+                  (<RequiredLabel text="Syntax type" />) as unknown as string
+                }
                 description="Choose the syntax used for dynamic variables and placeholders in this template."
                 value={formData.engineCode}
                 onChange={(value) => {
-                  setFormData((prev) => ({
-                    ...prev,
+                  setFormData((previous) => ({
+                    ...previous,
                     engineCode: value,
                   }))
-                  setFormErrors((prev) => ({ ...prev, engineCode: '' }))
+
+                  setFormErrors((previous) => ({
+                    ...previous,
+                    engineCode: '',
+                  }))
                 }}
                 aria-required="true"
                 isDisabled={isReadOnly}
-                isInvalid={!!formErrors.engineCode}
+                isInvalid={Boolean(formErrors.engineCode)}
                 errorMessage={formErrors.engineCode}
               >
                 {SYNTAX_TOOLTIPS.map((option) => (
-                  <div className="template-form__syntax-option" key={option.value}>
-                    <Radio value={option.value}>{option.label}</Radio>
+                  <div
+                    className="template-form__syntax-option"
+                    key={option.value}
+                  >
+                    <Radio value={option.value}>
+                      {option.label}
+                    </Radio>
+
                     <TooltipTrigger>
                       <Button
                         aria-label={option.tooltipLabel}
@@ -275,7 +382,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                       >
                         <SvgInfoIcon />
                       </Button>
-                      <Tooltip placement="left">{option.tooltipText}</Tooltip>
+
+                      <Tooltip placement="left">
+                        {option.tooltipText}
+                      </Tooltip>
                     </TooltipTrigger>
                   </div>
                 ))}
@@ -289,29 +399,48 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               >
                 <RequiredLabel text="Template body" />
               </label>
+
               <textarea
                 ref={bodyTextareaRef}
                 aria-label="Template body (required)"
                 id="body"
                 placeholder="Type the template body here"
-                className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
+                className={`form-control template-form__textarea${
+                  formErrors.body ? ' is-invalid' : ''
+                }`}
                 value={formData.body}
-                onChange={(e) => handleFieldChange('body')(e.target.value)}
+                onChange={(event) =>
+                  handleFieldChange('body')(event.target.value)
+                }
                 readOnly={isReadOnly}
               />
+
               {formErrors.body && (
-                <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
+                <span className="bcds-react-aria-TextField--Error">
+                  {formErrors.body}
+                </span>
               )}
             </div>
           </div>
 
           <div className="template-form__actions">
-            <Button type="button" variant="secondary" onClick={handleCancel}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCancel}
+            >
               Cancel
             </Button>
-            <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onPress={() => {}}
+              isDisabled
+            >
               Preview
             </Button>
+
             {!isReadOnly && (
               <Button type="submit" isDisabled={saving}>
                 {saving ? 'Saving...' : 'Save'}

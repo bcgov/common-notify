@@ -9,7 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  BadRequestException,
+  UseFilters,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -33,14 +33,29 @@ import { SmsContent } from './schemas/sms-content'
 import { NotificationsListResponse } from './schemas/notifications-list-response'
 import { TemplatesListResponse } from './schemas/templates-list-response'
 import { FileAttachment } from './schemas/file-attachment'
-import { ApiKeyGuard } from '../../common/guards/api-key.guard'
+import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guard'
+import { GcNotifyExceptionFilter } from './gc-notify-exception.filter'
+import { GcNotifyRoutingService } from './gc-notify-routing.service'
+import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+
+interface GcNotifyRequest extends express.Request {
+  gcNotifyAuthHeader: string
+  tenantId: string
+  tenantExternalId: string
+}
 
 @ApiTags('GC Notify')
 @ApiExtraModels(EmailContent, SmsContent, FileAttachment)
-@UseGuards(ApiKeyGuard)
+@UseGuards(GcNotifyServiceGuard)
+@UseFilters(GcNotifyExceptionFilter)
 @Controller('gcnotify/v2')
 export class GcNotifyController {
-  constructor(private readonly gcNotifyApiClient: GcNotifyApiClient) {}
+  constructor(
+    private readonly gcNotifyApiClient: GcNotifyApiClient,
+    private readonly gcNotifyRoutingService: GcNotifyRoutingService,
+    private readonly gcNotifyInternalExecutionService: GcNotifyInternalExecutionService,
+  ) {}
 
   @Get('notifications')
   @ApiOperation({ summary: 'Get list of notifications' })
@@ -72,7 +87,7 @@ export class GcNotifyController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getNotifications(
-    @Req() req: express.Request,
+    @Req() req: GcNotifyRequest,
     @Query('template_type') templateType?: 'sms' | 'email',
     @Query('status') status?: string | string[],
     @Query('reference') reference?: string,
@@ -80,17 +95,25 @@ export class GcNotifyController {
     @Query('include_jobs') includeJobs?: boolean,
   ) {
     const statusArray = Array.isArray(status) ? status : status ? [status] : undefined
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.getNotifications(
-      {
-        template_type: templateType,
-        status: statusArray,
-        reference,
-        older_than: olderThan,
-        include_jobs: includeJobs,
-      },
-      gcNotifyAuthHeader,
+    const query = {
+      template_type: templateType,
+      status: statusArray,
+      reference,
+      older_than: olderThan,
+      include_jobs: includeJobs,
+    }
+
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_NOTIFICATIONS,
+      req.tenantId,
     )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.getNotifications(
+          query,
+          req.tenantId,
+          req.tenantExternalId,
+        )
+      : this.gcNotifyApiClient.getNotifications(query, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/email')
@@ -110,9 +133,14 @@ export class GcNotifyController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
-  async sendEmail(@Body() body: CreateEmailNotificationRequest, @Req() req: express.Request) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.sendEmail(body, gcNotifyAuthHeader)
+  async sendEmail(@Body() body: CreateEmailNotificationRequest, @Req() req: GcNotifyRequest) {
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_EMAIL,
+      req.tenantId,
+    )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.sendEmail(body, req.tenantId)
+      : this.gcNotifyApiClient.sendEmail(body, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/sms')
@@ -132,9 +160,14 @@ export class GcNotifyController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
-  async sendSms(@Body() body: CreateSmsNotificationRequest, @Req() req: express.Request) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.sendSms(body, gcNotifyAuthHeader)
+  async sendSms(@Body() body: CreateSmsNotificationRequest, @Req() req: GcNotifyRequest) {
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_SMS,
+      req.tenantId,
+    )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.sendSms(body, req.tenantId)
+      : this.gcNotifyApiClient.sendSms(body, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/bulk')
@@ -154,9 +187,9 @@ export class GcNotifyController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
-  async sendBulk(@Body() body: PostBulkRequest, @Req() req: express.Request) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.sendBulk(body, gcNotifyAuthHeader)
+  async sendBulk(@Body() body: PostBulkRequest, @Req() req: GcNotifyRequest) {
+    // Bulk send is passthrough-only; a native mail-merge job runner is being built separately.
+    return this.gcNotifyApiClient.sendBulk(body, req.gcNotifyAuthHeader)
   }
 
   @Get('notifications/:notificationId')
@@ -175,10 +208,15 @@ export class GcNotifyController {
   @ApiResponse({ status: 404, description: 'Notification not found' })
   async getNotificationById(
     @Param('notificationId') notificationId: string,
-    @Req() req: express.Request,
+    @Req() req: GcNotifyRequest,
   ) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.getNotificationById(notificationId, gcNotifyAuthHeader)
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_GET_NOTIFICATION,
+      req.tenantId,
+    )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.getNotificationById(notificationId, req.tenantId)
+      : this.gcNotifyApiClient.getNotificationById(notificationId, req.gcNotifyAuthHeader)
   }
 
   @Get('templates')
@@ -196,9 +234,14 @@ export class GcNotifyController {
     type: TemplatesListResponse,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getTemplates(@Query('type') type?: 'sms' | 'email', @Req() req?: express.Request) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req!)
-    return this.gcNotifyApiClient.getTemplates(type, gcNotifyAuthHeader)
+  async getTemplates(@Query('type') type?: 'sms' | 'email', @Req() req?: GcNotifyRequest) {
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_TEMPLATES,
+      req!.tenantId,
+    )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.getTemplates(type, req!.tenantId)
+      : this.gcNotifyApiClient.getTemplates(type, req!.gcNotifyAuthHeader)
   }
 
   @Get('template/:templateId')
@@ -215,25 +258,13 @@ export class GcNotifyController {
     type: Template,
   })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  async getTemplate(@Param('templateId') templateId: string, @Req() req: express.Request) {
-    const gcNotifyAuthHeader = this.requireAuthHeader(req)
-    return this.gcNotifyApiClient.getTemplate(templateId, gcNotifyAuthHeader)
-  }
-
-  private requireAuthHeader(req: express.Request): string {
-    const authHeader = req.headers['authorization']
-    if (typeof authHeader === 'string') {
-      const trimmed = authHeader.trim()
-      // Validate format: "ApiKey-v1 {key}"
-      if (trimmed.startsWith('ApiKey-v1 ')) {
-        const key = trimmed.substring('ApiKey-v1 '.length).trim()
-        if (key) {
-          return trimmed
-        }
-      }
-    }
-    throw new BadRequestException(
-      'Authorization header is required with format: ApiKey-v1 {api-key}',
+  async getTemplate(@Param('templateId') templateId: string, @Req() req: GcNotifyRequest) {
+    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
+      FeatureFlagCode.GC_NOTIFY_ROUTE_GET_TEMPLATE,
+      req.tenantId,
     )
+    return useInternal
+      ? this.gcNotifyInternalExecutionService.getTemplate(templateId, req.tenantId)
+      : this.gcNotifyApiClient.getTemplate(templateId, req.gcNotifyAuthHeader)
   }
 }
