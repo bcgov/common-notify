@@ -12,6 +12,7 @@ import templatesReducer from './slices/templates.slice'
 import featureFlagsReducer from './slices/featureFlags.slice'
 import adminTenantsReducer from './slices/adminTenants.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
+import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     featureFlags: featureFlagsReducer,
     adminTenants: adminTenantsReducer,
     apiKeys: apiKeysReducer,
+    apiKeyUsage: apiKeyUsageReducer,
   },
 })
 

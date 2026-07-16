@@ -833,6 +833,48 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/api-key-usage (frontend variant - usage, history, threshold)
+  # Called by the Notify web app with a frontend user JWT (never a service API key).
+  # Kong prefix-matches this base path, so it also covers /history (GET) and
+  # /threshold (PATCH). The backend enforces exact method+path and CSTAR roles.
+  #
+  # NOTE: This must be declared BEFORE the /api/v1/frontend/admin/api-key-usage route
+  # is NOT a concern here because Kong matches the longest/most-specific prefix, and
+  # the admin route lives under a different path segment (/frontend/admin/...).
+  - name: ${ROUTE_PREFIX}api-key-usage-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/api-key-usage
+    methods:
+      - GET
+      - PATCH
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/api-key-usage (admin variant - all tenants' usage)
+  # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Same jwt-keycloak plugin
+  # as the other frontend admin routes. Kong prefix-matches, so PATCH also covers
+  # /api/v1/frontend/admin/api-key-usage/limits.
+  - name: ${ROUTE_PREFIX}admin-api-key-usage-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/api-key-usage
+    methods:
+      - GET
+      - PATCH
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
 plugins:
   # ============================================================================
   # SERVICE-TO-SERVICE PLUGINS
@@ -1842,6 +1884,62 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-preview
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # API Key Usage Frontend - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-usage-frontend
+    config:
+      allowed_iss:
+        - ${FRONTEND_KEYCLOAK_ISSUER}
+      allowed_aud: ${FRONTEND_ALLOWED_AUDIENCE}
+      run_on_preflight: true
+      iss_key_grace_period: 10
+      maximum_expiration: 0
+      algorithm: RS256
+      claims_to_verify:
+        - exp
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      scope: null
+      roles: null
+      realm_roles: null
+      client_roles: null
+      anonymous: null
+      consumer_match: true
+      consumer_match_claim: azp
+      consumer_match_claim_custom_id: true
+      consumer_match_ignore_not_found: true
+
+  # Admin API Key Usage Frontend - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-api-key-usage-frontend
     config:
       allowed_iss:
         - ${FRONTEND_KEYCLOAK_ISSUER}
