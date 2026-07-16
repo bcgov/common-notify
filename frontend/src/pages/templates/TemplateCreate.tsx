@@ -17,6 +17,52 @@ import Breadcrumb from '@/components/Breadcrumb'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'This field is required.'
+const DEFAULT_TEMPLATE_BODY_PLACEHOLDER = 'Type the template body here'
+const SYNTAX_TYPE_BODY_PLACEHOLDERS: Record<TemplateEngine, string> = {
+  [TemplateEngine.MJML]: `<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text>
+          Hello {{firstName}},
+        </mj-text>
+
+        <mj-text>
+          Your request for {{eventName}} has been approved.
+        </mj-text>
+
+        <mj-text>
+          Thank you,<br />
+          Notify Team
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>`,
+  [TemplateEngine.LEGACY_GC_NOTIFY]: `Hello ((name)),
+Your -reference, file, other type of number: ((number))
+Remember your appointment on ((date_en))
+About: -Add description-
+When: ((date_en))
+What time: ((time_en)) -time zone in full, not acronym-
+Where: ((address_en)) or -Add a link for a virtual appointment-`,
+  [TemplateEngine.MUSTACHE]: `Hello {{firstName}},
+
+Your notification for {{eventName}} has been successfully created.
+
+Thank you,
+Notify Team`,
+  [TemplateEngine.HANDLEBARS]: `Hello {{firstName}},
+
+{{#if isApproved}}
+Your request for {{eventName}} has been approved.
+{{else}}
+Your request for {{eventName}} is still under review.
+{{/if}}
+
+Thank you,
+Notify Team`,
+}
 const SYNTAX_TOOLTIPS = [
   {
     value: TemplateEngine.HANDLEBARS,
@@ -74,6 +120,9 @@ const TemplateCreate: FC = () => {
   })
 
   const isSaveDisabled = saving || !formData.name.trim()
+  const templateBodyPlaceholder =
+    SYNTAX_TYPE_BODY_PLACEHOLDERS[formData.engineCode as TemplateEngine] ??
+    DEFAULT_TEMPLATE_BODY_PLACEHOLDER
 
   const handleFieldChange = (field: string) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -255,7 +304,7 @@ const TemplateCreate: FC = () => {
               <textarea
                 aria-label="Template body (required)"
                 id="body"
-                placeholder="Type the template body here"
+                placeholder={templateBodyPlaceholder}
                 className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
                 value={formData.body}
                 onChange={(e) => handleFieldChange('body')(e.target.value)}
