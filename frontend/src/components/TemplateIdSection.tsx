@@ -26,7 +26,7 @@ const TemplateIdSection: FC<TemplateIdSectionProps> = ({ templateId }) => {
       <code className="template-id-section__value">{templateId}</code>
       <div className="template-id-section__actions">
         <Button type="button" variant="secondary" onClick={handleCopy}>
-          {copied ? 'Copied' : 'Copy template ID'}
+          {copied ? 'Copied' : 'Copy template ID to clipboard'}
         </Button>
       </div>
     </div>
