@@ -3,15 +3,49 @@
 }
 
 .template-form-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   margin: 0 auto;
   width: 100%;
   max-width: 572px;
 }
 
+.template-form-page__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  width: 100%;
+}
+
+.template-form-page__header > .d-flex,
+.template-form-page__header > .d-flex > h1 {
+  margin-bottom: 0 !important;
+}
+
+.template-form-page__header > .d-flex > h1 {
+  font-family: 'BC Sans', sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 54px;
+  letter-spacing: 0;
+  color: #1e1e1e;
+}
+
 .template-form {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+}
+
+.template-form__questions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  width: 100%;
+  padding-bottom: 24px;
 }
 
 .template-form__section {
@@ -63,7 +97,11 @@
 }
 
 .template-form__actions {
-  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  margin-top: 0;
 }
 
 .template-form__body-label {
