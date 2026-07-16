@@ -296,7 +296,12 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
             <Button type="button" variant="secondary" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button type="button" variant="secondary" onPress={() => {}} isDisabled={true}>
+            <Button
+              type="button"
+              variant="secondary"
+              onPress={() => setPreviewOpen(true)}
+              isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+            >
               Preview
             </Button>
             {!isReadOnly && (
