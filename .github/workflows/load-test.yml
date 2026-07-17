@@ -1,51 +1,73 @@
 name: Load Test
 
-# Ingress load test against the DEV environment.
-#   - Manually: Actions → "Load Test" → Run workflow (tune RPS / ramp).
+# Ingress load-test SUITE against the DEV environment.
+#   - Manually: Actions → "Load Test" → Run workflow (tune RPS / ramp / burst).
 #   - Automatically: called by merge.yml after the DEV deploy completes.
 #
-# For the run it switches the DEV backend to the non-delivering `log` email sink
-# and enables load-test auto-bind, then ALWAYS restores both. Scoped to DEV only.
+# All tests run in ONE job so the DEV backend is switched to the `log` email sink
+# + load-test auto-bind exactly once, then ALWAYS restored. Running them as separate
+# parallel jobs would race on the shared deployment's env toggle. Scoped to DEV only.
+#
+# Order matters: the queue-drain test runs FIRST, against the freshly-rolled-out
+# (empty) queue, so its drain measurement isn't polluted by the ramps' backlog.
 on:
+  # TEMPORARY (remove before merge): lets this branch run the suite against PR-159
+  # so we can validate it end-to-end without merging to main.
+  push:
+    branches: [CCP-5158-load-testing]
   workflow_dispatch:
     inputs:
+      target:
+        description: Target env — "dev" or a PR number (e.g. 159)
+        default: "dev"
+        type: string
       target_rps:
-        description: Peak requests/sec for the ramp
+        description: Peak requests/sec for the ramps
         default: "50"
         type: string
       ramp_seconds:
-        description: Seconds per ramp stage (total run ≈ 3× this + 15s)
+        description: Seconds per ramp stage (each ramp ≈ 3× this + 15s)
         default: "60"
+        type: string
+      burst_size:
+        description: Notifications to enqueue for the queue-drain test
+        default: "1000"
         type: string
   workflow_call:
     inputs:
+      target:
+        default: "dev"
+        type: string
       target_rps:
         default: "50"
         type: string
       ramp_seconds:
         default: "60"
+        type: string
+      burst_size:
+        default: "1000"
         type: string
 
 permissions: {}
 
 jobs:
-  backend-ingress:
-    name: Backend ingress (DEV)
+  load-suite:
+    name: Load suite (DEV)
     runs-on: ubuntu-24.04
-    # Sized for: rollouts (~6m) + ramp (3×ramp_seconds + 15s) + overhead.
-    # Raise if you dispatch a long/soak ramp.
     timeout-minutes: 60
     permissions:
       contents: read
     env:
-      # DEV backend deployment (release == <repo>-dev) + shared DEV gateway host.
-      # The DEV gateway has no PR path prefix, so requests go straight to /api.
-      DEPLOYMENT: ${{ github.event.repository.name }}-dev-backend
-      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}/api
+      # `inputs.target || '159'`: the `|| '159'` is TEMPORARY — push-triggered branch
+      # runs carry no inputs, so this makes them target PR-159. Before merge, remove
+      # the `|| '159'` fallbacks (leaving `inputs.target`) and the push: trigger above.
+      # dev → no path prefix; a PR number → /pr-<N> prefix (shared gateway host).
+      DEPLOYMENT: ${{ github.event.repository.name }}-${{ inputs.target || '159' }}-backend
+      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}${{ (inputs.target || '159') == 'dev' && '/api' || format('/pr-{0}/api', inputs.target || '159') }}
     steps:
       - uses: actions/checkout@v6
 
-      # 1. Switch DEV backend to the email sink + enable auto-bind for this run.
+      # ── Setup: sink + auto-bind (once) ────────────────────────────────────
       - name: Enable email sink + auto-bind
         uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
@@ -56,9 +78,6 @@ jobs:
             oc set env deployment/${{ env.DEPLOYMENT }} DELIVERY_EMAIL_ADAPTER=log LOADTEST_AUTOBIND_ENABLED=true
             oc rollout status deployment/${{ env.DEPLOYMENT }} --timeout=180s
 
-      # 2. Bind the load-test API key to a throwaway tenant via the gateway.
-      #    `|| true` keeps `bash -e` from aborting on a transient curl error so the
-      #    loop can retry; cstarTenantId is ignored in auto-bind mode.
       - name: Auto-bind load-test API key
         env:
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
@@ -74,9 +93,76 @@ jobs:
           done
           echo "::error::Auto-bind failed after retries"; exit 1
 
-      # 3. Run the ingress ramp through the DEV gateway.
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1
-      - uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
+
+      # ── Queue-drain FIRST (empty baseline) ────────────────────────────────
+      - name: Queue-drain burst (producer)
+        continue-on-error: true
+        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
+        env:
+          BACKEND_URL: ${{ env.GATEWAY_URL }}
+          API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          BURST_SIZE: ${{ inputs.burst_size }}
+        with:
+          path: ./tests/load/drain-test.js
+
+      # Sample Bull queue depth in Redis until empty → drain rate + peak depth.
+      - name: Measure queue drain
+        if: always()
+        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        with:
+          oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            POD=$(oc get pods -l app.kubernetes.io/name=redis --field-selector=status.phase=Running \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            if [ -z "$POD" ]; then
+              echo "WARN: no running redis pod found (label app.kubernetes.io/name=redis)."
+              echo "> Queue-drain not measured — redis pod/label needs confirmation." > summary-drain.md
+              exit 0
+            fi
+            echo "redis pod: $POD"
+            rc() { oc exec "$POD" -- sh -c "redis-cli -a \"\$REDIS_PASSWORD\" --no-auth-warning $*" 2>/dev/null | tr -d '\r'; }
+            depth() {
+              t=0
+              for q in ingestion email-delivery; do
+                for s in wait active; do n=$(rc LLEN "bull:$q:$s"); t=$((t + ${n:-0})); done
+              done
+              echo "$t"
+            }
+            burst=${{ inputs.burst_size }}
+            start=$SECONDS; peak=0
+            while :; do
+              d=$(depth); [ "${d:-0}" -gt "$peak" ] && peak=$d
+              el=$((SECONDS - start))
+              echo "t=${el}s depth=${d}"
+              [ "${d:-0}" -le 0 ] && break
+              [ "$el" -ge 1800 ] && { echo "drain timed out at 1800s"; break; }
+              sleep 5
+            done
+            el=$((SECONDS - start))
+            rate=$([ "$el" -gt 0 ] && echo $((burst / el)) || echo "n/a")
+            {
+              echo "<!-- load-test-report:drain -->"
+              echo "## 🚀 Load test — queue drain"
+              echo ""
+              echo "| Metric | Value |"
+              echo "| --- | --- |"
+              echo "| Burst size | ${burst} |"
+              echo "| Peak queue depth | ${peak} |"
+              echo "| Drain time (post-burst → empty) | ${el}s |"
+              echo "| Approx drain rate | ${rate} msg/s |"
+              echo ""
+              echo "_Ingestion worker concurrency is the primary drain bottleneck (default 1)._"
+            } > summary-drain.md
+            cat summary-drain.md
+
+      # ── Ramps (continue-on-error so every test runs + reports; the final
+      #    "Evaluate" step fails the job if any breached its thresholds) ──────
+      - name: Ingress ramp
+        continue-on-error: true
+        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
         env:
           BACKEND_URL: ${{ env.GATEWAY_URL }}
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
@@ -85,30 +171,50 @@ jobs:
         with:
           path: ./tests/load/backend-test.js
 
-      # 3a. Persist raw + human-readable results as an artifact.
-      - name: Upload load-test summary
+      - name: Template-render ramp
+        continue-on-error: true
+        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
+        env:
+          BACKEND_URL: ${{ env.GATEWAY_URL }}
+          API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          TARGET_RPS: ${{ inputs.target_rps }}
+          RAMP_SECONDS: ${{ inputs.ramp_seconds }}
+          RUN_ID: ${{ github.run_id }}
+        with:
+          path: ./tests/load/templates-test.js
+
+      - name: Attachment + ClamAV ramp
+        continue-on-error: true
+        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
+        env:
+          BACKEND_URL: ${{ env.GATEWAY_URL }}
+          API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          RAMP_SECONDS: ${{ inputs.ramp_seconds }}
+        with:
+          path: ./tests/load/attachments-test.js
+
+      # ── Report + restore (always) ─────────────────────────────────────────
+      - name: Upload load-test summaries
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: load-test-summary
+          name: load-test-summaries
           path: |
-            summary.json
-            summary.md
+            summary*.json
+            summary*.md
           retention-days: 14
           if-no-files-found: warn
 
-      # 3b. Render the metrics on the workflow run's summary page.
-      - name: Publish summary to run
+      - name: Publish summaries to run
         if: always()
         run: |
-          if [ -f summary.md ]; then
-            cat summary.md >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No summary.md produced (k6 may not have started)." >> "$GITHUB_STEP_SUMMARY"
+          for f in summary.md summary-*.md; do
+            [ -f "$f" ] && { cat "$f" >> "$GITHUB_STEP_SUMMARY"; echo "" >> "$GITHUB_STEP_SUMMARY"; }
+          done
+          if ! ls summary*.md >/dev/null 2>&1; then
+            echo "No summaries produced." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # 4. ALWAYS restore DEV to its real email adapter + disable auto-bind,
-      #    even if the ramp failed or the run was cancelled.
       - name: Restore email adapter + disable auto-bind
         if: always()
         uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
@@ -119,3 +225,14 @@ jobs:
           commands: |
             oc set env deployment/${{ env.DEPLOYMENT }} DELIVERY_EMAIL_ADAPTER- LOADTEST_AUTOBIND_ENABLED-
             oc rollout status deployment/${{ env.DEPLOYMENT }} --timeout=180s
+
+      # Fail the run if any ramp breached its thresholds (tests used continue-on-error).
+      - name: Evaluate thresholds
+        if: always()
+        run: |
+          if grep -lq "❌ thresholds failed" summary*.md 2>/dev/null; then
+            echo "::error::One or more load tests breached their thresholds"
+            grep -l "❌ thresholds failed" summary*.md
+            exit 1
+          fi
+          echo "All load tests within thresholds (or no thresholds defined)."
