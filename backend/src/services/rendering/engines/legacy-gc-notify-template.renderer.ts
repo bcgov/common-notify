@@ -17,14 +17,6 @@ import type {
  *   Input:  "Hello ((firstName)) ((lastName))!"
  *   Params: { firstName: "John", lastName: "Doe" }
  *   Output: "Hello John Doe!"
- *
- * Conditional content is also supported: ((key??content))
- * The content is kept only when `key` resolves to a truthy value.
- *
- * Example:
- *   Input:  "Hello((under18?? Please get a parent to sign.))"
- *   Params: { under18: true }
- *   Output: "Hello Please get a parent to sign."
  */
 @Injectable()
 export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
@@ -89,11 +81,13 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
       return text
     }
 
+    let result = text
+
     // Replace all ((key)) patterns with values from personalisation
     // Pattern: (( followed by word characters/underscores followed by ))
     const placeholderRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)\)\)/g
 
-    let result = text.replace(placeholderRegex, (match, key) => {
+    result = result.replace(placeholderRegex, (match, key) => {
       const value = personalisation[key]
 
       // If key not found, leave placeholder as-is
@@ -108,44 +102,6 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
       return String(value)
     })
 
-    // Resolve conditional blocks after placeholders so any inside kept content are
-    // already substituted before the block is evaluated.
-    result = this.renderConditionals(result, personalisation)
-
     return result
-  }
-
-  /**
-   * Resolve GC Notify conditional blocks: ((key??content))
-   * The content is kept when `key` is truthy, otherwise the whole block is removed.
-   *
-   * @param text Template text
-   * @param personalisation Data for evaluating conditions
-   * @returns Text with conditional blocks resolved
-   */
-  private renderConditionals(text: string, personalisation: Record<string, string | any>): string {
-    // Pattern: (( key ?? content )) — content is non-greedy up to the closing ))
-    const conditionalRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)\?\?([\s\S]*?)\)\)/g
-
-    return text.replace(conditionalRegex, (_match, key: string, content: string) =>
-      this.isTruthy(personalisation[key]) ? content : '',
-    )
-  }
-
-  /**
-   * Determine whether a personalisation value enables conditional content.
-   * Mirrors GC Notify's str2bool: booleans pass through; strings are truthy when
-   * they read as an affirmative value.
-   */
-  private isTruthy(value: unknown): boolean {
-    if (typeof value === 'boolean') {
-      return value
-    }
-
-    if (value === undefined || value === null) {
-      return false
-    }
-
-    return ['yes', 'y', 'true', '1', 't'].includes(String(value).trim().toLowerCase())
   }
 }
