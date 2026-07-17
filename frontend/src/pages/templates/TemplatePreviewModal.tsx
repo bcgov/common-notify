@@ -5,6 +5,7 @@ import {
   Dialog,
   Modal,
   Switch,
+  TextArea,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -322,32 +323,44 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
                   </ToggleButtonGroup>
                 </div>
 
-                <div
-                  className={
-                    activeTab === 'rendered' && !hasApplied
-                      ? 'template-preview__output template-preview__output--disabled'
-                      : 'template-preview__output'
-                  }
-                >
-                  {activeTab === 'raw' ? (
-                    body
-                  ) : !hasApplied ? (
-                    <span className="template-preview__unavailable">
-                      <span className="template-preview__unavailable-title">
-                        Preview unavailable.
+                {activeTab === 'raw' ? (
+                  // Read-only textarea so the raw template can be selected and
+                  // scrolled; it sizes itself to its content and can still be
+                  // resized by hand. Wrapped (not given `className`) so the DS
+                  // base class survives — see the __field-text note above.
+                  <div className="template-preview__raw">
+                    <TextArea aria-label="Raw template" value={body} isReadOnly />
+                  </div>
+                ) : !hasApplied || error || loading ? (
+                  <div
+                    className={
+                      !hasApplied
+                        ? 'template-preview__output template-preview__output--disabled'
+                        : 'template-preview__output'
+                    }
+                  >
+                    {!hasApplied ? (
+                      <span className="template-preview__unavailable">
+                        <span className="template-preview__unavailable-title">
+                          Preview unavailable.
+                        </span>
+                        <span className="template-preview__unavailable-desc">
+                          Provide values for all variables to view the rendered template.
+                        </span>
                       </span>
-                      <span className="template-preview__unavailable-desc">
-                        Provide values for all variables to view the rendered template.
-                      </span>
-                    </span>
-                  ) : error ? (
-                    <span className="template-preview__error">{error}</span>
-                  ) : loading ? (
-                    <span className="template-preview__placeholder">Rendering preview...</span>
-                  ) : (
-                    rendered
-                  )}
-                </div>
+                    ) : error ? (
+                      <span className="template-preview__error">{error}</span>
+                    ) : (
+                      <span className="template-preview__placeholder">Rendering preview...</span>
+                    )}
+                  </div>
+                ) : (
+                  // Rendered output uses the same read-only, self-sizing textarea
+                  // as the Raw Template tab.
+                  <div className="template-preview__raw">
+                    <TextArea aria-label="Rendered preview" value={rendered} isReadOnly />
+                  </div>
+                )}
               </div>
             </div>
           </div>

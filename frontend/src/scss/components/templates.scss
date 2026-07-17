@@ -371,6 +371,28 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     }
   }
 
+  // Raw template textarea: grows to fit its content (up to the pane's scroll)
+  // while still being resizable by hand.
+  &__raw {
+    .bcds-react-aria-TextArea {
+      width: 100%;
+    }
+
+    .bcds-react-aria-TextArea--Input {
+      field-sizing: content;
+      resize: vertical;
+      min-height: 6rem;
+    }
+
+    // Keep a white field: the DS greys read-only inputs, but this one reads as
+    // content rather than a disabled control. Match the DS `[data-readonly]`
+    // selector so this override wins on specificity.
+    .bcds-react-aria-TextArea[data-readonly] > .bcds-react-aria-TextArea--Container,
+    .bcds-react-aria-TextArea[data-readonly] .bcds-react-aria-TextArea--Input {
+      background: var(--surface-color-forms-default, #fff);
+    }
+  }
+
   // "Preview unavailable" placeholder shown in the Rendered tab before Apply
   &__unavailable {
     display: flex;
