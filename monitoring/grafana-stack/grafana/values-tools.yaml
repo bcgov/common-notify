@@ -168,12 +168,6 @@ grafana.ini:
   explore:
     enabled: true
 
-  # OpenShift OAuth Integration - DISABLED for now
-  # Requires cluster-admin to create OAuthClient resource
-  # TODO: Work with platform team to enable OAuth
-  # auth.generic_oauth:
-  #   enabled: false
-
 # Service configuration
 service:
   type: ClusterIP
@@ -221,21 +215,12 @@ securityContext:
 # Environment variables
 env:
   TZ: America/Vancouver
-  GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
-    valueFrom:
-      secretKeyRef:
-        name: grafana-oauth-secret
-        key: client-secret
-        optional: true
 
-# RBAC - Required for OAuth integration
+# RBAC - Use OpenShift defaults
 rbac:
-  create: true
+  create: false
   pspEnabled: false
   namespaced: true
 
 serviceAccount:
-  create: true
-  name: grafana
-  annotations:
-    serviceaccounts.openshift.io/oauth-redirectreference.grafana: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"grafana"}}'
+  create: false  # Use default OpenShift service account
