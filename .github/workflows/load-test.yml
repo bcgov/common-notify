@@ -11,16 +11,8 @@ name: Load Test
 # Order matters: the queue-drain test runs FIRST, against the freshly-rolled-out
 # (empty) queue, so its drain measurement isn't polluted by the ramps' backlog.
 on:
-  # TEMPORARY (remove before merge): lets this branch run the suite against DEV
-  # so we can validate it end-to-end without merging to main.
-  push:
-    branches: [CCP-5158-load-testing]
   workflow_dispatch:
     inputs:
-      target:
-        description: Target env — "dev" or a PR number (e.g. 159)
-        default: "dev"
-        type: string
       target_rps:
         description: Peak requests/sec for the ramps
         default: "50"
@@ -35,9 +27,6 @@ on:
         type: string
   workflow_call:
     inputs:
-      target:
-        default: "dev"
-        type: string
       target_rps:
         default: "50"
         type: string
@@ -58,11 +47,10 @@ jobs:
     permissions:
       contents: read
     env:
-      # `inputs.target || 'dev'`: the `|| 'dev'` covers push-triggered branch runs
-      # (which carry no inputs) → target DEV. Harmless permanently; tidy it up with the
-      # push: trigger before merge. dev → no path prefix; a PR number → /pr-<N> prefix.
-      DEPLOYMENT: ${{ github.event.repository.name }}-${{ inputs.target || 'dev' }}-backend
-      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}${{ (inputs.target || 'dev') == 'dev' && '/api' || format('/pr-{0}/api', inputs.target || 'dev') }}
+      # DEV backend deployment (release == <repo>-dev) + shared DEV gateway host.
+      # The DEV gateway has no PR path prefix, so requests go straight to /api.
+      DEPLOYMENT: ${{ github.event.repository.name }}-dev-backend
+      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}/api
     steps:
       - uses: actions/checkout@v6
 
