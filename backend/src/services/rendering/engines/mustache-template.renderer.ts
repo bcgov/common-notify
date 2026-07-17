@@ -38,10 +38,7 @@ export class MustacheTemplateRenderer implements ITemplateRenderer {
     })
   }
 
-  renderSms(
-    context: RenderContext & { personalisation: Record<string, string> },
-    _options?: RenderOptions,
-  ): Promise<RenderedSms> {
+  renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     const body = Mustache.render(context.template.body, context.personalisation)
     return Promise.resolve({ body })
   }

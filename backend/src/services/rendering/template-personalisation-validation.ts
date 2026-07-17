@@ -10,15 +10,21 @@ const LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?[
 
 type MustacheToken = [string, string, number?, number?, MustacheToken[]?]
 
-export function extractTemplatePersonalisationKeys(template: Template): string[] {
+export function extractTemplatePersonalisationKeys(
+  template: Template,
+  personalisation?: Record<string, unknown>,
+): string[] {
   const placeholders = new Set<string>()
 
-  addPlaceholders(placeholders, extractPlaceholdersForEngine(template.engineCode, template.body))
+  addPlaceholders(
+    placeholders,
+    extractPlaceholdersForEngine(template.engineCode, template.body, personalisation),
+  )
 
   if (template.channelCode === NotificationChannel.EMAIL) {
     addPlaceholders(
       placeholders,
-      extractPlaceholdersForEngine(template.engineCode, template.subject),
+      extractPlaceholdersForEngine(template.engineCode, template.subject, personalisation),
     )
   }
 
@@ -28,13 +34,14 @@ export function extractTemplatePersonalisationKeys(template: Template): string[]
 function extractPlaceholdersForEngine(
   engineCode: TemplateEngine | string,
   text?: string,
+  personalisation?: Record<string, unknown>,
 ): string[] {
   switch (engineCode) {
     case TemplateEngine.LEGACY_GC_NOTIFY:
       return extractLegacyGcNotifyPlaceholders(text)
     case TemplateEngine.HANDLEBARS:
     case TemplateEngine.MJML:
-      return extractHandlebarsStylePlaceholders(text)
+      return extractHandlebarsStylePlaceholders(text, personalisation)
     case TemplateEngine.MUSTACHE:
       return extractMustachePlaceholders(text)
     default:
@@ -56,7 +63,10 @@ function extractLegacyGcNotifyPlaceholders(text?: string): string[] {
   return [...placeholders]
 }
 
-function extractHandlebarsStylePlaceholders(text?: string): string[] {
+function extractHandlebarsStylePlaceholders(
+  text?: string,
+  personalisation?: Record<string, unknown>,
+): string[] {
   if (!text) {
     return []
   }
@@ -64,12 +74,17 @@ function extractHandlebarsStylePlaceholders(text?: string): string[] {
   const placeholders = new Set<string>()
   const ast = Handlebars.parse(text) as any
 
-  visitHandlebarsNode(ast, placeholders, 0)
+  visitHandlebarsNode(ast, placeholders, 0, personalisation)
 
   return [...placeholders]
 }
 
-function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: number): void {
+function visitHandlebarsNode(
+  node: any,
+  placeholders: Set<string>,
+  scopedDepth: number,
+  personalisation?: Record<string, unknown>,
+): void {
   if (!node || typeof node !== 'object') {
     return
   }
@@ -77,7 +92,7 @@ function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: 
   switch (node.type) {
     case 'Program':
       for (const child of node.body || []) {
-        visitHandlebarsNode(child, placeholders, scopedDepth)
+        visitHandlebarsNode(child, placeholders, scopedDepth, personalisation)
       }
       return
     case 'MustacheStatement':
@@ -89,8 +104,21 @@ function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: 
         helperName === 'with' || helperName === 'each' ? scopedDepth + 1 : scopedDepth
 
       collectHandlebarsReference(node, placeholders, scopedDepth)
-      visitHandlebarsNode(node.program, placeholders, nextScopedDepth)
-      visitHandlebarsNode(node.inverse, placeholders, scopedDepth)
+      const selectedConditionalBranch = selectHandlebarsConditionalBranch(
+        node,
+        helperName,
+        scopedDepth,
+        personalisation,
+      )
+
+      if (selectedConditionalBranch === 'program') {
+        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation)
+      } else if (selectedConditionalBranch === 'inverse') {
+        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation)
+      } else {
+        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation)
+        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation)
+      }
       return
     }
     case 'PartialStatement':
@@ -99,7 +127,7 @@ function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: 
         collectHandlebarsExpression(param, placeholders, scopedDepth)
       }
       collectHandlebarsHash(node.hash, placeholders, scopedDepth)
-      visitHandlebarsNode(node.program, placeholders, scopedDepth)
+      visitHandlebarsNode(node.program, placeholders, scopedDepth, personalisation)
       return
     case 'SubExpression':
       collectHandlebarsReference(node, placeholders, scopedDepth)
@@ -107,6 +135,59 @@ function visitHandlebarsNode(node: any, placeholders: Set<string>, scopedDepth: 
     default:
       return
   }
+}
+
+function selectHandlebarsConditionalBranch(
+  node: any,
+  helperName: string | undefined,
+  scopedDepth: number,
+  personalisation?: Record<string, unknown>,
+): 'program' | 'inverse' | undefined {
+  if ((helperName !== 'if' && helperName !== 'unless') || scopedDepth !== 0 || !personalisation) {
+    return undefined
+  }
+
+  const condition = node.params?.[0]
+  if (condition?.type !== 'PathExpression' || condition.depth !== 0 || condition.data) {
+    return undefined
+  }
+
+  const resolved = resolveOwnPath(personalisation, condition.original)
+  if (!resolved.found) {
+    return undefined
+  }
+
+  const includeZero = node.hash?.pairs?.some(
+    (pair: any) => pair.key === 'includeZero' && pair.value?.value === true,
+  )
+  const conditionIsTruthy =
+    (includeZero && resolved.value === 0) || !Handlebars.Utils.isEmpty(resolved.value)
+  const rendersProgram = helperName === 'if' ? conditionIsTruthy : !conditionIsTruthy
+
+  return rendersProgram ? 'program' : 'inverse'
+}
+
+function resolveOwnPath(
+  personalisation: Record<string, unknown>,
+  path: unknown,
+): { found: boolean; value?: unknown } {
+  if (typeof path !== 'string' || !path) {
+    return { found: false }
+  }
+
+  let current: unknown = personalisation
+  for (const segment of path.split('.')) {
+    if (
+      typeof current !== 'object' ||
+      current === null ||
+      !Object.prototype.hasOwnProperty.call(current, segment)
+    ) {
+      return { found: false }
+    }
+    current = (current as Record<string, unknown>)[segment]
+  }
+
+  return { found: true, value: current }
 }
 
 function collectHandlebarsReference(

@@ -282,6 +282,18 @@ describe('TemplatesService', () => {
       )
     })
 
+    it('should preserve Legacy GC Notify empty substitution for present null values', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Static subject',
+        body: 'Status: ((status))',
+      }
+
+      const result = await service.renderTemplateContent(template, { status: null })
+
+      expect(result.body).toBe('Status: ')
+    })
+
     it('should throw a clean error when personalisation is null and placeholders are required', async () => {
       const template: Template = {
         ...mockTemplate,
@@ -362,6 +374,122 @@ describe('TemplatesService', () => {
       await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
         'Missing personalisation for template ID template-123: isBlocked',
       )
+    })
+
+    it('should not require Handlebars variables inside a false #if branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{/if}}',
+      }
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: false })
+
+      expect(result.body).toBe('')
+    })
+
+    it('should require Handlebars variables inside a true #if branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{/if}}',
+      }
+
+      await expect(service.renderTemplateContent(template, { isSubscribed: true })).rejects.toThrow(
+        'Missing personalisation for template ID template-123: name',
+      )
+    })
+
+    it('should validate only the selected Handlebars #if/else branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{else}}Reason: {{reason}}{{/if}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: true, reason: 'paused' }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: name')
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: false, name: 'Alice' }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: reason')
+    })
+
+    it('should apply inverse branch validation for Handlebars #unless', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#unless isSubscribed}}Hello {{name}}{{else}}Subscribed{{/unless}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: false }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: name')
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: true })
+      expect(result.body).toBe('Subscribed')
+    })
+
+    it('should still report a missing Handlebars condition key', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello{{/if}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: isSubscribed',
+      )
+    })
+
+    it('should preserve Handlebars #each scoping and typed arrays', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#each articles}}{{title}} by {{author}};{{/each}}',
+      }
+
+      const emptyResult = await service.renderTemplateContent(template, { articles: [] })
+      expect(emptyResult.body).toBe('')
+
+      const populatedResult = await service.renderTemplateContent(template, {
+        articles: [{ title: 'One', author: 'Ada' }],
+      })
+      expect(populatedResult.body).toBe('One by Ada;')
+    })
+
+    it('should preserve typed false values for Mustache sections', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: 'Static subject',
+        body: '{{#isSubscribed}}Hello {{name}}{{/isSubscribed}}',
+      }
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: false })
+
+      expect(result.body).toBe('')
+    })
+
+    it('should apply value-aware Handlebars validation to email subject and body', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: '{{#if includeSubject}}Hello {{subjectName}}{{/if}}',
+        body: '{{#if includeBody}}Body for {{bodyName}}{{/if}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, {
+          includeSubject: false,
+          includeBody: true,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: bodyName')
+
+      await expect(
+        service.renderTemplateContent(template, {
+          includeSubject: true,
+          includeBody: false,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: subjectName')
     })
 
     it('should throw BadRequestException for missing Mustache personalisation', async () => {

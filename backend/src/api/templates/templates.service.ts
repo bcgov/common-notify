@@ -245,12 +245,6 @@ export class TemplatesService {
 
     this.validateTemplatePersonalisation(template, normalizedPersonalisation)
 
-    // Convert all personalisation values to strings for template rendering
-    const stringPersonalisation: Record<string, string> = {}
-    for (const [key, value] of Object.entries(normalizedPersonalisation)) {
-      stringPersonalisation[key] = value !== null && value !== undefined ? String(value) : ''
-    }
-
     // Get the renderer for this template's engine
     const engineName = this.mapEngineToRendererName(template.engineCode as TemplateEngine)
     const renderer = this.rendererRegistry.getRenderer(engineName)
@@ -273,10 +267,20 @@ export class TemplatesService {
       engine: engineName,
     }
 
+    const renderPersonalisation =
+      template.engineCode === TemplateEngine.LEGACY_GC_NOTIFY
+        ? Object.fromEntries(
+            Object.entries(normalizedPersonalisation).map(([key, value]) => [
+              key,
+              value !== null && value !== undefined ? String(value) : '',
+            ]),
+          )
+        : normalizedPersonalisation
+
     // Render the template
     const renderContext = {
       template: templateDef,
-      personalisation: stringPersonalisation,
+      personalisation: renderPersonalisation,
     }
 
     const rendered = await renderer.renderEmail(renderContext)
@@ -331,7 +335,7 @@ export class TemplatesService {
     template: Template,
     personalisation: Record<string, any>,
   ): void {
-    const requiredKeys = extractTemplatePersonalisationKeys(template)
+    const requiredKeys = extractTemplatePersonalisationKeys(template, personalisation)
 
     const missingKeys = requiredKeys.filter(
       (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
