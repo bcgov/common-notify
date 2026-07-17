@@ -95,9 +95,10 @@ export const selectShouldFetchFeatureFlags = createSelector(
 )
 
 /**
- * Get all feature flags list for admin view
+ * Get all feature flags list for admin view, sorted by creation date (stable order)
  */
-export const selectAllFeatureFlagsList = createSelector(
-  [selectFeatureFlagsState],
-  (state) => state.flagsList,
+export const selectAllFeatureFlagsList = createSelector([selectFeatureFlagsState], (state) =>
+  [...state.flagsList].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  ),
 )

@@ -1,12 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { getRepositoryToken } from '@nestjs/typeorm'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { BadRequestException } from '@nestjs/common'
 import { GcNotifyController } from './gc-notify.controller'
 import { GcNotifyApiClient } from './gc-notify-api.client'
+import { GcNotifyRoutingService } from './gc-notify-routing.service'
+import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { ApiKeyConsumer } from '../api-keys/entities/api-key-consumer.entity'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
 import { CreateSmsNotificationRequest } from './schemas/create-sms-notification-request'
 import { PostBulkRequest } from './schemas/post-bulk-request'
-import type * as express from 'express'
 
 describe('GcNotifyController', () => {
   let controller: GcNotifyController
@@ -21,23 +25,48 @@ describe('GcNotifyController', () => {
     getTemplate: vi.fn(),
   }
 
-  const makeReq = (apiKey?: string): express.Request => {
-    return {
-      headers: apiKey ? { authorization: `ApiKey-v1 ${apiKey}` } : {},
-    } as unknown as express.Request
+  const mockGcNotifyRoutingService = {
+    shouldExecuteInternally: vi.fn(),
   }
 
-  const VALID_KEY = 'test-api-key-abc123'
-  const EXPECTED_AUTH_HEADER = `ApiKey-v1 ${VALID_KEY}`
+  const mockGcNotifyInternalExecutionService = {
+    sendEmail: vi.fn(),
+    sendSms: vi.fn(),
+    getNotifications: vi.fn(),
+    getNotificationById: vi.fn(),
+    getTemplates: vi.fn(),
+    getTemplate: vi.fn(),
+  }
+
+  const TENANT_ID = 'tenant-1'
+  const TENANT_EXTERNAL_ID = 'ext-tenant-1'
+  const AUTH_HEADER = 'ApiKey-v1 test-api-key-abc123'
+
+  // Guards run before the controller in production; for these unit tests we
+  // simulate what GcNotifyServiceGuard already attached to the request.
+  const makeReq = () =>
+    ({
+      gcNotifyAuthHeader: AUTH_HEADER,
+      tenantId: TENANT_ID,
+      tenantExternalId: TENANT_EXTERNAL_ID,
+    }) as any
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GcNotifyController],
       providers: [
+        { provide: GcNotifyApiClient, useValue: mockGcNotifyApiClient },
+        { provide: GcNotifyRoutingService, useValue: mockGcNotifyRoutingService },
         {
-          provide: GcNotifyApiClient,
-          useValue: mockGcNotifyApiClient,
+          provide: GcNotifyInternalExecutionService,
+          useValue: mockGcNotifyInternalExecutionService,
         },
+        // GcNotifyServiceGuard is referenced by @UseGuards() on the controller, so
+        // Nest's DI container instantiates it during module compilation even
+        // though guards aren't executed when calling controller methods directly
+        // in these unit tests - its repository dependencies just need to resolve.
+        { provide: getRepositoryToken(Tenant), useValue: {} },
+        { provide: getRepositoryToken(ApiKeyConsumer), useValue: {} },
       ],
     }).compile()
 
@@ -48,37 +77,19 @@ describe('GcNotifyController', () => {
     vi.clearAllMocks()
   })
 
-  describe('requireAuthHeader (via any endpoint)', () => {
-    it('should throw BadRequestException when Authorization header is missing', async () => {
-      await expect(controller.getTemplates(undefined, makeReq())).rejects.toThrow(
-        BadRequestException,
-      )
-    })
-
-    it('should throw BadRequestException when Authorization header is blank', async () => {
-      await expect(controller.getTemplates(undefined, makeReq('   '))).rejects.toThrow(
-        BadRequestException,
-      )
-    })
-
-    it('should prefix the key with ApiKey-v1 and pass it through', async () => {
-      mockGcNotifyApiClient.getTemplates.mockResolvedValue({ templates: [] })
-      await controller.getTemplates(undefined, makeReq(VALID_KEY))
-      expect(mockGcNotifyApiClient.getTemplates).toHaveBeenCalledWith(
-        undefined,
-        EXPECTED_AUTH_HEADER,
-      )
-    })
-  })
-
   describe('getNotifications', () => {
-    it('should return a list of notifications', async () => {
-      const expected = { notifications: [], links: { current: '/api/gcnotify/v2/notifications' } }
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
+      const expected = { notifications: [], links: { current: '/gcnotify/v2/notifications' } }
       mockGcNotifyApiClient.getNotifications.mockResolvedValue(expected)
 
-      const result = await controller.getNotifications(makeReq(VALID_KEY))
+      const result = await controller.getNotifications(makeReq())
 
       expect(result).toEqual(expected)
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_NOTIFICATIONS,
+        TENANT_ID,
+      )
       expect(mockGcNotifyApiClient.getNotifications).toHaveBeenCalledWith(
         {
           template_type: undefined,
@@ -87,42 +98,36 @@ describe('GcNotifyController', () => {
           older_than: undefined,
           include_jobs: undefined,
         },
-        EXPECTED_AUTH_HEADER,
+        AUTH_HEADER,
       )
+      expect(mockGcNotifyInternalExecutionService.getNotifications).not.toHaveBeenCalled()
     })
 
-    it('should pass query filters through to the client', async () => {
-      mockGcNotifyApiClient.getNotifications.mockResolvedValue({ notifications: [], links: {} })
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = { notifications: [], links: { current: '/gcnotify/v2/notifications' } }
+      mockGcNotifyInternalExecutionService.getNotifications.mockResolvedValue(expected)
 
-      await controller.getNotifications(
-        makeReq(VALID_KEY),
-        'email',
-        ['delivered', 'failed'],
-        'ref-1',
-        'uuid-older',
-        true,
-      )
+      const result = await controller.getNotifications(makeReq(), 'email')
 
-      expect(mockGcNotifyApiClient.getNotifications).toHaveBeenCalledWith(
-        {
-          template_type: 'email',
-          status: ['delivered', 'failed'],
-          reference: 'ref-1',
-          older_than: 'uuid-older',
-          include_jobs: true,
-        },
-        EXPECTED_AUTH_HEADER,
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.getNotifications).toHaveBeenCalledWith(
+        expect.objectContaining({ template_type: 'email' }),
+        TENANT_ID,
+        TENANT_EXTERNAL_ID,
       )
+      expect(mockGcNotifyApiClient.getNotifications).not.toHaveBeenCalled()
     })
 
-    it('should coerce a single status string into an array', async () => {
+    it('coerces a single status string into an array', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       mockGcNotifyApiClient.getNotifications.mockResolvedValue({ notifications: [], links: {} })
 
-      await controller.getNotifications(makeReq(VALID_KEY), undefined, 'delivered')
+      await controller.getNotifications(makeReq(), undefined, 'delivered')
 
       expect(mockGcNotifyApiClient.getNotifications).toHaveBeenCalledWith(
         expect.objectContaining({ status: ['delivered'] }),
-        EXPECTED_AUTH_HEADER,
+        AUTH_HEADER,
       )
     })
   })
@@ -133,39 +138,44 @@ describe('GcNotifyController', () => {
       template_id: '12345678-1234-1234-1234-123456789012',
     }
 
-    it('should send an email notification successfully', async () => {
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       const expected = {
         id: 'notif-id-1',
         content: { from_email: 'sender@example.com', body: 'Hello', subject: 'Hi' },
-        uri: '/api/gcnotify/v2/notifications/notif-id-1',
-        template: { id: 'tpl-1', version: 1, uri: '/api/gcnotify/v2/templates/tpl-1' },
+        uri: '/gcnotify/v2/notifications/notif-id-1',
+        template: { id: 'tpl-1', version: 1, uri: '/gcnotify/v2/template/tpl-1' },
       }
       mockGcNotifyApiClient.sendEmail.mockResolvedValue(expected)
 
-      const result = await controller.sendEmail(emailBody, makeReq(VALID_KEY))
+      const result = await controller.sendEmail(emailBody, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyApiClient.sendEmail).toHaveBeenCalledWith(emailBody, EXPECTED_AUTH_HEADER)
-      expect(mockGcNotifyApiClient.sendEmail).toHaveBeenCalledTimes(1)
-    })
-
-    it('should send an email with personalisation', async () => {
-      const bodyWithPersonalisation: CreateEmailNotificationRequest = {
-        ...emailBody,
-        personalisation: { name: 'Alice' },
-      }
-      mockGcNotifyApiClient.sendEmail.mockResolvedValue({ id: 'notif-id-2' })
-
-      await controller.sendEmail(bodyWithPersonalisation, makeReq(VALID_KEY))
-
-      expect(mockGcNotifyApiClient.sendEmail).toHaveBeenCalledWith(
-        bodyWithPersonalisation,
-        EXPECTED_AUTH_HEADER,
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_EMAIL,
+        TENANT_ID,
       )
+      expect(mockGcNotifyApiClient.sendEmail).toHaveBeenCalledWith(emailBody, AUTH_HEADER)
+      expect(mockGcNotifyInternalExecutionService.sendEmail).not.toHaveBeenCalled()
     })
 
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.sendEmail(emailBody, makeReq())).rejects.toThrow(BadRequestException)
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = {
+        id: 'notif-id-2',
+        content: { from_email: 'sender@example.com', body: 'Hello', subject: 'Hi' },
+        uri: '/gcnotify/v2/notifications/notif-id-2',
+        template: { id: 'tpl-1', version: 1, uri: '/gcnotify/v2/template/tpl-1' },
+      }
+      mockGcNotifyInternalExecutionService.sendEmail.mockResolvedValue(expected)
+
+      const result = await controller.sendEmail(emailBody, makeReq())
+
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.sendEmail).toHaveBeenCalledWith(
+        emailBody,
+        TENANT_ID,
+      )
       expect(mockGcNotifyApiClient.sendEmail).not.toHaveBeenCalled()
     })
   })
@@ -176,24 +186,41 @@ describe('GcNotifyController', () => {
       template_id: '12345678-1234-1234-1234-123456789012',
     }
 
-    it('should send an SMS notification successfully', async () => {
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       const expected = {
         id: 'notif-sms-1',
         content: { body: 'Hello', from_number: '+10000000000' },
-        uri: '/api/gcnotify/v2/notifications/notif-sms-1',
-        template: { id: 'tpl-1', version: 1, uri: '/api/gcnotify/v2/templates/tpl-1' },
+        uri: '/gcnotify/v2/notifications/notif-sms-1',
+        template: { id: 'tpl-1', version: 1, uri: '/gcnotify/v2/template/tpl-1' },
       }
       mockGcNotifyApiClient.sendSms.mockResolvedValue(expected)
 
-      const result = await controller.sendSms(smsBody, makeReq(VALID_KEY))
+      const result = await controller.sendSms(smsBody, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyApiClient.sendSms).toHaveBeenCalledWith(smsBody, EXPECTED_AUTH_HEADER)
-      expect(mockGcNotifyApiClient.sendSms).toHaveBeenCalledTimes(1)
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_SMS,
+        TENANT_ID,
+      )
+      expect(mockGcNotifyApiClient.sendSms).toHaveBeenCalledWith(smsBody, AUTH_HEADER)
+      expect(mockGcNotifyInternalExecutionService.sendSms).not.toHaveBeenCalled()
     })
 
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.sendSms(smsBody, makeReq())).rejects.toThrow(BadRequestException)
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = {
+        id: 'notif-sms-2',
+        content: { body: 'Hello', from_number: '+10000000000' },
+        uri: '/gcnotify/v2/notifications/notif-sms-2',
+        template: { id: 'tpl-1', version: 1, uri: '/gcnotify/v2/template/tpl-1' },
+      }
+      mockGcNotifyInternalExecutionService.sendSms.mockResolvedValue(expected)
+
+      const result = await controller.sendSms(smsBody, makeReq())
+
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.sendSms).toHaveBeenCalledWith(smsBody, TENANT_ID)
       expect(mockGcNotifyApiClient.sendSms).not.toHaveBeenCalled()
     })
   })
@@ -208,72 +235,82 @@ describe('GcNotifyController', () => {
       ],
     }
 
-    it('should create a bulk notification job successfully', async () => {
+    it('always passes through to GcNotifyApiClient (no internal-execution toggle for bulk)', async () => {
       const expected = { data: { id: 'job-id-1', job_status: 'pending', notification_count: 1 } }
       mockGcNotifyApiClient.sendBulk.mockResolvedValue(expected)
 
-      const result = await controller.sendBulk(bulkBody, makeReq(VALID_KEY))
+      const result = await controller.sendBulk(bulkBody, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyApiClient.sendBulk).toHaveBeenCalledWith(bulkBody, EXPECTED_AUTH_HEADER)
-      expect(mockGcNotifyApiClient.sendBulk).toHaveBeenCalledTimes(1)
-    })
-
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.sendBulk(bulkBody, makeReq())).rejects.toThrow(BadRequestException)
-      expect(mockGcNotifyApiClient.sendBulk).not.toHaveBeenCalled()
+      expect(mockGcNotifyApiClient.sendBulk).toHaveBeenCalledWith(bulkBody, AUTH_HEADER)
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).not.toHaveBeenCalled()
     })
   })
 
   describe('getNotificationById', () => {
     const notificationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
-    it('should return a notification by ID', async () => {
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       const expected = { id: notificationId, type: 'email', status: 'delivered' }
       mockGcNotifyApiClient.getNotificationById.mockResolvedValue(expected)
 
-      const result = await controller.getNotificationById(notificationId, makeReq(VALID_KEY))
+      const result = await controller.getNotificationById(notificationId, makeReq())
 
       expect(result).toEqual(expected)
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_GET_NOTIFICATION,
+        TENANT_ID,
+      )
       expect(mockGcNotifyApiClient.getNotificationById).toHaveBeenCalledWith(
         notificationId,
-        EXPECTED_AUTH_HEADER,
+        AUTH_HEADER,
       )
     })
 
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.getNotificationById(notificationId, makeReq())).rejects.toThrow(
-        BadRequestException,
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = { id: notificationId, type: 'email', status: 'delivered' }
+      mockGcNotifyInternalExecutionService.getNotificationById.mockResolvedValue(expected)
+
+      const result = await controller.getNotificationById(notificationId, makeReq())
+
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.getNotificationById).toHaveBeenCalledWith(
+        notificationId,
+        TENANT_ID,
       )
       expect(mockGcNotifyApiClient.getNotificationById).not.toHaveBeenCalled()
     })
   })
 
   describe('getTemplates', () => {
-    it('should return a list of all templates', async () => {
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       const expected = { templates: [{ id: 'tpl-1', name: 'My Template', type: 'email' }] }
       mockGcNotifyApiClient.getTemplates.mockResolvedValue(expected)
 
-      const result = await controller.getTemplates(undefined, makeReq(VALID_KEY))
+      const result = await controller.getTemplates(undefined, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyApiClient.getTemplates).toHaveBeenCalledWith(
-        undefined,
-        EXPECTED_AUTH_HEADER,
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_TEMPLATES,
+        TENANT_ID,
       )
+      expect(mockGcNotifyApiClient.getTemplates).toHaveBeenCalledWith(undefined, AUTH_HEADER)
     })
 
-    it('should filter templates by type', async () => {
-      mockGcNotifyApiClient.getTemplates.mockResolvedValue({ templates: [] })
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = { templates: [] }
+      mockGcNotifyInternalExecutionService.getTemplates.mockResolvedValue(expected)
 
-      await controller.getTemplates('sms', makeReq(VALID_KEY))
+      const result = await controller.getTemplates('sms', makeReq())
 
-      expect(mockGcNotifyApiClient.getTemplates).toHaveBeenCalledWith('sms', EXPECTED_AUTH_HEADER)
-    })
-
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.getTemplates(undefined, makeReq())).rejects.toThrow(
-        BadRequestException,
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.getTemplates).toHaveBeenCalledWith(
+        'sms',
+        TENANT_ID,
       )
       expect(mockGcNotifyApiClient.getTemplates).not.toHaveBeenCalled()
     })
@@ -282,22 +319,32 @@ describe('GcNotifyController', () => {
   describe('getTemplate', () => {
     const templateId = '11111111-2222-3333-4444-555555555555'
 
-    it('should return a template by ID', async () => {
+    it('passes through to GcNotifyApiClient when internal routing is disabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
       const expected = { id: templateId, name: 'My Template', type: 'email', body: 'Hello' }
       mockGcNotifyApiClient.getTemplate.mockResolvedValue(expected)
 
-      const result = await controller.getTemplate(templateId, makeReq(VALID_KEY))
+      const result = await controller.getTemplate(templateId, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyApiClient.getTemplate).toHaveBeenCalledWith(
-        templateId,
-        EXPECTED_AUTH_HEADER,
+      expect(mockGcNotifyRoutingService.shouldExecuteInternally).toHaveBeenCalledWith(
+        FeatureFlagCode.GC_NOTIFY_ROUTE_GET_TEMPLATE,
+        TENANT_ID,
       )
+      expect(mockGcNotifyApiClient.getTemplate).toHaveBeenCalledWith(templateId, AUTH_HEADER)
     })
 
-    it('should throw when GC Notify api key header is missing', async () => {
-      await expect(controller.getTemplate(templateId, makeReq())).rejects.toThrow(
-        BadRequestException,
+    it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
+      const expected = { id: templateId, name: 'My Template', type: 'email', body: 'Hello' }
+      mockGcNotifyInternalExecutionService.getTemplate.mockResolvedValue(expected)
+
+      const result = await controller.getTemplate(templateId, makeReq())
+
+      expect(result).toEqual(expected)
+      expect(mockGcNotifyInternalExecutionService.getTemplate).toHaveBeenCalledWith(
+        templateId,
+        TENANT_ID,
       )
       expect(mockGcNotifyApiClient.getTemplate).not.toHaveBeenCalled()
     })
