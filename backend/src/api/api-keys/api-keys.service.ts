@@ -202,9 +202,7 @@ export class ApiKeysService {
     // the namespace is the reliable discriminator.)
     const namespace = process.env.NAMESPACE || ''
     if (namespace.includes('-test') || namespace.includes('-prod')) {
-      this.logger.error(
-        `[LOADTEST] Refusing auto-bind in protected namespace "${namespace}"`,
-      )
+      this.logger.error(`[LOADTEST] Refusing auto-bind in protected namespace "${namespace}"`)
       throw new ForbiddenException('Load-test auto-bind is disabled in this environment')
     }
 
