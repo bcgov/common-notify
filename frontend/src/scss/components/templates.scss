@@ -219,6 +219,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     justify-content: space-between;
     align-items: center;
     align-self: stretch;
+    border-bottom: 1px solid var(--surface-color-border-base, #d8d8d8);
   }
 
   &__title {
