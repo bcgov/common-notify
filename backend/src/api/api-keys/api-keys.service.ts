@@ -184,4 +184,71 @@ export class ApiKeysService {
     )
     return saved
   }
+
+  /**
+   * Load-test-only: bind an API key to a dedicated throwaway load-test tenant,
+   * creating that tenant on first use. No JWT / CSTAR membership check.
+   *
+   * Callable ONLY when loadtest.autobindEnabled is true (guarded upstream). Exists so
+   * a load test running against an ephemeral PR dev environment can authenticate
+   * without a manual binding step. Idempotent.
+   */
+  async autoBindApiKeyForLoadTest(
+    credentialIdentifier: string,
+    consumerId: string,
+  ): Promise<ApiKeyConsumer> {
+    // Defense-in-depth: refuse to auto-bind in test/prod namespaces even if the
+    // config flag were somehow enabled there. (All envs run NODE_ENV=production, so
+    // the namespace is the reliable discriminator.)
+    const namespace = process.env.NAMESPACE || ''
+    if (namespace.includes('-test') || namespace.includes('-prod')) {
+      this.logger.error(`[LOADTEST] Refusing auto-bind in protected namespace "${namespace}"`)
+      throw new ForbiddenException('Load-test auto-bind is disabled in this environment')
+    }
+
+    const LOADTEST_SLUG = 'loadtest-tenant'
+    const now = new Date()
+
+    let tenant = await this.tenantRepository.findOne({ where: { slug: LOADTEST_SLUG } })
+    if (!tenant) {
+      // `status` column has a DB default of 'active' and is insert:false on the entity.
+      tenant = await this.tenantRepository.save(
+        this.tenantRepository.create({
+          externalId: 'loadtest',
+          name: 'Load Test Tenant',
+          slug: LOADTEST_SLUG,
+          isDeleted: false,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
+      this.logger.warn(`[LOADTEST] Created load-test tenant ${tenant.id}`)
+    }
+
+    const existing = await this.apiKeyConsumerRepository.findOne({
+      where: { credentialIdentifier },
+    })
+    if (existing) {
+      if (existing.tenantId !== tenant.id) {
+        existing.tenantId = tenant.id
+        existing.updatedAt = now
+        await this.apiKeyConsumerRepository.save(existing)
+      }
+      return existing
+    }
+
+    const mapping = this.apiKeyConsumerRepository.create({
+      credentialIdentifier,
+      consumerId: consumerId || undefined,
+      tenantId: tenant.id,
+      boundByIdirGuid: 'loadtest-autobind',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const saved = await this.apiKeyConsumerRepository.save(mapping)
+    this.logger.warn(
+      `[LOADTEST] Auto-bound credential ${credentialIdentifier} to load-test tenant ${tenant.id}`,
+    )
+    return saved
+  }
 }
