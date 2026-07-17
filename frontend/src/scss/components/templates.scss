@@ -203,23 +203,17 @@
 $preview-pane-height: 70vh; // Visible height of each pane
 $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
 
+.bcds-react-aria-Modal:has(.template-preview) {
+  width: 1140px;
+  max-width: calc(100vw - #{$preview-gutter});
+}
+
+.react-aria-ModalOverlay:has(.template-preview) {
+  background: transparent;
+}
+
 .template-preview {
-  display: block;
-  z-index: 1050;
-
-  &__backdrop {
-    z-index: 1040;
-    // No dimmed overlay behind the modal
-    background-color: transparent;
-  }
-
-  .modal-content {
-    box-shadow:
-      0 4.8px 14.4px 0 rgba(0, 0, 0, 0.18),
-      0 25.6px 57.6px 0 rgba(0, 0, 0, 0.22);
-  }
-
-  .modal-header {
+  &__header {
     display: flex;
     padding: var(--layout-padding-medium, 16px) var(--layout-padding-large, 24px);
     justify-content: space-between;
@@ -227,7 +221,7 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     align-self: stretch;
   }
 
-  .modal-title {
+  &__title {
     color: var(--typography-color-primary, #2d2d2d);
     /* bold/H5 */
     font-family: 'BC Sans';
@@ -250,7 +244,6 @@ $preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
     max-width: 37%;
     overflow-y: auto;
     padding: var(--layout-padding-large, 24px);
-    border-right: 1px solid $border-default;
   }
 
   &__preview {

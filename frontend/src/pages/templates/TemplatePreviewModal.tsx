@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import {
   Button,
+  Dialog,
+  Modal,
   Switch,
   TextField,
   ToggleButton,
@@ -197,176 +199,161 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
-  // Disable scrolling while modal is open
-  useEffect(() => {
-    if (!isOpen) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [isOpen])
-
-  if (!isOpen) return null
-
   const handleValueChange = (name: string) => (value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }))
     dispatch(setPreviewValues({ [name]: value }))
   }
 
   return (
-    <>
-      <div className="modal-backdrop fade show template-preview__backdrop" />
-      <div
-        className="modal show template-preview"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="template-preview-title"
-      >
-        <div className="modal-dialog modal-xl modal-dialog-centered">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title" id="template-preview-title">
-                Email Notification Preview
-              </h5>
-              <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
+    <Modal
+      isOpen={isOpen}
+      isDismissable
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <Dialog aria-labelledby="template-preview-title">
+        <div className="template-preview">
+          <div className="template-preview__header">
+            <h5 className="template-preview__title" id="template-preview-title">
+              Email Notification Preview
+            </h5>
+          </div>
+
+          <div className="template-preview__body">
+            {/* Left pane: variable inputs */}
+            <div className="template-preview__data">
+              <h6 className="template-preview__heading">Preview data</h6>
+              <p className="template-preview__intro">
+                Enter values for all variables to view the rendered template.
+              </p>
+
+              {variables.length === 0 ? (
+                <p className="template-preview__intro">No variables found.</p>
+              ) : (
+                <div className="template-preview__fields">
+                  {variables.map((variable) =>
+                    variable.type === 'boolean' ? (
+                      <div key={variable.name} className="template-preview__field-switch">
+                        <span className="template-preview__switch-label">{variable.name}</span>
+                        <Switch
+                          isSelected={(values[variable.name] ?? 'true') === 'true'}
+                          onChange={(isSelected) =>
+                            handleValueChange(variable.name)(isSelected ? 'true' : 'false')
+                          }
+                        >
+                          {(values[variable.name] ?? 'true') === 'true' ? 'True' : 'False'}
+                        </Switch>
+                      </div>
+                    ) : (
+                      // Wrap rather than pass `className` to TextField: the DS
+                      // spreads props over its own `bcds-react-aria-TextField`
+                      // class, so a className here would strip it and break the
+                      // `[data-invalid]` red border.
+                      <div key={variable.name} className="template-preview__field-text">
+                        <TextField
+                          label={variable.name}
+                          value={values[variable.name] ?? ''}
+                          onChange={handleValueChange(variable.name)}
+                          isRequired
+                          isInvalid={showErrors && isMissing(variable.name)}
+                          errorMessage="Enter a value to generate the preview"
+                          // The DS TextField omits `placeholder` from its types, but
+                          // react-aria's useTextField still forwards it to the input.
+                          {...({ placeholder: `Enter text...` } as { placeholder?: string })}
+                        />
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+
+              <div className="template-preview__apply">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onPress={() => {
+                    setActiveTab('rendered')
+                    if (hasMissing) {
+                      // Surface field errors and keep the preview unavailable.
+                      setShowErrors(true)
+                      setHasApplied(false)
+                    } else {
+                      setShowErrors(false)
+                      setHasApplied(true)
+                      void runPreview(values)
+                    }
+                  }}
+                  isDisabled={loading || !canApply}
+                >
+                  {loading ? 'Applying...' : 'Apply to Preview'}
+                </Button>
+              </div>
             </div>
 
-            <div className="modal-body template-preview__body">
-              {/* Left pane: variable inputs */}
-              <div className="template-preview__data">
-                <h6 className="template-preview__heading">Preview data</h6>
+            {/* Right pane: preview output */}
+            <div className="template-preview__preview">
+              <div className="template-preview__preview-main">
+                <h6 className="template-preview__heading">Show preview</h6>
                 <p className="template-preview__intro">
-                  Enter values for all variables to view the rendered template.
+                  Preview how your template will appear using the provided values.
                 </p>
 
-                {variables.length === 0 ? (
-                  <p className="template-preview__intro">No variables found.</p>
-                ) : (
-                  <div className="template-preview__fields">
-                    {variables.map((variable) =>
-                      variable.type === 'boolean' ? (
-                        <div key={variable.name} className="template-preview__field-switch">
-                          <span className="template-preview__switch-label">{variable.name}</span>
-                          <Switch
-                            isSelected={(values[variable.name] ?? 'true') === 'true'}
-                            onChange={(isSelected) =>
-                              handleValueChange(variable.name)(isSelected ? 'true' : 'false')
-                            }
-                          >
-                            {(values[variable.name] ?? 'true') === 'true' ? 'True' : 'False'}
-                          </Switch>
-                        </div>
-                      ) : (
-                        // Wrap rather than pass `className` to TextField: the DS
-                        // spreads props over its own `bcds-react-aria-TextField`
-                        // class, so a className here would strip it and break the
-                        // `[data-invalid]` red border.
-                        <div key={variable.name} className="template-preview__field-text">
-                          <TextField
-                            label={variable.name}
-                            value={values[variable.name] ?? ''}
-                            onChange={handleValueChange(variable.name)}
-                            isRequired
-                            isInvalid={showErrors && isMissing(variable.name)}
-                            errorMessage="Enter a value to generate the preview"
-                            // The DS TextField omits `placeholder` from its types, but
-                            // react-aria's useTextField still forwards it to the input.
-                            {...({ placeholder: `Enter text...` } as { placeholder?: string })}
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
-                )}
-
-                <div className="template-preview__apply">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onPress={() => {
-                      setActiveTab('rendered')
-                      if (hasMissing) {
-                        // Surface field errors and keep the preview unavailable.
-                        setShowErrors(true)
-                        setHasApplied(false)
-                      } else {
-                        setShowErrors(false)
-                        setHasApplied(true)
-                        void runPreview(values)
+                <div className="template-preview__tabs">
+                  <ToggleButtonGroup
+                    aria-label="Preview mode"
+                    selectionMode="single"
+                    disallowEmptySelection
+                    selectedKeys={[activeTab]}
+                    size="small"
+                    onSelectionChange={(keys) => {
+                      const [selected] = keys
+                      if (selected != null) {
+                        setActiveTab(selected as 'rendered' | 'raw')
                       }
                     }}
-                    isDisabled={loading || !canApply}
                   >
-                    {loading ? 'Applying...' : 'Apply to Preview'}
-                  </Button>
+                    <ToggleButton id="rendered" size="small">
+                      Rendered Preview
+                    </ToggleButton>
+                    <ToggleButton id="raw" size="small">
+                      Raw Template
+                    </ToggleButton>
+                  </ToggleButtonGroup>
                 </div>
-              </div>
 
-              {/* Right pane: preview output */}
-              <div className="template-preview__preview">
-                <div className="template-preview__preview-main">
-                  <h6 className="template-preview__heading">Show preview</h6>
-                  <p className="template-preview__intro">
-                    Preview how your template will appear using the provided values.
-                  </p>
-
-                  <div className="template-preview__tabs">
-                    <ToggleButtonGroup
-                      aria-label="Preview mode"
-                      selectionMode="single"
-                      disallowEmptySelection
-                      selectedKeys={[activeTab]}
-                      size="small"
-                      onSelectionChange={(keys) => {
-                        const [selected] = keys
-                        if (selected != null) {
-                          setActiveTab(selected as 'rendered' | 'raw')
-                        }
-                      }}
-                    >
-                      <ToggleButton id="rendered" size="small">
-                        Rendered Preview
-                      </ToggleButton>
-                      <ToggleButton id="raw" size="small">
-                        Raw Template
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </div>
-
-                  <div
-                    className={
-                      activeTab === 'rendered' && !hasApplied
-                        ? 'template-preview__output template-preview__output--disabled'
-                        : 'template-preview__output'
-                    }
-                  >
-                    {activeTab === 'raw' ? (
-                      body
-                    ) : !hasApplied ? (
-                      <span className="template-preview__unavailable">
-                        <span className="template-preview__unavailable-title">
-                          Preview unavailable.
-                        </span>
-                        <span className="template-preview__unavailable-desc">
-                          Provide values for all variables to view the rendered template.
-                        </span>
+                <div
+                  className={
+                    activeTab === 'rendered' && !hasApplied
+                      ? 'template-preview__output template-preview__output--disabled'
+                      : 'template-preview__output'
+                  }
+                >
+                  {activeTab === 'raw' ? (
+                    body
+                  ) : !hasApplied ? (
+                    <span className="template-preview__unavailable">
+                      <span className="template-preview__unavailable-title">
+                        Preview unavailable.
                       </span>
-                    ) : error ? (
-                      <span className="template-preview__error">{error}</span>
-                    ) : loading ? (
-                      <span className="template-preview__placeholder">Rendering preview...</span>
-                    ) : (
-                      rendered
-                    )}
-                  </div>
+                      <span className="template-preview__unavailable-desc">
+                        Provide values for all variables to view the rendered template.
+                      </span>
+                    </span>
+                  ) : error ? (
+                    <span className="template-preview__error">{error}</span>
+                  ) : loading ? (
+                    <span className="template-preview__placeholder">Rendering preview...</span>
+                  ) : (
+                    rendered
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </Dialog>
+    </Modal>
   )
 }
 
