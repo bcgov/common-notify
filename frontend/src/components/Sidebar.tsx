@@ -19,8 +19,13 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import { CstarRole } from '@/enum/cstar-role.enum'
-import { Button } from '~/@bcgov/design-system-react-components'
+import { CstarRole, CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
+import {
+  Button,
+  Tooltip,
+  TooltipTrigger,
+  SvgInfoIcon,
+} from '~/@bcgov/design-system-react-components'
 
 const navItems = [
   {
@@ -61,7 +66,7 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const { hasRole, hasTenantRole } = useCstarRoles()
+  const { primaryRole, hasRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
 
@@ -175,16 +180,44 @@ const Sidebar: FC = () => {
         <div className="sidebar__bottom">
           {/* User */}
           {user && (
-            <div
-              className="sidebar__item sidebar__user"
-              title={collapsed ? user.displayName : ''}
-              aria-label={`Signed in as ${user.displayName}`}
-            >
-              <span className="sidebar__icon" aria-hidden="true">
-                <PersonOutlinedIcon />
-              </span>
-              <span className="sidebar__label">{user.displayName}</span>
-            </div>
+            <>
+              <div
+                className="sidebar__item sidebar__user"
+                title={collapsed ? user.displayName : ''}
+                aria-label={`Signed in as ${user.displayName}`}
+              >
+                <span className="sidebar__icon" aria-hidden="true">
+                  <PersonOutlinedIcon />
+                </span>
+                <span className="sidebar__label">{user.displayName}</span>
+              </div>
+              {primaryRole && (
+                <div
+                  className="sidebar__role"
+                  aria-label={`User role ${CSTAR_ROLE_DISPLAY[primaryRole].label}`}
+                >
+                  <span className="sidebar__role-heading">Role</span>
+                  <span className="sidebar__role-value">
+                    <span className="sidebar__label">{CSTAR_ROLE_DISPLAY[primaryRole].label}</span>
+                    <TooltipTrigger>
+                      <Button
+                        aria-label={`About the ${CSTAR_ROLE_DISPLAY[primaryRole].label} role`}
+                        className="sidebar__role-tooltip-trigger"
+                        isIconButton
+                        size="xsmall"
+                        type="button"
+                        variant="tertiary"
+                      >
+                        <SvgInfoIcon />
+                      </Button>
+                      <Tooltip placement="right">
+                        {CSTAR_ROLE_DISPLAY[primaryRole].description}
+                      </Tooltip>
+                    </TooltipTrigger>
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {/* Logout */}

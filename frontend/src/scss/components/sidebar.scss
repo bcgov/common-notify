@@ -56,7 +56,7 @@
   &__nav {
     display: flex;
     flex-direction: column;
-    gap: $spacing-xs;
+    gap: var(--layout-margin-small, 8px);
   }
 
   &__item {
@@ -122,6 +122,49 @@
     gap: $spacing-xs;
     padding-top: $spacing-md;
     border-top: 1px solid $border-default;
+  }
+
+  &__role {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding: $spacing-sm $spacing-md;
+  }
+
+  &__role-heading {
+    font-size: $font-size-base;
+    font-weight: 700;
+    color: $dark-text;
+  }
+
+  &__role-value {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+
+    .sidebar__label {
+      margin-left: 0;
+    }
+
+    .sidebar__role-tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: $dark-text;
+
+      &:hover,
+      &:focus,
+      &:focus-visible {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        outline: none;
+      }
+    }
   }
 
   &__menu-group {
