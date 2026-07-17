@@ -11,7 +11,7 @@ name: Load Test
 # Order matters: the queue-drain test runs FIRST, against the freshly-rolled-out
 # (empty) queue, so its drain measurement isn't polluted by the ramps' backlog.
 on:
-  # TEMPORARY (remove before merge): lets this branch run the suite against PR-159
+  # TEMPORARY (remove before merge): lets this branch run the suite against DEV
   # so we can validate it end-to-end without merging to main.
   push:
     branches: [CCP-5158-load-testing]
@@ -58,12 +58,11 @@ jobs:
     permissions:
       contents: read
     env:
-      # `inputs.target || '159'`: the `|| '159'` is TEMPORARY — push-triggered branch
-      # runs carry no inputs, so this makes them target PR-159. Before merge, remove
-      # the `|| '159'` fallbacks (leaving `inputs.target`) and the push: trigger above.
-      # dev → no path prefix; a PR number → /pr-<N> prefix (shared gateway host).
-      DEPLOYMENT: ${{ github.event.repository.name }}-${{ inputs.target || '159' }}-backend
-      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}${{ (inputs.target || '159') == 'dev' && '/api' || format('/pr-{0}/api', inputs.target || '159') }}
+      # `inputs.target || 'dev'`: the `|| 'dev'` covers push-triggered branch runs
+      # (which carry no inputs) → target DEV. Harmless permanently; tidy it up with the
+      # push: trigger before merge. dev → no path prefix; a PR number → /pr-<N> prefix.
+      DEPLOYMENT: ${{ github.event.repository.name }}-${{ inputs.target || 'dev' }}-backend
+      GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}${{ (inputs.target || 'dev') == 'dev' && '/api' || format('/pr-{0}/api', inputs.target || 'dev') }}
     steps:
       - uses: actions/checkout@v6
 
