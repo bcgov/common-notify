@@ -9,19 +9,23 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
-import { UseGuards } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ConfigService } from '@nestjs/config'
+import { UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
 import { BindApiKeyDto } from './schemas/bind-api-key.dto'
+import { JwtOrLoadtestBindGuard } from '../../common/guards/jwt-or-loadtest-bind.guard'
 
 @ApiTags('api-keys')
 @Controller('service/api-key')
 export class ApiKeysController {
   private readonly logger = new Logger(ApiKeysController.name)
 
-  constructor(private readonly apiKeysService: ApiKeysService) {}
+  constructor(
+    private readonly apiKeysService: ApiKeysService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Bind an API key to a CSTAR tenant.
@@ -41,7 +45,7 @@ export class ApiKeysController {
    */
   @Version('1')
   @Post('bind')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtOrLoadtestBindGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bind an API key to a CSTAR tenant' })
   @ApiResponse({ status: 200, description: 'API key successfully bound to tenant' })
@@ -65,6 +69,13 @@ export class ApiKeysController {
     const consumerId = (request.headers['x-consumer-id'] as string) || ''
     const jwtUser = (request as any).user as { idir_user_guid?: string } | undefined
     const idirUserGuid = jwtUser?.idir_user_guid
+
+    // Load-test-only path (PR dev): no user JWT, self-bind to a throwaway tenant.
+    if (this.configService.get<boolean>('loadtest.autobindEnabled') && !idirUserGuid) {
+      this.logger.warn(`[LOADTEST] Auto-binding credential ${credentialIdentifier} (no JWT)`)
+      await this.apiKeysService.autoBindApiKeyForLoadTest(credentialIdentifier, consumerId)
+      return { message: 'API key auto-bound to load-test tenant' }
+    }
 
     if (!idirUserGuid) {
       throw new UnauthorizedException('JWT is missing required idir_user_guid claim')

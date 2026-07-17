@@ -2,6 +2,7 @@ import { DynamicModule, Module, Type } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ChesEmailTransport } from './implementations/delivery/email/ches/ches-email.adapter'
 import { NodemailerEmailTransport } from './implementations/delivery/email/nodemailer/nodemailer-email.adapter'
+import { LogEmailTransport } from './implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter'
 import {
   EMAIL_ADAPTER,
@@ -32,17 +33,20 @@ export class AdaptersModule {
       providers: [
         ChesEmailTransport,
         NodemailerEmailTransport,
+        LogEmailTransport,
         TwilioSmsTransport,
         {
           provide: EMAIL_ADAPTER_MAP,
           useFactory: (
             ches: ChesEmailTransport,
             nodemailer: NodemailerEmailTransport,
+            log: LogEmailTransport,
           ): Record<string, IEmailTransport> => ({
             ches,
             nodemailer,
+            log,
           }),
-          inject: [ChesEmailTransport, NodemailerEmailTransport],
+          inject: [ChesEmailTransport, NodemailerEmailTransport, LogEmailTransport],
         },
         {
           provide: SMS_ADAPTER_MAP,
