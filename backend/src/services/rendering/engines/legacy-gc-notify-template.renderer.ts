@@ -10,7 +10,9 @@ import type {
 /**
  * Legacy GC Notify Template Renderer
  *
- * Renders templates using GC Notify's legacy placeholder syntax: ((key))
+ * Renders templates using GC Notify's legacy placeholder syntax:
+ * - ((key))
+ * - ((key??default text))
  * This format uses double parentheses to denote template variables.
  *
  * Example:
@@ -64,8 +66,12 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
   }
 
   /**
-   * Render text with legacy GC Notify syntax ((key))
-   * Replaces all ((key)) with corresponding values from personalisation
+   * Render text with legacy GC Notify syntax:
+   * - ((key))
+   * - ((key??default text))
+   *
+   * Replaces placeholders with corresponding values from personalisation.
+   * If key is missing and a default is provided, default text is used.
    *
    * @param text Template text
    * @param personalisation Data for substitution
@@ -76,21 +82,29 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
       return ''
     }
 
-    if (!personalisation || Object.keys(personalisation).length === 0) {
-      // If no personalisation data, return text as-is (placeholders will remain)
-      return text
-    }
+    const values = personalisation ?? {}
 
     let result = text
 
-    // Replace all ((key)) patterns with values from personalisation
-    // Pattern: (( followed by word characters/underscores followed by ))
-    const placeholderRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)\)\)/g
+    // Replace all legacy GC Notify placeholder patterns:
+    // - ((key))
+    // - ((key??default text))
+    const placeholderRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?([\s\S]*?))?\)\)/g
 
-    result = result.replace(placeholderRegex, (match, key) => {
-      const value = personalisation[key]
+    result = result.replace(placeholderRegex, (match, key, defaultValue) => {
+      const value = values[key]
 
-      // If key not found, leave placeholder as-is
+      if (value !== undefined && value !== null) {
+        // Convert value to string (handles numbers, booleans, etc.)
+        return String(value)
+      }
+
+      // If key not found and default text is provided, use the default.
+      if (defaultValue !== undefined) {
+        return defaultValue
+      }
+
+      // If key not found and no default text exists, leave placeholder as-is.
       if (value === undefined || value === null) {
         this.logger.warn(
           `Placeholder key not found in personalisation data: ${key}. Leaving placeholder as-is.`,
@@ -98,8 +112,7 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
         return match
       }
 
-      // Convert value to string (handles numbers, booleans, etc.)
-      return String(value)
+      return match
     })
 
     return result
