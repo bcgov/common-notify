@@ -131,13 +131,10 @@ jobs:
     name: Tests
     if: needs.deploys.outputs.triggered == 'true'
     needs: [deploys]
-    permissions:
-      pull-requests: write # allow the load job to post its summary comment
-      contents: read
     uses: ./.github/workflows/.tests.yml
-    # inherit so the load job can reach OC creds (OC_DEV_TOKEN/NAMESPACE) for the
-    # email-sink toggle and LOAD_TEST_API_KEY for gateway auth, alongside E2E_* secrets.
-    secrets: inherit
+    secrets:
+      E2E_TEST_CLIENT_ID: ${{ secrets.E2E_TEST_CLIENT_ID }}
+      E2E_TEST_CLIENT_SECRET: ${{ secrets.E2E_TEST_CLIENT_SECRET }}
 
   results:
     name: PR Results

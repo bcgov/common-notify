@@ -7,15 +7,15 @@ import { Rate, Trend } from 'k6/metrics'
  *
  * Measures the SYNCHRONOUS accept path: gateway (Kong key-auth) -> NotifyServiceGuard
  * -> validation -> DB insert -> enqueue -> 202. Downstream delivery is async and is
- * NOT what this test measures; during load the PR env should run the `log` email sink
+ * NOT what this test measures; during load the target env runs the `log` email sink
  * (DELIVERY_EMAIL_ADAPTER=log) so nothing is delivered externally.
  *
- * Auth: must go through the per-PR Kong gateway, which injects x-credential-identifier.
+ * Auth: must go through the Kong gateway, which injects x-credential-identifier.
  * Hitting the apps.silver backend route directly returns 401 (no Kong).
  *
  * Required env:
- *   BACKEND_URL  Gateway base incl. /api, e.g. https://gw-fe8c5-notify-pr-147.dev.api.gov.bc.ca/api
- *   API_KEY      Kong API key bound to a tenant in the PR env (sent as X-API-KEY)
+ *   BACKEND_URL  Gateway base incl. /api, e.g. https://gw-fe8c5-notify.dev.api.gov.bc.ca/api
+ *   API_KEY      Kong API key bound to a tenant in the target env (sent as X-API-KEY)
  *
  * Optional env (ramp shape):
  *   TARGET_RPS   peak requests/sec (default 50)
