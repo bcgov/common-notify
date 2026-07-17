@@ -106,25 +106,33 @@ jobs:
             # Best-effort measurement — never fail the load-test run on a monitoring hiccup.
             set +e +u +o pipefail
 
+            # Derive the redis password the SAME way the backend does — from its own
+            # REDIS_PASSWORD secretKeyRef — rather than guessing bitnami secret naming.
+            # (The chart sets redis.auth.enabled=false, but the live redis still requires
+            # auth, so the deployed state drifts from the chart; the backend's secret is
+            # the source of truth since the backend connects successfully.)
+            DEP=${{ env.DEPLOYMENT }}
+            SEC=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="REDIS_PASSWORD")].valueFrom.secretKeyRef.name}' 2>/dev/null)
+            KEY=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="REDIS_PASSWORD")].valueFrom.secretKeyRef.key}' 2>/dev/null)
+            PW=""
+            [ -n "$SEC" ] && PW=$(oc get secret "$SEC" -o jsonpath="{.data['$KEY']}" 2>/dev/null | base64 -d 2>/dev/null)
             POD=$(oc get pods -l app.kubernetes.io/name=redis --field-selector=status.phase=Running \
               -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-            SECRET=$(oc get secret -l app.kubernetes.io/name=redis \
-              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-            PW=$(oc get secret "$SECRET" -o jsonpath='{.data.redis-password}' 2>/dev/null | base64 -d 2>/dev/null)
-            if [ -z "$POD" ] || [ -z "$PW" ]; then
-              echo "WARN: redis pod/secret not resolvable (pod='$POD' secret='$SECRET'); skipping drain measurement."
-              echo "> Queue-drain not measured (redis pod/secret lookup failed)." > summary-drain.md
+            if [ -z "$POD" ]; then
+              echo "WARN: no running redis pod found (label app.kubernetes.io/name=redis)."
+              echo "> Queue-drain not measured (redis pod lookup failed)." > summary-drain.md
               exit 0
             fi
-            echo "redis pod: $POD  secret: $SECRET"
+            echo "redis pod: $POD  (auth: $([ -n "$PW" ] && echo yes || echo no), secret: ${SEC:-none})"
 
-            # redis-cli inside the pod, authed via REDISCLI_AUTH. tr -dc '0-9' guarantees a
-            # numeric result even if redis-cli emits an error (NOAUTH, etc.), so the
-            # arithmetic below can never blow up.
-            rc() { oc exec "$POD" -- env REDISCLI_AUTH="$PW" redis-cli --no-auth-warning "$@" 2>/dev/null; }
+            # redis-cli inside the pod; auth only when the backend uses a password.
+            rc() {
+              if [ -n "$PW" ]; then oc exec "$POD" -- env REDISCLI_AUTH="$PW" redis-cli --no-auth-warning "$@" 2>/dev/null
+              else oc exec "$POD" -- redis-cli "$@" 2>/dev/null; fi
+            }
             if ! rc PING | grep -q PONG; then
               echo "WARN: redis auth/PING failed; skipping drain measurement."
-              echo "> Queue-drain not measured (redis auth failed)." > summary-drain.md
+              echo "> Queue-drain not measured (redis auth/ping failed)." > summary-drain.md
               exit 0
             fi
             llen() { n=$(rc LLEN "$1" | tr -dc '0-9'); echo "${n:-0}"; }
