@@ -197,6 +197,17 @@ export class ApiKeysService {
     credentialIdentifier: string,
     consumerId: string,
   ): Promise<ApiKeyConsumer> {
+    // Defense-in-depth: refuse to auto-bind in test/prod namespaces even if the
+    // config flag were somehow enabled there. (All envs run NODE_ENV=production, so
+    // the namespace is the reliable discriminator.)
+    const namespace = process.env.NAMESPACE || ''
+    if (namespace.includes('-test') || namespace.includes('-prod')) {
+      this.logger.error(
+        `[LOADTEST] Refusing auto-bind in protected namespace "${namespace}"`,
+      )
+      throw new ForbiddenException('Load-test auto-bind is disabled in this environment')
+    }
+
     const LOADTEST_SLUG = 'loadtest-tenant'
     const now = new Date()
 
