@@ -11,10 +11,12 @@ export class NotificationResponse {
   })
   id: string
 
-  @ApiPropertyOptional({
-    description: 'Reference identifier provided when creating the notification',
+  @ApiProperty({
+    description: 'Reference identifier provided when creating the notification, or null if not set',
+    nullable: true,
+    type: 'string',
   })
-  reference?: string
+  reference: string | null
 
   @ApiProperty({
     description: 'Content of the notification',
@@ -24,7 +26,7 @@ export class NotificationResponse {
 
   @ApiProperty({
     description: 'URI to retrieve the notification',
-    example: '/api/gcnotify/v2/notifications/740e5834-3a29-46b4-9a6f-16142fde533a',
+    example: '/gcnotify/v2/notifications/740e5834-3a29-46b4-9a6f-16142fde533a',
     format: 'uri',
   })
   uri: string

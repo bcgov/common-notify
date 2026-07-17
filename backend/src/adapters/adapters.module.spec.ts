@@ -8,6 +8,7 @@ import {
 } from '../../src/adapters/tokens'
 import { ChesEmailTransport } from '../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
 import { NodemailerEmailTransport } from '../../src/adapters/implementations/delivery/email/nodemailer/nodemailer-email.adapter'
+import { LogEmailTransport } from '../../src/adapters/implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from '../../src/adapters/implementations/delivery/sms/twilio/twilio-sms.adapter'
 
 describe('AdaptersModule', () => {
@@ -16,7 +17,7 @@ describe('AdaptersModule', () => {
 
     expect(dynamic.module).toBe(AdaptersModule)
     expect(dynamic.global).toBe(true)
-    expect(dynamic.providers).toHaveLength(9)
+    expect(dynamic.providers).toHaveLength(10)
     expect(dynamic.exports).toContain(EMAIL_ADAPTER)
     expect(dynamic.exports).toContain(SMS_ADAPTER)
     expect(dynamic.exports).toContain(EMAIL_ADAPTER_MAP)
@@ -29,10 +30,11 @@ describe('AdaptersModule', () => {
     expect(providerProvides).toContain(EMAIL_ADAPTER_MAP)
     expect(providerProvides).toContain(SMS_ADAPTER_MAP)
 
-    // First 3 providers are adapter classes (ChesEmailTransport, NodemailerEmailTransport, TwilioSmsTransport)
-    const adapterProviders = (dynamic.providers ?? []).slice(0, 3)
+    // First 4 providers are adapter classes (Ches, Nodemailer, Log email + Twilio SMS)
+    const adapterProviders = (dynamic.providers ?? []).slice(0, 4)
     expect(adapterProviders).toContain(ChesEmailTransport)
     expect(adapterProviders).toContain(NodemailerEmailTransport)
+    expect(adapterProviders).toContain(LogEmailTransport)
     expect(adapterProviders).toContain(TwilioSmsTransport)
   })
 })

@@ -2,20 +2,16 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { Request } from 'express'
 
 /**
- * API Key Guard
- *
- * Validates that an API key is provided in the Authorization header using ApiKey-v1 scheme.
- * Expected format: Authorization: ApiKey-v1 {api-key}
- *
- * Does not validate the key value itself - that responsibility is delegated
- * to the downstream service (e.g., GC Notify API).
- *
- * Used for passthrough endpoints that forward requests to external APIs.
+ * Format-only API key guard for GC Notify passthrough routes. Validates that
+ * the Authorization header is present and uses the `ApiKey-v1 {key}` scheme,
+ * then attaches the raw header as `request.gcNotifyAuthHeader` so the controller
+ * can forward it unmodified to the real GC Notify API. No DB lookups or tenant
+ * resolution — key validity is enforced by upstream GC Notify.
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>()
+    const request = context.switchToHttp().getRequest<Request & { gcNotifyAuthHeader?: string }>()
     const authHeader = request.headers['authorization']
 
     if (!authHeader || typeof authHeader !== 'string') {
@@ -34,6 +30,8 @@ export class ApiKeyGuard implements CanActivate {
     if (!apiKey) {
       throw new UnauthorizedException('API key cannot be empty')
     }
+
+    request.gcNotifyAuthHeader = authHeader.trim()
 
     return true
   }

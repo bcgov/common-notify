@@ -5,7 +5,7 @@ import { AppModule } from './app.module'
 import { StructuredLoggerService } from './common/logger'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
-import { VersioningType, ValidationPipe } from '@nestjs/common'
+import { VersioningType, ValidationPipe, RequestMethod } from '@nestjs/common'
 import { metricsMiddleware } from './middleware/prom'
 import bodyParser from 'body-parser'
 import { Router } from 'express'
@@ -60,7 +60,18 @@ export async function bootstrap() {
   })
   app.use(rootRouter)
 
-  app.setGlobalPrefix('api')
+  // GC Notify-compatible routes (GcNotifyController) are reachable at
+  // /gcnotify/v2/... (no /api prefix). The /gcnotify segment is kept deliberately:
+  // it makes this traffic unambiguous in logs/metrics/dashboards (which are
+  // labeled by raw path), while still only costing a migrating GC Notify
+  // integration a single baseUrl config change (baseUrl + '/gcnotify'), same as
+  // changing just the hostname would.
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL },
+      { path: 'gcnotify-passthrough/v2/(.*)', method: RequestMethod.ALL },
+    ],
+  })
   app.enableVersioning({
     type: VersioningType.URI,
     prefix: 'v',
