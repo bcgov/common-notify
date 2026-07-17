@@ -150,6 +150,8 @@ jobs:
   load-test-dev:
     name: Load Test (DEV)
     needs: [deploy-dev]
+    permissions:
+      contents: read # required so the reusable load-test job can checkout
     uses: ./.github/workflows/load-test.yml
     secrets: inherit
 
