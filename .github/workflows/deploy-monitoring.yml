@@ -130,6 +130,31 @@ jobs:
                 echo "Grafana admin credentials already exist"
             fi
 
+            # Create/Update Grafana SSO secret from GitHub Secrets
+            echo "🔐 Creating/Updating Grafana SSO credentials..."
+            SSO_CLIENT_ID_B64=$(echo -n "${{ secrets.GRAFANA_SSO_CLIENT_ID }}" | base64 -w 0)
+            SSO_CLIENT_SECRET_B64=$(echo -n "${{ secrets.GRAFANA_SSO_CLIENT_SECRET }}" | base64 -w 0)
+
+            # Create secret YAML with actual values
+            cat > /tmp/sso-secret.yaml << EOF
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: grafana-sso-credentials
+              namespace: ${NAMESPACE}
+              labels:
+                app.kubernetes.io/name: grafana
+                app.kubernetes.io/component: sso
+            type: Opaque
+            data:
+              client_id: ${SSO_CLIENT_ID_B64}
+              client_secret: ${SSO_CLIENT_SECRET_B64}
+            EOF
+
+            oc apply -f /tmp/sso-secret.yaml
+            rm /tmp/sso-secret.yaml
+            echo "✅ SSO credentials configured"
+
             # Deploy Grafana using tools-specific values
             helm upgrade --install grafana grafana/grafana \
               --namespace ${NAMESPACE} \

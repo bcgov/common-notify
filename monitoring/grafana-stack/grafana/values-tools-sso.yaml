@@ -1,0 +1,205 @@
+# Grafana SSO Configuration - BC Gov IDIR Integration
+# This file extends values-tools.yaml with SSO authentication
+# Deployment: f6bc3f-tools namespace
+# Authentication: BC Gov Common Hosted Single Sign-On (CSS) with IDIR
+
+# Admin credentials - Keep for emergency access
+admin:
+  existingSecret: grafana-admin-credentials
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Persistence
+persistence:
+  enabled: false
+
+# Resources
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 256Mi
+
+# Datasources - Pre-configure Loki in tools namespace
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 5000
+          derivedFields:
+            - datasourceUid: Loki
+              matcherRegex: '"notificationId":"([^"]+)"'
+              name: NotificationID
+              url: ''
+      - name: Loki Alerting
+        type: loki
+        access: proxy
+        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        jsonData:
+          manageAlerts: true
+          alertmanagerUid: alertmanager
+
+# Dashboard providers
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: 'Common Notify'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Dashboards
+dashboards:
+  default: {}
+
+# Sidecar for auto-loading dashboards
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folder: /tmp/dashboards
+    defaultFolderName: "Common Notify"
+    searchNamespace: f6bc3f-tools
+    provider:
+      foldersFromFilesStructure: false
+    resource: configmap
+
+# Grafana configuration with SSO enabled
+grafana.ini:
+  server:
+    root_url: "https://grafana-f6bc3f-tools.apps.silver.devops.gov.bc.ca/"
+    serve_from_sub_path: false
+
+  # Authentication settings
+  auth:
+    disable_login_form: false  # Keep login form for fallback admin access
+    oauth_allow_insecure_email_lookup: true
+    oauth_auto_login: false  # Set to true to skip login page and go directly to SSO
+
+  # IDIR SSO via BC Gov Common Hosted SSO (Keycloak)
+  auth.generic_oauth:
+    enabled: true
+    name: IDIR
+    icon: signin
+    allow_sign_up: true  # Auto-create users on first login
+
+    # OAuth endpoints - DEV environment
+    # For TEST: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect
+    # For PROD: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect
+    auth_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
+    token_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
+    api_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/userinfo
+
+    # OAuth scopes
+    scopes: openid email profile
+
+    # User attribute mapping
+    email_attribute_path: email
+    login_attribute_path: preferred_username
+    name_attribute_path: name
+
+    # Role mapping - default all users to Viewer
+    # To grant admin access, manually promote users in Grafana after first login
+    role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'
+    role_attribute_strict: false
+
+    # Allow users to see Grafana org users list
+    allow_assign_grafana_admin: false
+
+    # Client credentials from secret
+    client_id: $__file{/etc/secrets/auth_generic_oauth/client_id}
+    client_secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
+
+  users:
+    allow_sign_up: false  # Handled by OAuth
+    auto_assign_org: true
+    auto_assign_org_role: Viewer  # Default role for new users
+
+  auth.anonymous:
+    enabled: false
+
+  log:
+    mode: console
+    level: info
+
+  explore:
+    enabled: true
+
+# Mount SSO credentials secret
+extraSecretMounts:
+  - name: auth-generic-oauth-secret-mount
+    secretName: grafana-sso-credentials
+    defaultMode: 0440
+    mountPath: /etc/secrets/auth_generic_oauth
+    readOnly: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress/Route - Disabled (using separate Route manifest)
+ingress:
+  enabled: false
+
+# Plugins
+plugins:
+  - grafana-piechart-panel
+  - grafana-clock-panel
+
+# Security context - OpenShift compatible
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: null
+  runAsUser: null
+  runAsGroup: null
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  runAsGroup: null
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Disable init containers
+initChownData:
+  enabled: false
+
+downloadDashboards:
+  enabled: false
+
+# Override default security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+
+# Environment variables
+env:
+  TZ: America/Vancouver
+
+# RBAC - Use OpenShift defaults
+rbac:
+  create: false
+  pspEnabled: false
+  namespaced: true
+
+serviceAccount:
+  create: false
