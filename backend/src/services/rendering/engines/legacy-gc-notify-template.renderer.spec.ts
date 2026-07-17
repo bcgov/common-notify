@@ -294,6 +294,133 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
     })
   })
 
+  describe('conditional content', () => {
+    it('should keep conditional content when the condition is truthy', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: 'Hello((under18?? Please get a parent to sign.))',
+          active: true,
+        },
+        personalisation: { under18: true },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('Hello Please get a parent to sign.')
+    })
+
+    it('should remove conditional content when the condition is falsey', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: 'Hello((under18?? Please get a parent to sign.))',
+          active: true,
+        },
+        personalisation: { under18: false },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('Hello')
+    })
+
+    it('should remove conditional content when the condition key is missing', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: 'Hello((under18?? Please get a parent to sign.))',
+          active: true,
+        },
+        personalisation: { firstName: 'Alice' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('Hello')
+    })
+
+    it('should treat affirmative string values as truthy', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: '((optIn??Subscribed))',
+          active: true,
+        },
+        personalisation: { optIn: 'yes' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('Subscribed')
+    })
+
+    it('should treat non-affirmative string values as falsey', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: '((optIn??Subscribed))',
+          active: true,
+        },
+        personalisation: { optIn: 'no' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('')
+    })
+
+    it('should substitute plain placeholders inside kept conditional content', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional',
+          type: 'email',
+          subject: 'Subject',
+          body: '((vip??Welcome back, ((firstName))!))',
+          active: true,
+        },
+        personalisation: { vip: true, firstName: 'Alice' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('Welcome back, Alice!')
+    })
+
+    it('should resolve conditionals in SMS bodies', async () => {
+      const context: RenderContext & { personalisation: Record<string, string> } = {
+        template: {
+          id: 'template-1',
+          name: 'SMS Conditional',
+          type: 'sms',
+          body: 'Code ((code))((resend?? (resent)))',
+          active: true,
+        },
+        personalisation: { code: '123456', resend: 'true' },
+      }
+
+      const result = await renderer.renderSms(context)
+
+      expect(result.body).toBe('Code 123456 (resent)')
+    })
+  })
+
   describe('renderSms', () => {
     it('should render SMS with body using legacy syntax', async () => {
       const context: RenderContext & { personalisation: Record<string, string> } = {
