@@ -50,12 +50,23 @@ function detectVariables(body: string, engine: TemplateEngine): DetectedVariable
   }
 
   if (engine === TemplateEngine.LEGACY_GC_NOTIFY) {
-    // Legacy GC Notify syntax: ((var)) or ((var??conditional text))
-    const re = /\(\(\s*([^)]+?)\s*\)\)/g
+    // Legacy GC Notify syntax:
+    //   ((var))            plain interpolation -> free-text value
+    //   ((var??content))   conditional: `content` shows when `var` is truthy,
+    //                      so `var` is a boolean toggle. The content may span
+    //                      multiple lines and contain parentheses, so match
+    //                      lazily up to the closing `))` with the dotAll flag.
+    const re = /\(\(\s*([\s\S]+?)\s*\)\)/g
     let match: RegExpExecArray | null
     while ((match = re.exec(body)) !== null) {
-      const name = match[1].split('??')[0].trim()
-      if (IDENTIFIER.test(name)) addVar(name, 'text')
+      const inner = match[1]
+      const condIndex = inner.indexOf('??')
+      if (condIndex !== -1) {
+        const name = inner.slice(0, condIndex).trim()
+        if (IDENTIFIER.test(name)) addVar(name, 'boolean')
+      } else if (IDENTIFIER.test(inner.trim())) {
+        addVar(inner.trim(), 'text')
+      }
     }
     return [...found].map(([name, type]) => ({ name, type }))
   }
