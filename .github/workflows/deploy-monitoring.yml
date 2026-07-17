@@ -182,6 +182,7 @@ jobs:
     name: Deploy Grafana Agent (Dev)
     needs: [deploy-grafana-centralized]
     if: |
+      false &&
       !cancelled() &&
       (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
       ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
