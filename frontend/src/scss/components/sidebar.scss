@@ -2,7 +2,7 @@
 
 .sidebar {
   width: 296px;
-  padding: $spacing-md $spacing-sm;
+  padding: 24px;
   transition: width 0.3s ease;
 
   display: flex;
@@ -14,12 +14,15 @@
   border-right: 1px solid $border-default;
 
   &--collapsed {
-    width: 72px;
+    width: 93px;
+
+    .sidebar__item {
+      gap: 0;
+    }
 
     .sidebar__label {
       max-width: 0;
       opacity: 0;
-      margin-left: 0;
     }
   }
 
@@ -62,7 +65,8 @@
   &__item {
     display: flex;
     align-items: center;
-    padding: $spacing-sm $spacing-md;
+    gap: 16px;
+    padding: 10px;
     border-radius: 6px;
     text-decoration: none;
     color: $dark-text;
@@ -90,9 +94,13 @@
 
   &__icon {
     display: flex;
-    font-size: 22px;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
     color: inherit;
-    min-width: 22px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
   }
 
   &__label {
@@ -102,11 +110,9 @@
     text-overflow: ellipsis;
     max-width: 200px;
     opacity: 1;
-    margin-left: $spacing-sm;
     transition:
       max-width 0.3s ease,
-      opacity 0.2s ease,
-      margin-left 0.3s ease;
+      opacity 0.2s ease;
   }
 
   &__footer {

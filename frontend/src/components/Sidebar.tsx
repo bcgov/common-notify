@@ -126,18 +126,27 @@ const Sidebar: FC = () => {
             <Button
               variant="link"
               className="sidebar__item"
-              onPress={() => setAdminExpanded(!adminExpanded)}
+              onPress={() => {
+                if (collapsed) {
+                  setCollapsed(false)
+                  setAdminExpanded(true)
+                } else {
+                  setAdminExpanded(!adminExpanded)
+                }
+              }}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 {adminItems.icon}
               </span>
               <span className="sidebar__label">{adminItems.label}</span>
-              <span
-                className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
-                aria-hidden="true"
-              >
-                <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
-              </span>
+              {!collapsed && (
+                <span
+                  className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
+                  aria-hidden="true"
+                >
+                  <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
+                </span>
+              )}
             </Button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
@@ -191,7 +200,7 @@ const Sidebar: FC = () => {
                 </span>
                 <span className="sidebar__label">{user.displayName}</span>
               </div>
-              {primaryRole && (
+              {primaryRole && !collapsed && (
                 <div
                   className="sidebar__role"
                   aria-label={`User role ${CSTAR_ROLE_DISPLAY[primaryRole].label}`}
