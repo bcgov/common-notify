@@ -17,7 +17,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
 
-const REQUIRED_FIELD_ERROR = 'This field is required.'
+const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
 const DEFAULT_TEMPLATE_BODY_PLACEHOLDER = 'Type the template body here'
 const SYNTAX_TYPE_BODY_PLACEHOLDERS: Record<TemplateEngine, string> = {
   [TemplateEngine.MJML]: `<mjml>
@@ -211,7 +211,7 @@ const TemplateCreate: FC = () => {
                 value={formData.name}
                 onChange={handleFieldChange('name')}
                 {...({ placeholder: 'Type a template title' } as any)}
-                className="template-form__field"
+                className="bcds-react-aria-TextField template-form__field"
                 size="small"
                 isRequired
                 isInvalid={!!formErrors.name}
@@ -248,7 +248,7 @@ const TemplateCreate: FC = () => {
                   description="Use a subject line that clearly describes the email content."
                   value={formData.subject}
                   onChange={handleFieldChange('subject')}
-                  className="template-form__field template-form__field--full"
+                  className="bcds-react-aria-TextField template-form__field template-form__field--full"
                   size="small"
                   isRequired
                   isInvalid={!!formErrors.subject}

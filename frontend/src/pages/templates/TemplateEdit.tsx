@@ -29,7 +29,7 @@ interface TemplateEditProps {
   templateId: string
 }
 
-const REQUIRED_FIELD_ERROR = 'This field is required.'
+const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
 
 const SYNTAX_TOOLTIPS = [
   {
@@ -260,7 +260,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 value={formData.name}
                 onChange={handleFieldChange('name')}
                 {...({ placeholder: 'Type a template title' } as any)}
-                className="template-form__field"
+                className="bcds-react-aria-TextField template-form__field"
                 size="small"
                 isRequired
                 isDisabled={isReadOnly}
@@ -296,7 +296,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                   description="Use a subject line that clearly describes the email content."
                   value={formData.subject}
                   onChange={handleFieldChange('subject')}
-                  className="template-form__field template-form__field--full"
+                  className="bcds-react-aria-TextField template-form__field template-form__field--full"
                   size="small"
                   isRequired
                   isDisabled={isReadOnly}

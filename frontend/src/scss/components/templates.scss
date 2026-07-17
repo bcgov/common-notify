@@ -175,6 +175,9 @@
 }
 
 .template-form__syntax-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 20px;
   width: 20px;
   height: 20px;
@@ -182,7 +185,7 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  color: #605e5c;
+  color: var(--icons-color-primary, #2d2d2d);
 }
 
 .template-form__syntax-tooltip-trigger svg {
