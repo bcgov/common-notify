@@ -240,7 +240,7 @@ describe('TemplateCreate', () => {
 
     expect(createTemplateMock).not.toHaveBeenCalled()
     expect(screen.getAllByText('Please select an option to continue.')).toHaveLength(2)
-    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(screen.getByText('Please fill out this field to continue.')).toBeTruthy()
     expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
   })
 
@@ -280,7 +280,7 @@ describe('TemplateCreate', () => {
     expect(
       screen.getByText('Use a subject line that clearly describes the email content.'),
     ).toBeTruthy()
-    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(screen.getByText('Please fill out this field to continue.')).toBeTruthy()
   })
 
   it('renders all syntax tooltip triggers', () => {

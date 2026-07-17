@@ -291,7 +291,7 @@ describe('TemplateEdit', () => {
       expect(updateTemplateMock).not.toHaveBeenCalled()
     })
 
-    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(screen.getByText('Please fill out this field to continue.')).toBeTruthy()
     expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
   })
 
