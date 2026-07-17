@@ -102,29 +102,45 @@ jobs:
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ vars.oc_server }}
           commands: |
+            # Best-effort measurement — never fail the load-test run on a monitoring hiccup.
+            set +e +u +o pipefail
+
             POD=$(oc get pods -l app.kubernetes.io/name=redis --field-selector=status.phase=Running \
-              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-            if [ -z "$POD" ]; then
-              echo "WARN: no running redis pod found (label app.kubernetes.io/name=redis)."
-              echo "> Queue-drain not measured — redis pod/label needs confirmation." > summary-drain.md
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+            SECRET=$(oc get secret -l app.kubernetes.io/name=redis \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+            PW=$(oc get secret "$SECRET" -o jsonpath='{.data.redis-password}' 2>/dev/null | base64 -d 2>/dev/null)
+            if [ -z "$POD" ] || [ -z "$PW" ]; then
+              echo "WARN: redis pod/secret not resolvable (pod='$POD' secret='$SECRET'); skipping drain measurement."
+              echo "> Queue-drain not measured (redis pod/secret lookup failed)." > summary-drain.md
               exit 0
             fi
-            echo "redis pod: $POD"
-            rc() { oc exec "$POD" -- sh -c "redis-cli -a \"\$REDIS_PASSWORD\" --no-auth-warning $*" 2>/dev/null | tr -d '\r'; }
+            echo "redis pod: $POD  secret: $SECRET"
+
+            # redis-cli inside the pod, authed via REDISCLI_AUTH. tr -dc '0-9' guarantees a
+            # numeric result even if redis-cli emits an error (NOAUTH, etc.), so the
+            # arithmetic below can never blow up.
+            rc() { oc exec "$POD" -- env REDISCLI_AUTH="$PW" redis-cli --no-auth-warning "$@" 2>/dev/null; }
+            if ! rc PING | grep -q PONG; then
+              echo "WARN: redis auth/PING failed; skipping drain measurement."
+              echo "> Queue-drain not measured (redis auth failed)." > summary-drain.md
+              exit 0
+            fi
+            llen() { n=$(rc LLEN "$1" | tr -dc '0-9'); echo "${n:-0}"; }
             depth() {
               t=0
               for q in ingestion email-delivery; do
-                for s in wait active; do n=$(rc LLEN "bull:$q:$s"); t=$((t + ${n:-0})); done
+                for s in wait active; do t=$((t + $(llen "bull:$q:$s"))); done
               done
               echo "$t"
             }
             burst=${{ inputs.burst_size }}
             start=$SECONDS; peak=0
             while :; do
-              d=$(depth); [ "${d:-0}" -gt "$peak" ] && peak=$d
+              d=$(depth); [ "$d" -gt "$peak" ] && peak=$d
               el=$((SECONDS - start))
               echo "t=${el}s depth=${d}"
-              [ "${d:-0}" -le 0 ] && break
+              [ "$d" -le 0 ] && break
               [ "$el" -ge 1800 ] && { echo "drain timed out at 1800s"; break; }
               sleep 5
             done
@@ -144,6 +160,7 @@ jobs:
               echo "_Ingestion worker concurrency is the primary drain bottleneck (default 1)._"
             } > summary-drain.md
             cat summary-drain.md
+            exit 0
 
       # ── Ramps (continue-on-error so every test runs + reports; the final
       #    "Evaluate" step fails the job if any breached its thresholds) ──────
