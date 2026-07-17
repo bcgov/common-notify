@@ -155,10 +155,10 @@ jobs:
             rm /tmp/sso-secret.yaml
             echo "✅ SSO credentials configured"
 
-            # Deploy Grafana using tools-specific values
+            # Deploy Grafana using SSO-enabled values
             helm upgrade --install grafana grafana/grafana \
               --namespace ${NAMESPACE} \
-              --values monitoring/grafana-stack/grafana/values-tools.yaml \
+              --values monitoring/grafana-stack/grafana/values-tools-sso.yaml \
               --wait \
               --timeout 10m
 
