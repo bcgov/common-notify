@@ -80,7 +80,7 @@
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="ion ion-key"></i>
-                            <h3 class="box-title">24 Foreign Key Constraints</h3>
+                            <h3 class="box-title">31 Foreign Key Constraints</h3>
                             <div class="box-tools pull-right">
                                 <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
                                 <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
@@ -170,6 +170,60 @@
                                             <table border='0' cellspacing='0' cellpadding='0'>
                                                 <tr>
                                                     <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_usage_consumer</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_usage.html'>api_key_usage</a><span>.api_key_consumer_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_consumer.html'>api_key_consumer</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_usage_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_usage.html'>api_key_usage</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_usage_period</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_usage.html'>api_key_usage</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/usage_period_type_code.html'>usage_period_type_code</a><span>.period_type_code</span></td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -284,6 +338,42 @@
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
                                     </tr>
                                     <tr>
+                                        <td>fk_api_key_limit_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_limit.html'>api_key_limit</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_limit_consumer</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_limit.html'>api_key_limit</a><span>.api_key_consumer_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_consumer.html'>api_key_consumer</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
                                         <td>fk_template_version_engine</td>
                                         <td>
                                             <table border='0' cellspacing='0' cellpadding='0'>
@@ -336,6 +426,42 @@
                                             </table>
                                         </td>
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_limit_alert_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_limit_alert.html'>api_key_limit_alert</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_api_key_limit_alert_consumer</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_limit_alert.html'>api_key_limit_alert</a><span>.api_key_consumer_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/api_key_consumer.html'>api_key_consumer</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>client_tenant_mapping_tenant_id_fkey</td>
@@ -568,6 +694,31 @@
                                         <td><a href='tables/notification_request_detail.html'>notification_request_detail</a></td>
                                         <td>notification_request_detail_email_address_type_check</td>
                                         <td>((email_address_type)::text &#61; ANY ((ARRAY[&#39;primary&#39;::character varying, &#39;cc&#39;::character varying, &#39;bcc&#39;::character varying])::text[]))</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_usage.html'>api_key_usage</a></td>
+                                        <td>chk_api_key_usage_count</td>
+                                        <td>(sent_count &gt;&#61; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_limit.html'>api_key_limit</a></td>
+                                        <td>chk_api_key_limit_annual</td>
+                                        <td>(annual_limit &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_limit.html'>api_key_limit</a></td>
+                                        <td>chk_api_key_limit_daily</td>
+                                        <td>(daily_limit &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_limit.html'>api_key_limit</a></td>
+                                        <td>chk_api_key_limit_rate</td>
+                                        <td>(rate_limit_per_minute &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_limit_alert.html'>api_key_limit_alert</a></td>
+                                        <td>chk_api_key_limit_alert_threshold</td>
+                                        <td>((warn_threshold_percent &gt;&#61; 1) AND (warn_threshold_percent &lt;&#61; 100))</td>
                                     </tr>
                                 </tbody>
                             </table>

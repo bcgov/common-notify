@@ -131,6 +131,21 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
+                                                <td title="api_key_limit.channel_code references notification_channel_code.channel_code via fk_api_key_limit_channel"><a href='api_key_limit.html'>api_key_limit</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_api_key_limit_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td title="api_key_limit_alert.channel_code references notification_channel_code.channel_code via fk_api_key_limit_alert_channel"><a href='api_key_limit_alert.html'>api_key_limit_alert</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_api_key_limit_alert_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td title="api_key_usage.channel_code references notification_channel_code.channel_code via fk_api_key_usage_channel"><a href='api_key_usage.html'>api_key_usage</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_api_key_usage_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
                                                 <td title="notification_request.channel_code references notification_channel_code.channel_code via fk_notification_channel_code"><a href='notification_request.html'>notification_request</a><span class='relatedKey'>.channel_code</span></td>
                                                 <td class="constraint detail">fk_notification_channel_code</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
@@ -342,25 +357,33 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="445,5,687,269">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,327,401,631">
-<area shape="rect" id="node3" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="731,68,1024,332">
-<area shape="rect" id="node4" href="template.html" target="_top" title="template" alt="" coords="487,323,645,645">
-<area shape="rect" id="node5" href="template_version.html" target="_top" title="template_version" alt="" coords="768,443,987,736">
+<area shape="rect" id="node1" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="455,5,679,181">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,759,401,1063">
+<area shape="rect" id="node3" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="445,199,688,375">
+<area shape="rect" id="node4" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="459,392,675,627">
+<area shape="rect" id="node5" href="notification_request.html" target="_top" title="notification_request" alt="" coords="446,644,687,908">
+<area shape="rect" id="node6" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="732,707,1025,971">
+<area shape="rect" id="node7" href="template.html" target="_top" title="template" alt="" coords="488,961,645,1284">
+<area shape="rect" id="node8" href="template_version.html" target="_top" title="template_version" alt="" coords="769,1081,988,1375">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_channel_code.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="445,96,687,184">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,216,401,520">
-<area shape="rect" id="node3" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="67,111,340,199">
-<area shape="rect" id="node4" href="tenant.html" target="_top" title="tenant" alt="" coords="137,5,270,93">
-<area shape="rect" id="node5" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="731,167,1024,255">
-<area shape="rect" id="node6" href="template.html" target="_top" title="template" alt="" coords="490,417,642,505">
-<area shape="rect" id="node7" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="75,537,332,625">
-<area shape="rect" id="node8" href="template_version.html" target="_top" title="template_version" alt="" coords="768,417,987,505">
-<area shape="rect" id="node9" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="750,43,1005,131">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="268,292,493,380">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,787,139,875">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="632,148,856,324">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="183,397,579,701">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="623,341,865,517">
+<area shape="rect" id="node6" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="636,535,852,769">
+<area shape="rect" id="node7" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="245,719,516,807">
+<area shape="rect" id="node8" href="notification_request.html" target="_top" title="notification_request" alt="" coords="623,896,865,984">
+<area shape="rect" id="node9" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="244,947,517,1035">
+<area shape="rect" id="node10" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="909,896,1203,984">
+<area shape="rect" id="node11" href="template.html" target="_top" title="template" alt="" coords="668,43,820,131">
+<area shape="rect" id="node12" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="252,5,509,93">
+<area shape="rect" id="node13" href="template_version.html" target="_top" title="template_version" alt="" coords="947,43,1165,131">
+<area shape="rect" id="node14" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="929,788,1183,876">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_channel_code.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>

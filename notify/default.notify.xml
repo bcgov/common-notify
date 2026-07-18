@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?><database name="default" schema="notify" type="PostgreSQL - 17.0 (Debian 17.0-1.pgdg110+1)">
    <tables>
       <table name="api_key_consumer" remarks="" schema="notify" type="TABLE">
-         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit"/>
+            <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_alert_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit_alert"/>
+            <child column="api_key_consumer_id" foreignKey="fk_api_key_usage_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_usage"/>
+         </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="credential_identifier" nullable="false" remarks="" size="512" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="consumer_id" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
@@ -20,6 +24,96 @@
          <index name="uq_api_key_consumer_credential" unique="true">
             <column ascending="true" name="credential_identifier"/>
          </index>
+      </table>
+      <table name="api_key_limit" remarks="Configured numeric notification limits per (API key, channel). Populated once when an API key is linked to a tenant during onboarding." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="api_key_consumer_id" nullable="false" remarks="The API key (api_key_consumer) these limits apply to." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_limit_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_consumer"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel the limits apply to (EMAIL, SMS). Limits differ per channel." size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_api_key_limit_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="rate_limit_per_minute" nullable="false" remarks="Maximum notifications accepted per minute (API rate limit)." size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="daily_limit" nullable="false" remarks="Maximum notifications per calendar day." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="annual_limit" nullable="false" remarks="Maximum notifications per fiscal year. The year boundary is set globally via notify.configuration key 'fiscal_year_start'." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_api_key_limit" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_api_key_limit_consumer" unique="false">
+            <column ascending="true" name="api_key_consumer_id"/>
+         </index>
+         <index name="uq_api_key_limit" unique="true">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <checkConstraint constraint="(annual_limit &gt; 0)" name="chk_api_key_limit_annual"/>
+         <checkConstraint constraint="(daily_limit &gt; 0)" name="chk_api_key_limit_daily"/>
+         <checkConstraint constraint="(rate_limit_per_minute &gt; 0)" name="chk_api_key_limit_rate"/>
+      </table>
+      <table name="api_key_limit_alert" remarks="Per-(API key, channel) limit-alert configuration. Seeded when an API key is bound to a tenant. Holds the warning threshold and an enabled flag; the 100% (limit reached) alert always fires." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="api_key_consumer_id" nullable="false" remarks="The API key (api_key_consumer) this alert config applies to." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_limit_alert_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_consumer"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel the alert config applies to (EMAIL, SMS)." size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_api_key_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="80" digits="0" id="3" name="warn_threshold_percent" nullable="false" remarks="Percent of a limit at which a warning alert is sent (default 80)." size="5" type="int2" typeCode="5"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="4" name="alerts_enabled" nullable="false" remarks="Whether limit alerts are enabled for this key/channel." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_api_key_limit_alert" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_api_key_limit_alert_consumer" unique="false">
+            <column ascending="true" name="api_key_consumer_id"/>
+         </index>
+         <index name="uq_api_key_limit_alert" unique="true">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <checkConstraint constraint="((warn_threshold_percent &gt;= 1) AND (warn_threshold_percent &lt;= 100))" name="chk_api_key_limit_alert_threshold"/>
+      </table>
+      <table name="api_key_usage" remarks="Rolling notification counters per (API key, channel, period). MINUTE/DAY/YEAR buckets are incremented on each accepted send. YEAR (and DAY) rows are retained as usage history; MINUTE rows are prunable." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="api_key_consumer_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_usage_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_consumer"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="period_type_code" nullable="false" remarks="Granularity of the bucket (FK to usage_period_type_code): MINUTE (rate limit), DAY (daily max), YEAR (annual max / fiscal-year history)." size="20" type="varchar" typeCode="12">
+            <parent column="period_type_code" foreignKey="fk_api_key_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="usage_period_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="4" name="period_start" nullable="false" remarks="Inclusive start of the bucket. For YEAR this is the fiscal-year anchor (e.g. April 1); for DAY/MINUTE it is the truncated timestamp." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="5" name="sent_count" nullable="false" remarks="Number of notifications sent in this bucket." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_api_key_usage" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_api_key_usage_lookup" unique="false">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="false" name="period_start"/>
+         </index>
+         <index name="uq_api_key_usage" unique="true">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="true" name="period_start"/>
+         </index>
+         <checkConstraint constraint="(sent_count &gt;= 0)" name="chk_api_key_usage_count"/>
       </table>
       <table name="attachment" remarks="" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
@@ -203,6 +297,9 @@
       </table>
       <table name="notification_channel_code" numRows="2" remarks="Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS).&#10;This ensures consistency with the NotificationChannel TypeScript enum." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="channel_code" nullable="false" remarks="Channel code (e.g., EMAIL, SMS). Primary key." size="20" type="varchar" typeCode="12">
+            <child column="channel_code" foreignKey="fk_api_key_limit_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit"/>
+            <child column="channel_code" foreignKey="fk_api_key_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert"/>
+            <child column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
             <child column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
             <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
@@ -566,6 +663,25 @@
          <primaryKey column="code" sequenceNumberInPK="1"/>
          <index name="tenant_status_code_pkey" unique="true">
             <column ascending="true" name="code"/>
+         </index>
+      </table>
+      <table name="usage_period_type_code" numRows="3" remarks="Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="period_type_code" nullable="false" remarks="Period type code (MINUTE, DAY, YEAR). Primary key." size="20" type="varchar" typeCode="12">
+            <child column="period_type_code" foreignKey="fk_api_key_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the period type." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="display_name" nullable="true" remarks="Display label for the period type." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="999" digits="0" id="3" name="sort_order" nullable="false" remarks="Ordering hint for display." size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="created_at" nullable="false" remarks="Timestamp when the period type code was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="updated_at" nullable="false" remarks="Timestamp when the period type code was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="period_type_code" sequenceNumberInPK="1"/>
+         <index name="usage_period_type_code_pkey" unique="true">
+            <column ascending="true" name="period_type_code"/>
+         </index>
+         <index name="idx_usage_period_type_code_description" unique="false">
+            <column ascending="true" name="description"/>
          </index>
       </table>
       <table name="user_identity" remarks="Links an external identity provider account to an internal Notify user. A single Notify user may have multiple identity links across different providers." schema="notify" type="TABLE">
