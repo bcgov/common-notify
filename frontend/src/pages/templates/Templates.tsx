@@ -6,8 +6,8 @@ import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { setPage, setLimit, setSearch, setSort, setFilter } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
-import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined'
 import PageHeading from '@/components/PageHeading'
+import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -129,29 +129,13 @@ const Templates: FC = () => {
       <PageHeading title="Notification Templates" />
 
       <div className="row mb-5 g-2 align-items-center">
-        <div className="col-auto">
-          <div className="position-relative" style={{ width: '360px' }}>
-            <SearchOutlinedIcon
-              fontSize="small"
-              className="position-absolute top-50 translate-middle-y text-secondary"
-              style={{ left: '0.75rem', pointerEvents: 'none' }}
-            />
-            <input
-              type="search"
-              className="form-control ps-5"
-              placeholder="Search Notification Templates..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              aria-label="Search templates"
-            />
-          </div>
-        </div>
-        <div className="col-auto">
-          <button className="btn btn-outline-secondary" type="button" onClick={handleSearch}>
-            Search
-          </button>
-        </div>
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          placeholder="Search Notification Templates..."
+          ariaLabel="Search templates"
+        />
         <div className="col-auto ms-auto">
           <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
             Create New Template
