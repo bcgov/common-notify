@@ -141,6 +141,6 @@ export class NotificationFrontendController {
   @ApiOperation({ summary: 'List notification request detail records for a notification request' })
   findRequestDetails(@Req() req: Request, @Param('id') id: string) {
     const frontendUser = (req as any).tenant as Tenant
-    return this.notificationRequestDetailService.findByRequestId(id, frontendUser.externalId)
+    return this.notificationRequestDetailService.findByRequestIdFrontend(id, frontendUser.externalId)
   }
 }
