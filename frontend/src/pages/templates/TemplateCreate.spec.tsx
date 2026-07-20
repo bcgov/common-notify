@@ -28,6 +28,10 @@ vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
 
+vi.mock('./TemplatePreviewModal', () => ({
+  default: () => null,
+}))
+
 vi.mock('@bcgov/design-system-react-components', async () => {
   const React = await import('react')
   type RadioOptionProps = {
