@@ -14,6 +14,7 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
@@ -76,6 +77,10 @@ const Sidebar: FC = () => {
 
   const handleLogout = () => {
     UserService.doLogout()
+  }
+
+  const handleLogin = () => {
+    UserService.doLogin()
   }
 
   return (
@@ -229,13 +234,22 @@ const Sidebar: FC = () => {
             </>
           )}
 
-          {/* Logout */}
-          <Button variant="link" className="sidebar__item" onPress={handleLogout}>
-            <span className="sidebar__icon" aria-hidden="true">
-              <LogoutOutlinedIcon />
-            </span>
-            <span className="sidebar__label">Logout</span>
-          </Button>
+          {/* Logout / Login */}
+          {user ? (
+            <Button variant="link" className="sidebar__item" onPress={handleLogout}>
+              <span className="sidebar__icon" aria-hidden="true">
+                <LogoutOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Logout</span>
+            </Button>
+          ) : (
+            <Button variant="link" className="sidebar__item" onPress={handleLogin}>
+              <span className="sidebar__icon" aria-hidden="true">
+                <LoginOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Login</span>
+            </Button>
+          )}
         </div>
       </div>
     </aside>
