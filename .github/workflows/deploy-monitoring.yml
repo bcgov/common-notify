@@ -168,14 +168,13 @@ jobs:
 
             # Display access info
             GRAFANA_ROUTE=$(oc get route grafana -n ${NAMESPACE} -o jsonpath='{.spec.host}' 2>/dev/null)
-            ADMIN_PASSWORD=$(oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath="{.data.admin-password}" | base64 -d 2>/dev/null)
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ Grafana deployed successfully!"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "🌐 URL: https://${GRAFANA_ROUTE}"
             echo "👤 Username: admin"
-            echo "🔑 Password: ${ADMIN_PASSWORD}"
+            echo "🔑 Password: Retrieve with: oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath='{.data.admin-password}' | base64 -d"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   deploy-agent-dev:
