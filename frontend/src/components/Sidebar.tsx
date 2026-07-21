@@ -20,7 +20,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import { CstarRole, CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
+import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
