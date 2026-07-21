@@ -115,12 +115,15 @@ export async function getTemplateById(templateId: string) {
   }
 }
 
-export interface PreviewTemplateResponse {
-  templateId: string
+export interface PreviewTemplateBodyResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
   bodyType: 'text' | 'markdown' | 'html'
+}
+
+export interface PreviewTemplateResponse extends PreviewTemplateBodyResponse {
+  templateId: string
 }
 
 /**
@@ -174,10 +177,10 @@ export interface PreviewTemplateBodyData {
  */
 export async function previewTemplateBody(
   data: PreviewTemplateBodyData,
-): Promise<PreviewTemplateResponse> {
+): Promise<PreviewTemplateBodyResponse> {
   try {
     const params = generateApiParameters('/api/v1/frontend/templates/preview')
-    return await post<PreviewTemplateResponse>({ ...params, data })
+    return await post<PreviewTemplateBodyResponse>({ ...params, data })
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}

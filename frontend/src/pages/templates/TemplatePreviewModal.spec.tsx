@@ -5,7 +5,7 @@ import {
   NotificationChannel,
   TemplateEngine,
   type PreviewTemplateBodyData,
-  type PreviewTemplateResponse,
+  type PreviewTemplateBodyResponse,
 } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import TemplatePreviewModal, { detectVariables } from './TemplatePreviewModal'
@@ -166,8 +166,7 @@ describe('TemplatePreviewModal apply flow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     previewTemplateBodyMock.mockImplementation(
-      async ({ params }: PreviewTemplateBodyData): Promise<PreviewTemplateResponse> => ({
-        templateId: 'preview',
+      async ({ params }: PreviewTemplateBodyData): Promise<PreviewTemplateBodyResponse> => ({
         channelCode: NotificationChannel.EMAIL,
         subject: 'Subject',
         body: `rendered:${params?.firstName ?? ''}:${params?.lastName ?? ''}`,
