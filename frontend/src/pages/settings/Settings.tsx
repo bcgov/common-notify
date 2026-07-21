@@ -8,14 +8,44 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const normalizeEmail = (value: string): string | null => value.trim() || null
+
 const Settings: FC = () => {
   const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const { alertEmail, loading, saving, error } = useAppSelector((state) => state.tenantSettings)
+  const { loading, saving, error } = useAppSelector((state) => state.tenantSettings)
+  const [savedAlertEmail, setSavedAlertEmail] = useState<string | null>(null)
+  const [emailInput, setEmailInput] = useState('')
+  const [loadedTenantId, setLoadedTenantId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (selectedTenant) {
-      dispatch(fetchTenantSettings())
+    let active = true
+
+    if (!selectedTenant) {
+      return () => {
+        active = false
+      }
+    }
+
+    dispatch(fetchTenantSettings())
+      .unwrap()
+      .then((settings) => {
+        if (!active) return
+
+        const nextAlertEmail = settings?.alertEmail ?? null
+        setSavedAlertEmail(nextAlertEmail)
+        setEmailInput(nextAlertEmail ?? '')
+        setLoadedTenantId(selectedTenant.id)
+      })
+      .catch(() => {
+        if (active) {
+          // The slice exposes the load error below; keep a clean empty form available.
+          setLoadedTenantId(selectedTenant.id)
+        }
+      })
+
+    return () => {
+      active = false
     }
   }, [selectedTenant, dispatch])
 
@@ -23,15 +53,22 @@ const Settings: FC = () => {
     <div>
       <PageHeading title="Tenant Settings" />
 
+      {selectedTenant && <p className="text-muted mb-3">{selectedTenant.name}</p>}
+
       {error && <div className="alert alert-danger mb-3">{error}</div>}
 
-      {loading ? (
+      {loading || loadedTenantId !== selectedTenant?.id ? (
         <p className="text-muted">Loading tenant settings...</p>
       ) : (
         <SettingsForm
-          key={`${selectedTenant?.id ?? ''}:${alertEmail ?? ''}`}
-          initialAlertEmail={alertEmail}
+          emailInput={emailInput}
+          savedAlertEmail={savedAlertEmail}
           saving={saving}
+          onEmailChange={setEmailInput}
+          onSaved={(alertEmail) => {
+            setSavedAlertEmail(alertEmail)
+            setEmailInput(alertEmail ?? '')
+          }}
         />
       )}
     </div>
@@ -39,26 +76,39 @@ const Settings: FC = () => {
 }
 
 function SettingsForm({
-  initialAlertEmail,
+  emailInput,
+  savedAlertEmail,
   saving,
+  onEmailChange,
+  onSaved,
 }: {
-  initialAlertEmail: string | null
+  emailInput: string
+  savedAlertEmail: string | null
   saving: boolean
+  onEmailChange: (value: string) => void
+  onSaved: (value: string | null) => void
 }) {
   const dispatch = useAppDispatch()
-  const [emailInput, setEmailInput] = useState(initialAlertEmail ?? '')
+  const normalizedEmail = normalizeEmail(emailInput)
+  const emailError =
+    normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)
+      ? 'Enter a valid alert email address'
+      : ''
+  const isDirty = normalizedEmail !== savedAlertEmail
+  const isSaveDisabled = !isDirty || saving || Boolean(emailError)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const trimmedEmail = emailInput.trim()
-    if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) {
-      showErrorToast('Enter a valid alert email address')
+    if (isSaveDisabled) {
       return
     }
 
     try {
-      await dispatch(updateTenantSettings({ alertEmail: trimmedEmail || null })).unwrap()
+      const updatedSettings = await dispatch(
+        updateTenantSettings({ alertEmail: normalizedEmail }),
+      ).unwrap()
+      onSaved(updatedSettings.alertEmail)
       showSuccessToast('Tenant settings updated successfully')
     } catch (updateError) {
       showErrorToast(
@@ -76,19 +126,25 @@ function SettingsForm({
         <input
           id="alert-email"
           type="email"
-          className="form-control"
+          className={`form-control${emailError ? ' is-invalid' : ''}`}
           value={emailInput}
           disabled={saving}
-          onChange={(event) => setEmailInput(event.target.value)}
-          aria-describedby="alert-email-help"
+          onChange={(event) => onEmailChange(event.target.value)}
+          aria-describedby={`alert-email-help${emailError ? ' alert-email-error' : ''}`}
+          aria-invalid={Boolean(emailError)}
         />
+        {emailError && (
+          <span id="alert-email-error" className="bcds-react-aria-TextField--Error">
+            {emailError}
+          </span>
+        )}
         <div id="alert-email-help" className="form-text">
           System and limit alerts for this tenant will be sent to this address. Leave blank to clear
           it.
         </div>
       </div>
 
-      <Button type="submit" variant="primary" isDisabled={saving}>
+      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
         {saving ? 'Saving…' : 'Save'}
       </Button>
     </form>
