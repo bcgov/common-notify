@@ -131,6 +131,8 @@ const Sidebar: FC = () => {
             <Button
               variant="link"
               className="sidebar__item"
+              title={collapsed ? adminItems.label : ''}
+              aria-expanded={!collapsed && adminExpanded}
               onPress={() => {
                 if (collapsed) {
                   setCollapsed(false)
@@ -236,7 +238,7 @@ const Sidebar: FC = () => {
 
           {/* Logout / Login */}
           {user ? (
-            <Button variant="link" className="sidebar__item" onPress={handleLogout}>
+            <Button variant="link" className="sidebar__item" onPress={handleLogout} title={collapsed ? 'Logout' : ''}>
               <span className="sidebar__icon" aria-hidden="true">
                 <LogoutOutlinedIcon />
               </span>

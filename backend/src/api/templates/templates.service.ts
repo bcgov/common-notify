@@ -235,7 +235,9 @@ export class TemplatesService {
    * Renders the provided body/subject with the given engine and sample data,
    * so the frontend can preview the current, possibly-unsaved, editor content.
    */
-  async previewTemplateBody(previewDto: PreviewTemplateBodyDto): Promise<any> {
+  async previewTemplateBody(
+    previewDto: PreviewTemplateBodyDto,
+  ): Promise<{ channelCode: NotificationChannel; subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
     const content: NotifyContent = {
       body: previewDto.body,
       subject: previewDto.subject,

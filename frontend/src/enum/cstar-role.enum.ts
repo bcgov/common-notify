@@ -14,7 +14,7 @@ export enum CstarRole {
   NOTIFY_OPERATIONS_ADMIN = 'NOTIFY_OPERATIONS_ADMIN',
 }
 
-/** Label and description for each CSTAR role. Used in the SideBar */
+/** Label and description for each CSTAR role. Used in the Sidebar */
 export const CSTAR_ROLE_DISPLAY: Record<CstarRole, { label: string; description: string }> = {
   [CstarRole.NOTIFY_VIEWER]: {
     label: 'Tenant Viewer',
