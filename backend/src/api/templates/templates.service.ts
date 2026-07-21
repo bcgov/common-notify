@@ -237,7 +237,12 @@ export class TemplatesService {
    */
   async previewTemplateBody(
     previewDto: PreviewTemplateBodyDto,
-  ): Promise<{ channelCode: NotificationChannel; subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+  ): Promise<{
+    channelCode: NotificationChannel
+    subject?: string
+    body: string
+    bodyType: 'text' | 'markdown' | 'html'
+  }> {
     const content: NotifyContent = {
       body: previewDto.body,
       subject: previewDto.subject,
