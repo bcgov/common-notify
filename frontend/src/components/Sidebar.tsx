@@ -66,7 +66,7 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const { primaryRole, hasRole, hasTenantRole } = useCstarRoles()
+  const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
 
   // Determine which menu items to show based on roles
