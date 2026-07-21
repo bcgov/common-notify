@@ -6,7 +6,7 @@ import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
-import { Select } from '~/@bcgov/design-system-react-components'
+import { Select } from '@bcgov/design-system-react-components'
 
 /**
  * TenantSwitcher
