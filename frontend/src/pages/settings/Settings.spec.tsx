@@ -84,21 +84,69 @@ describe('Tenant Settings', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
-  it('shows an inline error and prevents an invalid email from being saved', async () => {
+  it('does not show an error during initial invalid typing', async () => {
     await renderLoadedSettings()
 
     fireEvent.change(screen.getByLabelText('Alert email'), { target: { value: 'invalid-email' } })
 
+    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Alert email')).toHaveAttribute('aria-invalid', 'false')
+  })
+
+  it('shows the inline error after leaving an invalid field', async () => {
+    await renderLoadedSettings()
+
+    const input = screen.getByLabelText('Alert email')
+    fireEvent.change(input, { target: { value: 'invalid-email' } })
+    fireEvent.blur(input)
+
+    expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('shows the error on submit without blur and sends no PATCH request', async () => {
+    await renderLoadedSettings()
+
+    fireEvent.change(screen.getByLabelText('Alert email'), { target: { value: 'invalid-email' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!)
+
     expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!)
     expect(updateTenantSettings).not.toHaveBeenCalled()
+  })
+
+  it('clears a visible error immediately when the value becomes valid', async () => {
+    await renderLoadedSettings()
+
+    const input = screen.getByLabelText('Alert email')
+    fireEvent.change(input, { target: { value: 'invalid-email' } })
+    fireEvent.blur(input)
+    fireEvent.change(input, { target: { value: 'valid@example.com' } })
+
+    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('treats blank input as a valid clear operation', async () => {
+    await renderLoadedSettings()
+
+    const input = screen.getByLabelText('Alert email')
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.blur(input)
+
+    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
   it('makes the saved value the new clean baseline after a successful save', async () => {
     await renderLoadedSettings()
 
-    fireEvent.change(screen.getByLabelText('Alert email'), {
+    const input = screen.getByLabelText('Alert email')
+    fireEvent.change(input, { target: { value: 'invalid-email' } })
+    fireEvent.blur(input)
+    fireEvent.change(input, {
       target: { value: 'changed@example.com' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -107,14 +155,18 @@ describe('Tenant Settings', () => {
       expect(showSuccessToast).toHaveBeenCalledWith('Tenant settings updated successfully')
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     })
+
+    fireEvent.change(input, { target: { value: 'invalid-again' } })
+    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
   })
 
   it('resets to the newly loaded value when the selected tenant changes', async () => {
     const { rerender } = await renderLoadedSettings()
 
-    fireEvent.change(screen.getByLabelText('Alert email'), {
-      target: { value: 'unsaved@example.com' },
-    })
+    const input = screen.getByLabelText('Alert email')
+    fireEvent.change(input, { target: { value: 'invalid-email' } })
+    fireEvent.blur(input)
+    expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
     state = {
       ...state,
       tenant: { selectedTenant: tenant('tenant-2', 'Tenant Two') },
@@ -123,6 +175,7 @@ describe('Tenant Settings', () => {
 
     expect(await screen.findByDisplayValue('other@example.com')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('unsaved@example.com')).not.toBeInTheDocument()
+    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
     expect(screen.getByText('Tenant Two')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })

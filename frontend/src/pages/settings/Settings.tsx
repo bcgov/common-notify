@@ -6,9 +6,13 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchTenantSettings, updateTenantSettings } from '@/redux/thunks/tenantSettings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_PATTERN =
+  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
 
 const normalizeEmail = (value: string): string | null => value.trim() || null
+
+const isValidEmail = (value: string): boolean =>
+  value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 
 const Settings: FC = () => {
   const dispatch = useAppDispatch()
@@ -89,18 +93,23 @@ function SettingsForm({
   onSaved: (value: string | null) => void
 }) {
   const dispatch = useAppDispatch()
+  const [shouldShowValidation, setShouldShowValidation] = useState(false)
   const normalizedEmail = normalizeEmail(emailInput)
-  const emailError =
-    normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)
-      ? 'Enter a valid alert email address'
-      : ''
+  const validationError =
+    normalizedEmail && !isValidEmail(normalizedEmail) ? 'Enter a valid alert email address' : ''
+  const emailError = shouldShowValidation ? validationError : ''
   const isDirty = normalizedEmail !== savedAlertEmail
   const isSaveDisabled = !isDirty || saving || Boolean(emailError)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (isSaveDisabled) {
+    if (validationError) {
+      setShouldShowValidation(true)
+      return
+    }
+
+    if (!isDirty || saving) {
       return
     }
 
@@ -109,6 +118,7 @@ function SettingsForm({
         updateTenantSettings({ alertEmail: normalizedEmail }),
       ).unwrap()
       onSaved(updatedSettings.alertEmail)
+      setShouldShowValidation(false)
       showSuccessToast('Tenant settings updated successfully')
     } catch (updateError) {
       showErrorToast(
@@ -130,6 +140,11 @@ function SettingsForm({
           value={emailInput}
           disabled={saving}
           onChange={(event) => onEmailChange(event.target.value)}
+          onBlur={() => {
+            if (validationError) {
+              setShouldShowValidation(true)
+            }
+          }}
           aria-describedby={`alert-email-help${emailError ? ' alert-email-error' : ''}`}
           aria-invalid={Boolean(emailError)}
         />
