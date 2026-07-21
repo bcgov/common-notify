@@ -80,7 +80,8 @@ jobs:
       - name: Generate DEV gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV - this will remove TEST/PROD routes until they are re-approved
+          # Generate DEV routes (tag ns.gw-fe8c5.dev). Published below as a partial set
+          # scoped to the dev qualifier, so TEST/PROD routes are left untouched.
           api-gateway/scripts/generate-gateway-for-stage.sh dev
 
       - name: Add open PR routes (path-based routing)
@@ -116,7 +117,7 @@ jobs:
           mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
           echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
 
-      - name: Apply DEV gateway config (with open PRs)
+      - name: Publish DEV gateway config (with open PRs)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -126,10 +127,17 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply DEV + open PRs - TEST and PROD routes will be removed until re-approved
-          # All share tag ns.gw-fe8c5.dev but use path-based routing for isolation
-          echo "✅ Applying DEV config (with open PR routes) - TEST and PROD routes will be temporarily removed"
-          gwa apply -i api-gateway/generated/gw-active-services.yaml
+          # Publish ONLY the dev qualifier as a partial set (ns.gw-fe8c5.dev, including open-PR
+          # routes which share the dev tag with path-based isolation). --qualifier scopes the
+          # publish so TEST and PROD routes are left untouched — no more cross-env removal.
+          echo "Publishing DEV gateway config (qualifier=dev)…"
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-active-services.yaml --qualifier dev 2>&1) || true
+          echo "$OUT"
+          # gwa exits 0 even when the publish is rejected — fail explicitly on any error marker.
+          if echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+            echo "::error::gwa publish-gateway failed for qualifier=dev"
+            exit 1
+          fi
 
   deploy-dev:
     name: Deploy (DEV)
@@ -165,12 +173,12 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate DEV+TEST gateway configuration
+      - name: Generate TEST gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV+TEST - this will restore TEST routes (PROD still removed)
-          api-gateway/scripts/generate-gateway-for-stage.sh test
-      - name: Apply DEV+TEST gateway config (PROD still removed)
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          # Generate TEST routes only — single qualifier ns.gw-fe8c5.test -> gw-routes-test.yaml
+          api-gateway/scripts/generate-gateway-config.sh test
+      - name: Publish TEST gateway config
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -180,9 +188,17 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply DEV+TEST - PROD routes remain removed until PROD approval
-          echo "✅ Applying DEV+TEST config - TEST routes restored, PROD still removed"
-          gwa apply -i api-gateway/generated/gw-active-services.yaml
+          # Publish ONLY the test qualifier as a partial set. A single-qualifier file avoids the
+          # "Too many different qualified gateways" rejection, and --qualifier keeps DEV/PROD
+          # routes untouched.
+          echo "Publishing TEST gateway config (qualifier=test)…"
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-test.yaml --qualifier test 2>&1) || true
+          echo "$OUT"
+          # gwa exits 0 even when the publish is rejected — fail explicitly on any error marker.
+          if echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+            echo "::error::gwa publish-gateway failed for qualifier=test"
+            exit 1
+          fi
 
   deploy-test:
     name: Deploy (TEST)
@@ -226,12 +242,12 @@ jobs:
       cancel-in-progress: false # Queue instead of canceling
     steps:
       - uses: actions/checkout@v4
-      - name: Generate DEV+TEST+PROD gateway configuration
+      - name: Generate PROD gateway configuration
         run: |
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV+TEST+PROD - this will restore all environments
-          api-gateway/scripts/generate-gateway-for-stage.sh prod
-      - name: Apply DEV+TEST+PROD gateway config (all environments active)
+          chmod +x api-gateway/scripts/generate-gateway-config.sh
+          # Generate PROD routes only — single qualifier ns.gw-fe8c5.prod -> gw-routes-prod.yaml
+          api-gateway/scripts/generate-gateway-config.sh prod
+      - name: Publish PROD gateway config
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -241,9 +257,15 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply all environments - full restoration
-          echo "✅ Applying DEV+TEST+PROD config - all environments active"
-          gwa apply -i api-gateway/generated/gw-active-services.yaml
+          # Publish ONLY the prod qualifier as a partial set (DEV/TEST untouched).
+          echo "Publishing PROD gateway config (qualifier=prod)…"
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-prod.yaml --qualifier prod 2>&1) || true
+          echo "$OUT"
+          # gwa exits 0 even when the publish is rejected — fail explicitly on any error marker.
+          if echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+            echo "::error::gwa publish-gateway failed for qualifier=prod"
+            exit 1
+          fi
 
   deploy-prod:
     name: Deploy (PROD)
