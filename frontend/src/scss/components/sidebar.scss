@@ -170,12 +170,15 @@
       color: $dark-text;
 
       &:hover,
-      &:focus,
-      &:focus-visible {
+      &:focus {
         background: transparent;
         border: none;
         box-shadow: none;
         outline: none;
+      }
+      &:focus-visible {
+        outline: 2px solid $border-active;
+        outline-offset: 2px;
       }
     }
   }
