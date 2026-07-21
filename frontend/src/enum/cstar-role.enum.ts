@@ -24,7 +24,6 @@ export const CSTAR_ROLE_DISPLAY: Record<CstarRole, { label: string; description:
   [CstarRole.NOTIFY_TEMPLATE_EDITOR]: {
     label: 'Template Editor',
     description: 'You can create and manage templates within this tenant.',
-  }
   },
   [CstarRole.NOTIFY_OPERATIONS_ADMIN]: {
     label: 'Tenant Administrator',
