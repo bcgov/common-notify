@@ -22,8 +22,9 @@ export const CSTAR_ROLE_DISPLAY: Record<CstarRole, { label: string; description:
       'You have read-only access to templates and dashboard features within this tenant.',
   },
   [CstarRole.NOTIFY_TEMPLATE_EDITOR]: {
-    label: 'Template Template Editor',
+    label: 'Template Editor',
     description: 'You can create and manage templates within this tenant.',
+  }
   },
   [CstarRole.NOTIFY_OPERATIONS_ADMIN]: {
     label: 'Tenant Administrator',
