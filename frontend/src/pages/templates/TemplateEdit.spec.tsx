@@ -345,7 +345,9 @@ describe('TemplateEdit', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('template-123')
     })
 
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    })
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

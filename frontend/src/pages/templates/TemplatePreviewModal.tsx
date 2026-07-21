@@ -40,7 +40,7 @@ const IDENTIFIER = /^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
  * {{#if x}} or a mustache section {{#x}}) are surfaced as boolean toggles;
  * everything else is a free-text value.
  */
-function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
+export function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
   const found = new Map<string, VariableType>()
   const addVar = (name: string, type: VariableType) => {
     const existing = found.get(name)
