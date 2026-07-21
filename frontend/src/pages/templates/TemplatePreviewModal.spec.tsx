@@ -135,7 +135,9 @@ describe('detectVariables', () => {
     ])
   })
 
-  it('detects Handlebars blocks, helpers, and dotted paths', () => {
+  it('detects Handlebars blocks and helpers, ignoring dotted paths', () => {
+    // Dotted paths (user.createdAt) are excluded: the renderer receives a flat
+    // params object, so a nested lookup can never bind and would render empty.
     expect(
       detectVariables(
         'Hi {{firstName}} {{#if hasUpdates}}updates{{/if}} {{formatDate user.createdAt}}',
@@ -144,7 +146,6 @@ describe('detectVariables', () => {
     ).toEqual([
       { name: 'firstName', type: 'text' },
       { name: 'hasUpdates', type: 'boolean' },
-      { name: 'user.createdAt', type: 'text' },
     ])
   })
 

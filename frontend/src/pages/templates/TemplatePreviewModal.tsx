@@ -31,8 +31,8 @@ interface DetectedVariable {
   type: VariableType
 }
 
-// Matches a simple identifier or dotted path (e.g. firstName, user.name)
-const IDENTIFIER = /^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
+// Matches a single identifier (e.g. firstName).
+const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
 
 /**
  * Parse a template body and detect the variables it references, so the user can
