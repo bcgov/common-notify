@@ -131,6 +131,8 @@ const Sidebar: FC = () => {
             <Button
               variant="link"
               className="sidebar__item"
+              title={collapsed ? adminItems.label : ''}
+              aria-expanded={!collapsed && adminExpanded}
               onPress={() => {
                 if (collapsed) {
                   setCollapsed(false)
