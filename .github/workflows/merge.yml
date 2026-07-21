@@ -195,10 +195,13 @@ jobs:
           # "Too many different qualified gateways" rejection, and --qualifier keeps DEV/PROD
           # routes untouched.
           echo "Publishing TEST gateway config (qualifier=test)…"
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-test.yaml --qualifier test 2>&1) || true
+          set +e
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-test.yaml --qualifier test 2>&1)
+          STATUS=$?
+          set -e
           echo "$OUT"
-          # gwa exits 0 even when the publish is rejected — fail explicitly on any error marker.
-          if echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
             echo "::error::gwa publish-gateway failed for qualifier=test"
             exit 1
           fi
