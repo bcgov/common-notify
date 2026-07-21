@@ -262,10 +262,13 @@ jobs:
           gwa config set gateway gw-fe8c5
           # Publish ONLY the prod qualifier as a partial set (DEV/TEST untouched).
           echo "Publishing PROD gateway config (qualifier=prod)…"
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-prod.yaml --qualifier prod 2>&1) || true
+          set +e
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-prod.yaml --qualifier prod 2>&1)
+          STATUS=$?
+          set -e
           echo "$OUT"
-          # gwa exits 0 even when the publish is rejected — fail explicitly on any error marker.
-          if echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
             echo "::error::gwa publish-gateway failed for qualifier=prod"
             exit 1
           fi
