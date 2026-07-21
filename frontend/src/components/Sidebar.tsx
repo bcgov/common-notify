@@ -21,12 +21,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import { CstarRole, CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
-import {
-  Button,
-  Tooltip,
-  TooltipTrigger,
-  SvgInfoIcon,
-} from '@bcgov/design-system-react-components'
+import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
@@ -238,7 +233,12 @@ const Sidebar: FC = () => {
 
           {/* Logout / Login */}
           {user ? (
-            <Button variant="link" className="sidebar__item" onPress={handleLogout} aria-label={collapsed ? 'Logout' : undefined}>
+            <Button
+              variant="link"
+              className="sidebar__item"
+              onPress={handleLogout}
+              aria-label={collapsed ? 'Logout' : undefined}
+            >
               <span className="sidebar__icon" aria-hidden="true">
                 <LogoutOutlinedIcon />
               </span>
