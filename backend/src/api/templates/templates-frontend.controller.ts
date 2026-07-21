@@ -230,6 +230,8 @@ export class TemplatesFrontendController {
    * Preview arbitrary template content with sample data
    * Renders the provided body/subject without requiring a stored template,
    * so the editor can preview the current possibly unsaved content.
+   * Tenant verification not needed as the template content comes from the
+   * frontend and not the database.
    *
    * @param previewDto Body, subject, engine, channel and sample params
    * @returns Rendered template output
