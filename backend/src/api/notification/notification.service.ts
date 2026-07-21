@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -17,6 +17,7 @@ import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.con
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { TemplatesService } from '../templates/templates.service'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
@@ -73,6 +74,7 @@ export class NotificationService {
     private readonly tenantsService: TenantsService,
     private readonly configService: ConfigService,
     private readonly templatesRepository: TemplatesRepository,
+    private readonly templatesService: TemplatesService,
     private readonly notificationPubSubService: NotificationPubSubService,
   ) {
     // Load validation limits from environment variables with sensible defaults
@@ -468,8 +470,13 @@ export class NotificationService {
           errors.push(
             `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
           )
+        } else if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
+          await this.templatesService.renderTemplateContent(template as any, request.params ?? {})
         }
       } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error
+        }
         errors.push(
           `Failed to validate template: ${error instanceof Error ? error.message : String(error)}`,
         )

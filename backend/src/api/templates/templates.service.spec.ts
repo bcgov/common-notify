@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { BadRequestException } from '@nestjs/common'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -14,12 +15,15 @@ describe('TemplatesService', () => {
   const mockTemplate: Template = {
     id: 'template-123',
     tenantId: 'tenant-123',
+    tenant: undefined as any,
     name: 'Welcome Email',
     description: 'Welcome template',
     channelCode: NotificationChannel.EMAIL,
+    channel: undefined as any,
     subject: 'Welcome to {{siteName}}!',
     body: 'Hello {{userName}}, welcome!',
     engineCode: TemplateEngine.HANDLEBARS,
+    engine: undefined as any,
     bodyType: 'markdown',
     version: 1,
     active: true,
@@ -60,6 +64,20 @@ describe('TemplatesService', () => {
     body: 'Your code is {{code}}',
     engineCode: TemplateEngine.MJML,
     bodyType: null,
+  }
+
+  const mockLegacyTemplate: Template = {
+    ...mockTemplate,
+    subject: 'Order ((orderNumber)) update',
+    body: 'Hello ((firstName)), status: ((status))',
+    engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+  }
+
+  const mockMustacheTemplate: Template = {
+    ...mockTemplate,
+    subject: 'Case {{caseNumber}}',
+    body: 'Hello {{firstName}}',
+    engineCode: TemplateEngine.MUSTACHE,
   }
 
   const mockRepository = {
@@ -124,6 +142,7 @@ describe('TemplatesService', () => {
     it('should render markdown template and return bodyType without converting', async () => {
       const result = await service.renderTemplateContent(mockMarkdownTemplate, {
         userName: 'John',
+        siteName: 'MyApp',
       })
 
       // Body should be raw markdown, not converted to HTML (adapter handles that)
@@ -139,6 +158,7 @@ describe('TemplatesService', () => {
     it('should render subject without markdown syntax expansion', async () => {
       const result = await service.renderTemplateContent(mockMarkdownTemplate, {
         userName: 'John',
+        siteName: 'MyApp',
       })
 
       // Subject should be plain text, not wrapped in <p> tags or HTML
@@ -147,17 +167,17 @@ describe('TemplatesService', () => {
       expect(result.subject).not.toContain('<h1>')
     })
 
-    it('should handle markdown with undefined template values', async () => {
+    it('should throw when markdown template values are missing', async () => {
       const template: Template = {
         ...mockMarkdownTemplate,
         body: '# Title\n\nHello {{unknownVar}}, welcome!',
       }
 
-      const result = await service.renderTemplateContent(template, {})
-
-      expect(result.body).toContain('# Title')
-      expect(result.body).toContain('Hello , welcome!') // undefined vars render as empty
-      expect(result.bodyType).toBe('markdown') // markdown is returned raw, adapter converts to HTML
+      await expect(
+        service.renderTemplateContent(template, {
+          siteName: 'MyApp',
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: unknownVar')
     })
 
     it('should handle markdown with special characters', async () => {
@@ -166,7 +186,7 @@ describe('TemplatesService', () => {
         body: '# Title\n\n**Bold** and _italic_ & special chars',
       }
 
-      const result = await service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, { siteName: 'MyApp' })
 
       expect(result.body).toContain('**Bold**')
       expect(result.body).toContain('_italic_')
@@ -180,7 +200,7 @@ describe('TemplatesService', () => {
         body: '# Code Example\n\n```javascript\nconst x = 5;\n```',
       }
 
-      const result = await service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, { siteName: 'MyApp' })
 
       expect(result.body).toContain('```javascript')
       expect(result.body).toContain('const x = 5;')
@@ -193,7 +213,7 @@ describe('TemplatesService', () => {
         body: '# Items\n\n- Item 1\n- Item 2\n- Item 3',
       }
 
-      const result = await service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, { siteName: 'MyApp' })
 
       expect(result.body).toContain('- Item 1')
       expect(result.body).toContain('- Item 2')
@@ -206,15 +226,19 @@ describe('TemplatesService', () => {
         body: '| Name | Value |\n|------|-------|\n| A | 1 |\n| B | 2 |',
       }
 
-      const result = await service.renderTemplateContent(template, {})
+      const result = await service.renderTemplateContent(template, { siteName: 'MyApp' })
 
       expect(result.body).toContain('| Name | Value |')
       expect(result.body).toContain('| A | 1 |')
       expect(result.bodyType).toBe('markdown')
     })
 
-    it('should preserve undefined personalisation', async () => {
-      const result = await service.renderTemplateContent(mockTemplate)
+    it('should preserve undefined personalisation for templates without placeholders', async () => {
+      const result = await service.renderTemplateContent({
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: 'Static body',
+      })
 
       expect(result).toHaveProperty('subject')
       expect(result).toHaveProperty('body')
@@ -238,6 +262,373 @@ describe('TemplatesService', () => {
 
       expect(result.body).toBe('Your code is 123456')
       expect(result.bodyType).toBe('html')
+    })
+
+    it('should throw BadRequestException for missing Legacy GC Notify personalisation', async () => {
+      await expect(service.renderTemplateContent(mockLegacyTemplate, {})).rejects.toThrow(
+        BadRequestException,
+      )
+      await expect(service.renderTemplateContent(mockLegacyTemplate, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName, status, orderNumber',
+      )
+    })
+
+    it('should require the Legacy GC Notify key before ?? fallback text', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        body: 'Status: ((status??submitted for review))',
+        subject: 'Static subject',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: status',
+      )
+    })
+
+    it('should preserve Legacy GC Notify empty substitution for present null values', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Static subject',
+        body: 'Status: ((status))',
+      }
+
+      const result = await service.renderTemplateContent(template, { status: null })
+
+      expect(result.body).toBe('Status: ')
+    })
+
+    it('should throw a clean error when personalisation is null and placeholders are required', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: 'Hello {{firstName}}',
+      }
+
+      await expect(service.renderTemplateContent(template, null as any)).rejects.toThrow(
+        BadRequestException,
+      )
+      await expect(service.renderTemplateContent(template, null as any)).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName',
+      )
+    })
+
+    it('should throw a clean error when personalisation is undefined and placeholders are required', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: 'Hello {{firstName}}',
+      }
+
+      await expect(service.renderTemplateContent(template, undefined)).rejects.toThrow(
+        BadRequestException,
+      )
+      await expect(service.renderTemplateContent(template, undefined)).rejects.toThrow(
+        'Missing personalisation for template ID template-123: firstName',
+      )
+    })
+
+    it('should throw BadRequestException for missing Handlebars personalisation', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Welcome {{siteName}}',
+        body: '{{#if isApproved}}Approved{{/if}} for {{caseNumber}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: isApproved, caseNumber, siteName',
+      )
+    })
+
+    it('should accept empty-string values as present personalisation', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: 'Status: {{status}}',
+      }
+
+      const result = await service.renderTemplateContent(template, { status: '' })
+
+      expect(result.body).toBe('Status: ')
+      expect(result.bodyType).toBe('markdown')
+    })
+
+    it('should ignore extra unused personalisation keys', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: 'Hello {{firstName}}',
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        firstName: 'Test',
+        unusedKey: 'extra',
+      })
+
+      expect(result.body).toBe('Hello Test')
+    })
+
+    it('should validate Handlebars unless arguments', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#unless isBlocked}}Allowed{{/unless}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: isBlocked',
+      )
+    })
+
+    it('should not require Handlebars variables inside a false #if branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{/if}}',
+      }
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: false })
+
+      expect(result.body).toBe('')
+    })
+
+    it('should require Handlebars variables inside a true #if branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{/if}}',
+      }
+
+      await expect(service.renderTemplateContent(template, { isSubscribed: true })).rejects.toThrow(
+        'Missing personalisation for template ID template-123: name',
+      )
+    })
+
+    it('should validate only the selected Handlebars #if/else branch', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello {{name}}{{else}}Reason: {{reason}}{{/if}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: true, reason: 'paused' }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: name')
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: false, name: 'Alice' }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: reason')
+    })
+
+    it('should apply inverse branch validation for Handlebars #unless', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#unless isSubscribed}}Hello {{name}}{{else}}Subscribed{{/unless}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, { isSubscribed: false }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: name')
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: true })
+      expect(result.body).toBe('Subscribed')
+    })
+
+    it('should still report a missing Handlebars condition key', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#if isSubscribed}}Hello{{/if}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: isSubscribed',
+      )
+    })
+
+    it('should preserve Handlebars #each scoping and typed arrays', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Static subject',
+        body: '{{#each articles}}{{title}} by {{author}};{{/each}}',
+      }
+
+      const emptyResult = await service.renderTemplateContent(template, { articles: [] })
+      expect(emptyResult.body).toBe('')
+
+      const populatedResult = await service.renderTemplateContent(template, {
+        articles: [{ title: 'One', author: 'Ada' }],
+      })
+      expect(populatedResult.body).toBe('One by Ada;')
+    })
+
+    it('should preserve typed false values for Mustache sections', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: 'Static subject',
+        body: '{{#isSubscribed}}Hello {{name}}{{/isSubscribed}}',
+      }
+
+      const result = await service.renderTemplateContent(template, { isSubscribed: false })
+
+      expect(result.body).toBe('')
+    })
+
+    it('should apply value-aware Handlebars validation to email subject and body', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: '{{#if includeSubject}}Hello {{subjectName}}{{/if}}',
+        body: '{{#if includeBody}}Body for {{bodyName}}{{/if}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, {
+          includeSubject: false,
+          includeBody: true,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: bodyName')
+
+      await expect(
+        service.renderTemplateContent(template, {
+          includeSubject: true,
+          includeBody: false,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: subjectName')
+    })
+
+    it('should throw BadRequestException for missing Mustache personalisation', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        body: '{{#items}}Item{{/items}} for {{firstName}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: items, firstName, caseNumber',
+      )
+    })
+
+    it('should not require Mustache section item fields as top-level personalisation keys', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: '{{#isSubscribed}}Digest{{/isSubscribed}}',
+        body: `
+          Hello {{name}}
+          {{#articles}}
+          Article: {{title}}
+          By {{author}}
+          {{/articles}}
+          {{#categories}}
+          Category: {{label}}
+          {{/categories}}
+        `,
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: name, articles, categories, isSubscribed',
+      )
+    })
+
+    it('should allow Mustache section templates through validation when top-level keys are present', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        subject: '{{#isSubscribed}}Digest{{/isSubscribed}}',
+        body: `
+          Hello {{name}}
+          {{#articles}}
+          Article: {{title}}
+          By {{author}}
+          {{/articles}}
+          {{#categories}}
+          Category: {{label}}
+          {{/categories}}
+        `,
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        name: 'Alice',
+        isSubscribed: true,
+        articles: [{ title: 'One', author: 'A' }],
+        categories: [{ label: 'News' }],
+      })
+
+      expect(result.subject).toBe('Digest')
+      expect(result.body).toContain('Hello Alice')
+      expect(result.bodyType).toBe('markdown')
+    })
+
+    it('should validate MJML placeholders using existing MJML renderer syntax', async () => {
+      const template: Template = {
+        ...mockMjmlTemplate,
+        subject: 'Welcome {{userName}}',
+        body: `
+          <mjml>
+            <mj-body>
+              <mj-section>
+                <mj-column>
+                  <mj-text>{{#if isApproved}}Approved{{/if}} case {{caseNumber}}</mj-text>
+                </mj-column>
+              </mj-section>
+            </mj-body>
+          </mjml>
+        `,
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: isApproved, caseNumber, userName',
+      )
+    })
+
+    it('should validate email subject and body placeholders together', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Subject {{subjectKey}}',
+        body: 'Body {{bodyKey}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: bodyKey, subjectKey',
+      )
+    })
+
+    it('should validate only SMS body placeholders', async () => {
+      const template: Template = {
+        ...mockMustacheTemplate,
+        channelCode: NotificationChannel.SMS,
+        subject: 'Ignored {{subjectKey}}',
+        body: 'SMS {{bodyKey}}',
+      }
+
+      await expect(service.renderTemplateContent(template, {})).rejects.toThrow(
+        'Missing personalisation for template ID template-123: bodyKey',
+      )
+    })
+
+    it('should render successfully when all required keys are present', async () => {
+      const result = await service.renderTemplateContent(mockMustacheTemplate, {
+        firstName: 'Alice',
+        caseNumber: 'C-123',
+      })
+
+      expect(result.subject).toBe('Case C-123')
+      expect(result.body).toBe('Hello Alice')
+      expect(result.bodyType).toBe('markdown')
+    })
+
+    it('should preserve rendering output when all required keys are present', async () => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Welcome {{siteName}}',
+        body: '{{#if isApproved}}Approved{{else}}Pending{{/if}} for {{caseNumber}}',
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        siteName: 'MyApp',
+        isApproved: true,
+        caseNumber: 'C-100',
+      })
+
+      expect(result.subject).toBe('Welcome MyApp')
+      expect(result.body).toBe('Approved for C-100')
+      expect(result.bodyType).toBe('markdown')
     })
   })
 
@@ -403,7 +794,7 @@ describe('TemplatesService', () => {
       mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
 
       const result = await service.previewTemplate('tenant-123', 'template-123', {
-        params: { userName: 'John' },
+        params: { userName: 'John', siteName: 'MyApp' },
       })
 
       expect(result.body).toContain('# Welcome John')
