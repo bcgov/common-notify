@@ -26,7 +26,7 @@ import {
   Tooltip,
   TooltipTrigger,
   SvgInfoIcon,
-} from '~/@bcgov/design-system-react-components'
+} from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
