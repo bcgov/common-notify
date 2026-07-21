@@ -411,4 +411,62 @@ describe('TemplatesService', () => {
       expect(result.bodyType).toBe('markdown')
     })
   })
+
+  describe('previewTemplateBody', () => {
+    it('should render email body with subject and markdown bodyType for non-MJML engines', async () => {
+      const result = await service.previewTemplateBody({
+        body: '# Welcome {{userName}}\n\nThanks for joining!',
+        subject: 'Welcome to {{siteName}}!',
+        channelCode: NotificationChannel.EMAIL,
+        engineCode: TemplateEngine.HANDLEBARS,
+        params: { userName: 'John', siteName: 'MyApp' },
+      })
+
+      expect(result.channelCode).toBe(NotificationChannel.EMAIL)
+      expect(result.subject).toBe('Welcome to MyApp!')
+      expect(result.body).toContain('# Welcome John')
+      expect(result.body).toContain('Thanks for joining!')
+      expect(result.bodyType).toBe('markdown')
+    })
+
+    it('should render email MJML body to HTML with html bodyType', async () => {
+      const result = await service.previewTemplateBody({
+        body: `
+          <mjml>
+            <mj-body>
+              <mj-section>
+                <mj-column>
+                  <mj-text>Hello {{userName}}</mj-text>
+                </mj-column>
+              </mj-section>
+            </mj-body>
+          </mjml>
+        `,
+        subject: 'Welcome {{userName}}',
+        channelCode: NotificationChannel.EMAIL,
+        engineCode: TemplateEngine.MJML,
+        params: { userName: 'John' },
+      })
+
+      expect(result.channelCode).toBe(NotificationChannel.EMAIL)
+      expect(result.subject).toBe('Welcome John')
+      expect(result.body).toContain('<!doctype html>')
+      expect(result.body).toContain('Hello John')
+      expect(result.bodyType).toBe('html')
+    })
+
+    it('should render SMS body as markdown without a subject', async () => {
+      const result = await service.previewTemplateBody({
+        body: 'Your code is {{code}}',
+        channelCode: NotificationChannel.SMS,
+        engineCode: TemplateEngine.HANDLEBARS,
+        params: { code: '123456' },
+      })
+
+      expect(result.channelCode).toBe(NotificationChannel.SMS)
+      expect(result.subject).toBeUndefined()
+      expect(result.body).toBe('Your code is 123456')
+      expect(result.bodyType).toBe('markdown')
+    })
+  })
 })
