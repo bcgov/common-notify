@@ -64,10 +64,7 @@ export class HandlebarsTemplateRenderer implements ITemplateRenderer {
     })
   }
 
-  renderSms(
-    context: RenderContext & { personalisation: Record<string, string> },
-    _options?: RenderOptions,
-  ): Promise<RenderedSms> {
+  renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     // Validate template for dangerous patterns
     validateTemplate(context.template.body)
 

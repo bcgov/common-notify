@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import Bull from 'bull'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EmailDeliveryWorker } from './email-delivery.worker'
@@ -409,8 +409,12 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: 'EMAIL' })
-      mockTemplatesService.renderTemplateContent.mockReturnValue({
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
         subject: 'Rendered subject',
         body: 'Rendered body',
         bodyType: 'html',
@@ -421,10 +425,12 @@ describe('EmailDeliveryWorker', () => {
           notifyId: 'notify-tmpl-only',
           tenantId: 'tenant-123',
           channel: NotificationChannel.EMAIL,
-          request: {},
+          request: {
+            params: { firstName: 'Test' },
+          },
           payload: {
             recipients: { to: ['test@example.com'] },
-            content: { templateId: 'template-uuid' }, // template supplies subject/body
+            content: { templateId: 'template-uuid' },
           },
           attempt: 0,
         } as DeliveryJobPayload,
@@ -439,10 +445,81 @@ describe('EmailDeliveryWorker', () => {
 
       expect(result.success).toBe(true)
       expect(mockTemplatesRepository.findById).toHaveBeenCalledWith('tenant-123', 'template-uuid')
-      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(1)
-      expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-uuid' }),
+        { firstName: 'Test' },
+        undefined,
+      )
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            subject: 'Rendered subject',
+            body: 'Rendered body',
+          }),
+        }),
+      )
     })
 
+    it('should surface missing personalisation error for template email before raw body validation', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockRejectedValue(
+        new BadRequestException('Missing personalisation for template ID template-uuid: firstName'),
+      )
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-template-missing',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {
+            params: {},
+          },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-uuid' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+        discard: vi.fn(),
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        'Missing personalisation for template ID template-uuid: firstName',
+      )
+
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(job.discard).toHaveBeenCalledTimes(1)
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-template-missing',
+        'tenant-123',
+        expect.objectContaining({
+          status: NotificationStatus.FAILED,
+          errorReason: 'Missing personalisation for template ID template-uuid: firstName',
+        }),
+      )
+      expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
+        'notify-template-missing',
+        'Missing personalisation for template ID template-uuid: firstName',
+      )
+    })
     it('should throw error when notifyId is missing', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,

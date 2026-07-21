@@ -19,6 +19,7 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
+import { extractTemplatePersonalisationKeys } from '../../services/rendering/template-personalisation-validation'
 
 /**
  * Service for template business logic
@@ -240,11 +241,9 @@ export class TemplatesService {
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
   ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
-    // Convert all personalisation values to strings for template rendering
-    const stringPersonalisation: Record<string, string> = {}
-    for (const [key, value] of Object.entries(personalisation)) {
-      stringPersonalisation[key] = value !== null && value !== undefined ? String(value) : ''
-    }
+    const normalizedPersonalisation = personalisation ?? {}
+
+    this.validateTemplatePersonalisation(template, normalizedPersonalisation)
 
     // Get the renderer for this template's engine
     const engineName = this.mapEngineToRendererName(template.engineCode as TemplateEngine)
@@ -268,10 +267,20 @@ export class TemplatesService {
       engine: engineName,
     }
 
+    const renderPersonalisation =
+      template.engineCode === TemplateEngine.LEGACY_GC_NOTIFY
+        ? Object.fromEntries(
+            Object.entries(normalizedPersonalisation).map(([key, value]) => [
+              key,
+              value !== null && value !== undefined ? String(value) : '',
+            ]),
+          )
+        : normalizedPersonalisation
+
     // Render the template
     const renderContext = {
       template: templateDef,
-      personalisation: stringPersonalisation,
+      personalisation: renderPersonalisation,
     }
 
     const rendered = await renderer.renderEmail(renderContext)
@@ -319,6 +328,23 @@ export class TemplatesService {
         return 'sms'
       default:
         return 'email' // default fallback
+    }
+  }
+
+  private validateTemplatePersonalisation(
+    template: Template,
+    personalisation: Record<string, any>,
+  ): void {
+    const requiredKeys = extractTemplatePersonalisationKeys(template, personalisation)
+
+    const missingKeys = requiredKeys.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
+    )
+
+    if (missingKeys.length > 0) {
+      throw new BadRequestException(
+        `Missing personalisation for template ID ${template.id}: ${missingKeys.join(', ')}`,
+      )
     }
   }
 
