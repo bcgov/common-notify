@@ -14,7 +14,6 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
 import UserService from '@/service/user-service'
 import { SsoRole } from '@/enum/sso-role.enum'
 import Sidebar from './Sidebar'
-import { CstarRole } from '@/enum/cstar-role.enum'
 
 type Props = {
   children: React.ReactNode
@@ -33,8 +32,7 @@ const Layout: FC<Props> = ({ children }) => {
   const rolesError = useAppSelector((state) => state.user.rolesError)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
   const userCurrent = useAppSelector((state) => state.user.current)
-  const { canEdit, hasRole } = useCstarRoles()
-  const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  const { canEdit } = useCstarRoles()
 
   // Track which tenants we've already fetched roles for in this session
   const rolesFetchedRef = useRef<Set<string>>(new Set())
@@ -88,12 +86,6 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
-    // Settings is restricted to NOTIFY_OPERATIONS_ADMIN.
-    if (location.pathname === '/settings' && !isOperationsAdmin) {
-      navigate({ to: '/not-authorized' })
-      return
-    }
-
     // Feature Flags is open to NOTIFY_OPERATIONS_ADMIN as well as NOTIFY_ADMIN.
     if (
       location.pathname === '/admin/feature-flags' &&
@@ -107,7 +99,6 @@ const Layout: FC<Props> = ({ children }) => {
     rolesError,
     cstarRoles,
     canEdit,
-    isOperationsAdmin,
     location.pathname,
     navigate,
   ])
