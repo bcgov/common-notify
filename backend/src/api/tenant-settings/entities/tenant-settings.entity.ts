@@ -8,19 +8,19 @@ export class TenantSettings {
   @Column({ type: 'uuid', name: 'tenant_id' })
   tenantId: string
 
-  @Column({ nullable: true, length: 320, name: 'alert_email' })
+  @Column({ type: 'varchar', nullable: true, length: 320, name: 'alert_email' })
   alertEmail: string | null
 
   @Column({ name: 'created_at' })
   createdAt: Date
 
-  @Column({ nullable: true, name: 'created_by' })
+  @Column({ type: 'varchar', nullable: true, length: 200, name: 'created_by' })
   createdBy: string | null
 
   @Column({ name: 'updated_at' })
   updatedAt: Date
 
-  @Column({ nullable: true, name: 'updated_by' })
+  @Column({ type: 'varchar', nullable: true, length: 200, name: 'updated_by' })
   updatedBy: string | null
 
   @Column({ default: false, name: 'is_deleted' })

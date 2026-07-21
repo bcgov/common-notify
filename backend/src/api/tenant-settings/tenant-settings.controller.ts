@@ -2,7 +2,7 @@ import { Body, Controller, Get, Patch, Req, Request, UseGuards, Version } from '
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
-import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
+import { SsoRole } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantSettings } from './entities/tenant-settings.entity'
 import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
@@ -17,11 +17,7 @@ export class TenantSettingsController {
 
   @Version('1')
   @Get()
-  @Roles(
-    CstarRoleEnum.NOTIFY_VIEWER,
-    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
-    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
-  )
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Get settings for the authenticated tenant' })
   @ApiOkResponse({ type: TenantSettings })
   getSettings(@Req() req: Request): Promise<TenantSettings | null> {
@@ -31,7 +27,7 @@ export class TenantSettingsController {
 
   @Version('1')
   @Patch()
-  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Update settings for the authenticated tenant' })
   @ApiOkResponse({ type: TenantSettings })
   updateSettings(

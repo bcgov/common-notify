@@ -19,7 +19,6 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import { CstarRole } from '@/enum/cstar-role.enum'
 
 const navItems = [
   {
@@ -51,6 +50,10 @@ const adminItems = {
       label: 'Usage & Limits',
       to: '/admin/usage',
     },
+    {
+      label: 'Tenant Settings',
+      to: '/admin/settings',
+    },
   ],
 } as const
 
@@ -60,9 +63,8 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const { hasRole, hasTenantRole } = useCstarRoles()
+  const { hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-  const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -97,8 +99,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Usage & Limits' && showUsage) ||
-            (item.label === 'Settings' && isOperationsAdmin)
+            (item.label === 'Usage & Limits' && showUsage)
 
           return shouldShow ? (
             <Link
@@ -148,6 +149,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Usage &amp; Limits</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/settings"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">Tenant Settings</span>
                   </Link>
                 )}
               </div>
