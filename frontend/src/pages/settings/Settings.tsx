@@ -21,7 +21,7 @@ const Settings: FC = () => {
 
   return (
     <div>
-      <PageHeading title="Settings" />
+      <PageHeading title="Tenant Settings" />
 
       {error && <div className="alert alert-danger mb-3">{error}</div>}
 
