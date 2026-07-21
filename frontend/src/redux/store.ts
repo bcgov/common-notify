@@ -13,6 +13,7 @@ import featureFlagsReducer from './slices/featureFlags.slice'
 import adminTenantsReducer from './slices/adminTenants.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
 import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
+import tenantSettingsReducer from './slices/tenantSettings.slice'
 
 export const store = configureStore({
   reducer: {
@@ -30,6 +31,7 @@ export const store = configureStore({
     adminTenants: adminTenantsReducer,
     apiKeys: apiKeysReducer,
     apiKeyUsage: apiKeyUsageReducer,
+    tenantSettings: tenantSettingsReducer,
   },
 })
 
