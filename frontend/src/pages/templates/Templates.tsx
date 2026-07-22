@@ -128,20 +128,17 @@ const Templates: FC = () => {
     <div>
       <PageHeading title="Notification Templates" />
 
-      <div className="row mb-5 g-2 align-items-center">
-        <SearchField
-          value={searchInput}
-          onChange={setSearchInput}
-          onSearch={handleSearch}
-          placeholder="Search Notification Templates..."
-          ariaLabel="Search templates"
-        />
-        <div className="col-auto ms-auto">
-          <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
-            Create New Template
-          </Button>
-        </div>
-      </div>
+      <SearchField
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearch}
+        placeholder="Search Notification Templates..."
+        ariaLabel="Search templates"
+      >
+        <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
+          Create New Template
+        </Button>
+      </SearchField>
 
       <DataTable
         columns={columns}

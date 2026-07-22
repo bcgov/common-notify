@@ -1,0 +1,19 @@
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.search-field__input {
+  width: 360px;
+
+  .bcds-react-aria-TextField {
+    width: 100%;
+  }
+}
+
+// Pushes any additional actions (e.g. "Create New Template") to the far right.
+.search-field__actions {
+  margin-left: auto;
+}
