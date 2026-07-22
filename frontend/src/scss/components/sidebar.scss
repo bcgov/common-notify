@@ -85,7 +85,8 @@
       background-color: rgba($primary-color, 0.08);
     }
 
-    &:focus-visible {
+    &:focus-visible,
+    &:active {
       outline: 2px solid $border-active;
       outline-offset: 0;
       background-color: rgba($primary-color, 0.08);
@@ -96,6 +97,11 @@
       border-radius: var(--layout-borderRadius-medium, 4px);
       background: var(--surface-color-background-lightBlue, #f1f8fe);
       font-weight: 500;
+    }
+
+    &[aria-disabled='true'],
+    &:disabled {
+      color: var(--typography-color-disabled, #9f9d9c);
     }
   }
 
