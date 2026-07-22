@@ -6,6 +6,7 @@ import cstarReducer from './slices/cstar.slice'
 import loadingReducer from './slices/loading.slice'
 import toastReducer from './slices/toast.slice'
 import notificationReducer from './slices/notification.slice'
+import notificationDetailReducer from './slices/notificationDetail.slice'
 import codeTablesReducer from './slices/codeTables.slice'
 import tenantReducer from './slices/tenant.slice'
 import templatesReducer from './slices/templates.slice'
@@ -23,6 +24,7 @@ export const store = configureStore({
     loading: loadingReducer,
     toast: toastReducer,
     notification: notificationReducer,
+    notificationDetail: notificationDetailReducer,
     codeTables: codeTablesReducer,
     tenant: tenantReducer,
     templates: templatesReducer,
