@@ -56,6 +56,15 @@
     }
   }
 
+  &__toggle-icon {
+    width: 9px;
+    height: 17px;
+
+    path {
+      fill: var(--icons-color-primary, #2d2d2d);
+    }
+  }
+
   &__nav {
     display: flex;
     flex-direction: column;
