@@ -94,9 +94,9 @@ const Sidebar: FC = () => {
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {collapsed ? (
-          <ChevronRightIcon style={{ fontSize: 20 }} aria-hidden="true" />
+          <ChevronRightIcon style={{ fontSize: 24 }} aria-hidden="true" />
         ) : (
-          <ChevronLeftIcon style={{ fontSize: 20 }} aria-hidden="true" />
+          <ChevronLeftIcon style={{ fontSize: 24 }} aria-hidden="true" />
         )}
       </button>
 
