@@ -1,3 +1,15 @@
+@import '../variables.scss';
+
+.desc-above {
+  .bcds-react-aria-TextField--container {
+    order: 1;
+  }
+
+  .bcds-react-aria-TextField--Description {
+    white-space: nowrap;
+  }
+}
+
 .template-form-page {
   padding: 0 0 2rem;
 }
@@ -225,4 +237,224 @@
 // They are fixing it very soon
 .bcds-react-aria-Radio[data-selected][data-disabled]:before {
   border: 5px solid #d8d8d8;
+}
+
+/* Template preview modal */
+
+$preview-pane-height: 70vh; // Visible height of each pane
+$preview-gutter: $spacing-xl * 1.5; // 3rem outer/content padding
+
+.bcds-react-aria-Modal:has(.template-preview) {
+  width: 1140px;
+  max-width: calc(100vw - #{$preview-gutter});
+}
+
+.react-aria-ModalOverlay:has(.template-preview) {
+  background: transparent;
+}
+
+.template-preview {
+  &__header {
+    display: flex;
+    padding: var(--layout-padding-medium, 16px) var(--layout-padding-large, 24px);
+    justify-content: space-between;
+    align-items: center;
+    align-self: stretch;
+    border-bottom: 1px solid var(--surface-color-border-base, #d8d8d8);
+  }
+
+  &__title {
+    color: var(--typography-color-primary, #2d2d2d);
+    /* bold/H5 */
+    font-family: 'BC Sans';
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 34px; /* 170% */
+  }
+
+  /* Two-pane body */
+
+  &__body {
+    display: flex;
+    height: $preview-pane-height;
+    padding: 0;
+  }
+
+  &__data {
+    flex: 0 0 37%;
+    max-width: 37%;
+    overflow-y: auto;
+    padding: var(--layout-padding-large, 24px);
+  }
+
+  &__preview {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__preview-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--layout-padding-large, 24px);
+    overflow-y: auto;
+  }
+
+  /* Shared text */
+
+  &__heading {
+    font-weight: 700;
+    margin-bottom: $spacing-xs;
+  }
+
+  &__intro {
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-lg;
+  }
+
+  /* Left pane: variable inputs */
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    // Keep toggle groups at their natural width instead of stretching
+    .bcds-react-aria-ToggleButtonGroup {
+      align-self: flex-start;
+    }
+  }
+
+  // A toggle field: keep its label hugging its buttons (the DS renders them as
+  // siblings, so without this wrapper the __fields flex gap sits between them).
+  &__field-switch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+    .bcds-react-aria-Switch {
+      padding-left: var(--layout-padding-small, 8px);
+      padding-top: var(--layout-padding-small, 8px);
+    }
+
+    .bcds-react-aria-ToggleButtonGroup--Label {
+      display: flex;
+      padding: var(--layout-padding-small, 8px);
+      gap: var(--layout-padding-small, 8px);
+    }
+  }
+
+  // The variable name shown above a boolean switch, matching the TextField label.
+  // The name is bold; the appended "(required)" stays regular weight.
+  &__switch-label {
+    font: var(--typography-regular-small-body);
+    font-weight: 700;
+    color: var(--typography-color-primary);
+    padding: var(--layout-padding-xsmall) var(--layout-padding-none);
+  }
+
+  &__switch-label::after {
+    content: ' (required)';
+    font-weight: 400;
+  }
+
+  // Capped-width wrapper: the DS field fills it at 100% (so the invalid icon sits
+  // correctly inside the input) while the field grows with the pane up to a
+  // stable maximum. 269px matches the error-state field width.
+  &__field-text {
+    width: 100%;
+    max-width: 269px;
+
+    .bcds-react-aria-TextField {
+      width: 100%;
+    }
+
+    .bcds-react-aria-TextField--Label {
+      font-weight: 700;
+
+      // The DS-appended "(required)" stays regular weight
+      &.required {
+        font-weight: 400;
+      }
+    }
+  }
+
+  &__apply {
+    margin-top: $spacing-lg;
+    margin-bottom: $spacing-lg;
+  }
+
+  /* Right pane: rendered / raw tabs */
+
+  &__tabs {
+    align-self: flex-start;
+  }
+
+  &__output {
+    // Size to its content rather than stretching to the modal's bottom; the
+    // parent pane (__preview-main) scrolls if this grows past the modal height.
+    flex: 0 0 auto;
+    padding: $spacing-lg;
+    border: 1px solid $border-default;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    // Disabled/empty state shown before a valid preview has been applied
+    &--disabled {
+      background-color: var(--surface-color-background-gray, #f2f2f2);
+      color: $text-disabled;
+    }
+  }
+
+  // Raw template textarea: grows to fit its content (up to the pane's scroll)
+  // while still being resizable by hand.
+  &__raw {
+    .bcds-react-aria-TextArea {
+      width: 100%;
+    }
+
+    .bcds-react-aria-TextArea--Input {
+      field-sizing: content;
+      resize: vertical;
+      min-height: 6rem;
+    }
+
+    // Keep a white field: the DS greys read-only inputs, but this one reads as
+    // content rather than a disabled control. Match the DS `[data-readonly]`
+    // selector so this override wins on specificity.
+    .bcds-react-aria-TextArea[data-readonly] > .bcds-react-aria-TextArea--Container,
+    .bcds-react-aria-TextArea[data-readonly] .bcds-react-aria-TextArea--Input {
+      background: var(--surface-color-forms-default, #fff);
+    }
+  }
+
+  // "Preview unavailable" placeholder shown in the Rendered tab before Apply
+  &__unavailable {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+
+  &__unavailable-title {
+    font-weight: 700;
+    color: $text-disabled;
+  }
+
+  &__unavailable-desc {
+    color: $text-disabled;
+  }
+
+  &__error {
+    color: $danger-color;
+  }
+
+  &__placeholder {
+    color: $text-disabled;
+  }
 }

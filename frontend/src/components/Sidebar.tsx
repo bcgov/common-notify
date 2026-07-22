@@ -14,11 +14,14 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
+import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
@@ -63,7 +66,7 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const { hasTenantRole } = useCstarRoles()
+  const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
 
   // Determine which menu items to show based on roles
@@ -72,6 +75,10 @@ const Sidebar: FC = () => {
 
   const handleLogout = () => {
     UserService.doLogout()
+  }
+
+  const handleLogin = () => {
+    UserService.doLogin()
   }
 
   return (
@@ -118,19 +125,33 @@ const Sidebar: FC = () => {
         })}
         {isAdmin && (
           <div className="sidebar__menu-group">
-            <button
-              onClick={() => setAdminExpanded(!adminExpanded)}
-              className={`sidebar__item sidebar__menu-toggle ${adminExpanded ? 'expanded' : ''}`}
-              title={collapsed ? adminItems.label : ''}
+            <Button
+              variant="link"
+              className="sidebar__item"
+              aria-label={collapsed ? adminItems.label : undefined}
+              aria-expanded={!collapsed && adminExpanded}
+              onPress={() => {
+                if (collapsed) {
+                  setCollapsed(false)
+                  setAdminExpanded(true)
+                } else {
+                  setAdminExpanded(!adminExpanded)
+                }
+              }}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 {adminItems.icon}
               </span>
               <span className="sidebar__label">{adminItems.label}</span>
-              <span className="sidebar__menu-arrow" aria-hidden="true">
-                <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
-              </span>
-            </button>
+              {!collapsed && (
+                <span
+                  className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
+                  aria-hidden="true"
+                >
+                  <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
+                </span>
+              )}
+            </Button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
                 {isAdmin && (
@@ -170,41 +191,78 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <button type="button" className="sidebar__item" title={collapsed ? 'Help' : ''}>
+        <Button variant="link" className="sidebar__item">
           <span className="sidebar__icon" aria-hidden="true">
             <HelpOutlineOutlinedIcon />
           </span>
           <span className="sidebar__label">Help</span>
-        </button>
+        </Button>
 
         {/* Bottom section */}
         <div className="sidebar__bottom">
           {/* User */}
           {user && (
-            <div
-              className="sidebar__item sidebar__user"
-              title={collapsed ? user.displayName : ''}
-              aria-label={`Signed in as ${user.displayName}`}
-            >
-              <span className="sidebar__icon" aria-hidden="true">
-                <PersonOutlinedIcon />
-              </span>
-              <span className="sidebar__label">{user.displayName}</span>
-            </div>
+            <>
+              <div
+                className="sidebar__item sidebar__user"
+                title={collapsed ? user.displayName : ''}
+                aria-label={`Signed in as ${user.displayName}`}
+              >
+                <span className="sidebar__icon" aria-hidden="true">
+                  <PersonOutlinedIcon />
+                </span>
+                <span className="sidebar__label">{user.displayName}</span>
+              </div>
+              {primaryRole && !collapsed && (
+                <div
+                  className="sidebar__role"
+                  aria-label={`User role ${CSTAR_ROLE_DISPLAY[primaryRole].label}`}
+                >
+                  <span className="sidebar__role-heading">Role</span>
+                  <span className="sidebar__role-value">
+                    <span className="sidebar__label">{CSTAR_ROLE_DISPLAY[primaryRole].label}</span>
+                    <TooltipTrigger>
+                      <Button
+                        aria-label={`About the ${CSTAR_ROLE_DISPLAY[primaryRole].label} role`}
+                        className="sidebar__role-tooltip-trigger"
+                        isIconButton
+                        size="xsmall"
+                        type="button"
+                        variant="tertiary"
+                      >
+                        <SvgInfoIcon />
+                      </Button>
+                      <Tooltip placement="right">
+                        {CSTAR_ROLE_DISPLAY[primaryRole].description}
+                      </Tooltip>
+                    </TooltipTrigger>
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Logout */}
-          <button
-            type="button"
-            className="sidebar__item"
-            onClick={handleLogout}
-            title={collapsed ? 'Logout' : ''}
-          >
-            <span className="sidebar__icon" aria-hidden="true">
-              <LogoutOutlinedIcon />
-            </span>
-            <span className="sidebar__label">Logout</span>
-          </button>
+          {/* Logout / Login */}
+          {user ? (
+            <Button
+              variant="link"
+              className="sidebar__item"
+              onPress={handleLogout}
+              aria-label={collapsed ? 'Logout' : undefined}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                <LogoutOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Logout</span>
+            </Button>
+          ) : (
+            <Button variant="link" className="sidebar__item" onPress={handleLogin}>
+              <span className="sidebar__icon" aria-hidden="true">
+                <LoginOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Login</span>
+            </Button>
+          )}
         </div>
       </div>
     </aside>

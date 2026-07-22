@@ -12,6 +12,9 @@ import { TemplatesRepository } from './templates.repository'
 import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
+import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
+import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
+import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
@@ -32,6 +35,7 @@ export class TemplatesService {
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
     private readonly rendererRegistry: ITemplateRendererRegistry,
     private readonly tenantsService: TenantsService,
+    private readonly inlineRenderingService: InlineRenderingService,
   ) {}
 
   /**
@@ -224,6 +228,42 @@ export class TemplatesService {
       subject: rendered.subject,
       body: rendered.body,
       bodyType: rendered.bodyType,
+    }
+  }
+
+  /**
+   * Preview arbitrary template content (not a stored template)
+   * Renders the provided body/subject with the given engine and sample data,
+   * so the frontend can preview the current, possibly-unsaved, editor content.
+   */
+  async previewTemplateBody(previewDto: PreviewTemplateBodyDto): Promise<{
+    channelCode: NotificationChannel
+    subject?: string
+    body: string
+    bodyType: 'text' | 'markdown' | 'html'
+  }> {
+    const content: NotifyContent = {
+      body: previewDto.body,
+      subject: previewDto.subject,
+      renderer: previewDto.engineCode as NotifyContent['renderer'],
+    }
+    const params = previewDto.params || {}
+
+    if (previewDto.channelCode === NotificationChannel.EMAIL) {
+      const rendered = await this.inlineRenderingService.renderEmail(content, params)
+      return {
+        channelCode: previewDto.channelCode,
+        subject: rendered.subject,
+        body: rendered.body,
+        bodyType: previewDto.engineCode === TemplateEngine.MJML ? 'html' : 'markdown',
+      }
+    }
+
+    const rendered = await this.inlineRenderingService.renderSms(content, params)
+    return {
+      channelCode: previewDto.channelCode,
+      body: rendered.body,
+      bodyType: 'markdown',
     }
   }
 

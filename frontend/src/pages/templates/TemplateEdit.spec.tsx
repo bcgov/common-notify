@@ -36,6 +36,10 @@ vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
 
+vi.mock('./TemplatePreviewModal', () => ({
+  default: () => null,
+}))
+
 vi.mock('@/hooks/useCstarRoles', () => ({
   useCstarRoles: () => useCstarRolesMock(),
 }))
@@ -280,11 +284,14 @@ describe('TemplateEdit', () => {
       expect(screen.getByDisplayValue('Welcome Template')).toBeTruthy()
     })
 
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Preview' })).not.toBeDisabled()
 
     fireEvent.change(screen.getByLabelText('Template body (required)'), {
       target: { value: '' },
     })
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
@@ -308,7 +315,7 @@ describe('TemplateEdit', () => {
       screen.getByText('View reusable template', { selector: '[aria-current="page"]' }),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Preview' })).not.toBeDisabled()
   })
 
   it('renders all syntax tooltip triggers', async () => {
@@ -338,7 +345,9 @@ describe('TemplateEdit', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('template-123')
     })
 
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    })
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

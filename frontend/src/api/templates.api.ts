@@ -115,12 +115,15 @@ export async function getTemplateById(templateId: string) {
   }
 }
 
-export interface PreviewTemplateResponse {
-  templateId: string
+export interface PreviewTemplateBodyResponse {
   channelCode: NotificationChannel
   subject?: string
   body: string
   bodyType: 'text' | 'markdown' | 'html'
+}
+
+export interface PreviewTemplateResponse extends PreviewTemplateBodyResponse {
+  templateId: string
 }
 
 /**
@@ -150,6 +153,46 @@ export async function previewTemplate(
 
     throw new Error(
       `Failed to preview template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
+  }
+}
+
+export interface PreviewTemplateBodyData {
+  body: string
+  subject?: string
+  channelCode: NotificationChannel
+  engineCode: TemplateEngine
+  params?: Record<string, string>
+}
+
+/**
+ * Preview arbitrary template content (not a stored template)
+ *
+ * Renders the provided body/subject with the given engine and sample data,
+ * so the editor can preview the current (possibly unsaved) content.
+ *
+ * @param data Body, subject, channel, engine and sample params
+ * @returns Rendered template output
+ * @throws Error if preview fails
+ */
+export async function previewTemplateBody(
+  data: PreviewTemplateBodyData,
+): Promise<PreviewTemplateBodyResponse> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/templates/preview')
+    return await post<PreviewTemplateBodyResponse>({ ...params, data })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to preview templates')
+    }
+
+    throw new Error(
+      `Failed to preview template: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
     )
   }
 }
