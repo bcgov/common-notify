@@ -85,8 +85,7 @@
       background-color: rgba($primary-color, 0.08);
     }
 
-    &:focus-visible,
-    &:focus {
+    &:focus-visible {
       outline: 2px solid $border-active;
       outline-offset: 0;
       background-color: rgba($primary-color, 0.08);
