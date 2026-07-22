@@ -127,18 +127,18 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Publish ONLY the dev qualifier as a partial set (ns.gw-fe8c5.dev, including open-PR
-          # routes which share the dev tag with path-based isolation). --qualifier scopes the
-          # publish so TEST and PROD routes are left untouched — no more cross-env removal.
-          echo "Publishing DEV gateway config (qualifier=dev)…"
+          # Apply ONLY the dev GatewayService (single qualifier tag ns.gw-fe8c5.dev, including
+          # open-PR routes which share the dev tag with path-based isolation). A single-qualifier
+          # file is scoped by its tag, so TEST/PROD routes are left untouched.
+          echo "Applying DEV gateway config…"
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-active-services.yaml --qualifier dev 2>&1)
+          OUT=$(gwa apply -i api-gateway/generated/gw-active-services.yaml 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
           if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa publish-gateway failed for qualifier=dev"
+            echo "::error::gwa apply failed for the dev gateway config"
             exit 1
           fi
 
@@ -191,18 +191,18 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Publish ONLY the test qualifier as a partial set. A single-qualifier file avoids the
-          # "Too many different qualified gateways" rejection, and --qualifier keeps DEV/PROD
-          # routes untouched.
-          echo "Publishing TEST gateway config (qualifier=test)…"
+          # Apply ONLY the test GatewayService (single qualifier tag ns.gw-fe8c5.test). Applying a
+          # single-qualifier file avoids the "Too many different qualified gateways" rejection, and
+          # the tag scopes the reconcile so DEV/PROD routes are left untouched.
+          echo "Applying TEST gateway config…"
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-test.yaml --qualifier test 2>&1)
+          OUT=$(gwa apply -i api-gateway/generated/gw-routes-test.yaml 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
           if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa publish-gateway failed for qualifier=test"
+            echo "::error::gwa apply failed for the test gateway config"
             exit 1
           fi
 
@@ -263,16 +263,17 @@ jobs:
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Publish ONLY the prod qualifier as a partial set (DEV/TEST untouched).
-          echo "Publishing PROD gateway config (qualifier=prod)…"
+          # Apply ONLY the prod GatewayService (single qualifier tag ns.gw-fe8c5.prod). The tag
+          # scopes the reconcile so DEV/TEST routes are left untouched.
+          echo "Applying PROD gateway config…"
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-routes-prod.yaml --qualifier prod 2>&1)
+          OUT=$(gwa apply -i api-gateway/generated/gw-routes-prod.yaml 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
           if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa publish-gateway failed for qualifier=prod"
+            echo "::error::gwa apply failed for the prod gateway config"
             exit 1
           fi
 
