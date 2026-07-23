@@ -114,7 +114,6 @@ const featureFlagsSlice = createSlice({
       .addCase(fetchAllFeatureFlags.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
-        state.flagsList = [] // Ensure flagsList is always an array to prevent spread errors
       })
 
     // Create feature flag
