@@ -80,8 +80,8 @@ jobs:
       - name: Generate DEV gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV routes (tag ns.gw-fe8c5.dev). Published below as a partial set
-          # scoped to the dev qualifier, so TEST/PROD routes are left untouched.
+          # Generate DEV's routes standalone (tagged ns.gw-fe8c5.dev). TEST/PROD are published
+          # independently under their own qualifiers in the jobs below and are not affected.
           api-gateway/scripts/generate-gateway-for-stage.sh dev
 
       - name: Add open PR routes (path-based routing)
@@ -117,6 +117,11 @@ jobs:
           mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
           echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
 
+      # NOTE: DEV intentionally still uses `gwa apply` (unlike TEST/PROD below).
+      # The DEV config bundles the open-PR routes, which are path-based (/pr-N/...) and rely on
+      # gwa-api's own path handling. The raw-Kong conversion used for TEST/PROD cannot reproduce
+      # that prefix-stripping, so converting DEV would break every open PR environment.
+      # DEV's routes are already current, so there is nothing to gain by changing this.
       - name: Publish DEV gateway config (with open PRs)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
@@ -185,24 +190,27 @@ jobs:
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
+          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
+          python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+          python3 api-gateway/scripts/gwservice-to-kong.py \
+            api-gateway/generated/gw-routes-test.yaml > api-gateway/generated/gw-kong-test.yaml
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply ONLY the test GatewayService (single qualifier tag ns.gw-fe8c5.test). Applying a
-          # single-qualifier file avoids the "Too many different qualified gateways" rejection, and
-          # the tag scopes the reconcile so DEV/PROD routes are left untouched.
-          echo "Applying TEST gateway config…"
+          # Publish the test qualifier as a partial set. --qualifier scopes the reconcile so
+          # DEV/PROD (other qualifiers) are left untouched.
+          echo "Publishing TEST gateway config (qualifier=test)…"
           set +e
-          OUT=$(gwa apply -i api-gateway/generated/gw-routes-test.yaml 2>&1)
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-test.yaml --qualifier test 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa apply failed for the test gateway config"
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
+            echo "::error::gwa publish-gateway failed for qualifier=test"
             exit 1
           fi
 
@@ -257,23 +265,27 @@ jobs:
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
+          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
+          python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+          python3 api-gateway/scripts/gwservice-to-kong.py \
+            api-gateway/generated/gw-routes-prod.yaml > api-gateway/generated/gw-kong-prod.yaml
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply ONLY the prod GatewayService (single qualifier tag ns.gw-fe8c5.prod). The tag
-          # scopes the reconcile so DEV/TEST routes are left untouched.
-          echo "Applying PROD gateway config…"
+          # Publish the prod qualifier as a partial set. --qualifier scopes the reconcile so
+          # DEV/TEST (other qualifiers) are left untouched.
+          echo "Publishing PROD gateway config (qualifier=prod)…"
           set +e
-          OUT=$(gwa apply -i api-gateway/generated/gw-routes-prod.yaml 2>&1)
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-prod.yaml --qualifier prod 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa apply failed for the prod gateway config"
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
+            echo "::error::gwa publish-gateway failed for qualifier=prod"
             exit 1
           fi
 
