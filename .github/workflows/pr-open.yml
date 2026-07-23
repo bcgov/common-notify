@@ -64,15 +64,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate PR config from PR branch
+      - name: Generate DEV + all PR configs (preserve DEV)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Generate PR config only from PR branch code
-          # PR shares tag ns.gw-fe8c5.dev with DEV (path-based routing)
-          # DEV service already exists from merge workflow - only apply PR service
           chmod +x api-gateway/scripts/generate-gateway-config.sh
-          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
 
-      - name: Apply PR config (path-based routing)
+          # Generate DEV config first (main routes)
+          api-gateway/scripts/generate-gateway-for-stage.sh dev
+
+          # Start with DEV as base
+          cp api-gateway/generated/gw-active-services.yaml api-gateway/generated/gw-dev-with-prs.yaml
+
+          # Find all open PRs (including this one)
+          OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
+
+          if [ -z "$OPEN_PRS" ]; then
+            echo "No other open PRs found - applying DEV + this PR only"
+            # Just this PR
+            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+            echo "---" >> api-gateway/generated/gw-dev-with-prs.yaml
+            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-dev-with-prs.yaml
+          else
+            echo "Found open PRs: $OPEN_PRS"
+            echo "Generating PR configs to preserve all routes alongside DEV..."
+
+            # Generate and append each open PR config (including this one if already open)
+            for PR_NUM in $OPEN_PRS; do
+              echo "Adding PR-${PR_NUM} routes..."
+              api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
+
+              # Append PR config to combined file
+              echo "---" >> api-gateway/generated/gw-dev-with-prs.yaml
+              cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-dev-with-prs.yaml
+            done
+
+            echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
+          fi
+
+          # Use combined file for apply
+          mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
+
+      - name: Apply combined DEV + PR config (preserves DEV)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -88,30 +122,24 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply PR config only
-          # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
-          # DEV service already exists from merge workflow
-          # This adds PR routes without affecting DEV routes (different paths)
-          echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
+          # Apply combined DEV + all PRs config
+          # This preserves DEV routes while adding/updating PR routes
+          echo "✅ Applying combined DEV + PR config (path-based routing /pr-${{ github.event.number }}/)"
 
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+          set +e
+          OUT=$(gwa apply -i api-gateway/generated/gw-active-services.yaml 2>&1)
+          STATUS=$?
+          set -e
+          echo "$OUT"
 
-          # Check results
-          if grep -q "Published" /tmp/gwa-output.txt; then
-            PUBLISHED_COUNT=$(grep -oP '\d+(?=/\d+ Published)' /tmp/gwa-output.txt || echo "0")
-            echo "✅ Published $PUBLISHED_COUNT gateway service(s)"
-
-            if [ "$PUBLISHED_COUNT" -gt 0 ]; then
-              echo "✅ PR gateway config published successfully"
-              echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
-              exit 0
-            fi
+          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+            echo "::error::gwa apply failed for PR gateway config"
+            exit 1
           fi
 
-          # If we got here, nothing was published
-          echo "❌ Gateway config failed to publish"
-          cat /tmp/gwa-output.txt
-          exit 1
+          echo "✅ PR gateway config published successfully"
+          echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
 
   deploys:
     name: Deploys (${{ github.event.number }})
