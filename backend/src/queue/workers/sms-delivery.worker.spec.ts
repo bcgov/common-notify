@@ -367,6 +367,104 @@ describe('SmsDeliveryWorker', () => {
       )
     })
 
+    it('should merge channel-level params over global params when rendering a template SMS', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-sms-uuid',
+        channelCode: 'SMS',
+        name: 'Stored SMS Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        body: 'Rendered SMS Body',
+        bodyType: 'markdown',
+      })
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-sms-template-params',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {
+            params: { code: 'global', shared: 'global' },
+          },
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: { templateId: 'template-sms-uuid' },
+            params: { code: 'channel' },
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      // Channel-level param wins per-key; non-overlapping global param is retained.
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-sms-uuid' }),
+        { code: 'channel', shared: 'global' },
+        undefined,
+      )
+    })
+
+    it('should merge channel-level params over global params when rendering inline SMS content', async () => {
+      mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({
+        body: 'Rendered SMS Body',
+      })
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-sms-inline-params',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {
+            params: { code: 'global', shared: 'global' },
+          },
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: { renderer: 'handlebars', body: 'Code {{code}}' },
+            params: { code: 'channel' },
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      expect(mockTemplatesService.renderTemplateContent).not.toHaveBeenCalled()
+      // Channel-level param wins per-key; non-overlapping global param is retained.
+      expect(mockInlineRenderingService.renderSms).toHaveBeenCalledWith(
+        expect.objectContaining({ renderer: 'handlebars' }),
+        { code: 'channel', shared: 'global' },
+      )
+    })
+
     it('should mark template SMS personalisation validation errors as failed without retry', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'template-sms-uuid',
