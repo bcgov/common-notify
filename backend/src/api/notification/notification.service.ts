@@ -96,7 +96,13 @@ export class NotificationService {
     return {
       id: entity.id,
       tenantId: entity.tenantId,
-      status: entity.status,
+      status: entity.statusCode
+        ? {
+            code: entity.statusCode.code,
+            displayName: entity.statusCode.displayName,
+            description: entity.statusCode.description,
+          }
+        : { code: entity.status, displayName: entity.status },
       channelCode: entity.channelCode,
       channel: entity.channel
         ? {
@@ -363,6 +369,7 @@ export class NotificationService {
     const queryBuilder = this.notificationRepository
       .createQueryBuilder('notification')
       .leftJoinAndSelect('notification.tenant', 'tenant')
+      .leftJoinAndSelect('notification.statusCode', 'statusCode')
       .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
 
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)

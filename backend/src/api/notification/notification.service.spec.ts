@@ -1085,7 +1085,7 @@ describe('NotificationService', () => {
 
       expect(dto.id).toBe('notif-123')
       expect(dto.tenantId).toBe('tenant-456')
-      expect(dto.status).toBe(NotificationStatus.QUEUED)
+      expect(dto.status.code).toBe(NotificationStatus.QUEUED)
       expect(dto.createdAt).toEqual(new Date('2024-01-01'))
       expect(dto.createdBy).toBe('user1')
       expect(dto.updatedAt).toEqual(new Date('2024-01-02'))
@@ -1173,7 +1173,7 @@ describe('NotificationService', () => {
 
         const dto = (service as any).mapToDto(entity)
 
-        expect(dto.status).toBe(status)
+        expect(dto.status.code).toBe(status)
       })
     })
 

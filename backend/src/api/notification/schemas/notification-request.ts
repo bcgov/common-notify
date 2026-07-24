@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { NotificationStatus } from './create-notification-request'
 import { TenantDto } from './tenant'
 
 export class NotificationChannelCodeDto {
@@ -10,6 +9,17 @@ export class NotificationChannelCodeDto {
   displayName: string
 
   @ApiPropertyOptional({ description: 'Description of the channel' })
+  description?: string
+}
+
+export class NotificationStatusCodeDto {
+  @ApiProperty({ description: 'Status code identifier' })
+  code: string
+
+  @ApiProperty({ description: 'Display name for the status' })
+  displayName: string
+
+  @ApiPropertyOptional({ description: 'Description of the status' })
   description?: string
 }
 
@@ -24,10 +34,10 @@ export class NotificationRequestDto {
   tenant?: TenantDto
 
   @ApiProperty({
-    enum: NotificationStatus,
-    description: 'Processing status of the notification request',
+    type: NotificationStatusCodeDto,
+    description: 'Processing status of the notification request, including code and display name',
   })
-  status: string
+  status: NotificationStatusCodeDto
 
   @ApiPropertyOptional({
     description: 'Primary notification channel code',
