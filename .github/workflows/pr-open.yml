@@ -80,13 +80,49 @@ jobs:
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
 
+          # Retry configuration
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+
+          # Helper function for retry with exponential backoff
+          retry_command() {
+            local cmd="$1"
+            local description="$2"
+            local attempt=1
+            local delay=$RETRY_DELAY
+
+            while [ $attempt -le $MAX_RETRIES ]; do
+              echo "Attempt $attempt/$MAX_RETRIES: $description"
+
+              if eval "$cmd"; then
+                echo "✓ $description succeeded"
+                return 0
+              fi
+
+              local exit_code=$?
+              echo "✗ $description failed (exit code: $exit_code)"
+
+              if [ $attempt -eq $MAX_RETRIES ]; then
+                echo "❌ All $MAX_RETRIES attempts failed for: $description"
+                return $exit_code
+              fi
+
+              echo "Retrying in ${delay}s..."
+              sleep $delay
+              delay=$((delay * 2))
+              if [ $delay -gt 60 ]; then delay=60; fi
+              attempt=$((attempt + 1))
+            done
+          }
+
           # Login to API Gateway with service account credentials
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
+
+          retry_command "gwa login --client-id \"$CLIENT_ID\" --client-secret \"$CLIENT_SECRET\"" "GWA login"
 
           # Set gateway context
-          gwa config set gateway gw-fe8c5
+          retry_command "gwa config set gateway gw-fe8c5" "GWA config set"
 
           # Apply PR config only
           # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
@@ -94,7 +130,7 @@ jobs:
           # This adds PR routes without affecting DEV routes (different paths)
           echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
 
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+          retry_command "gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt" "GWA apply"
 
           # Check results
           if grep -q "Published" /tmp/gwa-output.txt; then

@@ -128,16 +128,54 @@ jobs:
         run: |
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
+
+          # Retry configuration
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+
+          # Helper function for retry with exponential backoff
+          retry_command() {
+            local cmd="$1"
+            local description="$2"
+            local attempt=1
+            local delay=$RETRY_DELAY
+
+            while [ $attempt -le $MAX_RETRIES ]; do
+              echo "Attempt $attempt/$MAX_RETRIES: $description"
+
+              if eval "$cmd"; then
+                echo "✓ $description succeeded"
+                return 0
+              fi
+
+              local exit_code=$?
+              echo "✗ $description failed (exit code: $exit_code)"
+
+              if [ $attempt -eq $MAX_RETRIES ]; then
+                echo "❌ All $MAX_RETRIES attempts failed for: $description"
+                return $exit_code
+              fi
+
+              echo "Retrying in ${delay}s..."
+              sleep $delay
+              delay=$((delay * 2))
+              if [ $delay -gt 60 ]; then delay=60; fi
+              attempt=$((attempt + 1))
+            done
+          }
+
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+
+          retry_command "gwa login --client-id \"$CLIENT_ID\" --client-secret \"$CLIENT_SECRET\"" "GWA login"
+          retry_command "gwa config set gateway gw-fe8c5" "GWA config set"
+
           # Apply ONLY the dev GatewayService (single qualifier tag ns.gw-fe8c5.dev, including
           # open-PR routes which share the dev tag with path-based isolation). A single-qualifier
           # file is scoped by its tag, so TEST/PROD routes are left untouched.
           echo "Applying DEV gateway config…"
           set +e
-          OUT=$(gwa apply -i api-gateway/generated/gw-active-services.yaml 2>&1)
+          OUT=$(retry_command "gwa apply -i api-gateway/generated/gw-active-services.yaml 2>&1" "GWA apply" | tee /tmp/gwa-out.txt)
           STATUS=$?
           set -e
           echo "$OUT"
@@ -196,15 +234,53 @@ jobs:
             api-gateway/generated/gw-routes-test.yaml > api-gateway/generated/gw-kong-test.yaml
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
+
+          # Retry configuration
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+
+          # Helper function for retry with exponential backoff
+          retry_command() {
+            local cmd="$1"
+            local description="$2"
+            local attempt=1
+            local delay=$RETRY_DELAY
+
+            while [ $attempt -le $MAX_RETRIES ]; do
+              echo "Attempt $attempt/$MAX_RETRIES: $description"
+
+              if eval "$cmd"; then
+                echo "✓ $description succeeded"
+                return 0
+              fi
+
+              local exit_code=$?
+              echo "✗ $description failed (exit code: $exit_code)"
+
+              if [ $attempt -eq $MAX_RETRIES ]; then
+                echo "❌ All $MAX_RETRIES attempts failed for: $description"
+                return $exit_code
+              fi
+
+              echo "Retrying in ${delay}s..."
+              sleep $delay
+              delay=$((delay * 2))
+              if [ $delay -gt 60 ]; then delay=60; fi
+              attempt=$((attempt + 1))
+            done
+          }
+
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+
+          retry_command "gwa login --client-id \"$CLIENT_ID\" --client-secret \"$CLIENT_SECRET\"" "GWA login"
+          retry_command "gwa config set gateway gw-fe8c5" "GWA config set"
+
           # Publish the test qualifier as a partial set. --qualifier scopes the reconcile so
           # DEV/PROD (other qualifiers) are left untouched.
           echo "Publishing TEST gateway config (qualifier=test)…"
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-test.yaml --qualifier test 2>&1)
+          OUT=$(retry_command "gwa publish-gateway api-gateway/generated/gw-kong-test.yaml --qualifier test 2>&1" "GWA publish-gateway" | tee /tmp/gwa-out.txt)
           STATUS=$?
           set -e
           echo "$OUT"
@@ -271,15 +347,53 @@ jobs:
             api-gateway/generated/gw-routes-prod.yaml > api-gateway/generated/gw-kong-prod.yaml
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
+
+          # Retry configuration
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+
+          # Helper function for retry with exponential backoff
+          retry_command() {
+            local cmd="$1"
+            local description="$2"
+            local attempt=1
+            local delay=$RETRY_DELAY
+
+            while [ $attempt -le $MAX_RETRIES ]; do
+              echo "Attempt $attempt/$MAX_RETRIES: $description"
+
+              if eval "$cmd"; then
+                echo "✓ $description succeeded"
+                return 0
+              fi
+
+              local exit_code=$?
+              echo "✗ $description failed (exit code: $exit_code)"
+
+              if [ $attempt -eq $MAX_RETRIES ]; then
+                echo "❌ All $MAX_RETRIES attempts failed for: $description"
+                return $exit_code
+              fi
+
+              echo "Retrying in ${delay}s..."
+              sleep $delay
+              delay=$((delay * 2))
+              if [ $delay -gt 60 ]; then delay=60; fi
+              attempt=$((attempt + 1))
+            done
+          }
+
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
+
+          retry_command "gwa login --client-id \"$CLIENT_ID\" --client-secret \"$CLIENT_SECRET\"" "GWA login"
+          retry_command "gwa config set gateway gw-fe8c5" "GWA config set"
+
           # Publish the prod qualifier as a partial set. --qualifier scopes the reconcile so
           # DEV/TEST (other qualifiers) are left untouched.
           echo "Publishing PROD gateway config (qualifier=prod)…"
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-prod.yaml --qualifier prod 2>&1)
+          OUT=$(retry_command "gwa publish-gateway api-gateway/generated/gw-kong-prod.yaml --qualifier prod 2>&1" "GWA publish-gateway" | tee /tmp/gwa-out.txt)
           STATUS=$?
           set -e
           echo "$OUT"
