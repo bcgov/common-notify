@@ -1,9 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
-import { fetchNotificationDetails } from '../thunks/notificationDetail.thunks'
+import type {
+  NotificationRequest,
+  NotificationRequestDetail,
+} from '@/interfaces/NotificationRequest'
+import {
+  fetchNotificationDetails,
+  fetchNotificationRequest,
+} from '../thunks/notificationDetail.thunks'
 
 interface NotificationDetailState {
+  notificationRequest: NotificationRequest | null
   items: NotificationRequestDetail[]
   page: number
   limit: number
@@ -19,6 +26,7 @@ interface NotificationDetailState {
 }
 
 const initialState: NotificationDetailState = {
+  notificationRequest: null,
   items: [],
   page: 1,
   limit: 15,
@@ -84,6 +92,9 @@ export const notificationDetailSlice = createSlice({
       .addCase(fetchNotificationDetails.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload ?? 'Failed to load notification details'
+      })
+      .addCase(fetchNotificationRequest.fulfilled, (state, action) => {
+        state.notificationRequest = action.payload
       })
   },
 })

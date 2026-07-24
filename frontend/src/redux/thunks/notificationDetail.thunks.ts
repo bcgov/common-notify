@@ -1,7 +1,22 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { notificationApi } from '@/api'
 import type { PaginatedNotificationDetailResponse } from '@/interfaces/PaginatedNotificationResponse'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import type { RootState } from '../store'
+
+export const fetchNotificationRequest = createAsyncThunk<
+  NotificationRequest,
+  string,
+  { rejectValue: string }
+>('notificationDetail/fetchRequest', async (notificationRequestId, { rejectWithValue }) => {
+  try {
+    return await notificationApi.getNotification(notificationRequestId)
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Failed to load notification request',
+    )
+  }
+})
 
 export const fetchNotificationDetails = createAsyncThunk<
   PaginatedNotificationDetailResponse,
