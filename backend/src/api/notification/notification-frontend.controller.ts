@@ -17,6 +17,7 @@ import {
   notificationRequestDetailListQueryConfig,
 } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { NotificationRequestDto } from './schemas/notification-request'
 import { PaginatedNotificationRequestDetailResponse } from './schemas/paginated-request-detail-response'
 import { NotificationRequestDetailListQueryDto } from './schemas/notification-request-detail-list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
@@ -185,5 +186,19 @@ export class NotificationFrontendController {
       parsedQuery,
       query.search,
     )
+  }
+
+  @Version('1')
+  @Get(':id')
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get a single notification request by id for the authenticated tenant' })
+  @ApiOkResponse({ type: NotificationRequestDto })
+  findOne(@Req() req: Request, @Param('id') id: string) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationService.findOneFrontend(id, tenant.externalId)
   }
 }

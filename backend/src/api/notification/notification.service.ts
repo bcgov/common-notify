@@ -390,6 +390,19 @@ export class NotificationService {
     return notification
   }
 
+  /**
+   * Retrieve a single notification request for a frontend user, scoped to their tenant.
+   * Resolves the internal tenant from the external ID before delegating to findOne.
+   */
+  async findOneFrontend(id: string, tenantExternalId: string): Promise<NotificationRequestDto> {
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new NotFoundException(`Notification request with id '${id}' not found`)
+    }
+    const notification = await this.findOne(id, tenant.id)
+    return this.mapToDto(notification)
+  }
+
   // Demo route, to be removed
   async getTenants(): Promise<any> {
     return this.tenantsService.findAll()
