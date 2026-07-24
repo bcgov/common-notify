@@ -20,7 +20,7 @@ case "$STAGE" in
   dev)
     echo "Generating gateway config for: DEV only"
     echo ""
-    echo "⚠️  This will DELETE TEST and PROD gateway routes!"
+    echo "TEST and PROD are published separately under their own qualifiers and are not affected."
     echo ""
 
     # Generate DEV only
@@ -36,7 +36,7 @@ case "$STAGE" in
   test)
     echo "Generating gateway config for: DEV + TEST"
     echo ""
-    echo "⚠️  This will DELETE PROD gateway routes!"
+    echo "PROD is published separately under its own qualifier and is not affected."
     echo ""
 
     # Generate both DEV and TEST
