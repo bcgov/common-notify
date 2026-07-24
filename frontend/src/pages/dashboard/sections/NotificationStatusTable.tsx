@@ -1,4 +1,5 @@
 import { Link } from '@bcgov/design-system-react-components'
+import { useNavigate } from '@tanstack/react-router'
 import type { FC } from 'react'
 import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -21,6 +22,7 @@ import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
  */
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const { sortBy, sortOrder, filters, page, limit, count, isLoading, hasLoaded } = useAppSelector(
     (state) => state.notification,
   )
@@ -90,7 +92,10 @@ const NotificationStatusTable: FC = () => {
         const count = getTotalRecipientCount(row.recipients)
         return count > 0 ? (
           <Link
-            onClick={() => handleShowRecipients(row)}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleShowRecipients(row)
+            }}
             className="p-0"
             style={{ textDecorationLine: 'underline', color: 'blue', cursor: 'pointer' }}
           >
@@ -116,7 +121,19 @@ const NotificationStatusTable: FC = () => {
       label: 'Status',
       sortable: true,
       filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
-      render: (_, row) => <StatusBadge status={row.status} />,
+      render: (_, row) => (
+        <Link
+          onClick={() =>
+            navigate({
+              to: '/request-status/$notificationRequestId',
+              params: { notificationRequestId: row.id },
+            })
+          }
+          style={{ cursor: 'pointer', color: 'inherit', textDecoration: 'none' }}
+        >
+          <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
+        </Link>
+      ),
     },
     {
       key: 'createdAt',
