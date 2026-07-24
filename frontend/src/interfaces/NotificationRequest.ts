@@ -12,11 +12,17 @@ export interface NotificationChannel {
   description?: string
 }
 
+export interface NotificationStatusCode {
+  code: string
+  displayName: string
+  description?: string
+}
+
 export interface NotificationRequest {
   id: string
   tenantId: string
   tenant?: Tenant
-  status: string
+  status: NotificationStatusCode
   channelCode?: string
   channel?: NotificationChannel
   delayedSendTime?: string
