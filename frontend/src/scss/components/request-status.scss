@@ -1,0 +1,92 @@
+@import '../variables.scss';
+
+.request-summary {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  max-width: 1110px;
+  padding: 16px 25px;
+  margin: 24px 0px;
+  border-radius: 4px;
+  border: 1px solid var(--surface-color-border-base, #{$border-default});
+
+  &__section {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  // Shared left gutter (icon width + gap) so label and value text line up in
+  // every section, whether or not a given row has an icon. Icons/dots are pulled
+  // into this gutter with absolute positioning and never shift the text.
+  &__label,
+  &__value {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding-left: 28px;
+  }
+
+  &__label--no-gutter {
+    padding-left: 0;
+  }
+
+  &__label {
+    color: $text-secondary;
+    font-size: 12px;
+
+    svg {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      color: $text-secondary;
+    }
+  }
+
+  &__value {
+    font-size: 14px;
+    font-style: normal;
+    line-height: 21px; /* 150% */
+    font-weight: 700;
+    color: var(--typography-color-secondary, #474543);
+  }
+
+  &__status-dot {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+
+    &--delivered {
+      background-color: $success-color;
+    }
+
+    &--failed {
+      background-color: $danger-color;
+    }
+
+    &--cancelled {
+      background-color: $text-disabled;
+    }
+
+    &--pending {
+      background-color: $warning-color;
+    }
+
+    // Split circle: green (delivered) / red (failed)
+    &--partial {
+      background: linear-gradient(
+        90deg,
+        $success-color 0%,
+        $success-color 50%,
+        $danger-color 50%,
+        $danger-color 100%
+      );
+    }
+  }
+}

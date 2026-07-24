@@ -15,10 +15,30 @@ import {
   setSort,
   setFilter,
 } from '@/redux/slices/notificationDetail.slice'
-import { fetchNotificationDetails } from '@/redux/thunks/notificationDetail.thunks'
+import {
+  fetchNotificationDetails,
+  fetchNotificationRequest,
+} from '@/redux/thunks/notificationDetail.thunks'
+import RequestStatusSummary from '@/components/RequestStatusSummary'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 
 interface RequestStatusProps {
   notificationRequestId: string
+}
+
+/** Channels the request targeted, derived from the recipients present on each channel. */
+function channelsFromRequest(request: NotificationRequest): string[] {
+  const channels: string[] = []
+  if (request.recipients?.email?.length) channels.push('EMAIL')
+  if (request.recipients?.sms?.length) channels.push('SMS')
+  if (request.recipients?.msgApp?.length) channels.push('MSGAPP')
+  return channels
+}
+
+/** Total recipient-channel entries across all channels on the parent request. */
+function recipientCountFromRequest(request: NotificationRequest): number {
+  const { email = [], sms = [], msgApp = [] } = request.recipients ?? {}
+  return email.length + sms.length + msgApp.length
 }
 
 const columns: TableColumn<NotificationRequestDetail>[] = [
@@ -59,6 +79,7 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
 const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
   const dispatch = useAppDispatch()
   const {
+    notificationRequest,
     items: details,
     page,
     limit,
@@ -71,6 +92,10 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
     hasLoaded,
   } = useAppSelector((state) => state.notificationDetail)
   const [searchInput, setSearchInput] = useState(search)
+
+  useEffect(() => {
+    dispatch(fetchNotificationRequest(notificationRequestId))
+  }, [notificationRequestId, dispatch])
 
   useEffect(() => {
     dispatch(fetchNotificationDetails(notificationRequestId))
@@ -95,6 +120,15 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
   return (
     <div>
       <PageHeading title="Notification Status" />
+
+      {notificationRequest && (
+        <RequestStatusSummary
+          channels={channelsFromRequest(notificationRequest)}
+          recipientsCount={recipientCountFromRequest(notificationRequest)}
+          sentDate={new Date(notificationRequest.delayedSendTime ?? notificationRequest.createdAt)}
+          overallStatus={notificationRequest.status}
+        />
+      )}
 
       <SearchField
         value={searchInput}
