@@ -619,6 +619,7 @@
             <child column="tenant_id" foreignKey="client_tenant_mapping_tenant_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="client_tenant_mapping"/>
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="tenant_id" foreignKey="fk_tenant_settings_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_settings"/>
             <child column="tenant_id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
             <child column="tenant_id" foreignKey="webhook_delivery_log_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_delivery_log"/>
          </column>
@@ -648,6 +649,28 @@
          </index>
          <index name="tenant_slug_key" unique="true">
             <column ascending="true" name="slug"/>
+         </index>
+      </table>
+      <table name="tenant_settings" remarks="Tenant-scoped configuration settings, one row per tenant. Column-per-setting; grows over time (alert email, header image, from-name, etc.)." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the tenant settings row." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="The tenant these settings belong to. Unique: at most one settings row per tenant." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_settings_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="alert_email" nullable="true" remarks="Email address that system and limit alerts for this tenant are sent to. Nullable when no alert recipient is configured." size="320" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="3" name="created_at" nullable="false" remarks="Timestamp with timezone when the settings record was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="true" remarks="Identifier of the user or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="updated_at" nullable="false" remarks="Timestamp with timezone when the settings record was last updated. Automatically maintained by trg_tenant_settings_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="7" name="is_deleted" nullable="false" remarks="Soft delete flag. When true, the settings row is considered inactive and excluded from normal queries." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_tenant_settings" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_settings_tenant" unique="false">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="uq_tenant_settings_tenant" unique="true">
+            <column ascending="true" name="tenant_id"/>
          </index>
       </table>
       <table name="tenant_status_code" remarks="Code table for tenant status values. Defines all valid statuses for tenants." schema="notify" type="TABLE">

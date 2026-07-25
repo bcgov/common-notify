@@ -14,6 +14,7 @@ template
 webhook_config
 attachment
 client_tenant_mapping
+tenant_settings
 api_key_limit
 api_key_limit_alert
 feature_flag

@@ -11,6 +11,7 @@ user_identity
 feature_flag
 api_key_limit_alert
 api_key_limit
+tenant_settings
 client_tenant_mapping
 attachment
 webhook_config
