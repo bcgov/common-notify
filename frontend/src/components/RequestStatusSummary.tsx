@@ -6,6 +6,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import { NotificationChannel } from '@/enum/notification-channel.enum'
 import '@/scss/components/request-status.scss'
 import { NotificationStatusCode } from '@/interfaces/NotificationRequest'
+import { StatusBadge } from '@/components/StatusBadge'
 
 interface RequestStatusSummaryProps {
   channels: string[]
@@ -32,25 +33,6 @@ const formatSentDate = (date: Date): string =>
     hour: 'numeric',
     minute: '2-digit',
   })
-
-const statusDotModifier = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case 'completed':
-    case 'sent':
-    case 'delivered':
-      return 'request-summary__status-dot--delivered'
-    case 'partially_completed':
-      return 'request-summary__status-dot--partial'
-    case 'failed':
-    case 'quarantined':
-    case 'bounced':
-      return 'request-summary__status-dot--failed'
-    case 'cancelled':
-      return 'request-summary__status-dot--cancelled'
-    default:
-      return 'request-summary__status-dot--pending'
-  }
-}
 
 /**
  * RequestStatusSummary Component
@@ -98,11 +80,11 @@ const RequestStatusSummary: FC<RequestStatusSummaryProps> = ({
         <span className="request-summary__label request-summary__label--no-gutter">
           Overall Status
         </span>
-        <span className="request-summary__value">
-          <span
-            className={`request-summary__status-dot ${statusDotModifier(overallStatus?.code ?? '')}`}
+        <span className="request-summary__value request-summary__value--status">
+          <StatusBadge
+            status={overallStatus?.code}
+            statusLabel={overallStatus?.displayName}
           />
-          {overallStatus?.displayName ?? ''}
         </span>
       </div>
     </div>

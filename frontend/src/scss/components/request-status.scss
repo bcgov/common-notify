@@ -32,6 +32,12 @@
     padding-left: 0;
   }
 
+  // Overall status renders a <StatusBadge> which draws its own inline dot,
+  // so this value opts out of the icon gutter.
+  &__value--status {
+    padding-left: 0;
+  }
+
   &__label {
     color: $text-secondary;
     font-size: 12px;
@@ -51,42 +57,5 @@
     line-height: 21px; /* 150% */
     font-weight: 700;
     color: var(--typography-color-secondary, #474543);
-  }
-
-  &__status-dot {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-
-    &--delivered {
-      background-color: $success-color;
-    }
-
-    &--failed {
-      background-color: $danger-color;
-    }
-
-    &--cancelled {
-      background-color: $text-disabled;
-    }
-
-    &--pending {
-      background-color: $warning-color;
-    }
-
-    // Split circle: green (delivered) / red (failed)
-    &--partial {
-      background: linear-gradient(
-        90deg,
-        $success-color 0%,
-        $success-color 50%,
-        $danger-color 50%,
-        $danger-color 100%
-      );
-    }
   }
 }
