@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@bcgov/bc-sans": "^2.1.0",
-    "@bcgov/design-system-react-components": "^0.6.1",
+    "@bcgov/design-system-react-components": "^0.8.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@microsoft/fetch-event-source": "^2.0.1",

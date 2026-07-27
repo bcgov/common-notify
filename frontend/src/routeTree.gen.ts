@@ -18,6 +18,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
 import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 
 const UsageRoute = UsageRouteImport.update({
@@ -66,6 +67,11 @@ const AdminUsageRoute = AdminUsageRouteImport.update({
   path: '/admin/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   id: '/admin/feature-flags',
   path: '/admin/feature-flags',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/settings'
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/settings'
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/settings'
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
@@ -156,6 +168,7 @@ export interface RootRouteChildren {
   TemplatesRoute: typeof TemplatesRoute
   UsageRoute: typeof UsageRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsageRoute: typeof AdminUsageRoute
   RequestStatusNotificationRequestIdRoute: typeof RequestStatusNotificationRequestIdRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/feature-flags': {
       id: '/admin/feature-flags'
       path: '/admin/feature-flags'
@@ -244,6 +264,7 @@ const rootRouteChildren: RootRouteChildren = {
   TemplatesRoute: TemplatesRoute,
   UsageRoute: UsageRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsageRoute: AdminUsageRoute,
   RequestStatusNotificationRequestIdRoute:
     RequestStatusNotificationRequestIdRoute,

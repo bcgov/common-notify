@@ -95,10 +95,7 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
     }
   }
 
-  async renderSms(
-    context: RenderContext & { personalisation: Record<string, string> },
-    _options?: RenderOptions,
-  ): Promise<RenderedSms> {
+  async renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     validateTemplate(context.template.body)
 
     return {

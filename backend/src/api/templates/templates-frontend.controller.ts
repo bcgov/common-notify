@@ -25,6 +25,7 @@ import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
 import { CreateTemplateDto } from './schemas/create-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
+import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
@@ -223,6 +224,29 @@ export class TemplatesFrontendController {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
+  }
+
+  /**
+   * Preview arbitrary template content with sample data
+   * Renders the provided body/subject without requiring a stored template,
+   * so the editor can preview the current possibly unsaved content.
+   * Tenant access is still enforced via NotifyFrontendRoleGuard (x-tenant-id),
+   * but no template lookup is required because the content is provided by the frontend.
+   *
+   * @param previewDto Body, subject, engine, channel and sample params
+   * @returns Rendered template output
+   */
+  @Version('1')
+  @Post('preview')
+  @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'Preview arbitrary template content with sample data' })
+  async previewTemplateBody(@Body() previewDto: PreviewTemplateBodyDto): Promise<any> {
+    return this.templatesService.previewTemplateBody(previewDto)
   }
 
   /**

@@ -13,6 +13,7 @@ interface TemplatesState {
   sortBy: string | null
   sortOrder: 'asc' | 'desc' | null
   filters: Record<string, string[]>
+  previewValues: Record<string, string>
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
@@ -28,6 +29,7 @@ const initialState: TemplatesState = {
   sortBy: null,
   sortOrder: null,
   filters: {},
+  previewValues: {},
   isLoading: false,
   hasLoaded: false,
   error: null,
@@ -65,6 +67,9 @@ export const templatesSlice = createSlice({
       }
       state.page = 1
     },
+    setPreviewValues(state, action: PayloadAction<Record<string, string>>) {
+      state.previewValues = { ...state.previewValues, ...action.payload }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -88,6 +93,7 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage, setLimit, setSearch, setSort, setFilter } = templatesSlice.actions
+export const { setPage, setLimit, setSearch, setSort, setFilter, setPreviewValues } =
+  templatesSlice.actions
 
 export default templatesSlice.reducer
