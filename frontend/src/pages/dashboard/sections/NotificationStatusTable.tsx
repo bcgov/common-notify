@@ -122,17 +122,7 @@ const NotificationStatusTable: FC = () => {
       sortable: true,
       filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
       render: (_, row) => (
-        <Link
-          onClick={() =>
-            navigate({
-              to: '/request-status/$notificationRequestId',
-              params: { notificationRequestId: row.id },
-            })
-          }
-          style={{ cursor: 'pointer', color: 'inherit', textDecoration: 'none' }}
-        >
-          <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
-        </Link>
+        <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
       ),
     },
     {
@@ -150,6 +140,12 @@ const NotificationStatusTable: FC = () => {
         columns={columns}
         data={notifications ?? []}
         keyExtractor={(row) => row.id}
+        onRowClick={(row) =>
+          navigate({
+            to: '/request-status/$notificationRequestId',
+            params: { notificationRequestId: row.id },
+          })
+        }
         isLoading={isLoading && !hasLoaded}
         emptyMessage="No notifications found"
         label="Notification Status"
