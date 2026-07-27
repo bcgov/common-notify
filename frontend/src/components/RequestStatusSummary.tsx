@@ -81,10 +81,7 @@ const RequestStatusSummary: FC<RequestStatusSummaryProps> = ({
           Overall Status
         </span>
         <span className="request-summary__value request-summary__value--status">
-          <StatusBadge
-            status={overallStatus?.code}
-            statusLabel={overallStatus?.displayName}
-          />
+          <StatusBadge status={overallStatus?.code} statusLabel={overallStatus?.displayName} />
         </span>
       </div>
     </div>
