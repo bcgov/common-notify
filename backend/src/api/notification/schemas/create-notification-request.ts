@@ -28,4 +28,12 @@ export class CreateNotificationRequestDto {
   })
   @IsOptional()
   payload?: any
+
+  @ApiPropertyOptional({
+    description:
+      "API route that accepted the request (e.g. 'notifysimple', 'notifysimple/email')",
+  })
+  @IsOptional()
+  @IsString()
+  requestRoute?: string
 }

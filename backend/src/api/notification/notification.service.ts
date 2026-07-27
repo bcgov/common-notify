@@ -113,6 +113,7 @@ export class NotificationService {
             description: entity.channel.description,
           }
         : undefined,
+      requestRoute: entity.requestRoute,
       recipients: entity.recipients,
       delayedSendTime: entity.delayedSendTime,
       payload: entity.payload,
@@ -236,6 +237,7 @@ export class NotificationService {
       channelCode: channel,
       recipients: recipients,
       delayedSendTime: delayedSendTime,
+      requestRoute: dto.requestRoute,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)

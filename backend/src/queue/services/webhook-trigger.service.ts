@@ -94,7 +94,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     const activeWebhooks = await this.webhookService.findActiveByTenant(tenantId)
     if (activeWebhooks.length === 0) return
 
-    const notificationStatus = notification.status?.toLowerCase()
+    const notificationStatus = notification.status?.code?.toLowerCase()
     const notificationChannel = notification.channelCode?.toLowerCase()
 
     for (const webhook of activeWebhooks) {

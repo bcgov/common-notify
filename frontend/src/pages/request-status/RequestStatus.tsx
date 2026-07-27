@@ -129,7 +129,8 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
             },
           ]}
         />
-        <h1 className="request-status-page__title">Notification Status</h1>
+        {/** Add event name here when events are added */}
+        <h1 className="request-status-page__title">{notificationRequest?.requestRoute}</h1>
       </div>
       <div className="request-status-page__request-id">Request ID: {notificationRequest?.id}</div>
 

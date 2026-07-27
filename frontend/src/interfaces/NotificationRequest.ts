@@ -25,6 +25,7 @@ export interface NotificationRequest {
   status: NotificationStatusCode
   channelCode?: string
   channel?: NotificationChannel
+  requestRoute?: string
   delayedSendTime?: string
   recipients?: {
     email?: string[]

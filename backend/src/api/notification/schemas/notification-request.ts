@@ -53,6 +53,12 @@ export class NotificationRequestDto {
   channel?: NotificationChannelCodeDto
 
   @ApiPropertyOptional({
+    description: 'API route that accepted the request',
+    example: 'notifysimple/email',
+  })
+  requestRoute?: string
+
+  @ApiPropertyOptional({
     description: 'Recipients by channel (email, sms, msgApp)',
     example: { email: ['test@example.com'], sms: ['+11234567890'], msgApp: ['user123'] },
   })

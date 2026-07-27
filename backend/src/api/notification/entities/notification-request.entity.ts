@@ -43,6 +43,9 @@ export class NotificationRequest {
   @Column({ name: 'channel_code', nullable: true, length: 20 })
   channelCode?: string
 
+  @Column({ name: 'request_route', nullable: true, length: 255 })
+  requestRoute?: string
+
   @ManyToOne(() => NotificationChannelCode, { eager: true })
   @JoinColumn({ name: 'channel_code', referencedColumnName: 'channelCode' })
   channel?: NotificationChannelCode

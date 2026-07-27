@@ -77,6 +77,23 @@ function channelKey(channel: NotificationChannel): 'email' | 'sms' {
 }
 
 /**
+ * Derive the API route that accepted the request, relative to the versioned global prefix.
+ * Uses the matched Express route pattern (falling back to the request path) and strips the
+ * leading `/api/v{n}/` so the stored value is e.g. `notifysimple`, `notifysimple/email`.
+ */
+function extractRequestRoute(req: any): string | undefined {
+  const raw: string | undefined = req?.route?.path ?? req?.path ?? req?.originalUrl
+  if (typeof raw !== 'string') return undefined
+  const route =
+    '/' +
+    raw
+      .split('?')[0]
+      .replace(/^\/?api\/v\d+\//i, '')
+      .replace(/^\/+|\/+$/g, '')
+  return route || undefined
+}
+
+/**
  * Type guard to validate tenant context
  * Ensures tenant has a valid string ID
  */
@@ -111,6 +128,7 @@ async function handleEmailMerge(
   tenantId: string,
   dto: NotifySimpleRequest,
   apiKeyConsumerId: string | undefined,
+  requestRoute: string | undefined,
 ) {
   const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
 
@@ -138,6 +156,7 @@ async function handleEmailMerge(
     status: NotificationStatus.PENDING,
     createdBy: tenantId,
     payload: dto as any,
+    requestRoute,
   })
   logger.debug(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
@@ -155,7 +174,13 @@ async function handleEmailMerge(
       .publish(tenantId, {
         id: notificationRecord.id,
         tenantId: notificationRecord.tenantId,
-        status: notificationRecord.status,
+        status: notificationRecord.statusCode
+          ? {
+              code: notificationRecord.statusCode.code,
+              displayName: notificationRecord.statusCode.displayName,
+              description: notificationRecord.statusCode.description,
+            }
+          : { code: notificationRecord.status, displayName: notificationRecord.status },
         createdAt: notificationRecord.createdAt,
         createdBy: notificationRecord.createdBy ?? undefined,
         updatedAt: notificationRecord.updatedAt,
@@ -336,6 +361,7 @@ export function Queueable(
         }
 
         const tenantId = tenant.id
+        const requestRoute = extractRequestRoute(req)
         const uploadedBy =
           typeof req?.user?.sub === 'string'
             ? req.user.sub
@@ -352,6 +378,7 @@ export function Queueable(
             tenantId,
             payload,
             req?.apiKeyConsumerId,
+            requestRoute,
           )
         }
 
@@ -403,6 +430,7 @@ export function Queueable(
             status: NotificationStatus.PENDING,
             createdBy: tenantId,
             payload: processedPayload, // Store sanitized request payload for retry purposes
+            requestRoute,
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,
@@ -415,7 +443,13 @@ export function Queueable(
               .publish(tenantId, {
                 id: notificationRecord.id,
                 tenantId: notificationRecord.tenantId,
-                status: notificationRecord.status,
+                status: notificationRecord.statusCode
+                  ? {
+                      code: notificationRecord.statusCode.code,
+                      displayName: notificationRecord.statusCode.displayName,
+                      description: notificationRecord.statusCode.description,
+                    }
+                  : { code: notificationRecord.status, displayName: notificationRecord.status },
                 createdAt: notificationRecord.createdAt,
                 createdBy: notificationRecord.createdBy ?? undefined,
                 updatedAt: notificationRecord.updatedAt,
