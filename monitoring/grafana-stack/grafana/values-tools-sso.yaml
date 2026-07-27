@@ -47,6 +47,67 @@ datasources:
           manageAlerts: true
           alertmanagerUid: alertmanager
 
+# Alerting - Provision contact points and notification policies
+alerting:
+  contactpoints.yaml:
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: common-notify-email
+        receivers:
+          - uid: common-notify-webhook
+            type: webhook
+            settings:
+              url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
+              httpMethod: POST
+              title: 'Grafana Alert Notification'
+              message: |
+                {{ `{{ if gt (len .Alerts.Firing) 0 }}` }}
+                **🔴 FIRING ALERTS ({{ `{{ len .Alerts.Firing }}` }})**
+                {{ `{{ range .Alerts.Firing }}` }}
+                ---
+                **Alert:** {{ `{{ .Labels.alertname }}` }}
+                **Severity:** {{ `{{ .Labels.severity }}` }}
+                **Namespace:** {{ `{{ .Labels.namespace }}` }}
+                **Service:** {{ `{{ .Labels.service }}` }}
+                {{ `{{ if .Labels.app }}` }}**App:** {{ `{{ .Labels.app }}{{ end }}` }}
+
+                **Summary:** {{ `{{ .Annotations.summary }}` }}
+                {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
+
+                **Status:** Firing for {{ `{{ .StartsAt | since }}` }}
+                [View in Grafana]({{ `{{ .GeneratorURL }}` }})
+                {{ `{{ end }}` }}
+                {{ `{{ end }}` }}
+
+                {{ `{{ if gt (len .Alerts.Resolved) 0 }}` }}
+                **✅ RESOLVED ALERTS ({{ `{{ len .Alerts.Resolved }}` }})**
+                {{ `{{ range .Alerts.Resolved }}` }}
+                ---
+                **Alert:** {{ `{{ .Labels.alertname }}` }}
+                **Namespace:** {{ `{{ .Labels.namespace }}` }}
+                **Resolved at:** {{ `{{ .EndsAt }}` }}
+                {{ `{{ end }}` }}
+                {{ `{{ end }}` }}
+            disableResolveMessage: false
+
+  policies.yaml:
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: common-notify-email
+        group_by:
+          - alertname
+          - namespace
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        routes:
+          - receiver: common-notify-email
+            matchers:
+              - severity =~ "warning|critical"
+            continue: false
+
 # Dashboard providers
 dashboardProviders:
   dashboardproviders.yaml:
