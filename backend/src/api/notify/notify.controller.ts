@@ -218,7 +218,13 @@ export class NotifySimpleController {
       return {
         id: updated.id,
         tenantId: updated.tenantId,
-        status: updated.status,
+        status: updated.statusCode
+          ? {
+              code: updated.statusCode.code,
+              displayName: updated.statusCode.displayName,
+              description: updated.statusCode.description,
+            }
+          : { code: updated.status, displayName: updated.status },
         channelCode: updated.channelCode,
         channel: updated.channel
           ? {
