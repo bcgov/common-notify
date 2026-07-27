@@ -4,7 +4,6 @@ import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
-import PageHeading from '@/components/PageHeading'
 import { ChannelBadge } from '@/components/ChannelBadge'
 import SearchField from '@/components/SearchField'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
@@ -21,7 +20,7 @@ import {
 } from '@/redux/thunks/notificationDetail.thunks'
 import RequestStatusSummary from '@/components/RequestStatusSummary'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
-import PageSubHeading from '@/components/PageSubHeading'
+import Breadcrumb from '@/components/Breadcrumb'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -119,8 +118,20 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
   }
 
   return (
-    <div>
-      <PageHeading title="Notification Status" />
+    <div className="request-status-page">
+      <div className="request-status-page__header">
+        <Breadcrumb
+          items={[
+            { label: 'Home', to: '/dashboard' },
+            { label: 'Dashboard', to: '/dashboard' },
+            {
+              label: 'Request Status',
+            },
+          ]}
+        />
+        <h1 className="request-status-page__title">Notification Status</h1>
+      </div>
+      <div className="request-status-page__request-id">Request ID: {notificationRequest?.id}</div>
 
       {notificationRequest && (
         <RequestStatusSummary
@@ -131,35 +142,39 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
         />
       )}
 
-      <PageSubHeading title="Request Notification Status" />
+      <h2 className="request-status-page__subtitle">Request Notification Status</h2>
 
-      <SearchField
-        value={searchInput}
-        onChange={setSearchInput}
-        onSearch={handleSearch}
-        placeholder="Search recipients..."
-        ariaLabel="Search delivery records"
-      />
+      <div className="request-status-page__search">
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          placeholder="Search recipients..."
+          ariaLabel="Search delivery records"
+        />
+      </div>
 
-      <DataTable
-        columns={columns}
-        data={details}
-        keyExtractor={(row) => row.id}
-        isLoading={isLoading && !hasLoaded}
-        emptyMessage="No delivery records found"
-        label="Notification Delivery Records"
-        currentPage={page}
-        pageSize={limit}
-        totalCount={count}
-        sortBy={sortBy ?? undefined}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-        activeFilters={filters}
-        onFilter={handleFilter}
-        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
-        onPageSizeChange={handleLimitChange}
-        pageSizeOptions={[15, 30]}
-      />
+      <div className="request-status-page__table">
+        <DataTable
+          columns={columns}
+          data={details}
+          keyExtractor={(row) => row.id}
+          isLoading={isLoading && !hasLoaded}
+          emptyMessage="No delivery records found"
+          label="Notification Delivery Records"
+          currentPage={page}
+          pageSize={limit}
+          totalCount={count}
+          sortBy={sortBy ?? undefined}
+          sortOrder={sortOrder}
+          onSort={handleSort}
+          activeFilters={filters}
+          onFilter={handleFilter}
+          onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+          onPageSizeChange={handleLimitChange}
+          pageSizeOptions={[15, 30]}
+        />
+      </div>
     </div>
   )
 }
