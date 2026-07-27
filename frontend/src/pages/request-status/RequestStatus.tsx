@@ -21,6 +21,7 @@ import {
 } from '@/redux/thunks/notificationDetail.thunks'
 import RequestStatusSummary from '@/components/RequestStatusSummary'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import PageSubHeading from '@/components/PageSubHeading'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -129,6 +130,8 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
           overallStatus={notificationRequest.status}
         />
       )}
+
+      <PageSubHeading title="Request Notification Status" />
 
       <SearchField
         value={searchInput}
