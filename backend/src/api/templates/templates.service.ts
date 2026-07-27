@@ -12,6 +12,9 @@ import { TemplatesRepository } from './templates.repository'
 import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
+import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
+import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
+import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
@@ -19,6 +22,7 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
+import { extractTemplatePersonalisationKeys } from '../../services/rendering/template-personalisation-validation'
 
 /**
  * Service for template business logic
@@ -31,6 +35,7 @@ export class TemplatesService {
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
     private readonly rendererRegistry: ITemplateRendererRegistry,
     private readonly tenantsService: TenantsService,
+    private readonly inlineRenderingService: InlineRenderingService,
   ) {}
 
   /**
@@ -227,6 +232,42 @@ export class TemplatesService {
   }
 
   /**
+   * Preview arbitrary template content (not a stored template)
+   * Renders the provided body/subject with the given engine and sample data,
+   * so the frontend can preview the current, possibly-unsaved, editor content.
+   */
+  async previewTemplateBody(previewDto: PreviewTemplateBodyDto): Promise<{
+    channelCode: NotificationChannel
+    subject?: string
+    body: string
+    bodyType: 'text' | 'markdown' | 'html'
+  }> {
+    const content: NotifyContent = {
+      body: previewDto.body,
+      subject: previewDto.subject,
+      renderer: previewDto.engineCode as NotifyContent['renderer'],
+    }
+    const params = previewDto.params || {}
+
+    if (previewDto.channelCode === NotificationChannel.EMAIL) {
+      const rendered = await this.inlineRenderingService.renderEmail(content, params)
+      return {
+        channelCode: previewDto.channelCode,
+        subject: rendered.subject,
+        body: rendered.body,
+        bodyType: previewDto.engineCode === TemplateEngine.MJML ? 'html' : 'markdown',
+      }
+    }
+
+    const rendered = await this.inlineRenderingService.renderSms(content, params)
+    return {
+      channelCode: previewDto.channelCode,
+      body: rendered.body,
+      bodyType: 'markdown',
+    }
+  }
+
+  /**
    * Render template content (subject and/or body) with personalisation data
    * Used by delivery workers to render templates before sending
    * Returns raw body with bodyType flag - adapter will handle format conversion
@@ -240,11 +281,9 @@ export class TemplatesService {
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
   ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
-    // Convert all personalisation values to strings for template rendering
-    const stringPersonalisation: Record<string, string> = {}
-    for (const [key, value] of Object.entries(personalisation)) {
-      stringPersonalisation[key] = value !== null && value !== undefined ? String(value) : ''
-    }
+    const normalizedPersonalisation = personalisation ?? {}
+
+    this.validateTemplatePersonalisation(template, normalizedPersonalisation)
 
     // Get the renderer for this template's engine
     const engineName = this.mapEngineToRendererName(template.engineCode as TemplateEngine)
@@ -268,10 +307,20 @@ export class TemplatesService {
       engine: engineName,
     }
 
+    const renderPersonalisation =
+      template.engineCode === TemplateEngine.LEGACY_GC_NOTIFY
+        ? Object.fromEntries(
+            Object.entries(normalizedPersonalisation).map(([key, value]) => [
+              key,
+              value !== null && value !== undefined ? String(value) : '',
+            ]),
+          )
+        : normalizedPersonalisation
+
     // Render the template
     const renderContext = {
       template: templateDef,
-      personalisation: stringPersonalisation,
+      personalisation: renderPersonalisation,
     }
 
     const rendered = await renderer.renderEmail(renderContext)
@@ -319,6 +368,23 @@ export class TemplatesService {
         return 'sms'
       default:
         return 'email' // default fallback
+    }
+  }
+
+  private validateTemplatePersonalisation(
+    template: Template,
+    personalisation: Record<string, any>,
+  ): void {
+    const requiredKeys = extractTemplatePersonalisationKeys(template, personalisation)
+
+    const missingKeys = requiredKeys.filter(
+      (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
+    )
+
+    if (missingKeys.length > 0) {
+      throw new BadRequestException(
+        `Missing personalisation for template ID ${template.id}: ${missingKeys.join(', ')}`,
+      )
     }
   }
 

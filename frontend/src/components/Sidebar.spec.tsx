@@ -6,6 +6,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
 import cstarReducer from '@/redux/slices/cstar.slice'
 import userReducer from '@/redux/slices/user.slice'
+import UserService from '@/service/user-service'
 import Sidebar from './Sidebar'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -67,6 +68,7 @@ function renderSidebar(user: typeof mockUser | null = null, cstarRoles: string[]
 describe('Sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(UserService.hasRole).mockReturnValue(false)
   })
 
   it('renders primary nav items when user has CSTAR roles', () => {
@@ -83,26 +85,26 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument()
   })
 
-  it('hides Settings for NOTIFY_ADMIN users who are not operations admins', async () => {
+  it('shows Tenant Settings for NOTIFY_ADMIN users', async () => {
+    const user = userEvent.setup()
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(true)
 
     renderSidebar()
 
-    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /admin/i }))
+
+    expect(screen.getByRole('link', { name: /tenant settings/i })).toHaveAttribute(
+      'href',
+      '/admin/settings',
+    )
   })
 
-  it('shows the Feature Flags admin link for NOTIFY_OPERATIONS_ADMIN users', async () => {
-    const user = userEvent.setup()
+  it('does not show Admin or Tenant Settings for NOTIFY_OPERATIONS_ADMIN-only users', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
 
-    const adminButton = screen.getByRole('button', { name: /admin/i })
-    expect(adminButton).toBeInTheDocument()
-
-    await user.click(adminButton)
-
-    expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /admin/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /tenant settings/i })).not.toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

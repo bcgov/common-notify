@@ -96,35 +96,60 @@ jobs:
       # Sample Bull queue depth in Redis until empty → drain rate + peak depth.
       - name: Measure queue drain
         if: always()
+        continue-on-error: true # measurement must never block the ramps that follow
         uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ vars.oc_server }}
           commands: |
+            # Best-effort measurement — never fail the load-test run on a monitoring hiccup.
+            set +e +u +o pipefail
+
+            # Derive the redis password the SAME way the backend does — from its own
+            # REDIS_PASSWORD secretKeyRef — rather than guessing bitnami secret naming.
+            # (The chart sets redis.auth.enabled=false, but the live redis still requires
+            # auth, so the deployed state drifts from the chart; the backend's secret is
+            # the source of truth since the backend connects successfully.)
+            DEP=${{ env.DEPLOYMENT }}
+            SEC=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="REDIS_PASSWORD")].valueFrom.secretKeyRef.name}' 2>/dev/null)
+            KEY=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="REDIS_PASSWORD")].valueFrom.secretKeyRef.key}' 2>/dev/null)
+            PW=""
+            [ -n "$SEC" ] && PW=$(oc get secret "$SEC" -o jsonpath="{.data['$KEY']}" 2>/dev/null | base64 -d 2>/dev/null)
             POD=$(oc get pods -l app.kubernetes.io/name=redis --field-selector=status.phase=Running \
-              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
             if [ -z "$POD" ]; then
               echo "WARN: no running redis pod found (label app.kubernetes.io/name=redis)."
-              echo "> Queue-drain not measured — redis pod/label needs confirmation." > summary-drain.md
+              echo "> Queue-drain not measured (redis pod lookup failed)." > summary-drain.md
               exit 0
             fi
-            echo "redis pod: $POD"
-            rc() { oc exec "$POD" -- sh -c "redis-cli -a \"\$REDIS_PASSWORD\" --no-auth-warning $*" 2>/dev/null | tr -d '\r'; }
+            echo "redis pod: $POD  (auth: $([ -n "$PW" ] && echo yes || echo no), secret: ${SEC:-none})"
+
+            # redis-cli inside the pod; auth only when the backend uses a password.
+            rc() {
+              if [ -n "$PW" ]; then oc exec "$POD" -- env REDISCLI_AUTH="$PW" redis-cli --no-auth-warning "$@" 2>/dev/null
+              else oc exec "$POD" -- redis-cli "$@" 2>/dev/null; fi
+            }
+            if ! rc PING | grep -q PONG; then
+              echo "WARN: redis auth/PING failed; skipping drain measurement."
+              echo "> Queue-drain not measured (redis auth/ping failed)." > summary-drain.md
+              exit 0
+            fi
+            llen() { n=$(rc LLEN "$1" | tr -dc '0-9'); echo "${n:-0}"; }
             depth() {
               t=0
               for q in ingestion email-delivery; do
-                for s in wait active; do n=$(rc LLEN "bull:$q:$s"); t=$((t + ${n:-0})); done
+                for s in wait active; do t=$((t + $(llen "bull:$q:$s"))); done
               done
               echo "$t"
             }
             burst=${{ inputs.burst_size }}
             start=$SECONDS; peak=0
             while :; do
-              d=$(depth); [ "${d:-0}" -gt "$peak" ] && peak=$d
+              d=$(depth); [ "$d" -gt "$peak" ] && peak=$d
               el=$((SECONDS - start))
               echo "t=${el}s depth=${d}"
-              [ "${d:-0}" -le 0 ] && break
+              [ "$d" -le 0 ] && break
               [ "$el" -ge 1800 ] && { echo "drain timed out at 1800s"; break; }
               sleep 5
             done
@@ -144,6 +169,7 @@ jobs:
               echo "_Ingestion worker concurrency is the primary drain bottleneck (default 1)._"
             } > summary-drain.md
             cat summary-drain.md
+            exit 0
 
       # ── Ramps (continue-on-error so every test runs + reports; the final
       #    "Evaluate" step fails the job if any breached its thresholds) ──────
