@@ -1,4 +1,3 @@
-import { Link } from '@bcgov/design-system-react-components'
 import { useNavigate } from '@tanstack/react-router'
 import type { FC } from 'react'
 import { useState, useEffect } from 'react'
@@ -14,7 +13,8 @@ import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ChannelBadge } from '@/components/ChannelBadge'
-import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
+import { RecipientsModal } from './RecipientsModal'
+import { RecipientsCell } from './RecipientsCell'
 
 /** Channels the request targeted, derived from the recipients present on each channel. */
 const channelsFromRequest = (row: NotificationRequest): string[] => {
@@ -120,24 +120,10 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'recipients',
       label: 'Recipients',
-      width: '19%',
-      render: (_, row) => {
-        const count = getTotalRecipientCount(row.recipients)
-        return count > 0 ? (
-          <Link
-            onClick={(e) => {
-              e.stopPropagation()
-              handleShowRecipients(row)
-            }}
-            className="p-0"
-            style={{ textDecorationLine: 'underline', color: 'blue', cursor: 'pointer' }}
-          >
-            {count} recipient{count !== 1 ? 's' : ''}
-          </Link>
-        ) : (
-          <span className="text-muted">No recipients</span>
-        )
-      },
+      className: 'data-table__recipients-col',
+      render: (_, row) => (
+        <RecipientsCell recipients={row.recipients} onViewAll={() => handleShowRecipients(row)} />
+      ),
     },
     {
       key: 'delayedSendTime',

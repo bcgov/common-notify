@@ -29,3 +29,63 @@
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/* Keep the recipients column width restricted so the comma-separated list truncates */
+.data-table__recipients-col {
+  width: 210px;
+  min-width: 210px;
+  max-width: 210px;
+}
+
+/* Recipient list popover (shown on hover over a Recipients cell) */
+.recipients-popover.popover {
+  max-width: 320px;
+  border: 1px solid $border-default;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+  .popover-arrow {
+    display: none;
+  }
+}
+
+.recipients-popover__title.popover-header {
+  padding: 16px 16px 0;
+  background: $white;
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  color: $dark-text;
+}
+
+.recipients-popover__body {
+  padding: 12px 16px 16px;
+}
+
+.recipients-popover__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipients-popover__item {
+  font-size: 14px;
+  color: $dark-text;
+  word-break: break-word;
+}
+
+.recipients-popover__view-all {
+  margin-top: 12px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: $primary-color;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
