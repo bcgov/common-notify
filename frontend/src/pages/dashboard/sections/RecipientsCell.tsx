@@ -42,7 +42,7 @@ export const RecipientsCell: FC<{
       </span>
 
       <Overlay
-        target={targetRef.current}
+        target={() => targetRef.current}
         show={show}
         placement="bottom-start"
         container={document.body}

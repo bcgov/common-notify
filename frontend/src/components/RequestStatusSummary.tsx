@@ -5,7 +5,7 @@ import GroupIcon from '@mui/icons-material/Group'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import { NotificationChannel } from '@/enum/notification-channel.enum'
 import '@/scss/components/request-status.scss'
-import { NotificationStatusCode } from '@/interfaces/NotificationRequest'
+import type { NotificationStatusCode } from '@/interfaces/NotificationRequest'
 import { StatusBadge } from '@/components/StatusBadge'
 
 interface RequestStatusSummaryProps {
