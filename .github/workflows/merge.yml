@@ -223,7 +223,7 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set frontend.secrets.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=2 --set backend.autoscaling.maxReplicas=2 --set frontend.autoscaling.minReplicas=2 --set frontend.autoscaling.maxReplicas=2 --set frontend.secrets.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: test
@@ -298,7 +298,7 @@ jobs:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=5 --set backend.autoscaling.maxReplicas=5 --set frontend.autoscaling.minReplicas=5 --set frontend.autoscaling.maxReplicas=5 --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: prod
