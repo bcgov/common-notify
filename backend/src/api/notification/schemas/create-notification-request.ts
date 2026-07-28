@@ -30,8 +30,7 @@ export class CreateNotificationRequestDto {
   payload?: any
 
   @ApiPropertyOptional({
-    description:
-      "API route that accepted the request (e.g. 'notifysimple', 'notifysimple/email')",
+    description: "API route that accepted the request (e.g. 'notifysimple', 'notifysimple/email')",
   })
   @IsOptional()
   @IsString()
