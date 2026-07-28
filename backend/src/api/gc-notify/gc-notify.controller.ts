@@ -38,6 +38,7 @@ import { GcNotifyExceptionFilter } from './gc-notify-exception.filter'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+import { extractRequestRoute } from '../../common/utils/extract-request-route'
 
 interface GcNotifyRequest extends express.Request {
   gcNotifyAuthHeader: string
@@ -139,7 +140,7 @@ export class GcNotifyController {
       req.tenantId,
     )
     return useInternal
-      ? this.gcNotifyInternalExecutionService.sendEmail(body, req.tenantId)
+      ? this.gcNotifyInternalExecutionService.sendEmail(body, req.tenantId, extractRequestRoute(req))
       : this.gcNotifyApiClient.sendEmail(body, req.gcNotifyAuthHeader)
   }
 
@@ -166,7 +167,7 @@ export class GcNotifyController {
       req.tenantId,
     )
     return useInternal
-      ? this.gcNotifyInternalExecutionService.sendSms(body, req.tenantId)
+      ? this.gcNotifyInternalExecutionService.sendSms(body, req.tenantId, extractRequestRoute(req))
       : this.gcNotifyApiClient.sendSms(body, req.gcNotifyAuthHeader)
   }
 
