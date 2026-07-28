@@ -1,0 +1,31 @@
+@import '../variables.scss';
+
+.dashboard-page__search {
+  margin-bottom: 73px;
+
+  .search-field {
+    margin: 0;
+  }
+}
+
+.dashboard-page__table {
+  .data-table {
+    margin-top: 0;
+  }
+}
+
+/* Keep the table id column width restricted with ellipses */
+.data-table__id-col {
+  width: 126px;
+  min-width: 126px;
+  max-width: 126px;
+}
+
+.data-table__truncate {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}

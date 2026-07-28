@@ -1,27 +1,31 @@
-import type { FC } from 'react'
-import { useAppSelector } from '@/redux/hooks'
+import { useState, type FC } from 'react'
+import NotificationStatusTable from './sections/NotificationStatusTable'
+import SearchField from '@/components/SearchField'
 import PageHeading from '@/components/PageHeading'
-import { Col, Row } from 'react-bootstrap'
-import { NotificationStatusSection } from '@/pages/dashboard/sections/NotificationStatusSection'
-import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection'
 
 const Dashboard: FC = () => {
-  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  const [searchInput, setSearchInput] = useState<string>('')
+
+  // TODO: wire up notification-event search
+  const handleSearch = () => {}
+
   return (
-    <div>
-      <PageHeading title={selectedTenant ? selectedTenant.name : 'Dashboard'} />
+    <div className="dashboard-page">
+      <PageHeading title="Dashboard" />
 
-      <Row className="mb-5">
-        <Col md={12}>
-          <NotificationTemplatesSection />
-        </Col>
-      </Row>
+      <div className="dashboard-page__search">
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          placeholder="Search Notification Events..."
+          ariaLabel="Search Notification Events"
+        />
+      </div>
 
-      <Row>
-        <Col md={12}>
-          <NotificationStatusSection />
-        </Col>
-      </Row>
+      <div className="dashboard-page__table">
+        <NotificationStatusTable />
+      </div>
     </div>
   )
 }

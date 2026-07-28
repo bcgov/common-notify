@@ -11,6 +11,7 @@ import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import '@/scss/components/templates.scss'
 
 const columns: TableColumn<TemplateResponse>[] = [
   {
@@ -128,17 +129,19 @@ const Templates: FC = () => {
     <div>
       <PageHeading title="Notification Templates" />
 
-      <SearchField
-        value={searchInput}
-        onChange={setSearchInput}
-        onSearch={handleSearch}
-        placeholder="Search Notification Templates..."
-        ariaLabel="Search templates"
-      >
-        <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
-          Create New Template
-        </Button>
-      </SearchField>
+      <div className="templates-page__search">
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          placeholder="Search Notification Templates..."
+          ariaLabel="Search templates"
+        >
+          <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
+            Create New Template
+          </Button>
+        </SearchField>
+      </div>
 
       <DataTable
         columns={columns}

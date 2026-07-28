@@ -13,7 +13,17 @@ import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { ChannelBadge } from '@/components/ChannelBadge'
 import { RecipientsModal, getTotalRecipientCount } from './RecipientsModal'
+
+/** Channels the request targeted, derived from the recipients present on each channel. */
+const channelsFromRequest = (row: NotificationRequest): string[] => {
+  const channels: string[] = []
+  if (row.recipients?.email?.length) channels.push('EMAIL')
+  if (row.recipients?.sms?.length) channels.push('SMS')
+  if (row.recipients?.msgApp?.length) channels.push('MSGAPP')
+  return channels
+}
 
 /**
  * NotificationStatusTable Component
@@ -76,18 +86,41 @@ const NotificationStatusTable: FC = () => {
 
   const columns: TableColumn<NotificationRequest>[] = [
     {
-      key: 'tenant',
-      label: 'Tenant Name',
-      render: (_, row) => row.tenant?.name || row.tenantId,
+      key: 'id',
+      label: 'Request ID',
+      className: 'data-table__id-col',
+      render: (_, row) => (
+        <span className="data-table__truncate" title={row.id}>
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: 'requestRoute',
+      label: 'Notification Event',
+      width: '19%',
+      render: (_, row) => row.requestRoute ?? '-',
     },
     {
       key: 'channel',
       label: 'Channel',
-      render: (_, row) => row.channel?.displayName ?? '-',
+      width: '17%',
+      render: (_, row) => <ChannelBadge channels={channelsFromRequest(row)} />,
+    },
+    {
+      key: 'status',
+      label: 'Notification Status',
+      width: '17%',
+      sortable: true,
+      filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
+      render: (_, row) => (
+        <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
+      ),
     },
     {
       key: 'recipients',
       label: 'Recipients',
+      width: '19%',
       render: (_, row) => {
         const count = getTotalRecipientCount(row.recipients)
         return count > 0 ? (
@@ -108,29 +141,11 @@ const NotificationStatusTable: FC = () => {
     },
     {
       key: 'delayedSendTime',
-      label: 'Delayed Send',
-      render: (_, row) =>
-        row.delayedSendTime ? (
-          new Date(row.delayedSendTime).toLocaleString()
-        ) : (
-          <span className="text-muted">—</span>
-        ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      sortable: true,
-      filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
-      render: (_, row) => (
-        <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
-      ),
-    },
-    {
-      key: 'createdAt',
-      label: 'Created',
+      label: 'Sent Date',
+      width: '16%',
       sortable: true,
       sortType: 'date',
-      render: (_, row) => new Date(row.createdAt).toLocaleString(),
+      render: (_, row) => new Date(row.delayedSendTime ?? row.createdAt).toLocaleString(),
     },
   ]
 

@@ -9,11 +9,7 @@ interface PageHeadingProps {
  * Standardized page heading component for consistent styling across all pages
  */
 const PageHeading: FC<PageHeadingProps> = ({ title }) => {
-  return (
-    <div className="d-flex align-items-center justify-content-between mb-4">
-      <h1 className="fw-bold mb-2 fs-3">{title}</h1>
-    </div>
-  )
+  return <h1 className="page-heading">{title}</h1>
 }
 
 export default PageHeading
