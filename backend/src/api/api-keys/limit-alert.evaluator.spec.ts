@@ -164,4 +164,22 @@ describe('evaluateLimitAlerts', () => {
 
     expect(result).toEqual([])
   })
+  it('does not fire WARN when warning threshold exceeds 100', () => {
+    const result = evaluateLimitAlerts({
+      ...baseInput,
+      warnThresholdPercent: 120,
+      dayUsage: 110,
+    })
+
+    expect(result).toEqual([
+      {
+        channelCode: 'EMAIL',
+        periodTypeCode: 'DAY',
+        alertLevel: 'LIMIT_REACHED',
+        sentCount: 110,
+        limit: 100,
+        percent: 110,
+      },
+    ])
+  })
 })
