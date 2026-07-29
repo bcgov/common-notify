@@ -21,6 +21,11 @@ const DEFAULT_FISCAL_MONTH = 4 // April
 const DEFAULT_FISCAL_DAY = 1
 const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
+export interface RecordedUsageResult {
+  periodTypeCode: UsagePeriodType.DAY | UsagePeriodType.YEAR
+  sentCount: number
+}
+
 /**
  * Reads notification limits and usage for a tenant and lets an operations admin
  * update the alert threshold.
@@ -421,7 +426,7 @@ export class ApiKeyUsageService {
     apiKeyConsumerId: string,
     channel: string,
     count: number,
-  ): Promise<Array<{ periodTypeCode: string; sentCount: number }>> {
+  ): Promise<RecordedUsageResult[]> {
     if (!apiKeyConsumerId || !channel || count <= 0) return []
 
     const fiscalYearStart = await this.getFiscalYearStart()
@@ -443,9 +448,14 @@ export class ApiKeyUsageService {
       [apiKeyConsumerId, channel, count, fiscalYearStart],
     )
 
-    return (rows as Array<{ period_type_code: string; sent_count: string }>)
+    return (rows as Array<{ period_type_code: UsagePeriodType; sent_count: string }>)
       .filter(
-        (row) =>
+        (
+          row,
+        ): row is {
+          period_type_code: UsagePeriodType.DAY | UsagePeriodType.YEAR
+          sent_count: string
+        } =>
           row.period_type_code === UsagePeriodType.DAY ||
           row.period_type_code === UsagePeriodType.YEAR,
       )

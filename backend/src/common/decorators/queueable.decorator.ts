@@ -14,7 +14,14 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
-import type { ApiKeyUsageService } from '../../api/api-keys/api-key-usage.service'
+import type {
+  ApiKeyUsageService,
+  RecordedUsageResult,
+} from '../../api/api-keys/api-key-usage.service'
+
+interface AcceptedUsageResult extends RecordedUsageResult {
+  channelCode: string
+}
 
 /**
  * Context required by the Queueable decorator.
@@ -38,15 +45,15 @@ async function recordAcceptedUsage(
   ctx: QueueableContext,
   apiKeyConsumerId: string | undefined,
   entries: Array<{ channel: string; count: number }>,
-): Promise<Array<{ channel: string; periodTypeCode: string; sentCount: number }>> {
+): Promise<AcceptedUsageResult[]> {
   if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return []
   const logger = new Logger('Queueable[usage]')
-  const results: Array<{ channel: string; periodTypeCode: string; sentCount: number }> = []
+  const results: AcceptedUsageResult[] = []
   for (const { channel, count } of entries) {
     if (count <= 0) continue
     try {
       const usageRows = await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
-      results.push(...usageRows.map((row) => ({ channel, ...row })))
+      results.push(...usageRows.map((row) => ({ channelCode: channel, ...row })))
     } catch (error) {
       logger.warn(
         `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${

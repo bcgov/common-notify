@@ -1,12 +1,15 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
 import { ApiKeyConsumer } from './api-key-consumer.entity'
 
+export type LimitAlertLevel = 'WARN' | 'LIMIT_REACHED'
+export type LimitAlertPeriod = 'DAY' | 'YEAR'
+
 /**
  * ApiKeyLimitAlertLog Entity
  *
- * Insert-only delivery and deduplication log for API key limit alerts. One row per
+ * Deduplication and delivery-tracking record for API key limit alerts. One row per
  * (api_key_consumer, channel_code, period_type_code, period_start, alert_level)
- * records a warning or limit-reached notification for a usage period (see migration V43).
+ * claims a warning or limit-reached notification for a usage period (see migration V43).
  */
 @Entity('api_key_limit_alert_log')
 export class ApiKeyLimitAlertLog {
@@ -24,17 +27,20 @@ export class ApiKeyLimitAlertLog {
   channelCode: string
 
   @Column({ name: 'period_type_code' })
-  periodTypeCode: string
+  periodTypeCode: LimitAlertPeriod
 
   @Column({ name: 'period_start', type: 'timestamptz' })
   periodStart: Date
 
   @Column({ name: 'alert_level' })
-  alertLevel: string
+  alertLevel: LimitAlertLevel
 
   @Column({ name: 'notification_request_id', nullable: true })
-  notificationRequestId: string
+  notificationRequestId: string | null
 
-  @Column({ name: 'sent_at' })
-  sentAt: Date
+  @Column({ name: 'claimed_at', type: 'timestamptz' })
+  claimedAt: Date
+
+  @Column({ name: 'enqueued_at', type: 'timestamptz', nullable: true })
+  enqueuedAt: Date | null
 }

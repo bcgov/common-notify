@@ -1,37 +1,8 @@
--- V43: Create API key limit alert delivery log.
+-- V43: Create API key limit alert deduplication and delivery-tracking table.
 --
--- Registers limit-alert notification event types and adds an insert-only log used to
--- deduplicate warning and limit-reached notifications for each API key usage period.
-INSERT INTO
-  notify.notification_event_type_code (
-    event_type_code,
-    description,
-    is_mandatory,
-    display_name,
-    sort_order,
-    created_by,
-    updated_by
-  )
-VALUES
-  (
-    'LIMIT_ALERT_WARN',
-    'API key usage approaching a configured limit',
-    false,
-    'Limit Alert Warning',
-    40,
-    'system',
-    'system'
-  ),
-  (
-    'LIMIT_ALERT_REACHED',
-    'API key usage reached a configured limit',
-    false,
-    'Limit Alert Reached',
-    50,
-    'system',
-    'system'
-  ) ON CONFLICT (event_type_code) DO NOTHING;
-
+-- Atomically claims warning and limit-reached alerts for each API key usage period.
+-- Delivery metadata is populated after notification creation and queueing. An incomplete
+-- claim remains observable and suppresses automatic retries until repaired operationally.
 CREATE TABLE
   notify.api_key_limit_alert_log (
     id UUID NOT NULL DEFAULT gen_random_uuid (),
@@ -41,7 +12,8 @@ CREATE TABLE
     period_start TIMESTAMPTZ NOT NULL,
     alert_level VARCHAR(20) NOT NULL,
     notification_request_id UUID,
-    sent_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    claimed_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    enqueued_at TIMESTAMPTZ,
     CONSTRAINT pk_api_key_limit_alert_log PRIMARY KEY (id),
     CONSTRAINT uq_api_key_limit_alert_log UNIQUE (
       api_key_consumer_id,
