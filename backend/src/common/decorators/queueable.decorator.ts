@@ -38,13 +38,15 @@ async function recordAcceptedUsage(
   ctx: QueueableContext,
   apiKeyConsumerId: string | undefined,
   entries: Array<{ channel: string; count: number }>,
-): Promise<void> {
-  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+): Promise<Array<{ channel: string; periodTypeCode: string; sentCount: number }>> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return []
   const logger = new Logger('Queueable[usage]')
+  const results: Array<{ channel: string; periodTypeCode: string; sentCount: number }> = []
   for (const { channel, count } of entries) {
     if (count <= 0) continue
     try {
-      await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+      const usageRows = await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+      results.push(...usageRows.map((row) => ({ channel, ...row })))
     } catch (error) {
       logger.warn(
         `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${
@@ -53,6 +55,7 @@ async function recordAcceptedUsage(
       )
     }
   }
+  return results
 }
 
 /**
@@ -144,7 +147,7 @@ async function handleEmailMerge(
   )
 
   // Attribute accepted merge emails against the API key's usage limits (non-fatal).
-  await recordAcceptedUsage(ctx, apiKeyConsumerId, [
+  const _usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
 
@@ -450,7 +453,11 @@ export function Queueable(
         if (processedPayload.msgApp) channels.push('msgApp')
 
         // Attribute accepted notifications against the API key's usage limits (non-fatal).
-        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
+        const _usageResults = await recordAcceptedUsage(
+          this as QueueableContext,
+          req?.apiKeyConsumerId,
+          usageEntries,
+        )
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =

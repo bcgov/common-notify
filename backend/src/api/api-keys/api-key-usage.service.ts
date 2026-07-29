@@ -414,13 +414,19 @@ export class ApiKeyUsageService {
    *   MINUTE -> date_trunc('minute', now())
    *   DAY    -> date_trunc('day', now())
    *   YEAR   -> the global fiscal-year start
+   *
+   * Returns the post-increment counts for the DAY and YEAR buckets.
    */
-  async recordUsage(apiKeyConsumerId: string, channel: string, count: number): Promise<void> {
-    if (!apiKeyConsumerId || !channel || count <= 0) return
+  async recordUsage(
+    apiKeyConsumerId: string,
+    channel: string,
+    count: number,
+  ): Promise<Array<{ periodTypeCode: string; sentCount: number }>> {
+    if (!apiKeyConsumerId || !channel || count <= 0) return []
 
     const fiscalYearStart = await this.getFiscalYearStart()
 
-    await this.apiKeyUsageRepository.query(
+    const rows = await this.apiKeyUsageRepository.query(
       `
       INSERT INTO notify.api_key_usage
         (api_key_consumer_id, channel_code, period_type_code, period_start, sent_count, created_at, updated_at)
@@ -432,9 +438,21 @@ export class ApiKeyUsageService {
       DO UPDATE SET
         sent_count = notify.api_key_usage.sent_count + EXCLUDED.sent_count,
         updated_at = now()
+      RETURNING period_type_code, sent_count
       `,
       [apiKeyConsumerId, channel, count, fiscalYearStart],
     )
+
+    return (rows as Array<{ period_type_code: string; sent_count: string }>)
+      .filter(
+        (row) =>
+          row.period_type_code === UsagePeriodType.DAY ||
+          row.period_type_code === UsagePeriodType.YEAR,
+      )
+      .map((row) => ({
+        periodTypeCode: row.period_type_code,
+        sentCount: Number(row.sent_count),
+      }))
   }
 
   /**
