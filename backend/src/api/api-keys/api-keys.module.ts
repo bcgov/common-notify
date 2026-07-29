@@ -4,6 +4,7 @@ import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyUsage } from './entities/api-key-usage.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
+import { ApiKeyLimitAlertLog } from './entities/api-key-limit-alert-log.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { ApiKeysService } from './api-keys.service'
@@ -21,6 +22,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
       ApiKeyLimit,
       ApiKeyUsage,
       ApiKeyLimitAlert,
+      ApiKeyLimitAlertLog,
       Tenant,
       NotifyConfiguration,
     ]),
