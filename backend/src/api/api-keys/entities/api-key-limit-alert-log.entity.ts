@@ -16,26 +16,26 @@ export class ApiKeyLimitAlertLog {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ name: 'api_key_consumer_id' })
+  @Column({ name: 'api_key_consumer_id', type: 'uuid' })
   apiKeyConsumerId: string
 
   @ManyToOne(() => ApiKeyConsumer, { eager: false })
   @JoinColumn({ name: 'api_key_consumer_id' })
   apiKeyConsumer: ApiKeyConsumer
 
-  @Column({ name: 'channel_code' })
+  @Column({ name: 'channel_code', type: 'varchar', length: 20 })
   channelCode: string
 
-  @Column({ name: 'period_type_code' })
+  @Column({ name: 'period_type_code', type: 'varchar', length: 20 })
   periodTypeCode: LimitAlertPeriod
 
   @Column({ name: 'period_start', type: 'timestamptz' })
   periodStart: Date
 
-  @Column({ name: 'alert_level' })
+  @Column({ name: 'alert_level', type: 'varchar', length: 20 })
   alertLevel: LimitAlertLevel
 
-  @Column({ name: 'notification_request_id', nullable: true })
+  @Column({ name: 'notification_request_id', type: 'uuid', nullable: true })
   notificationRequestId: string | null
 
   @Column({ name: 'claimed_at', type: 'timestamptz' })
