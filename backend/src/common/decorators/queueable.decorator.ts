@@ -18,6 +18,7 @@ import type {
   ApiKeyUsageService,
   RecordedUsageResult,
 } from '../../api/api-keys/api-key-usage.service'
+import type { LimitAlertNotificationService } from '../../api/notify/services/limit-alert-notification.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -33,6 +34,7 @@ export interface QueueableContext {
   attachmentProcessingService: AttachmentProcessingService
   notificationPubSubService?: NotificationPubSubService
   apiKeyUsageService?: ApiKeyUsageService
+  limitAlertNotificationService?: LimitAlertNotificationService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -70,6 +72,30 @@ async function recordAcceptedUsage(
     }
   }
   return results
+}
+
+async function processLimitAlerts(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  usageResults: AcceptedUsageResult[],
+): Promise<void> {
+  if (!apiKeyConsumerId || usageResults.length === 0 || !ctx.limitAlertNotificationService) {
+    return
+  }
+
+  try {
+    await ctx.limitAlertNotificationService.processAcceptedUsage({
+      apiKeyConsumerId,
+      usageResults,
+    })
+  } catch (error) {
+    const logger = new Logger('Queueable[limit-alerts]')
+    logger.warn(
+      `Failed to process usage limit alerts: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
 }
 
 /**
@@ -161,10 +187,10 @@ async function handleEmailMerge(
   )
 
   // Attribute accepted merge emails against the API key's usage limits (non-fatal).
-  const _usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
+  const usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
-  void _usageResults
+  await processLimitAlerts(ctx, apiKeyConsumerId, usageResults)
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
   const updateSvc = ctx.notificationPubSubService
@@ -468,12 +494,12 @@ export function Queueable(
         if (processedPayload.msgApp) channels.push('msgApp')
 
         // Attribute accepted notifications against the API key's usage limits (non-fatal).
-        const _usageResults = await recordAcceptedUsage(
+        const usageResults = await recordAcceptedUsage(
           this as QueueableContext,
           req?.apiKeyConsumerId,
           usageEntries,
         )
-        void _usageResults
+        await processLimitAlerts(this as QueueableContext, req?.apiKeyConsumerId, usageResults)
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =
