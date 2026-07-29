@@ -53,7 +53,14 @@ async function recordAcceptedUsage(
     if (count <= 0) continue
     try {
       const usageRows = await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
-      results.push(...usageRows.map((row) => ({ channelCode: channel, ...row })))
+      results.push(
+        ...usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
+          channelCode: channel,
+          periodTypeCode,
+          periodStart,
+          sentCount,
+        })),
+      )
     } catch (error) {
       logger.warn(
         `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${
@@ -157,6 +164,7 @@ async function handleEmailMerge(
   const _usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
+  void _usageResults
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
   const updateSvc = ctx.notificationPubSubService
@@ -465,6 +473,7 @@ export function Queueable(
           req?.apiKeyConsumerId,
           usageEntries,
         )
+        void _usageResults
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =

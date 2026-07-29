@@ -23,6 +23,7 @@ const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
 export interface RecordedUsageResult {
   periodTypeCode: UsagePeriodType.DAY | UsagePeriodType.YEAR
+  periodStart: Date
   sentCount: number
 }
 
@@ -443,17 +444,24 @@ export class ApiKeyUsageService {
       DO UPDATE SET
         sent_count = notify.api_key_usage.sent_count + EXCLUDED.sent_count,
         updated_at = now()
-      RETURNING period_type_code, sent_count
+      RETURNING period_type_code, period_start, sent_count
       `,
       [apiKeyConsumerId, channel, count, fiscalYearStart],
     )
 
-    return (rows as Array<{ period_type_code: UsagePeriodType; sent_count: string }>)
+    return (
+      rows as Array<{
+        period_type_code: UsagePeriodType
+        period_start: Date | string
+        sent_count: string
+      }>
+    )
       .filter(
         (
           row,
         ): row is {
           period_type_code: UsagePeriodType.DAY | UsagePeriodType.YEAR
+          period_start: Date | string
           sent_count: string
         } =>
           row.period_type_code === UsagePeriodType.DAY ||
@@ -461,6 +469,7 @@ export class ApiKeyUsageService {
       )
       .map((row) => ({
         periodTypeCode: row.period_type_code,
+        periodStart: new Date(row.period_start),
         sentCount: Number(row.sent_count),
       }))
   }
