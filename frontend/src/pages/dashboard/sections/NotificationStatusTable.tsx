@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPage, setSort, setFilter, selectNotifications } from '@/redux/slices/notification.slice'
 import { setLimit } from '@/redux/slices/notification.slice'
-import { selectStatuses } from '@/redux/slices/codeTables.slice'
+import { CodeTable, selectStatuses } from '@/redux/slices/codeTables.slice'
 import { connectNotificationSSE, fetchNotifications } from '@/redux/thunks/notification.thunks'
 import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
 import { selectFeatureFlag } from '@/config/featureFlags/featureFlagsSelectors'
@@ -112,7 +112,7 @@ const NotificationStatusTable: FC = () => {
       label: 'Notification Status',
       width: '17%',
       sortable: true,
-      filterOptions: statuses.map((s) => ({ label: s.label, value: s.id })),
+      filterOptions: statuses.map((s: CodeTable) => ({ label: s.label, value: s.id })),
       render: (_, row) => (
         <StatusBadge status={row.status.code} statusLabel={row.status.displayName} />
       ),
