@@ -37,11 +37,13 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
     key: 'recipientAddress',
     label: 'Recipient',
     sortable: true,
+    width: '223px',
   },
   {
     key: 'channel',
     label: 'Channel',
     sortable: true,
+    width: '162px',
     filterOptions: [
       { label: 'Email', value: 'EMAIL' },
       { label: 'SMS', value: 'SMS' },
@@ -53,6 +55,7 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
     key: 'status',
     label: 'Status',
     sortable: true,
+    width: '160px',
     filterOptions: [
       { label: 'Pending', value: 'pending' },
       { label: 'Sent', value: 'sent' },
@@ -61,6 +64,8 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
     render: (_, row) => <StatusBadge status={row.status} />,
   },
   {
+    // No fixed width: this column absorbs the remaining table width so the table
+    // matches the request summary bar (max 1110px) in both sidebar states.
     key: 'errorMessage',
     label: 'Failure Reason',
     render: (_, row) => row.errorMessage ?? '-',
@@ -134,7 +139,7 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
         />
       )}
 
-      <h2 className="request-status-page__subtitle">Request Notification Status</h2>
+      <h2 className="request-status-page__subtitle">Recipient Delivery Status</h2>
 
       <div className="request-status-page__search">
         <SearchField

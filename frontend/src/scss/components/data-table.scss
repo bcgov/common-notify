@@ -112,6 +112,13 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     }
   }
 
+  /* Extra right padding on the final column (e.g. Sent Date) */
+
+  thead th:last-child,
+  tbody td:last-child {
+    padding-right: 12px;
+  }
+
   /* Footer */
 
   tfoot {

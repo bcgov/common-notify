@@ -50,6 +50,20 @@
 
 .request-status-page__table {
   margin-top: 29px;
+
+  // Cap the table at the summary bar's width and honour the fixed column widths
+  // so the table edges align with the summary bar in both sidebar states.
+  .data-table {
+    max-width: 1110px;
+    table-layout: fixed;
+  }
+
+  // Failure Reason has no fixed width, so let long messages wrap instead of
+  // overflowing the table.
+  .data-table td:last-child {
+    white-space: normal;
+    word-break: break-word;
+  }
 }
 
 .request-summary {
