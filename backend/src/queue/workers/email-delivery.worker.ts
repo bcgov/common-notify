@@ -186,7 +186,7 @@ export class EmailDeliveryWorker {
               // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
-                request.params || {},
+                { ...request?.params, ...emailPayload.params },
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
 
@@ -213,10 +213,10 @@ export class EmailDeliveryWorker {
             `[${notifyId}] Rendering inline content with renderer: ${emailPayload.content.renderer}`,
           )
           try {
-            const rendered = await inlineRenderingService.renderEmail(
-              emailPayload.content,
-              emailPayload.params || request?.params,
-            )
+            const rendered = await inlineRenderingService.renderEmail(emailPayload.content, {
+              ...request?.params,
+              ...emailPayload.params,
+            })
 
             emailPayload = {
               ...emailPayload,

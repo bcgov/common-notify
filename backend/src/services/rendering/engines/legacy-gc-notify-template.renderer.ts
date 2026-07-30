@@ -11,14 +11,14 @@ import type {
  * Legacy GC Notify Template Renderer
  *
  * Renders templates using GC Notify's legacy placeholder syntax:
- * - ((key))
- * - ((key??default text))
+ * - ((key))            plain interpolation
+ * - ((key??content))   conditional: content shows only when key is truthy
  * This format uses double parentheses to denote template variables.
  *
  * Example:
- *   Input:  "Hello ((firstName)) ((lastName))!"
- *   Params: { firstName: "John", lastName: "Doe" }
- *   Output: "Hello John Doe!"
+ *   Input:  "Hello ((firstName))! ((vip??Thanks for being a VIP.))"
+ *   Params: { firstName: "John", vip: true }
+ *   Output: "Hello John! Thanks for being a VIP."
  */
 @Injectable()
 export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
@@ -67,11 +67,11 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
 
   /**
    * Render text with legacy GC Notify syntax:
-   * - ((key))
-   * - ((key??default text))
+   * - ((key))            plain interpolation
+   * - ((key??content))   conditional: content shows only when key is truthy
    *
-   * Replaces placeholders with corresponding values from personalisation.
-   * If key is missing and a default is provided, default text is used.
+   * Plain placeholders are replaced with their personalisation value.
+   * Conditional placeholders render their content only when the key is truthy.
    *
    * @param text Template text
    * @param personalisation Data for substitution
@@ -87,34 +87,47 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
     let result = text
 
     // Replace all legacy GC Notify placeholder patterns:
-    // - ((key))
-    // - ((key??default text))
+    // - ((key))            plain interpolation
+    // - ((key??content))   conditional: content shows only when key is truthy
     const placeholderRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?([\s\S]*?))?\)\)/g
 
-    result = result.replace(placeholderRegex, (match, key, defaultValue) => {
+    result = result.replace(placeholderRegex, (match, key, conditionalText) => {
       const value = values[key]
 
+      // Conditional form: ((key??content)). `key` is a boolean condition, not a
+      // value to print. Show `content` when truthy; otherwise remove it.
+      if (conditionalText !== undefined) {
+        return this.isTruthy(value) ? conditionalText : ''
+      }
+
+      // Plain interpolation: ((key)).
       if (value !== undefined && value !== null) {
         // Convert value to string (handles numbers, booleans, etc.)
         return String(value)
       }
 
-      // If key not found and default text is provided, use the default.
-      if (defaultValue !== undefined) {
-        return defaultValue
-      }
-
-      // If key not found and no default text exists, leave placeholder as-is.
-      if (value === undefined || value === null) {
-        this.logger.warn(
-          `Placeholder key not found in personalisation data: ${key}. Leaving placeholder as-is.`,
-        )
-        return match
-      }
-
+      // Key not found and no content to fall back on: leave placeholder as-is.
+      this.logger.warn(
+        `Placeholder key not found in personalisation data: ${key}. Leaving placeholder as-is.`,
+      )
       return match
     })
 
     return result
+  }
+
+  /**
+   * Evaluate a placeholder value as a boolean condition. Personalisation values
+   * arrive as strings, so "", "false", "0", and "no" are treated as falsy.
+   */
+  private isTruthy(value: unknown): boolean {
+    if (value === undefined || value === null) return false
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number') return value !== 0
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase()
+      return v !== '' && v !== 'false' && v !== '0' && v !== 'no'
+    }
+    return Boolean(value)
   }
 }

@@ -17,8 +17,6 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
@@ -93,11 +91,16 @@ const Sidebar: FC = () => {
         aria-expanded={!collapsed}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {collapsed ? (
-          <ChevronRightIcon style={{ fontSize: 20 }} aria-hidden="true" />
-        ) : (
-          <ChevronLeftIcon style={{ fontSize: 20 }} aria-hidden="true" />
-        )}
+        <svg
+          className="sidebar__toggle-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 9 17"
+          fill="none"
+          aria-hidden="true"
+          style={{ transform: collapsed ? 'rotate(180deg)' : undefined }}
+        >
+          <path d="M7.38247 16.7L0.271976 9.18823C0.0776981 8.95227 -5.72673e-07 8.7163 -5.81268e-07 8.51966C-5.91583e-07 8.28369 0.0776981 8.04771 0.233126 7.85109L7.38247 0.300072C7.73216 -0.0932103 8.35384 -0.0932103 8.70354 0.260743C9.09209 0.614697 9.09209 1.24395 8.74239 1.5979L2.21473 8.51966L8.74239 15.4021C9.09209 15.756 9.09209 16.3853 8.70354 16.7392C8.35384 17.0932 7.73216 17.0932 7.38247 16.7Z" />
+        </svg>
       </button>
 
       {/* Top nav */}
