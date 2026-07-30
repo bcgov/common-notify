@@ -460,6 +460,118 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
+    it('should merge channel-level params over global params when rendering a template email', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'template-uuid',
+        channelCode: 'EMAIL',
+        name: 'Stored Email Template',
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Rendered subject',
+        body: 'Rendered body',
+        bodyType: 'html',
+      })
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-tmpl-params',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {
+            params: { firstName: 'Global', shared: 'global' },
+          },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-uuid' },
+            params: { firstName: 'Channel' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      // Channel-level param wins per-key; non-overlapping global param is retained.
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-uuid' }),
+        { firstName: 'Channel', shared: 'global' },
+        undefined,
+      )
+    })
+
+    it('should merge channel-level params over global params when rendering inline content', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+
+      mockInlineRenderingService.renderEmail.mockResolvedValue({
+        subject: 'Rendered subject',
+        body: 'Rendered body',
+      })
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-inline-params',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {
+            params: { firstName: 'Global', shared: 'global' },
+          },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: {
+              renderer: 'handlebars',
+              subject: 'Hi {{firstName}}',
+              body: 'Dear {{firstName}}',
+            },
+            params: { firstName: 'Channel' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        } as any,
+        attemptsMade: 0,
+      }
+
+      const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(result.success).toBe(true)
+      expect(mockTemplatesService.renderTemplateContent).not.toHaveBeenCalled()
+      // Channel-level param wins per-key; non-overlapping global param is retained.
+      expect(mockInlineRenderingService.renderEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ renderer: 'handlebars' }),
+        { firstName: 'Channel', shared: 'global' },
+      )
+    })
+
     it('should surface missing personalisation error for template email before raw body validation', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'template-uuid',

@@ -133,7 +133,7 @@ export class SmsDeliveryWorker {
               // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
-                request.params || {},
+                { ...request?.params, ...payload.params },
                 SmsDeliveryWorker.normalizeTemplateBodyType(payload.content?.bodyType),
               )
 
@@ -159,10 +159,10 @@ export class SmsDeliveryWorker {
             `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
           )
           try {
-            const rendered = await inlineRenderingService.renderSms(
-              payload.content,
-              payload.params || request?.params,
-            )
+            const rendered = await inlineRenderingService.renderSms(payload.content, {
+              ...request?.params,
+              ...payload.params,
+            })
 
             resolvedPayload = {
               ...payload,
