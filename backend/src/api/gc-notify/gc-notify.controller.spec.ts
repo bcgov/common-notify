@@ -175,6 +175,7 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyInternalExecutionService.sendEmail).toHaveBeenCalledWith(
         emailBody,
         TENANT_ID,
+        undefined,
       )
       expect(mockGcNotifyApiClient.sendEmail).not.toHaveBeenCalled()
     })
@@ -220,7 +221,11 @@ describe('GcNotifyController', () => {
       const result = await controller.sendSms(smsBody, makeReq())
 
       expect(result).toEqual(expected)
-      expect(mockGcNotifyInternalExecutionService.sendSms).toHaveBeenCalledWith(smsBody, TENANT_ID)
+      expect(mockGcNotifyInternalExecutionService.sendSms).toHaveBeenCalledWith(
+        smsBody,
+        TENANT_ID,
+        undefined,
+      )
       expect(mockGcNotifyApiClient.sendSms).not.toHaveBeenCalled()
     })
   })
