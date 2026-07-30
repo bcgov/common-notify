@@ -923,7 +923,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -951,7 +955,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -979,7 +987,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1007,7 +1019,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1061,7 +1077,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1089,7 +1109,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1117,7 +1141,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1145,7 +1173,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1173,7 +1205,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1201,7 +1237,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1229,7 +1269,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1281,7 +1325,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1324,7 +1372,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1367,7 +1419,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1410,7 +1466,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1453,7 +1513,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1496,7 +1560,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1539,7 +1607,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1573,7 +1645,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1631,7 +1707,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1689,7 +1769,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1747,7 +1831,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -1805,7 +1893,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -2093,7 +2185,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -2207,7 +2303,11 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
-  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
+  # throughput per key can exceed the configured value by ~the replica count. This is intentional
+  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
+  # limit, switch policy to redis (adds ~100-200ms latency).
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
