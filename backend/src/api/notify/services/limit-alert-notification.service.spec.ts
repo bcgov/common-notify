@@ -5,6 +5,7 @@ import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { ClaimedLimitAlert, LimitAlertService } from '../../api-keys/limit-alert.service'
 import { NotificationService } from '../../notification/notification.service'
+import { TenantsService } from '../../admin/tenants/tenants.service'
 import {
   buildLimitAlertEmail,
   LimitAlertNotificationService,
@@ -25,6 +26,9 @@ describe('LimitAlertNotificationService', () => {
   }
   const ingestionQueue = {
     add: vi.fn(),
+  }
+  const tenantsService = {
+    findOne: vi.fn(),
   }
 
   const dayWarning: ClaimedLimitAlert = {
@@ -80,6 +84,10 @@ describe('LimitAlertNotificationService', () => {
           useValue: notificationService,
         },
         {
+          provide: TenantsService,
+          useValue: tenantsService,
+        },
+        {
           provide: QueueName.INGESTION,
           useValue: ingestionQueue,
         },
@@ -97,6 +105,12 @@ describe('LimitAlertNotificationService', () => {
     })
     notificationService.update.mockResolvedValue(undefined)
     ingestionQueue.add.mockResolvedValue({ id: 'notification-1' })
+    tenantsService.findOne.mockImplementation((tenantId) =>
+      Promise.resolve({
+        id: tenantId,
+        name: tenantId === 'tenant-1' ? 'Tenant One' : 'Tenant Two',
+      }),
+    )
   })
 
   it.each([
@@ -135,14 +149,14 @@ describe('LimitAlertNotificationService', () => {
             body: [
               'BC Notify usage alert',
               '',
-              'Tenant: tenant-1',
+              'Tenant: Tenant One',
               'Monitored channel: EMAIL',
               'Period: daily',
               'Alert level: Warning',
               'Current sent count: 80',
               'Configured limit: 100',
               'Usage: 80%',
-              'Period start: 2026-07-29T00:00:00.000Z',
+              'Period start: 2026-07-29',
             ].join('\n'),
             bodyType: 'text',
           },
@@ -167,6 +181,40 @@ describe('LimitAlertNotificationService', () => {
     expect(createInput.payload.email.content.body).toContain('Monitored channel: SMS')
     expect(createInput.payload.email.content.body).toContain('Alert level: Limit reached')
     expect(createInput.payload.email.content.body).toContain('Current sent count: 1250')
+    expect(createInput.payload.email.content.body).toContain('Tenant: Tenant Two')
+    expect(createInput.payload.email.content.body).toContain('Period start: 2026')
+  })
+
+  it('falls back to the tenant ID when no tenant is found', async () => {
+    tenantsService.findOne.mockResolvedValue(null)
+    limitAlertService.evaluateAndClaim.mockResolvedValue([dayWarning])
+
+    await service.processAcceptedUsage(acceptedUsageInput)
+
+    const body = notificationService.create.mock.calls[0][0].payload.email.content.body
+    expect(body).toContain('Tenant: tenant-1')
+  })
+
+  it('falls back to the tenant ID when tenant lookup fails', async () => {
+    tenantsService.findOne.mockRejectedValue(new Error('tenant lookup unavailable'))
+    limitAlertService.evaluateAndClaim.mockResolvedValue([dayWarning])
+
+    await expect(service.processAcceptedUsage(acceptedUsageInput)).resolves.toBeUndefined()
+
+    const body = notificationService.create.mock.calls[0][0].payload.email.content.body
+    expect(body).toContain('Tenant: tenant-1')
+  })
+
+  it('does not mutate the claimed period start while rendering and enqueueing', async () => {
+    const originalPeriodStart = dayWarning.periodStart
+    const originalTimestamp = originalPeriodStart.getTime()
+    limitAlertService.evaluateAndClaim.mockResolvedValue([dayWarning])
+
+    await service.processAcceptedUsage(acceptedUsageInput)
+
+    expect(dayWarning.periodStart).toBe(originalPeriodStart)
+    expect(dayWarning.periodStart.getTime()).toBe(originalTimestamp)
+    expect(limitAlertService.evaluateAndClaim).toHaveBeenCalledWith(acceptedUsageInput)
   })
 
   it('does not include an API key value in generated content', () => {

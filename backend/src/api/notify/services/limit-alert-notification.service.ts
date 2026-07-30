@@ -10,6 +10,7 @@ import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../../queue/queue.types'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
+import { TenantsService } from '../../admin/tenants/tenants.service'
 
 export type ProcessLimitAlertNotificationsInput = ProcessLimitAlertUsageInput
 
@@ -18,7 +19,19 @@ export interface LimitAlertEmailContent {
   body: string
 }
 
-export function buildLimitAlertEmail(claim: ClaimedLimitAlert): LimitAlertEmailContent {
+export function formatLimitAlertPeriodStart(claim: ClaimedLimitAlert): string {
+  const year = claim.periodStart.getUTCFullYear()
+  if (claim.periodTypeCode === 'YEAR') return String(year)
+
+  const month = String(claim.periodStart.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(claim.periodStart.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function buildLimitAlertEmail(
+  claim: ClaimedLimitAlert,
+  tenantDisplayName: string = claim.tenantId,
+): LimitAlertEmailContent {
   const periodLabel = claim.periodTypeCode === 'DAY' ? 'daily' : 'annual'
   const levelLabel = claim.alertLevel === 'WARN' ? 'Warning' : 'Limit reached'
   const subject =
@@ -29,14 +42,14 @@ export function buildLimitAlertEmail(claim: ClaimedLimitAlert): LimitAlertEmailC
   const body = [
     'BC Notify usage alert',
     '',
-    `Tenant: ${claim.tenantId}`,
+    `Tenant: ${tenantDisplayName}`,
     `Monitored channel: ${claim.channelCode}`,
     `Period: ${periodLabel}`,
     `Alert level: ${levelLabel}`,
     `Current sent count: ${claim.sentCount}`,
     `Configured limit: ${claim.limit}`,
     `Usage: ${claim.percent}%`,
-    `Period start: ${claim.periodStart.toISOString()}`,
+    `Period start: ${formatLimitAlertPeriodStart(claim)}`,
   ].join('\n')
 
   return { subject, body }
@@ -49,6 +62,7 @@ export class LimitAlertNotificationService {
   constructor(
     private readonly limitAlertService: LimitAlertService,
     private readonly notificationService: NotificationService,
+    private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION)
     private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
   ) {}
@@ -82,7 +96,8 @@ export class LimitAlertNotificationService {
   }
 
   private async createAndEnqueue(claim: ClaimedLimitAlert): Promise<void> {
-    const content = buildLimitAlertEmail(claim)
+    const tenantDisplayName = await this.resolveTenantDisplayName(claim.tenantId)
+    const content = buildLimitAlertEmail(claim, tenantDisplayName)
     const notifyRequest: NotifySimpleRequest = {
       email: {
         recipients: { to: [claim.recipientEmail] },
@@ -123,5 +138,19 @@ export class LimitAlertNotificationService {
       updatedBy: 'system',
     })
     await this.limitAlertService.markEnqueued(claim.alertLogId)
+  }
+
+  private async resolveTenantDisplayName(tenantId: string): Promise<string> {
+    try {
+      const tenant = await this.tenantsService.findOne(tenantId)
+      return tenant?.name || tenantId
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve tenant display name for tenant ${tenantId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+      return tenantId
+    }
   }
 }
