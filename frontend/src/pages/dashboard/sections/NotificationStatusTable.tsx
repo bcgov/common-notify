@@ -17,15 +17,6 @@ import { ChannelBadge } from '@/components/ChannelBadge'
 import { RecipientsModal } from './RecipientsModal'
 import { RecipientsCell } from './RecipientsCell'
 
-/** Channels the request targeted, derived from the recipients present on each channel. */
-const channelsFromRequest = (row: NotificationRequest): string[] => {
-  const channels: string[] = []
-  if (row.recipients?.email?.length) channels.push('EMAIL')
-  if (row.recipients?.sms?.length) channels.push('SMS')
-  if (row.recipients?.msgApp?.length) channels.push('MSGAPP')
-  return channels
-}
-
 /**
  * NotificationStatusTable Component
  * Displays a filterable table of notification requests with their status and creation date
@@ -99,19 +90,19 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'requestRoute',
       label: 'Notification Event',
-      width: '19%',
+      width: '18%',
       render: (_, row) => row.requestRoute ?? '-',
     },
     {
       key: 'channelCodes',
       label: 'Channel',
-      width: '17%',
+      width: '21%',
       filterOptions: [
         { label: 'Email', value: 'EMAIL' },
         { label: 'SMS', value: 'SMS' },
         { label: 'MsgApp', value: 'MSGAPP' },
       ],
-      render: (_, row) => <ChannelBadge channels={channelsFromRequest(row)} />,
+      render: (_, row) => <ChannelBadge channels={row.channelCodes ?? []} />,
     },
     {
       key: 'status',

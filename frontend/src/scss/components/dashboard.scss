@@ -32,9 +32,9 @@
 
 /* Keep the recipients column width restricted so the comma-separated list truncates */
 .data-table__recipients-col {
-  width: 210px;
-  min-width: 210px;
-  max-width: 210px;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
 }
 
 /* Recipient list popover (shown on hover over a Recipients cell) */
