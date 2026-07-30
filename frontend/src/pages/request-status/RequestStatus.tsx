@@ -26,15 +26,6 @@ interface RequestStatusProps {
   notificationRequestId: string
 }
 
-/** Channels the request targeted, derived from the recipients present on each channel. */
-function channelsFromRequest(request: NotificationRequest): string[] {
-  const channels: string[] = []
-  if (request.recipients?.email?.length) channels.push('EMAIL')
-  if (request.recipients?.sms?.length) channels.push('SMS')
-  if (request.recipients?.msgApp?.length) channels.push('MSGAPP')
-  return channels
-}
-
 /** Total recipient-channel entries across all channels on the parent request. */
 function recipientCountFromRequest(request: NotificationRequest): number {
   const { email = [], sms = [], msgApp = [] } = request.recipients ?? {}
@@ -136,7 +127,7 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
 
       {notificationRequest && (
         <RequestStatusSummary
-          channels={channelsFromRequest(notificationRequest)}
+          channels={notificationRequest.channelCodes ?? []}
           recipientsCount={recipientCountFromRequest(notificationRequest)}
           sentDate={new Date(notificationRequest.delayedSendTime ?? notificationRequest.createdAt)}
           overallStatus={notificationRequest.status}
