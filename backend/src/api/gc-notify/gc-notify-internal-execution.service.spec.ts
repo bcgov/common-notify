@@ -8,6 +8,8 @@ import { TemplatesService } from '../templates/templates.service'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
+import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -34,6 +36,8 @@ describe('GcNotifyInternalExecutionService', () => {
   }
   let mockConfigurationRepository: { findOne: ReturnType<typeof vi.fn> }
   let mockIngestionQueue: { add: ReturnType<typeof vi.fn> }
+  let mockAttachmentValidationService: { validateAttachments: ReturnType<typeof vi.fn> }
+  let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
 
   const TENANT_ID = 'tenant-1'
 
@@ -53,6 +57,13 @@ describe('GcNotifyInternalExecutionService', () => {
     mockNotificationRequestDetailService = { createPending: vi.fn(), updateStatus: vi.fn() }
     mockConfigurationRepository = { findOne: vi.fn().mockResolvedValue(null) }
     mockIngestionQueue = { add: vi.fn().mockResolvedValue(undefined) }
+    mockAttachmentValidationService = { validateAttachments: vi.fn().mockResolvedValue(undefined) }
+    mockAttachmentProcessingService = {
+      // By default, echo back a single stored reference so callers can assert wiring.
+      processAttachments: vi.fn().mockResolvedValue({
+        email: { attachments: [{ attachmentId: 'att-1' }] },
+      }),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +77,8 @@ describe('GcNotifyInternalExecutionService', () => {
         },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: mockConfigurationRepository },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
+        { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
+        { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
       ],
     }).compile()
 
@@ -147,6 +160,115 @@ describe('GcNotifyInternalExecutionService', () => {
         TENANT_ID,
         expect.objectContaining({ status: 'queued' }),
       )
+    })
+  })
+
+  describe('sendEmail attachments', () => {
+    const emailTemplate = {
+      id: 'tpl-1',
+      version: 1,
+      channelCode: NotificationChannel.EMAIL,
+    }
+
+    beforeEach(() => {
+      mockTemplatesRepository.findById.mockResolvedValue(emailTemplate)
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Subject',
+        body: 'Body',
+        bodyType: 'html',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-att',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+    })
+
+    it('does not touch the attachment pipeline when personalisation has no files', async () => {
+      await service.sendEmail(
+        { email_address: 'user@example.com', template_id: 'tpl-1', personalisation: { name: 'A' } },
+        TENANT_ID,
+      )
+
+      expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
+      expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+
+      await flushMicrotasks()
+      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      expect(jobPayload.request.email.attachments).toBeUndefined()
+    })
+
+    it('lifts file personalisation out, stores it, and enqueues stored references', async () => {
+      await service.sendEmail(
+        {
+          email_address: 'user@example.com',
+          template_id: 'tpl-1',
+          personalisation: {
+            name: 'Alice',
+            attachment1: {
+              file: 'aGVsbG8=',
+              filename: 'scratch.txt',
+              sending_method: 'attach',
+            },
+          },
+        },
+        TENANT_ID,
+      )
+
+      // Only the string param reaches the renderer; the file entry is not rendered.
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(expect.anything(), {
+        name: 'Alice',
+      })
+      // GC Notify file object mapped to native NotifyAttachment (MIME derived from extension).
+      expect(mockAttachmentProcessingService.processAttachments).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: {
+            attachments: [{ filename: 'scratch.txt', mimeType: 'text/plain', content: 'aGVsbG8=' }],
+          },
+        }),
+        TENANT_ID,
+        TENANT_ID,
+      )
+      expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledOnce()
+
+      await flushMicrotasks()
+      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      expect(jobPayload.request.email.attachments).toEqual([{ attachmentId: 'att-1' }])
+    })
+
+    it('rejects sending_method "link" with a 400', async () => {
+      await expect(
+        service.sendEmail(
+          {
+            email_address: 'user@example.com',
+            template_id: 'tpl-1',
+            personalisation: {
+              doc: { file: 'aGVsbG8=', filename: 'a.pdf', sending_method: 'link' },
+            },
+          },
+          TENANT_ID,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+
+      expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a file whose extension is not in the allow-list with a 400', async () => {
+      await expect(
+        service.sendEmail(
+          {
+            email_address: 'user@example.com',
+            template_id: 'tpl-1',
+            personalisation: {
+              danger: { file: 'aGVsbG8=', filename: 'malware.exe', sending_method: 'attach' },
+            },
+          },
+          TENANT_ID,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+
+      expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
     })
   })
 
