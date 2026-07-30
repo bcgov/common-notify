@@ -95,7 +95,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     if (activeWebhooks.length === 0) return
 
     const notificationStatus = notification.status?.code?.toLowerCase()
-    const notificationChannel = notification.channelCode?.toLowerCase()
+    const notificationChannels = (notification.channelCodes ?? []).map((c) => c.toLowerCase())
 
     for (const webhook of activeWebhooks) {
       const triggerTypes = webhook.triggerOn ?? []
@@ -114,12 +114,12 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
 
       if (!statusMatches) continue
 
-      // Empty channelType = fire for any channel; otherwise check for match
+      // Empty channelType = fire for any channel; otherwise fire if the request targeted any of
+      // the webhook's channels
       const channelTypes = webhook.channelType ?? []
       const channelMatches =
         channelTypes.length === 0 ||
-        (notificationChannel !== undefined &&
-          channelTypes.some((ct) => ct.toLowerCase() === notificationChannel))
+        channelTypes.some((ct) => notificationChannels.includes(ct.toLowerCase()))
 
       if (!channelMatches) continue
 
@@ -131,7 +131,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
         payload: {
           notifyId: notification.id,
           status: notification.status,
-          channel: notification.channelCode,
+          channel: notification.channelCodes?.join(', '),
           createdAt: notification.createdAt,
           updatedAt: notification.updatedAt,
         },

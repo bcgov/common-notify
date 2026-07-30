@@ -1,17 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { TenantDto } from './tenant'
 
-export class NotificationChannelCodeDto {
-  @ApiProperty({ description: 'Channel code identifier' })
-  channelCode: string
-
-  @ApiProperty({ description: 'Display name for the channel' })
-  displayName: string
-
-  @ApiPropertyOptional({ description: 'Description of the channel' })
-  description?: string
-}
-
 export class NotificationStatusCodeDto {
   @ApiProperty({ description: 'Status code identifier' })
   code: string
@@ -40,17 +29,12 @@ export class NotificationRequestDto {
   status: NotificationStatusCodeDto
 
   @ApiPropertyOptional({
-    description: 'Primary notification channel code',
-    example: 'EMAIL',
-    enum: ['EMAIL', 'SMS', 'MSGAPP', 'MULTIPLE'],
+    description: 'Channels this request targeted',
+    example: ['EMAIL', 'SMS'],
+    isArray: true,
+    enum: ['EMAIL', 'SMS', 'MSGAPP'],
   })
-  channelCode?: string
-
-  @ApiPropertyOptional({
-    type: NotificationChannelCodeDto,
-    description: 'Channel code details including display name',
-  })
-  channel?: NotificationChannelCodeDto
+  channelCodes?: string[]
 
   @ApiPropertyOptional({
     description: 'API route that accepted the request',

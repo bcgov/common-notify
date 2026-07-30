@@ -102,9 +102,14 @@ const NotificationStatusTable: FC = () => {
       render: (_, row) => row.requestRoute ?? '-',
     },
     {
-      key: 'channel',
+      key: 'channelCodes',
       label: 'Channel',
       width: '17%',
+      filterOptions: [
+        { label: 'Email', value: 'EMAIL' },
+        { label: 'SMS', value: 'SMS' },
+        { label: 'MsgApp', value: 'MSGAPP' },
+      ],
       render: (_, row) => <ChannelBadge channels={channelsFromRequest(row)} />,
     },
     {

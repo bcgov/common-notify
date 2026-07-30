@@ -108,7 +108,7 @@ describe('NotificationService', () => {
         tenantId: 'tenant-uuid',
         status: NotificationStatus.QUEUED,
         createdBy: 'user1',
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       }
@@ -122,7 +122,7 @@ describe('NotificationService', () => {
         status: NotificationStatus.QUEUED,
         createdBy: dto.createdBy,
         payload: undefined,
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       })
@@ -140,7 +140,7 @@ describe('NotificationService', () => {
         tenantId: 'tenant-uuid',
         status: NotificationStatus.PROCESSING,
         createdBy: 'user1',
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       }
@@ -154,7 +154,7 @@ describe('NotificationService', () => {
         status: NotificationStatus.PROCESSING,
         createdBy: dto.createdBy,
         payload: undefined,
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       })
@@ -211,7 +211,7 @@ describe('NotificationService', () => {
         page: 2,
         limit: 5,
         sort: '-createdAt,status',
-        filter: ['status:eq:COMPLETED', 'channelCode:in:EMAIL|SMS'],
+        filter: ['status:eq:COMPLETED', 'channelCodes:in:EMAIL|SMS'],
       })
 
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
@@ -223,8 +223,8 @@ describe('NotificationService', () => {
       )
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
         2,
-        'LOWER(notification.channelCode) IN (:...filter_1)',
-        { filter_1: ['email', 'sms'] },
+        'jsonb_exists_any(notification.channel_codes, ARRAY[:...channelCodeValues]::text[])',
+        { channelCodeValues: ['EMAIL', 'SMS'] },
       )
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(1, 'notification.createdAt', 'DESC')
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(2, 'notification.status', 'ASC')

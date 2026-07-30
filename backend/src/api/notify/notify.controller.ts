@@ -225,14 +225,7 @@ export class NotifySimpleController {
               description: updated.statusCode.description,
             }
           : { code: updated.status, displayName: updated.status },
-        channelCode: updated.channelCode,
-        channel: updated.channel
-          ? {
-              channelCode: updated.channel.channelCode,
-              displayName: updated.channel.displayName,
-              description: updated.channel.description,
-            }
-          : undefined,
+        channelCodes: updated.channelCodes,
         recipients: updated.recipients,
         delayedSendTime: updated.delayedSendTime,
         payload: updated.payload,

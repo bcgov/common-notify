@@ -6,12 +6,6 @@ export interface Tenant {
   slug: string
 }
 
-export interface NotificationChannel {
-  channelCode: string
-  displayName: string
-  description?: string
-}
-
 export interface NotificationStatusCode {
   code: string
   displayName: string
@@ -23,8 +17,7 @@ export interface NotificationRequest {
   tenantId: string
   tenant?: Tenant
   status: NotificationStatusCode
-  channelCode?: string
-  channel?: NotificationChannel
+  channelCodes?: string[] // array of notification_channel_code.channel_code values
   requestRoute?: string
   delayedSendTime?: string
   recipients?: {
