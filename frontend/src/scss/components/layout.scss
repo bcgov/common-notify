@@ -9,7 +9,10 @@
 .layout-header {
   @include flex-between;
   gap: $spacing-md;
-  padding: $spacing-md;
+  // padding: $spacing-md;
+  padding-top: $spacing-md;
+  padding-left: $spacing-md;
+  padding-right: $spacing-md;
   background-color: $secondary-color;
   color: $white;
 }

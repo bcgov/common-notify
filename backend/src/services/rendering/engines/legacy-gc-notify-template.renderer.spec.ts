@@ -212,11 +212,11 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
       expect(result.body).toBe('Dear Alice,\n\nWelcome Alice!')
     })
 
-    it('should use default text when placeholder uses ?? and key is missing', async () => {
+    it('should omit ??-conditional content when the key is missing (falsy)', async () => {
       const context: RenderContext = {
         template: {
           id: 'template-1',
-          name: 'Default Fallback',
+          name: 'Conditional Missing',
           type: 'email',
           subject: 'Order ((orderNumber??unknown)) Confirmation',
           body: 'Status: ((status??submitted for review))',
@@ -227,27 +227,46 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
 
       const result = await renderer.renderEmail(context)
 
-      expect(result.subject).toBe('Order unknown Confirmation')
-      expect(result.body).toBe('Status: submitted for review')
+      expect(result.subject).toBe('Order  Confirmation')
+      expect(result.body).toBe('Status: ')
     })
 
-    it('should prefer personalisation value over ?? default text', async () => {
+    it('should render ??-conditional content when the key is truthy', async () => {
       const context: RenderContext = {
         template: {
           id: 'template-1',
-          name: 'Default Override',
+          name: 'Conditional Truthy',
           type: 'email',
           subject: 'Order ((orderNumber??unknown)) Confirmation',
           body: 'Status: ((status??submitted for review))',
           active: true,
         },
-        personalisation: { orderNumber: 'ABC-123', status: 'approved' },
+        personalisation: { orderNumber: 'ABC-123', status: true },
       }
 
       const result = await renderer.renderEmail(context)
 
-      expect(result.subject).toBe('Order ABC-123 Confirmation')
-      expect(result.body).toBe('Status: approved')
+      // Truthy conditions show their content verbatim; the value is not printed.
+      expect(result.subject).toBe('Order unknown Confirmation')
+      expect(result.body).toBe('Status: submitted for review')
+    })
+
+    it('should omit ??-conditional content when the key is falsy ("false"/"")', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Conditional Falsy',
+          type: 'email',
+          subject: 'Subject',
+          body: 'A((a??-alpha-))B((b??-beta-))C',
+          active: true,
+        },
+        personalisation: { a: 'false', b: '' },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe('ABC')
     })
 
     it('should handle empty personalisation', async () => {
@@ -418,21 +437,22 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
       expect(result.body).toBe('Alice: Hello - 123')
     })
 
-    it('should support ?? default placeholders in SMS', async () => {
+    it('should support ??-conditional placeholders in SMS', async () => {
       const context: RenderContext & { personalisation: Record<string, string> } = {
         template: {
           id: 'template-1',
-          name: 'SMS Default',
+          name: 'SMS Conditional',
           type: 'sms',
-          body: 'Hi ((firstName??there)), status: ((status??pending))',
+          body: 'Hi((vip?? valued customer)), status: ((paid??paid))',
           active: true,
         },
-        personalisation: {},
+        personalisation: { vip: 'true', paid: '' },
       }
 
       const result = await renderer.renderSms(context)
 
-      expect(result.body).toBe('Hi there, status: pending')
+      // vip is truthy -> its content shows; paid is falsy -> its content is removed.
+      expect(result.body).toBe('Hi valued customer, status: ')
     })
 
     it('should be a Promise', async () => {

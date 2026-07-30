@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Loki to Tools Namespace
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana to Tools Namespace
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
@@ -130,10 +130,35 @@ jobs:
                 echo "Grafana admin credentials already exist"
             fi
 
-            # Deploy Grafana using tools-specific values
+            # Create/Update Grafana SSO secret from GitHub Secrets
+            echo "🔐 Creating/Updating Grafana SSO credentials..."
+            SSO_CLIENT_ID_B64=$(echo -n "${{ secrets.GRAFANA_SSO_CLIENT_ID }}" | base64 -w 0)
+            SSO_CLIENT_SECRET_B64=$(echo -n "${{ secrets.GRAFANA_SSO_CLIENT_SECRET }}" | base64 -w 0)
+
+            # Create secret YAML with actual values
+            cat > /tmp/sso-secret.yaml << EOF
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: grafana-sso-credentials
+              namespace: ${NAMESPACE}
+              labels:
+                app.kubernetes.io/name: grafana
+                app.kubernetes.io/component: sso
+            type: Opaque
+            data:
+              client_id: ${SSO_CLIENT_ID_B64}
+              client_secret: ${SSO_CLIENT_SECRET_B64}
+            EOF
+
+            oc apply -f /tmp/sso-secret.yaml
+            rm /tmp/sso-secret.yaml
+            echo "✅ SSO credentials configured"
+
+            # Deploy Grafana using SSO-enabled values
             helm upgrade --install grafana grafana/grafana \
               --namespace ${NAMESPACE} \
-              --values monitoring/grafana-stack/grafana/values-tools.yaml \
+              --values monitoring/grafana-stack/grafana/values-tools-sso.yaml \
               --wait \
               --timeout 10m
 
@@ -143,20 +168,20 @@ jobs:
 
             # Display access info
             GRAFANA_ROUTE=$(oc get route grafana -n ${NAMESPACE} -o jsonpath='{.spec.host}' 2>/dev/null)
-            ADMIN_PASSWORD=$(oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath="{.data.admin-password}" | base64 -d 2>/dev/null)
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ Grafana deployed successfully!"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "🌐 URL: https://${GRAFANA_ROUTE}"
             echo "👤 Username: admin"
-            echo "🔑 Password: ${ADMIN_PASSWORD}"
+            echo "🔑 Password: Retrieve with: oc get secret grafana-admin-credentials -n ${NAMESPACE} -o jsonpath='{.data.admin-password}' | base64 -d"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   deploy-agent-dev:
     name: Deploy Grafana Agent (Dev)
     needs: [deploy-grafana-centralized]
     if: |
+      false &&
       !cancelled() &&
       (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
       ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
@@ -168,7 +193,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Dev
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.OC_DEV_TOKEN }}
@@ -192,6 +217,7 @@ jobs:
     name: Deploy Grafana Agent (Test)
     needs: [deploy-grafana-centralized]
     if: |
+      false &&
       !cancelled() &&
       (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
       ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
@@ -203,7 +229,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Test
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
           oc_token: ${{ secrets.OC_TEST_TOKEN }}
@@ -227,6 +253,7 @@ jobs:
     name: Deploy Grafana Agent (Prod)
     needs: [deploy-grafana-centralized]
     if: |
+      false &&
       !cancelled() &&
       (needs.deploy-grafana-centralized.result == 'success' || needs.deploy-grafana-centralized.result == 'skipped') &&
       ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
@@ -238,7 +265,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Prod
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
           oc_token: ${{ secrets.OC_PROD_TOKEN }}
@@ -274,7 +301,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Loki
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
@@ -315,7 +342,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
