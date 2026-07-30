@@ -161,6 +161,32 @@ describe('GcNotifyInternalExecutionService', () => {
         expect.objectContaining({ status: 'queued' }),
       )
     })
+
+    it('carries the rendered bodyType onto the enqueued email content so markdown is converted downstream', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 1,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Subject',
+        body: '# Heading\n\n**Bold**',
+        bodyType: 'markdown',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-md',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      await service.sendEmail(body, TENANT_ID)
+
+      await flushMicrotasks()
+      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      expect(jobPayload.request.email.content).toMatchObject({
+        body: '# Heading\n\n**Bold**',
+        bodyType: 'markdown',
+      })
+    })
   })
 
   describe('sendEmail attachments', () => {

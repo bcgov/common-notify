@@ -180,6 +180,10 @@ export class GcNotifyInternalExecutionService {
         content: {
           subject: rendered.subject ?? '',
           body: rendered.body,
+          // Carry the rendered body type through to delivery. Without it the CHES
+          // adapter can't tell the body is markdown, skips markdown->HTML conversion,
+          // and ships raw markdown (## H1, **bold**, - lists) in the email.
+          bodyType: rendered.bodyType,
         },
         ...(attachments.length > 0 && { attachments }),
         delayedSend: body.scheduled_for,
