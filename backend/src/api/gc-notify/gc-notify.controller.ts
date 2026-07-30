@@ -140,7 +140,11 @@ export class GcNotifyController {
       req.tenantId,
     )
     return useInternal
-      ? this.gcNotifyInternalExecutionService.sendEmail(body, req.tenantId, extractRequestRoute(req))
+      ? this.gcNotifyInternalExecutionService.sendEmail(
+          body,
+          req.tenantId,
+          extractRequestRoute(req),
+        )
       : this.gcNotifyApiClient.sendEmail(body, req.gcNotifyAuthHeader)
   }
 
