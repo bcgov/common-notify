@@ -1,5 +1,5 @@
 # Build
-FROM node:24.14.0-slim AS build
+FROM node:24.18.0-slim AS build
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -7,7 +7,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
-FROM node:24.14.0-slim AS dependencies
+FROM node:24.18.0-slim AS dependencies
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app

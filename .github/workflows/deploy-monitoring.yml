@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Loki to Tools Namespace
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana to Tools Namespace
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
@@ -193,7 +193,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Dev
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.OC_DEV_TOKEN }}
@@ -229,7 +229,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Test
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
           oc_token: ${{ secrets.OC_TEST_TOKEN }}
@@ -265,7 +265,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana Agent to Prod
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
           oc_token: ${{ secrets.OC_PROD_TOKEN }}
@@ -301,7 +301,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Loki
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
@@ -342,7 +342,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Deploy Grafana
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
