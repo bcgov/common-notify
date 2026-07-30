@@ -1,4 +1,4 @@
-import { Logger, NotFoundException } from '@nestjs/common'
+import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
@@ -58,6 +58,10 @@ export class EmailDeliveryWorker {
           typeof (attachment as { attachmentId?: unknown }).attachmentId === 'string',
       )
     )
+  }
+
+  private static isPermanentValidationError(error: unknown): error is HttpException {
+    return error instanceof HttpException && error.getStatus() === 400
   }
 
   /**
@@ -182,7 +186,7 @@ export class EmailDeliveryWorker {
               // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
-                request.params || {},
+                { ...request?.params, ...emailPayload.params },
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
 
@@ -209,10 +213,10 @@ export class EmailDeliveryWorker {
             `[${notifyId}] Rendering inline content with renderer: ${emailPayload.content.renderer}`,
           )
           try {
-            const rendered = await inlineRenderingService.renderEmail(
-              emailPayload.content,
-              emailPayload.params || request?.params,
-            )
+            const rendered = await inlineRenderingService.renderEmail(emailPayload.content, {
+              ...request?.params,
+              ...emailPayload.params,
+            })
 
             emailPayload = {
               ...emailPayload,
@@ -324,6 +328,20 @@ export class EmailDeliveryWorker {
           `[${notifyId}] Failed to send email delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
+
+        if (EmailDeliveryWorker.isPermanentValidationError(error)) {
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.FAILED,
+            updatedBy: 'system',
+            errorReason: errorMessage,
+          })
+          await requestDetailService.markFailed(notifyId, errorMessage)
+          job.discard()
+          logger.error(
+            `[${notifyId}] Notification marked as FAILED after permanent validation error. Error: ${errorMessage}`,
+          )
+          throw error
+        }
 
         // Update status to FAILED only on final attempt (when no retries left)
         if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {

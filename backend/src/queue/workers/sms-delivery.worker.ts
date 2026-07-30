@@ -1,4 +1,4 @@
-import { Logger, NotFoundException } from '@nestjs/common'
+import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
@@ -36,6 +36,10 @@ export class SmsDeliveryWorker {
     }
 
     return undefined
+  }
+
+  private static isPermanentValidationError(error: unknown): error is HttpException {
+    return error instanceof HttpException && error.getStatus() === 400
   }
 
   /**
@@ -91,12 +95,28 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid delivery job: SMS payload is missing or invalid')
         }
 
+        if (
+          !payload.recipients ||
+          !payload.recipients.to ||
+          !Array.isArray(payload.recipients.to) ||
+          payload.recipients.to.length === 0
+        ) {
+          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
+        }
+
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
 
         let resolvedPayload = payload
         const smsTemplateId = payload.content?.templateId
+        if (
+          !smsTemplateId &&
+          (!payload.content?.body || typeof payload.content.body !== 'string')
+        ) {
+          throw new Error('Invalid SMS payload: body is missing or invalid')
+        }
+
         if (smsTemplateId) {
           logger.debug(`[${notifyId}] Resolving template: ${smsTemplateId}`)
           try {
@@ -113,7 +133,7 @@ export class SmsDeliveryWorker {
               // Normalize legacy body types before entering the markdown-only render path.
               const rendered = await templatesService.renderTemplateContent(
                 template,
-                request.params || {},
+                { ...request?.params, ...payload.params },
                 SmsDeliveryWorker.normalizeTemplateBodyType(payload.content?.bodyType),
               )
 
@@ -139,10 +159,10 @@ export class SmsDeliveryWorker {
             `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
           )
           try {
-            const rendered = await inlineRenderingService.renderSms(
-              payload.content,
-              payload.params || request?.params,
-            )
+            const rendered = await inlineRenderingService.renderSms(payload.content, {
+              ...request?.params,
+              ...payload.params,
+            })
 
             resolvedPayload = {
               ...payload,
@@ -158,15 +178,6 @@ export class SmsDeliveryWorker {
             )
             throw renderError
           }
-        }
-
-        if (
-          !resolvedPayload.recipients ||
-          !resolvedPayload.recipients.to ||
-          !Array.isArray(resolvedPayload.recipients.to) ||
-          resolvedPayload.recipients.to.length === 0
-        ) {
-          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
         if (!resolvedPayload.content?.body || typeof resolvedPayload.content.body !== 'string') {
@@ -217,6 +228,20 @@ export class SmsDeliveryWorker {
           `[${notifyId}] Failed to send SMS delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
+
+        if (SmsDeliveryWorker.isPermanentValidationError(error)) {
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.FAILED,
+            updatedBy: 'system',
+            errorReason: errorMessage,
+          })
+          await requestDetailService.markFailed(notifyId, errorMessage)
+          job.discard()
+          logger.error(
+            `[${notifyId}] Notification marked as FAILED after permanent validation error. Error: ${errorMessage}`,
+          )
+          throw error
+        }
 
         // Update status to FAILED only on final attempt (when no retries left)
         if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {

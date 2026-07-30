@@ -11,6 +11,7 @@ const useCstarRolesMock = vi.fn(() => ({ primaryRole: 'NOTIFY_ADMIN' }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('@/api/templates.api', async () => {
@@ -33,6 +34,10 @@ vi.mock('@/hooks/useCstarRoles', () => ({
 
 vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
+}))
+
+vi.mock('./TemplatePreviewModal', () => ({
+  default: () => null,
 }))
 
 vi.mock('@/hooks/useCstarRoles', () => ({
@@ -238,6 +243,20 @@ describe('TemplateEdit', () => {
     updateTemplateMock.mockResolvedValue({})
   })
 
+  it('renders the edit breadcrumb with links and a current-page item', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Edit reusable template', { selector: '[aria-current="page"]' }),
+      ).toBeTruthy()
+    })
+
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates')
+  })
+
   it('does not show body type choices', async () => {
     getTemplateByIdMock.mockResolvedValue(template)
 
@@ -265,18 +284,21 @@ describe('TemplateEdit', () => {
       expect(screen.getByDisplayValue('Welcome Template')).toBeTruthy()
     })
 
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Preview' })).not.toBeDisabled()
 
     fireEvent.change(screen.getByLabelText('Template body (required)'), {
       target: { value: '' },
     })
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(updateTemplateMock).not.toHaveBeenCalled()
     })
 
-    expect(screen.getByText('This field is required.')).toBeTruthy()
+    expect(screen.getByText('Please fill out this field to continue.')).toBeTruthy()
     expect(container.querySelectorAll('.bcds-react-aria-TextField--Error')).toHaveLength(1)
   })
 
@@ -289,8 +311,11 @@ describe('TemplateEdit', () => {
       expect(screen.getByRole('heading', { name: 'View reusable template' })).toBeTruthy()
     })
 
+    expect(
+      screen.getByText('View reusable template', { selector: '[aria-current="page"]' }),
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Preview' })).not.toBeDisabled()
   })
 
   it('renders all syntax tooltip triggers', async () => {
@@ -320,7 +345,9 @@ describe('TemplateEdit', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('template-123')
     })
 
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    })
   })
 
   it('does not require or send bodyType when saving an MJML template', async () => {

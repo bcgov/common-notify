@@ -2,7 +2,7 @@
 
 .sidebar {
   width: 296px;
-  padding: $spacing-md $spacing-sm;
+  padding: 24px;
   transition: width 0.3s ease;
 
   display: flex;
@@ -14,18 +14,21 @@
   border-right: 1px solid $border-default;
 
   &--collapsed {
-    width: 72px;
+    width: 93px;
+
+    .sidebar__item {
+      gap: 0;
+    }
 
     .sidebar__label {
       max-width: 0;
       opacity: 0;
-      margin-left: 0;
     }
   }
 
   &__toggle {
     position: absolute;
-    right: -15px;
+    right: -18px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 10;
@@ -35,8 +38,8 @@
     justify-content: center;
     cursor: pointer;
 
-    width: 30px;
-    height: 72px;
+    width: 36px;
+    height: 84px;
     border-radius: 8px;
 
     background-color: $secondary-color;
@@ -53,50 +56,73 @@
     }
   }
 
+  &__toggle-icon {
+    width: 9px;
+    height: 17px;
+
+    path {
+      fill: var(--icons-color-primary, #2d2d2d);
+    }
+  }
+
   &__nav {
     display: flex;
     flex-direction: column;
-    gap: $spacing-xs;
+    gap: var(--layout-margin-small, 8px);
   }
 
   &__item {
     display: flex;
     align-items: center;
-    padding: $spacing-sm $spacing-md;
+    gap: 8px;
+    padding: 10px;
     border-radius: 6px;
     text-decoration: none;
     color: $dark-text;
+    border: none;
+    background: transparent;
+    font: inherit;
+    width: 100%;
 
     cursor: pointer;
     transition:
       background-color 0.2s ease,
-      color 0.2s ease;
-
-    // reset button styling in the sidebar (button is used for accessibility)
-    &:is(button) {
-      width: 100%;
-      background: none;
-      border: none;
-      font: inherit;
-      text-align: left;
-    }
+      color 0.2s ease,
+      gap 0.3s ease;
 
     &:hover {
       background-color: rgba($primary-color, 0.08);
     }
 
+    &:focus-visible,
+    &:active {
+      outline: 2px solid $border-active;
+      outline-offset: 0;
+      background-color: rgba($primary-color, 0.08);
+    }
+
     &.active {
       background-color: rgba($primary-color, 0.15);
-      color: $primary-color;
+      border-radius: var(--layout-borderRadius-medium, 4px);
+      background: var(--surface-color-background-lightBlue, #f1f8fe);
       font-weight: 500;
+    }
+
+    &[aria-disabled='true'],
+    &:disabled {
+      color: var(--typography-color-disabled, #9f9d9c);
     }
   }
 
   &__icon {
     display: flex;
-    font-size: 22px;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
     color: inherit;
-    min-width: 22px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
   }
 
   &__label {
@@ -106,11 +132,9 @@
     text-overflow: ellipsis;
     max-width: 200px;
     opacity: 1;
-    margin-left: $spacing-sm;
     transition:
       max-width 0.3s ease,
-      opacity 0.2s ease,
-      margin-left 0.3s ease;
+      opacity 0.2s ease;
   }
 
   &__footer {
@@ -128,19 +152,55 @@
     border-top: 1px solid $border-default;
   }
 
+  &__role {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding: 10px;
+  }
+
+  &__role-heading {
+    font-size: $font-size-base;
+    font-weight: 700;
+    color: $dark-text;
+  }
+
+  &__role-value {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+
+    .sidebar__label {
+      margin-left: 0;
+    }
+
+    .sidebar__role-tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: $dark-text;
+
+      &:hover,
+      &:focus {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        outline: none;
+      }
+      &:focus-visible {
+        outline: 2px solid $border-active;
+        outline-offset: 2px;
+      }
+    }
+  }
+
   &__menu-group {
     display: flex;
     flex-direction: column;
-  }
-
-  &__menu-toggle {
-    position: relative;
-
-    &.expanded {
-      .sidebar__menu-arrow {
-        transform: rotate(180deg);
-      }
-    }
   }
 
   &__menu-arrow {
@@ -148,6 +208,10 @@
     display: flex;
     transition: transform 0.2s ease;
     color: $dark-text;
+
+    &.expanded {
+      transform: rotate(180deg);
+    }
   }
 
   &__submenu {
@@ -174,6 +238,12 @@
     &:hover {
       background-color: rgba($primary-color, 0.08);
       color: $dark-text;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $border-active;
+      outline-offset: 0;
+      background-color: rgba($primary-color, 0.08);
     }
 
     &.active {

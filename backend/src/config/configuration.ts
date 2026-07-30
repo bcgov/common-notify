@@ -86,6 +86,20 @@ export default () => {
       sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
     },
 
+    // Load-test-only switches. MUST stay false outside DEV / ephemeral PR dev envs.
+    // When enabled, the api-key bind endpoint self-binds the calling key to a
+    // throwaway load-test tenant without a user JWT / CSTAR membership check, so a
+    // load test can authenticate without a manual binding step.
+    //
+    // Hard-gated to non-test/prod namespaces: all environments run NODE_ENV=production,
+    // so the namespace (…-dev / …-test / …-prod) is the reliable discriminator. Even if
+    // LOADTEST_AUTOBIND_ENABLED were somehow set in test/prod, this stays false there.
+    loadtest: {
+      autobindEnabled:
+        process.env.LOADTEST_AUTOBIND_ENABLED === 'true' &&
+        !['-test', '-prod'].some((s) => (process.env.NAMESPACE || '').includes(s)),
+    },
+
     // S3-compatible object storage
     s3: {
       endpoint: process.env.S3_ENDPOINT,

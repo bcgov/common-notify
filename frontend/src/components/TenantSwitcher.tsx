@@ -1,11 +1,12 @@
 import type { FC } from 'react'
-import { useState, useRef, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
+import { Select } from '@bcgov/design-system-react-components'
 
 /**
  * TenantSwitcher
@@ -31,28 +32,20 @@ interface Props {
 const TenantSwitcher: FC<Props> = ({ className = '' }) => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
+  const tenantItems = useMemo(
+    () =>
+      tenants
+        .map((tenant) => ({
+          id: tenant.id,
+          label: tenant.name,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [tenants],
+  )
 
   // Hide if only one tenant (no need to switch)
   if (tenants.length <= 1) {
@@ -76,36 +69,27 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
         navigate({ to: '/dashboard' })
       }
     })
-    setIsOpen(false)
+  }
+
+  const handleChange = (key: string | number | null) => {
+    if (key == null) {
+      return
+    }
+
+    const tenant = tenants.find((item) => item.id === String(key))
+    if (tenant && tenant.id !== selectedTenant?.id) {
+      handleSelectTenant(tenant)
+    }
   }
 
   return (
-    <div ref={dropdownRef} className={`tenant-switcher ${className}`}>
-      <button
-        className="tenant-switcher-button"
-        onClick={() => setIsOpen(!isOpen)}
-        title="Switch tenant"
-        type="button"
-      >
-        <span className="tenant-switcher-label">{selectedTenant?.name || 'Select Tenant'}</span>
-        <i className={`bi bi-chevron-down ${isOpen ? 'open' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="tenant-switcher-dropdown">
-          {tenants.map((tenant) => (
-            <button
-              key={tenant.id}
-              className={`tenant-switcher-item ${selectedTenant?.id === tenant.id ? 'active' : ''}`}
-              onClick={() => handleSelectTenant(tenant)}
-              type="button"
-            >
-              <span className="tenant-switcher-name">{tenant.name}</span>
-              {selectedTenant?.id === tenant.id && <i className="bi bi-check-lg" />}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className={`tenant-switcher ${className}`}>
+      <Select
+        label="Tenant"
+        items={tenantItems}
+        value={selectedTenant?.id}
+        onChange={handleChange}
+      />
     </div>
   )
 }

@@ -13,3 +13,21 @@ export enum CstarRole {
   NOTIFY_TEMPLATE_EDITOR = 'NOTIFY_TEMPLATE_EDITOR',
   NOTIFY_OPERATIONS_ADMIN = 'NOTIFY_OPERATIONS_ADMIN',
 }
+
+/** Label and description for each CSTAR role. Used in the Sidebar */
+export const CSTAR_ROLE_DISPLAY: Record<CstarRole, { label: string; description: string }> = {
+  [CstarRole.NOTIFY_VIEWER]: {
+    label: 'Tenant Viewer',
+    description:
+      'You have read-only access to templates and dashboard features within this tenant.',
+  },
+  [CstarRole.NOTIFY_TEMPLATE_EDITOR]: {
+    label: 'Template Editor',
+    description: 'You can create and manage templates within this tenant.',
+  },
+  [CstarRole.NOTIFY_OPERATIONS_ADMIN]: {
+    label: 'Tenant Administrator',
+    description:
+      'You can manage templates, notification events, dashboard, settings, and other users within this tenant.',
+  },
+}

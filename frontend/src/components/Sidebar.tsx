@@ -14,12 +14,12 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import { CstarRole } from '@/enum/cstar-role.enum'
+import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
+import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
@@ -51,6 +51,10 @@ const adminItems = {
       label: 'Usage & Limits',
       to: '/admin/usage',
     },
+    {
+      label: 'Tenant Settings',
+      to: '/admin/settings',
+    },
   ],
 } as const
 
@@ -60,9 +64,8 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
-  const { hasRole, hasTenantRole } = useCstarRoles()
+  const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-  const isOperationsAdmin = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -70,6 +73,10 @@ const Sidebar: FC = () => {
 
   const handleLogout = () => {
     UserService.doLogout()
+  }
+
+  const handleLogin = () => {
+    UserService.doLogin()
   }
 
   return (
@@ -84,11 +91,16 @@ const Sidebar: FC = () => {
         aria-expanded={!collapsed}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {collapsed ? (
-          <ChevronRightIcon style={{ fontSize: 20 }} aria-hidden="true" />
-        ) : (
-          <ChevronLeftIcon style={{ fontSize: 20 }} aria-hidden="true" />
-        )}
+        <svg
+          className="sidebar__toggle-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 9 17"
+          fill="none"
+          aria-hidden="true"
+          style={{ transform: collapsed ? 'rotate(180deg)' : undefined }}
+        >
+          <path d="M7.38247 16.7L0.271976 9.18823C0.0776981 8.95227 -5.72673e-07 8.7163 -5.81268e-07 8.51966C-5.91583e-07 8.28369 0.0776981 8.04771 0.233126 7.85109L7.38247 0.300072C7.73216 -0.0932103 8.35384 -0.0932103 8.70354 0.260743C9.09209 0.614697 9.09209 1.24395 8.74239 1.5979L2.21473 8.51966L8.74239 15.4021C9.09209 15.756 9.09209 16.3853 8.70354 16.7392C8.35384 17.0932 7.73216 17.0932 7.38247 16.7Z" />
+        </svg>
       </button>
 
       {/* Top nav */}
@@ -97,8 +109,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Usage & Limits' && showUsage) ||
-            (item.label === 'Settings' && isOperationsAdmin)
+            (item.label === 'Usage & Limits' && showUsage)
 
           return shouldShow ? (
             <Link
@@ -117,19 +128,33 @@ const Sidebar: FC = () => {
         })}
         {isAdmin && (
           <div className="sidebar__menu-group">
-            <button
-              onClick={() => setAdminExpanded(!adminExpanded)}
-              className={`sidebar__item sidebar__menu-toggle ${adminExpanded ? 'expanded' : ''}`}
-              title={collapsed ? adminItems.label : ''}
+            <Button
+              variant="link"
+              className="sidebar__item"
+              aria-label={collapsed ? adminItems.label : undefined}
+              aria-expanded={!collapsed && adminExpanded}
+              onPress={() => {
+                if (collapsed) {
+                  setCollapsed(false)
+                  setAdminExpanded(true)
+                } else {
+                  setAdminExpanded(!adminExpanded)
+                }
+              }}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 {adminItems.icon}
               </span>
               <span className="sidebar__label">{adminItems.label}</span>
-              <span className="sidebar__menu-arrow" aria-hidden="true">
-                <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
-              </span>
-            </button>
+              {!collapsed && (
+                <span
+                  className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
+                  aria-hidden="true"
+                >
+                  <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
+                </span>
+              )}
+            </Button>
             {adminExpanded && !collapsed && (
               <div className="sidebar__submenu">
                 {isAdmin && (
@@ -150,6 +175,15 @@ const Sidebar: FC = () => {
                     <span className="sidebar__label">Usage &amp; Limits</span>
                   </Link>
                 )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/settings"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">Tenant Settings</span>
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -160,41 +194,78 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <button type="button" className="sidebar__item" title={collapsed ? 'Help' : ''}>
+        <Button variant="link" className="sidebar__item">
           <span className="sidebar__icon" aria-hidden="true">
             <HelpOutlineOutlinedIcon />
           </span>
           <span className="sidebar__label">Help</span>
-        </button>
+        </Button>
 
         {/* Bottom section */}
         <div className="sidebar__bottom">
           {/* User */}
           {user && (
-            <div
-              className="sidebar__item sidebar__user"
-              title={collapsed ? user.displayName : ''}
-              aria-label={`Signed in as ${user.displayName}`}
-            >
-              <span className="sidebar__icon" aria-hidden="true">
-                <PersonOutlinedIcon />
-              </span>
-              <span className="sidebar__label">{user.displayName}</span>
-            </div>
+            <>
+              <div
+                className="sidebar__item sidebar__user"
+                title={collapsed ? user.displayName : ''}
+                aria-label={`Signed in as ${user.displayName}`}
+              >
+                <span className="sidebar__icon" aria-hidden="true">
+                  <PersonOutlinedIcon />
+                </span>
+                <span className="sidebar__label">{user.displayName}</span>
+              </div>
+              {primaryRole && !collapsed && (
+                <div
+                  className="sidebar__role"
+                  aria-label={`User role ${CSTAR_ROLE_DISPLAY[primaryRole].label}`}
+                >
+                  <span className="sidebar__role-heading">Role</span>
+                  <span className="sidebar__role-value">
+                    <span className="sidebar__label">{CSTAR_ROLE_DISPLAY[primaryRole].label}</span>
+                    <TooltipTrigger>
+                      <Button
+                        aria-label={`About the ${CSTAR_ROLE_DISPLAY[primaryRole].label} role`}
+                        className="sidebar__role-tooltip-trigger"
+                        isIconButton
+                        size="xsmall"
+                        type="button"
+                        variant="tertiary"
+                      >
+                        <SvgInfoIcon />
+                      </Button>
+                      <Tooltip placement="right">
+                        {CSTAR_ROLE_DISPLAY[primaryRole].description}
+                      </Tooltip>
+                    </TooltipTrigger>
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Logout */}
-          <button
-            type="button"
-            className="sidebar__item"
-            onClick={handleLogout}
-            title={collapsed ? 'Logout' : ''}
-          >
-            <span className="sidebar__icon" aria-hidden="true">
-              <LogoutOutlinedIcon />
-            </span>
-            <span className="sidebar__label">Logout</span>
-          </button>
+          {/* Logout / Login */}
+          {user ? (
+            <Button
+              variant="link"
+              className="sidebar__item"
+              onPress={handleLogout}
+              aria-label={collapsed ? 'Logout' : undefined}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                <LogoutOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Logout</span>
+            </Button>
+          ) : (
+            <Button variant="link" className="sidebar__item" onPress={handleLogin}>
+              <span className="sidebar__icon" aria-hidden="true">
+                <LoginOutlinedIcon />
+              </span>
+              <span className="sidebar__label">Login</span>
+            </Button>
+          )}
         </div>
       </div>
     </aside>

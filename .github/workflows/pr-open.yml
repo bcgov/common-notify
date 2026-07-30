@@ -46,7 +46,7 @@ jobs:
         package: [backend, frontend, migrations]
     steps:
       - name: Import image to OpenShift ImageStream
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: f6bc3f-tools
           oc_token: ${{ secrets.OC_TOKEN_TOOLS }}
@@ -123,7 +123,7 @@ jobs:
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
       params: --set global.secrets.persist=false --set frontend.secrets.enabled=true --set backend.clamav.enabled=false --set backend.clamav.host=common-notify-dev-clamav
-      triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' '.github/workflows/.deployer.yml')
+      triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
 

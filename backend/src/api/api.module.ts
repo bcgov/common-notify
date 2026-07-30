@@ -5,6 +5,7 @@ import { TemplatesModule } from './templates/templates.module'
 import { AuthModule } from './auth/auth.module'
 import { ApiKeysModule } from './api-keys/api-keys.module'
 import { AttachmentModule } from './attachment/attachment.module'
+import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
 
 /**
  * API Module
@@ -28,6 +29,7 @@ import { AttachmentModule } from './attachment/attachment.module'
     AuthModule,
     ApiKeysModule,
     AttachmentModule,
+    TenantSettingsModule,
   ],
   exports: [
     NotifyModule,
@@ -36,6 +38,7 @@ import { AttachmentModule } from './attachment/attachment.module'
     AuthModule,
     ApiKeysModule,
     AttachmentModule,
+    TenantSettingsModule,
   ],
 })
 export class ApiModule {}

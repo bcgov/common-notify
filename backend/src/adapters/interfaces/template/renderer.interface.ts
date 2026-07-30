@@ -8,7 +8,7 @@ export interface FileAttachmentValue {
 
 export interface RenderContext {
   template: TemplateDefinition
-  personalisation: Record<string, string | FileAttachmentValue>
+  personalisation: Record<string, unknown>
   /** Default subject when template has no subject. From config defaults.templates.defaultSubject. */
   defaultSubject?: string
 }
@@ -35,8 +35,5 @@ export interface RenderOptions {
 export interface ITemplateRenderer {
   readonly name: string
   renderEmail(context: RenderContext, options?: RenderOptions): Promise<RenderedEmail>
-  renderSms(
-    context: RenderContext & { personalisation: Record<string, string> },
-    options?: RenderOptions,
-  ): Promise<RenderedSms>
+  renderSms(context: RenderContext, options?: RenderOptions): Promise<RenderedSms>
 }

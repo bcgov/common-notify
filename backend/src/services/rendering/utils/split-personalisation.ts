@@ -41,17 +41,15 @@ export function isFileAttachment(v: unknown): v is FileAttachmentValue {
  * // strings: { firstName: "John" }
  * // attachments: [{ filename: "receipt.pdf", content: Buffer(...), sendingMethod: "attach" }]
  */
-export function splitPersonalisation(
-  personalisation: Record<string, string | FileAttachmentValue>,
-): {
-  strings: Record<string, string>
+export function splitPersonalisation(personalisation: Record<string, unknown>): {
+  strings: Record<string, unknown>
   attachments: Array<{
     filename: string
     content: Buffer
     sendingMethod: 'attach' | 'link'
   }>
 } {
-  const strings: Record<string, string> = {}
+  const strings: Record<string, unknown> = {}
   const attachments: Array<{
     filename: string
     content: Buffer
