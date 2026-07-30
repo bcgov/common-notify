@@ -114,6 +114,7 @@ export class LimitAlertNotificationService {
       status: NotificationStatus.PENDING,
       createdBy: claim.tenantId,
       payload: notifyRequest,
+      isInternal: true,
     })
 
     await this.limitAlertService.markNotificationCreated(claim.alertLogId, notificationRecord.id)

@@ -141,6 +141,7 @@ describe('LimitAlertNotificationService', () => {
       tenantId: 'tenant-1',
       status: NotificationStatus.PENDING,
       createdBy: 'tenant-1',
+      isInternal: true,
       payload: {
         email: {
           recipients: { to: ['operations@example.com'] },
