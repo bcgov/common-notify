@@ -56,7 +56,7 @@ jobs:
 
       # ── Setup: sink + auto-bind (once) ────────────────────────────────────
       - name: Enable email sink + auto-bind
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
@@ -97,7 +97,7 @@ jobs:
       - name: Measure queue drain
         if: always()
         continue-on-error: true # measurement must never block the ramps that follow
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
@@ -230,7 +230,7 @@ jobs:
 
       - name: Restore email adapter + disable auto-bind
         if: always()
-        uses: bcgov/action-oc-runner@b1c55b8a8bd5f42b19f72e6ea7df6d6a6eda44a1 # v1.5.1
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
