@@ -10,7 +10,6 @@ import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
