@@ -67,10 +67,8 @@ jobs:
           echo "Deleting PR qualifier: pr-${{ github.event.number }}"
 
           # Create empty Kong config to clear the qualifier
-          cat > /tmp/empty-config.yaml << 'EOF'
-_format_version: '3.0'
-services: []
-EOF
+          echo "_format_version: '3.0'" > /tmp/empty-config.yaml
+          echo "services: []" >> /tmp/empty-config.yaml
 
           set +e
           OUT=$(gwa publish-gateway /tmp/empty-config.yaml --qualifier pr-${{ github.event.number }} 2>&1)
