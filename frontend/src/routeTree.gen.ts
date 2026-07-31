@@ -13,7 +13,6 @@ import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
-import { Route as HomeRouteImport } from './routes/home'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
@@ -40,11 +39,6 @@ const TemplateCreateRoute = TemplateCreateRouteImport.update({
 const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
   id: '/not-authorized',
   path: '/not-authorized',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -87,7 +81,6 @@ const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/home': typeof HomeRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
@@ -101,7 +94,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/home': typeof HomeRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/home': typeof HomeRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
@@ -132,7 +123,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
-    | '/home'
     | '/not-authorized'
     | '/template-create'
     | '/templates'
@@ -146,7 +136,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
-    | '/home'
     | '/not-authorized'
     | '/template-create'
     | '/templates'
@@ -160,7 +149,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
-    | '/home'
     | '/not-authorized'
     | '/template-create'
     | '/templates'
@@ -175,7 +163,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  HomeRoute: typeof HomeRoute
   NotAuthorizedRoute: typeof NotAuthorizedRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRoute
@@ -215,13 +202,6 @@ declare module '@tanstack/react-router' {
       path: '/not-authorized'
       fullPath: '/not-authorized'
       preLoaderRoute: typeof NotAuthorizedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -279,7 +259,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  HomeRoute: HomeRoute,
   NotAuthorizedRoute: NotAuthorizedRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRoute,

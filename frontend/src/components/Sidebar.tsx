@@ -25,7 +25,7 @@ import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-syst
 const navItems = [
   {
     label: 'Home',
-    to: '/home',
+    to: '/',
     icon: <HomeOutlinedIcon />,
   },
   {
