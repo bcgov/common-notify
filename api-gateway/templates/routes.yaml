@@ -924,17 +924,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}api-key-bind
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -956,17 +956,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}ches-email
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -988,17 +988,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1020,17 +1020,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1078,17 +1078,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1110,17 +1110,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-preview
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1142,17 +1142,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-types
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1174,17 +1174,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-list
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1206,17 +1206,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-status
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1238,17 +1238,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-callbacks
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1270,17 +1270,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1326,17 +1326,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-list
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1373,17 +1373,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-email
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1420,17 +1420,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-sms
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1467,17 +1467,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1514,17 +1514,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-notification-by-id
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1561,17 +1561,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-templates-list
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1608,17 +1608,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}gcnotify-template-by-id
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1646,17 +1646,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1708,17 +1708,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-status-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1770,17 +1770,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1832,17 +1832,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-event-types-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -1894,17 +1894,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -2186,17 +2186,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}feature-flags
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
@@ -2304,17 +2304,17 @@ plugins:
       run_on_preflight: true
 
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
-  # policy: local enforces the limit PER Kong node and resets on pod restart, so cluster-wide
-  # throughput per key can exceed the configured value by ~the replica count. This is intentional
-  # backend-overload protection, not a precise global quota. For an exact per-key cluster-wide
-  # limit, switch policy to redis (adds ~100-200ms latency).
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
   - name: rate-limiting
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
     config:
       limit_by: credential
-      policy: local
+      policy: redis
       fault_tolerant: true
       hide_client_headers: false
       minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
