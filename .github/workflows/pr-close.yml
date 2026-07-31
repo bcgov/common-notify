@@ -46,7 +46,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Delete PR qualifier from gateway
+      - name: Generate gateway config (other open PRs only, exclude closing PR)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find OTHER open PRs (exclude the one being closed)
+          CURRENT_PR=${{ github.event.number }}
+          OTHER_OPEN_PRS=$(gh pr list --state open --json number --jq '.[] | select(.number != '$CURRENT_PR') | .number')
+
+          if [ -z "$OTHER_OPEN_PRS" ]; then
+            echo "No other open PRs - will publish empty dev qualifier"
+            # Create empty services list to clear all PR routes from dev qualifier
+            echo "_format_version: '3.0'" > api-gateway/generated/gw-kong-dev.yaml
+            echo "services: []" >> api-gateway/generated/gw-kong-dev.yaml
+            exit 0
+          fi
+
+          echo "Found other open PRs: $OTHER_OPEN_PRS"
+          echo "Generating config for remaining PRs..."
+
+          # Generate combined config for remaining PRs
+          > api-gateway/generated/gw-active-services.yaml  # Empty the file first
+
+          for PR_NUM in $OTHER_OPEN_PRS; do
+            echo "Adding PR-${PR_NUM} routes..."
+            chmod +x api-gateway/scripts/generate-gateway-config.sh
+            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
+
+            # Append PR config
+            if [ -s api-gateway/generated/gw-active-services.yaml ]; then
+              echo "---" >> api-gateway/generated/gw-active-services.yaml
+            fi
+            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-active-services.yaml
+          done
+
+          # Convert GatewayService -> Kong format
+          python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+          python3 api-gateway/scripts/gwservice-to-kong.py \
+            api-gateway/generated/gw-active-services.yaml > api-gateway/generated/gw-kong-dev.yaml
+
+          echo "✅ Generated config for ${OTHER_OPEN_PRS} remaining PR(s)"
+
+      - name: Remove this PR's routes (publish remaining PRs to dev qualifier)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -62,24 +103,19 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Delete the PR qualifier by publishing an empty config
-          # Each PR has its own qualifier (pr-111, pr-112, etc.), so deleting one doesn't affect others
-          echo "Deleting PR qualifier: pr-${{ github.event.number }}"
-
-          # Create empty Kong config to clear the qualifier
-          echo "_format_version: '3.0'" > /tmp/empty-config.yaml
-          echo "services: []" >> /tmp/empty-config.yaml
+          # Publish remaining PRs to dev qualifier (removes closed PR's routes)
+          echo "Removing PR-${{ github.event.number }} routes from dev qualifier"
 
           set +e
-          OUT=$(gwa publish-gateway /tmp/empty-config.yaml --qualifier pr-${{ github.event.number }} 2>&1)
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-dev.yaml --qualifier dev 2>&1)
           STATUS=$?
           set -e
 
           echo "$OUT"
 
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::warning::Failed to delete PR qualifier pr-${{ github.event.number }}"
-            echo "This is non-critical - the qualifier may already be deleted or not exist"
-          else
-            echo "✅ Successfully deleted qualifier pr-${{ github.event.number }}"
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
+            echo "::error::Failed to remove PR routes from dev qualifier"
+            exit 1
           fi
+
+          echo "✅ Successfully removed PR-${{ github.event.number }} routes"
