@@ -4,6 +4,7 @@ import { ChesEmailTransport } from './implementations/delivery/email/ches/ches-e
 import { NodemailerEmailTransport } from './implementations/delivery/email/nodemailer/nodemailer-email.adapter'
 import { LogEmailTransport } from './implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter'
+import { AcsSmsTransport } from './implementations/delivery/sms/acs/acs-sms.adapter'
 import {
   EMAIL_ADAPTER,
   EMAIL_ADAPTER_MAP,
@@ -35,6 +36,7 @@ export class AdaptersModule {
         NodemailerEmailTransport,
         LogEmailTransport,
         TwilioSmsTransport,
+        AcsSmsTransport,
         {
           provide: EMAIL_ADAPTER_MAP,
           useFactory: (
@@ -50,10 +52,14 @@ export class AdaptersModule {
         },
         {
           provide: SMS_ADAPTER_MAP,
-          useFactory: (twilio: TwilioSmsTransport): Record<string, ISmsTransport> => ({
+          useFactory: (
+            twilio: TwilioSmsTransport,
+            acs: AcsSmsTransport,
+          ): Record<string, ISmsTransport> => ({
             twilio,
+            acs,
           }),
-          inject: [TwilioSmsTransport],
+          inject: [TwilioSmsTransport, AcsSmsTransport],
         },
         {
           provide: EMAIL_ADAPTER,

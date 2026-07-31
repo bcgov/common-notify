@@ -143,6 +143,18 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: TWILIO_FROM_NUMBER
+            - name: ACS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: ACS_CONNECTION_STRING
+                  optional: true
+            - name: ACS_FROM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: ACS_FROM_NUMBER
+                  optional: true
             - name: FRONTEND_KEYCLOAK_ISSUER
               valueFrom:
                 secretKeyRef:
