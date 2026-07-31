@@ -214,6 +214,7 @@ export class NotificationService {
       createdBy: dto.createdBy,
       payload: dto.payload,
       channelCodes: channelCodes ?? undefined,
+      isInternal: dto.isInternal ?? false,
       recipients: recipients,
       delayedSendTime: delayedSendTime,
       requestRoute: dto.requestRoute,
@@ -378,6 +379,7 @@ export class NotificationService {
       .leftJoinAndSelect('notification.tenant', 'tenant')
       .leftJoinAndSelect('notification.statusCode', 'statusCode')
       .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
+      .andWhere('notification.isInternal = :isInternal', { isInternal: false })
 
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
 

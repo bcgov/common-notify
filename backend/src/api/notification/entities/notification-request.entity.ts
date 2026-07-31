@@ -58,6 +58,9 @@ export class NotificationRequest {
   @Column({ name: 'payload', type: 'jsonb', nullable: true })
   payload?: any
 
+  @Column({ name: 'is_internal', type: 'boolean', default: false })
+  isInternal: boolean
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 

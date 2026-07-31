@@ -14,8 +14,16 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
-import type { ApiKeyUsageService } from '../../api/api-keys/api-key-usage.service'
 import { extractRequestRoute } from '../utils/extract-request-route'
+import type {
+  ApiKeyUsageService,
+  RecordedUsageResult,
+} from '../../api/api-keys/api-key-usage.service'
+import type { LimitAlertNotificationService } from '../../api/notify/services/limit-alert-notification.service'
+
+interface AcceptedUsageResult extends RecordedUsageResult {
+  channelCode: string
+}
 
 /**
  * Context required by the Queueable decorator.
@@ -27,6 +35,7 @@ export interface QueueableContext {
   attachmentProcessingService: AttachmentProcessingService
   notificationPubSubService?: NotificationPubSubService
   apiKeyUsageService?: ApiKeyUsageService
+  limitAlertNotificationService?: LimitAlertNotificationService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -39,13 +48,22 @@ async function recordAcceptedUsage(
   ctx: QueueableContext,
   apiKeyConsumerId: string | undefined,
   entries: Array<{ channel: string; count: number }>,
-): Promise<void> {
-  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return
+): Promise<AcceptedUsageResult[]> {
+  if (!apiKeyConsumerId || !ctx.apiKeyUsageService) return []
   const logger = new Logger('Queueable[usage]')
+  const results: AcceptedUsageResult[] = []
   for (const { channel, count } of entries) {
     if (count <= 0) continue
     try {
-      await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+      const usageRows = await ctx.apiKeyUsageService.recordUsage(apiKeyConsumerId, channel, count)
+      results.push(
+        ...usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
+          channelCode: channel,
+          periodTypeCode,
+          periodStart,
+          sentCount,
+        })),
+      )
     } catch (error) {
       logger.warn(
         `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${
@@ -53,6 +71,31 @@ async function recordAcceptedUsage(
         }`,
       )
     }
+  }
+  return results
+}
+
+async function processLimitAlerts(
+  ctx: QueueableContext,
+  apiKeyConsumerId: string | undefined,
+  usageResults: AcceptedUsageResult[],
+): Promise<void> {
+  if (!apiKeyConsumerId || usageResults.length === 0 || !ctx.limitAlertNotificationService) {
+    return
+  }
+
+  try {
+    await ctx.limitAlertNotificationService.processAcceptedUsage({
+      apiKeyConsumerId,
+      usageResults,
+    })
+  } catch (error) {
+    const logger = new Logger('Queueable[limit-alerts]')
+    logger.warn(
+      `Failed to process usage limit alerts: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
   }
 }
 
@@ -147,9 +190,10 @@ async function handleEmailMerge(
   )
 
   // Attribute accepted merge emails against the API key's usage limits (non-fatal).
-  await recordAcceptedUsage(ctx, apiKeyConsumerId, [
+  const usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
     { channel: NotificationChannel.EMAIL, count: recipients.length },
   ])
+  await processLimitAlerts(ctx, apiKeyConsumerId, usageResults)
 
   // Publish initial record to SSE subscribers (fire-and-forget), matching the simple flow
   const updateSvc = ctx.notificationPubSubService
@@ -468,7 +512,12 @@ export function Queueable(
         if (processedPayload.msgApp) channels.push('msgApp')
 
         // Attribute accepted notifications against the API key's usage limits (non-fatal).
-        await recordAcceptedUsage(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
+        const usageResults = await recordAcceptedUsage(
+          this as QueueableContext,
+          req?.apiKeyConsumerId,
+          usageEntries,
+        )
+        await processLimitAlerts(this as QueueableContext, req?.apiKeyConsumerId, usageResults)
 
         // Determine if this is a delayed send and extract the scheduled timestamp
         const delayedSendTimestamp =
