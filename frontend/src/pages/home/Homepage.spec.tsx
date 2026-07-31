@@ -114,7 +114,9 @@ describe('Dashboard with CodeTables', () => {
     )
 
     // Open the Status column header dropdown and reveal the filter submenu
-    await user.click(screen.getByRole('button', { name: /column options for status/i }))
+    await user.click(
+      screen.getByRole('button', { name: /column options for notification status/i }),
+    )
     fireEvent.mouseEnter(screen.getByText('Filter by'))
 
     // Filter options should come from the Redux code table statuses
@@ -217,7 +219,9 @@ describe('Dashboard with CodeTables', () => {
       </Provider>,
     )
 
-    await user.click(screen.getByRole('button', { name: /column options for status/i }))
+    await user.click(
+      screen.getByRole('button', { name: /column options for notification status/i }),
+    )
     fireEvent.mouseEnter(screen.getByText('Filter by'))
 
     expect(screen.getByText('Scheduled')).toBeInTheDocument()
