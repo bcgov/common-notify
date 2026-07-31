@@ -46,40 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate gateway config (dev+test+prod + other open PRs)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate combined services file with dev+test+prod
-          api-gateway/scripts/generate-gateway-for-stage.sh prod
-
-          # Find OTHER open PRs (exclude the one being closed)
-          CURRENT_PR=${{ github.event.number }}
-          OTHER_OPEN_PRS=$(gh pr list --state open --json number --jq '.[] | select(.number != '$CURRENT_PR') | .number')
-
-          if [ -z "$OTHER_OPEN_PRS" ]; then
-            echo "No other open PRs - applying DEV+TEST+PROD only"
-            exit 0
-          fi
-
-          echo "Found other open PRs: $OTHER_OPEN_PRS"
-          echo "Preserving their routes alongside DEV+TEST+PROD..."
-
-          # Append each OTHER open PR config
-          for PR_NUM in $OTHER_OPEN_PRS; do
-            echo "Adding PR-${PR_NUM} routes..."
-            chmod +x api-gateway/scripts/generate-gateway-config.sh
-            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
-
-            # Append PR config
-            echo "---" >> api-gateway/generated/gw-active-services.yaml
-            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-active-services.yaml
-          done
-
-          echo "✅ Combined DEV+TEST+PROD + ${OTHER_OPEN_PRS} open PR(s)"
-
-      - name: Remove this PR's routes (preserve other open PRs)
+      - name: Delete PR qualifier from gateway
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
@@ -95,39 +62,26 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply permanent services + other open PRs
-          # This removes the CLOSED PR but preserves other open PR routes
-          echo "✅ Removing PR-${{ github.event.number }} routes (preserving other open PRs)"
-          gwa apply -i api-gateway/generated/gw-active-services.yaml
+          # Delete the PR qualifier by publishing an empty config
+          # Each PR has its own qualifier (pr-111, pr-112, etc.), so deleting one doesn't affect others
+          echo "Deleting PR qualifier: pr-${{ github.event.number }}"
 
-      - name: Wait for PR service deletion
-        env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
-        run: |
-          # Define PR service name (matches template: ${GATEWAY_SERVICE_NAME})
-          PR_SERVICE_NAME="gw-fe8c5-notify-pr-${{ github.event.number }}"
+          # Create empty Kong config to clear the qualifier
+          cat > /tmp/empty-config.yaml << 'EOF'
+_format_version: '3.0'
+services: []
+EOF
 
-          echo "Waiting for service '$PR_SERVICE_NAME' to be deleted..."
+          set +e
+          OUT=$(gwa publish-gateway /tmp/empty-config.yaml --qualifier pr-${{ github.event.number }} 2>&1)
+          STATUS=$?
+          set -e
 
-          # Maximum wait time in seconds (5 minutes)
-          MAX_WAIT=300
-          ELAPSED=0
-          INTERVAL=10
+          echo "$OUT"
 
-          while [ $ELAPSED -lt $MAX_WAIT ]; do
-            # Get list of services and check if PR service still exists
-            SERVICES=$(gwa status | grep -c "$PR_SERVICE_NAME" || true)
-
-            if [ "$SERVICES" -eq 0 ]; then
-              echo "✓ Service '$PR_SERVICE_NAME' has been successfully deleted"
-              exit 0
-            fi
-
-            echo "Service still exists. Waiting ${INTERVAL}s... (${ELAPSED}s/${MAX_WAIT}s elapsed)"
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-          done
-
-          echo "Warning: Timeout waiting for service deletion after ${MAX_WAIT}s"
-          echo "Service may still exist in the gateway"
-          exit 1
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
+            echo "::warning::Failed to delete PR qualifier pr-${{ github.event.number }}"
+            echo "This is non-critical - the qualifier may already be deleted or not exist"
+          else
+            echo "✅ Successfully deleted qualifier pr-${{ github.event.number }}"
+          fi

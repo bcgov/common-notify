@@ -72,10 +72,15 @@ jobs:
           chmod +x api-gateway/scripts/generate-gateway-config.sh
           api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
 
-      - name: Apply PR config (path-based routing)
+      - name: Publish PR config (path-based routing)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
+          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
+          python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+          python3 api-gateway/scripts/gwservice-to-kong.py \
+            api-gateway/generated/gw-routes-pr.yaml > api-gateway/generated/gw-kong-pr.yaml
+
           # Install gwa CLI
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
@@ -88,30 +93,26 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Apply PR config only
-          # PR shares tag ns.gw-fe8c5.dev with DEV for path-based routing
-          # DEV service already exists from merge workflow
-          # This adds PR routes without affecting DEV routes (different paths)
-          echo "✅ Applying PR config (path-based routing /pr-${{ github.event.number }}/)"
+          # Publish PR config using qualifier for proper reconciliation
+          # Each PR gets its own qualifier (pr-111, pr-112, etc.) for isolated updates
+          # This allows CREATE + UPDATE + DELETE operations without 409 conflicts
+          echo "✅ Publishing PR config (qualifier=pr-${{ github.event.number }}, path-based routing /pr-${{ github.event.number }}/)"
 
-          gwa apply -i api-gateway/generated/gw-routes-pr.yaml 2>&1 | tee /tmp/gwa-output.txt
+          set +e
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-pr.yaml --qualifier pr-${{ github.event.number }} 2>&1)
+          STATUS=$?
+          set -e
 
-          # Check results
-          if grep -q "Published" /tmp/gwa-output.txt; then
-            PUBLISHED_COUNT=$(grep -oP '\d+(?=/\d+ Published)' /tmp/gwa-output.txt || echo "0")
-            echo "✅ Published $PUBLISHED_COUNT gateway service(s)"
+          echo "$OUT"
 
-            if [ "$PUBLISHED_COUNT" -gt 0 ]; then
-              echo "✅ PR gateway config published successfully"
-              echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
-              exit 0
-            fi
+          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
+            echo "::error::gwa publish-gateway failed for qualifier=pr-${{ github.event.number }}"
+            exit 1
           fi
 
-          # If we got here, nothing was published
-          echo "❌ Gateway config failed to publish"
-          cat /tmp/gwa-output.txt
-          exit 1
+          echo "✅ PR gateway config published successfully"
+          echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
 
   deploys:
     name: Deploys (${{ github.event.number }})
