@@ -40,6 +40,7 @@ import { NotificationRequestDetailService } from '../notification/notification-r
 import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
+import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -71,6 +72,7 @@ export class NotifySimpleController {
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
+    readonly limitAlertNotificationService: LimitAlertNotificationService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -281,6 +283,7 @@ export class NotifySimpleFrontendController {
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
+    readonly limitAlertNotificationService: LimitAlertNotificationService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -315,6 +318,7 @@ export class NotifySimpleFrontendController {
       this.attachmentProcessingService,
       this.notificationRequestDetailService,
       this.apiKeyUsageService,
+      this.limitAlertNotificationService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)

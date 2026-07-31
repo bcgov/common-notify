@@ -26,6 +26,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentResolverService } from './services/attachment-resolver.service'
+import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 
 @Module({
@@ -57,6 +58,7 @@ import { AttachmentModule } from '../attachment/attachment.module'
     AttachmentValidationService,
     AttachmentProcessingService,
     AttachmentResolverService,
+    LimitAlertNotificationService,
   ],
   exports: [
     NotifyService,
