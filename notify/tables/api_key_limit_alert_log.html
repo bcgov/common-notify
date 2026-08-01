@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>usage_period_type_code - default.notify</title>
+        <title>api_key_limit_alert_log - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,20 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>usage_period_type_code</h1><p><span id="recordNumber">3</span> rows</p><br />
-                    <div class="box box-primary">
-                        <div class="box-header with-border">
-                            <i class="fa fa-file-text-o"></i>
-                            <h3 id="Description" class="box-title">Description</h3>
-                            <div class="box-tools pull-right">
-                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
-                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
-                            </div>
-                        </div><!-- /.box-header -->
-                        <div class="box-body clearfix">
-                            <p>Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks.</p>
-                        </div><!-- /.box-body -->
-                    </div>
+                    <h1>api_key_limit_alert_log</h1><p><span id="recordNumber">-1</span> rows</p><br />
                 </section>
                 <!-- Main content -->
                 <section class="content">
@@ -122,7 +109,46 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="period_type_code">period_type_code</span></td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="id">id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>gen_random_uuid()</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="api_key_consumer_id">api_key_consumer_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="api_key_limit_alert_log.api_key_consumer_id references api_key_consumer.id via fk_api_key_limit_alert_log_consumer"><a href='api_key_consumer.html'>api_key_consumer</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_api_key_limit_alert_log_consumer</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
                                     <td>varchar</td>
                                     <td>20</td>
                                     <td title=''></td>
@@ -130,77 +156,99 @@
                                     <td>null</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="api_key_limit_alert_log.period_type_code references usage_period_type_code.period_type_code via fk_api_key_limit_alert_log_period"><a href='api_key_limit_alert_log.html'>api_key_limit_alert_log</a><span class='relatedKey'>.period_type_code</span></td>
+                                                <td title="api_key_limit_alert_log.channel_code references notification_channel_code.channel_code via fk_api_key_limit_alert_log_channel"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_api_key_limit_alert_log_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="period_type_code">period_type_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="api_key_limit_alert_log.period_type_code references usage_period_type_code.period_type_code via fk_api_key_limit_alert_log_period"><a href='usage_period_type_code.html'>usage_period_type_code</a><span class='relatedKey'>.period_type_code</span></td>
                                                 <td class="constraint detail">fk_api_key_limit_alert_log_period</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="period_start">period_start</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="alert_level">alert_level</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="notification_request_id">notification_request_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="api_key_usage.period_type_code references usage_period_type_code.period_type_code via fk_api_key_usage_period"><a href='api_key_usage.html'>api_key_usage</a><span class='relatedKey'>.period_type_code</span></td>
-                                                <td class="constraint detail">fk_api_key_usage_period</td>
+                                                <td title="api_key_limit_alert_log.notification_request_id references notification_request.id via fk_api_key_limit_alert_log_notification_request"><a href='notification_request.html'>notification_request</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_api_key_limit_alert_log_notification_request</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
                                         </table>
                                     </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Period type code (MINUTE, DAY, YEAR). Primary key.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="description">description</span></td>
-                                    <td>varchar</td>
-                                    <td>255</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Human-readable description of the period type.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="display_name">display_name</span></td>
-                                    <td>varchar</td>
-                                    <td>255</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Display label for the period type.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="sort_order">sort_order</span></td>
-                                    <td>int4</td>
-                                    <td>10</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>999</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Ordering hint for display.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="created_at">created_at</span></td>
+                                    <td><span id="claimed_at">claimed_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
                                     <td title=''></td>
@@ -214,46 +262,12 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp when the period type code was created.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="created_by">created_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>User or process that created this record.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_at">updated_at</span></td>
+                                    <td><span id="enqueued_at">enqueued_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>now()</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp when the period type code was last updated.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_by">updated_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
                                     <td title='nullable'>√</td>
                                     <td title=''></td>
                                     <td>null</td>
@@ -265,7 +279,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>User or process that last updated this record.</p></td>
+                                    <td></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -298,20 +312,58 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> usage_period_type_code_pkey</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_api_key_limit_alert_log</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>period_type_code</td>
+                                    <td>id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_usage_period_type_code_description</td>
+                                    <td title='Indexed'>idx_api_key_limit_alert_log_consumer_channel</td>
                                     <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>description</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>api_key_consumer_id + channel_code</td>
+                                </tr>
+                                <tr>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_api_key_limit_alert_log</td>
+                                    <td>Must be unique</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>api_key_consumer_id + channel_code + period_type_code + period_start + alert_level</td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div><!-- /.box-body -->
+                    </div>
+                    <div class="box box-primary">
+                        <div class="box-header with-border">
+                            <i class="fa fa-sitemap"></i>
+                            <h3 class="box-title">Check Constraints</h3>
+                            <div class="box-tools pull-right">
+                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="box-body">
+                            <table
+                                    id="check_table"
+                                    class="table table-bordered table-striped dataTable"
+                                    role="grid"
+                                    data-paging="true"
+                                    data-page-length="10"
+                                    data-length-change="false">
+                                <thead align='left'>
+                                <tr>
+                                    <th>Constraint Name</th>
+                                    <th>Constraint</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>chk_api_key_limit_alert_log_level</td>
+                                    <td>((alert_level)::text &#61; ANY ((ARRAY[&#39;WARN&#39;::character varying, &#39;LIMIT_REACHED&#39;::character varying])::text[]))</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
@@ -332,22 +384,32 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="428,5,687,299">
-<area shape="rect" id="node2" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="5,247,384,551">
-<area shape="rect" id="node3" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="449,316,665,551">
+<area shape="rect" id="node1" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="652,121,1023,455">
+<area shape="rect" id="node2" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="360,5,585,181">
+<area shape="rect" id="node3" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,337,293,484">
+<area shape="rect" id="node4" href="notification_request.html" target="_top" title="notification_request" alt="" coords="352,399,593,663">
+<area shape="rect" id="node5" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="337,235,608,381">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/usage_period_type_code.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/api_key_limit_alert_log.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="760,336,1019,629">
-<area shape="rect" id="node2" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="414,84,639,172">
-<area shape="rect" id="node3" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,473,293,561">
-<area shape="rect" id="node4" href="notification_request.html" target="_top" title="notification_request" alt="" coords="406,547,647,635">
-<area shape="rect" id="node5" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="337,189,716,493">
-<area shape="rect" id="node6" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="781,52,997,287">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="360,305,585,481">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="83,697,216,785">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="746,111,929,199">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,217,293,305">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="723,216,951,304">
+<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="652,427,1023,760">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="352,735,593,823">
+<area shape="rect" id="node8" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="337,499,608,645">
+<area shape="rect" id="node10" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="13,803,286,891">
+<area shape="rect" id="node9" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="741,321,933,409">
+<area shape="rect" id="node11" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="691,777,984,865">
+<area shape="rect" id="node12" href="template.html" target="_top" title="template" alt="" coords="397,83,549,171">
+<area shape="rect" id="node13" href="template_version.html" target="_top" title="template_version" alt="" coords="728,5,947,93">
+<area shape="rect" id="node14" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="710,883,965,971">
 </map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/usage_period_type_code.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/api_key_limit_alert_log.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

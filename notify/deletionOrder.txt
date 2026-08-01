@@ -3,6 +3,7 @@ notification_event_type_code
 mime_type_code
 flyway_schema_history
 configuration
+api_key_limit_alert_log
 webhook_delivery_log
 template_version
 notification_request_detail
@@ -20,11 +21,11 @@ notification_request
 api_key_consumer
 tenant
 webhook_type
-usage_period_type_code
 tenant_status_code
 notify_user
 identity_provider
 feature_flag_code
+usage_period_type_code
 template_engine_code
 notification_status_code
 notification_channel_code

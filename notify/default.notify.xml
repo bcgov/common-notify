@@ -4,6 +4,7 @@
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
             <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit"/>
             <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_alert_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit_alert"/>
+            <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_alert_log_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit_alert_log"/>
             <child column="api_key_consumer_id" foreignKey="fk_api_key_usage_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_usage"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="credential_identifier" nullable="false" remarks="" size="512" type="varchar" typeCode="12"/>
@@ -81,6 +82,41 @@
             <column ascending="true" name="channel_code"/>
          </index>
          <checkConstraint constraint="((warn_threshold_percent &gt;= 1) AND (warn_threshold_percent &lt;= 100))" name="chk_api_key_limit_alert_threshold"/>
+      </table>
+      <table name="api_key_limit_alert_log" remarks="" schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="api_key_consumer_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_limit_alert_log_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_consumer"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_api_key_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="period_type_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="period_type_code" foreignKey="fk_api_key_limit_alert_log_period" implied="false" onDeleteCascade="false" schema="notify" table="usage_period_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="4" name="period_start" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="alert_level" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="notification_request_id" nullable="true" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_api_key_limit_alert_log_notification_request" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="claimed_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="8" name="enqueued_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_api_key_limit_alert_log" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_api_key_limit_alert_log_consumer_channel" unique="false">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <index name="uq_api_key_limit_alert_log" unique="true">
+            <column ascending="true" name="api_key_consumer_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="true" name="period_start"/>
+            <column ascending="true" name="alert_level"/>
+         </index>
+         <checkConstraint constraint="((alert_level)::text = ANY ((ARRAY['WARN'::character varying, 'LIMIT_REACHED'::character varying])::text[]))" name="chk_api_key_limit_alert_log_level"/>
       </table>
       <table name="api_key_usage" remarks="Rolling notification counters per (API key, channel, period). MINUTE/DAY/YEAR buckets are incremented on each accepted send. YEAR (and DAY) rows are retained as usage history; MINUTE rows are prunable." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
@@ -299,6 +335,7 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="channel_code" nullable="false" remarks="Channel code (e.g., EMAIL, SMS). Primary key." size="20" type="varchar" typeCode="12">
             <child column="channel_code" foreignKey="fk_api_key_limit_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit"/>
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert"/>
+            <child column="channel_code" foreignKey="fk_api_key_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
             <child column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
             <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
@@ -340,6 +377,7 @@
       </table>
       <table name="notification_request" remarks="Stores all incoming notification requests for auditing and tracking" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the notification request" size="2147483647" type="uuid" typeCode="1111">
+            <child column="notification_request_id" foreignKey="fk_api_key_limit_alert_log_notification_request" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="notification_request_id" foreignKey="fk_notification_request" implied="false" onDeleteCascade="true" schema="notify" table="notification_request_detail"/>
             <child column="notification_id" foreignKey="webhook_delivery_log_notification_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_delivery_log"/>
          </column>
@@ -361,6 +399,7 @@
          <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="delayed_send_time" nullable="true" remarks="When set, indicates the notification should be delivered at this time instead of immediately" size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="recipients" nullable="true" remarks="Stores recipients as JSONB object with channels as keys (email, sms, msgApp), each containing an array of recipient addresses/identifiers" size="2147483647" type="jsonb" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="quarantine_details" nullable="true" remarks="JSONB data structure storing ClamAV quarantine information. Example: {&quot;viruses&quot;: [&quot;Win.Test.EICAR_HDB-1&quot;], &quot;filename&quot;: &quot;document.pdf&quot;, &quot;scannedAt&quot;: &quot;2026-05-19T10:30:00Z&quot;, &quot;reason&quot;: &quot;Malware detected during content scanning&quot;}" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="13" name="is_internal" nullable="false" remarks="Whether the notification was generated internally rather than initiated by a tenant." size="1" type="bool" typeCode="-7"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="notification_request_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -690,6 +729,7 @@
       </table>
       <table name="usage_period_type_code" numRows="3" remarks="Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="period_type_code" nullable="false" remarks="Period type code (MINUTE, DAY, YEAR). Primary key." size="20" type="varchar" typeCode="12">
+            <child column="period_type_code" foreignKey="fk_api_key_limit_alert_log_period" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="period_type_code" foreignKey="fk_api_key_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the period type." size="255" type="varchar" typeCode="12"/>

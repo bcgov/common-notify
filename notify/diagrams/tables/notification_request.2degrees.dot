@@ -5,8 +5,13 @@ digraph "twoDegreesRelationshipsDiagram" {
   "api_key_limit":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_limit_alert":"elipses":w -> "api_key_consumer":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_limit_alert":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
+  "api_key_limit_alert_log":"api_key_consumer_id":w -> "api_key_consumer":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
+  "api_key_limit_alert_log":"channel_code":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
+  "api_key_limit_alert_log":"notification_request_id":w -> "notification_request":"id.type":e [arrowhead=none dir=back arrowtail=crowodot];
+  "api_key_limit_alert_log":"period_type_code":w -> "usage_period_type_code":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_usage":"elipses":w -> "api_key_consumer":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_usage":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
+  "api_key_usage":"elipses":w -> "usage_period_type_code":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "attachment":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "client_tenant_mapping":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "feature_flag":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
@@ -30,7 +35,7 @@ digraph "twoDegreesRelationshipsDiagram" {
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
       <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="109" HEIGHT="16"><B>api_key_consumer</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
       <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">3 &gt;</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">4 &gt;</TD></TR>
     </TABLE>>
     URL="api_key_consumer.html"
     target="_top"
@@ -57,6 +62,17 @@ digraph "twoDegreesRelationshipsDiagram" {
     URL="api_key_limit_alert.html"
     target="_top"
     tooltip="api_key_limit_alert"
+  ];
+  "api_key_limit_alert_log" [
+   label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
+      <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="134" HEIGHT="16"><B>api_key_limit_alert_log</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
+      <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 4</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD></TR>
+    </TABLE>>
+    URL="api_key_limit_alert_log.html"
+    target="_top"
+    tooltip="api_key_limit_alert_log"
   ];
   "api_key_usage" [
    label=<
@@ -107,7 +123,7 @@ digraph "twoDegreesRelationshipsDiagram" {
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
       <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="156" HEIGHT="16"><B>notification_channel_code</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
       <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">7 &gt;</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">8 &gt;</TD></TR>
     </TABLE>>
     URL="notification_channel_code.html"
     target="_top"
@@ -130,7 +146,8 @@ digraph "twoDegreesRelationshipsDiagram" {
       <TR><TD PORT="delayed_send_time" COLSPAN="2" BGCOLOR="#ffffff" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="121" HEIGHT="16">delayed_send_time</TD></TR></TABLE></TD><TD PORT="delayed_send_time.type" ALIGN="LEFT">timestamptz[35,6]</TD></TR>
       <TR><TD PORT="recipients" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="121" HEIGHT="16">recipients</TD></TR></TABLE></TD><TD PORT="recipients.type" ALIGN="LEFT">jsonb[2147483647]</TD></TR>
       <TR><TD PORT="quarantine_details" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="121" HEIGHT="16">quarantine_details</TD></TR></TABLE></TD><TD PORT="quarantine_details.type" ALIGN="LEFT">jsonb[2147483647]</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 3</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 &gt;</TD></TR>
+      <TR><TD PORT="is_internal" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="121" HEIGHT="16">is_internal</TD></TR></TABLE></TD><TD PORT="is_internal.type" ALIGN="LEFT">bool[1]</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 3</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">3 &gt;</TD></TR>
     </TABLE>>
     URL="notification_request.html"
     target="_top"
@@ -212,6 +229,17 @@ digraph "twoDegreesRelationshipsDiagram" {
     URL="tenant_status_code.html"
     target="_top"
     tooltip="tenant_status_code"
+  ];
+  "usage_period_type_code" [
+   label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
+      <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="143" HEIGHT="16"><B>usage_period_type_code</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
+      <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">3 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 &gt;</TD></TR>
+    </TABLE>>
+    URL="usage_period_type_code.html"
+    target="_top"
+    tooltip="usage_period_type_code"
   ];
   "webhook_config" [
    label=<
