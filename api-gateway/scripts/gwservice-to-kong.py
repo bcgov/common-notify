@@ -27,6 +27,18 @@ import sys
 import yaml
 
 
+# The source template (routes.yaml) uses YAML anchors/aliases to DRY shared plugin
+# configs. safe_load collapses each aliased block into a single shared Python object,
+# and PyYAML's default dumper would RE-EMIT those as `&id001`/`*id001` in the output.
+# We force full materialization (every config map written inline) so the published
+# Kong/deck config never depends on gwa/deck accepting YAML anchors.
+class _MaterializingDumper(yaml.SafeDumper):
+    pass
+
+
+_MaterializingDumper.ignore_aliases = lambda self, data: True
+
+
 def convert(path):
     services, plugins = [], []
     for doc in yaml.safe_load_all(open(path)):
@@ -66,4 +78,10 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         sys.stderr.write("usage: gwservice-to-kong.py <gw-routes-file.yaml>\n")
         sys.exit(2)
-    yaml.safe_dump(convert(sys.argv[1]), sys.stdout, sort_keys=False, width=4096)
+    yaml.dump(
+        convert(sys.argv[1]),
+        sys.stdout,
+        Dumper=_MaterializingDumper,
+        sort_keys=False,
+        width=4096,
+    )
