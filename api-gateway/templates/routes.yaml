@@ -922,6 +922,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-bind
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -933,6 +954,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}ches-email
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -944,6 +986,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -955,6 +1018,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
@@ -992,6 +1076,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1003,6 +1108,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-preview
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1014,6 +1140,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-types
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1025,6 +1172,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-list
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1036,6 +1204,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-status
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1047,6 +1236,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-callbacks
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1058,6 +1268,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   # GC Notify clients authenticate with a single credential, sent the same way real
   # GC Notify expects it: `Authorization: ApiKey-v1 {key}`. They aren't expected to
   # also send a separate X-API-KEY header. pre-function extracts the key from that
@@ -1093,6 +1324,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1119,6 +1371,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1145,6 +1418,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1171,6 +1465,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1197,6 +1512,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1223,6 +1559,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   - name: pre-function
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]
@@ -1249,6 +1606,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
   # ============================================================================
   # SERVICE & FRONTEND PLUGINS
   # Each route appears twice: once for service tokens, once for frontend tokens
@@ -1266,6 +1644,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
 
   # Code Tables - Frontend Token
   - name: jwt-keycloak
@@ -1308,6 +1707,27 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-status-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
+
   # Code Tables Status - Frontend Token
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
@@ -1348,6 +1768,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-channels-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
 
   # Code Tables Channels - Frontend Token
   - name: jwt-keycloak
@@ -1390,6 +1831,27 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-event-types-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
+
   # Code Tables Event Types - Frontend Token
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
@@ -1430,6 +1892,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notification-request-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
 
   # Notification Request - Frontend Token
   - name: jwt-keycloak
@@ -1702,6 +2185,27 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
+
   # Feature Flags Frontend - Frontend Token (authenticated users)
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
@@ -1798,6 +2302,27 @@ plugins:
       key_in_header: true
       key_names: ["X-API-KEY"]
       run_on_preflight: true
+
+  # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
+  # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
+  # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
+  # fault_tolerant: true fails open if Redis is unreachable - a Redis outage degrades to no
+  # limiting rather than blocking traffic. Redis is provided by the managed BC Gov gateway.
+  - name: rate-limiting
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    config:
+      limit_by: credential
+      policy: redis
+      fault_tolerant: true
+      hide_client_headers: false
+      minute: ${API_KEY_RATE_LIMIT_PER_MINUTE}
+      second: null
+      hour: null
+      day: null
+      month: null
+      year: null
 
   # Code Tables Feature Flags - Frontend Token
   - name: jwt-keycloak
