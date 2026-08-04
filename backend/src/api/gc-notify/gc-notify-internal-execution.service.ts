@@ -341,8 +341,7 @@ export class GcNotifyInternalExecutionService {
 
     const notifyAttachments = files.map((file) => this.toNotifyAttachment(file))
     // Only email.attachments is populated; the shared services read exactly that.
-    const request = { email: { attachments: notifyAttachments } } as unknown as NotifySimpleRequest
-
+    const request: NotifySimpleRequest = { email: { attachments: notifyAttachments } }
     await this.attachmentValidationService.validateAttachments(request)
     const processed = await this.attachmentProcessingService.processAttachments(
       request,
