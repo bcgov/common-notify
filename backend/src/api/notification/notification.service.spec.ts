@@ -122,6 +122,7 @@ describe('NotificationService', () => {
         status: NotificationStatus.QUEUED,
         createdBy: dto.createdBy,
         payload: undefined,
+        isInternal: false,
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
@@ -154,6 +155,7 @@ describe('NotificationService', () => {
         status: NotificationStatus.PROCESSING,
         createdBy: dto.createdBy,
         payload: undefined,
+        isInternal: false,
         channelCode: null,
         recipients: null,
         delayedSendTime: null,
@@ -187,6 +189,9 @@ describe('NotificationService', () => {
       expect(queryBuilder.where).toHaveBeenCalledWith('notification.tenantId = :tenantId', {
         tenantId: 'tenant-uuid',
       })
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('notification.isInternal = :isInternal', {
+        isInternal: false,
+      })
       expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('notification.createdAt', 'DESC')
       expect(queryBuilder.skip).toHaveBeenCalledWith(0)
       expect(queryBuilder.take).toHaveBeenCalledWith(10)
@@ -216,13 +221,18 @@ describe('NotificationService', () => {
 
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
         1,
+        'notification.isInternal = :isInternal',
+        { isInternal: false },
+      )
+      expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
+        2,
         'LOWER(notification.status) = :filter_0',
         {
           filter_0: 'completed',
         },
       )
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
-        2,
+        3,
         'LOWER(notification.channelCode) IN (:...filter_1)',
         { filter_1: ['email', 'sms'] },
       )
