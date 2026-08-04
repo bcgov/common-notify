@@ -18,6 +18,7 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
@@ -37,6 +38,11 @@ const navItems = [
     to: '/usage',
     icon: <SpeedOutlinedIcon />,
   },
+  {
+    label: 'Settings',
+    to: '/settings',
+    icon: <SettingsOutlinedIcon />,
+  },
 ]
 
 const adminItems = {
@@ -50,10 +56,6 @@ const adminItems = {
     {
       label: 'Usage & Limits',
       to: '/admin/usage',
-    },
-    {
-      label: 'Tenant Settings',
-      to: '/admin/settings',
     },
   ],
 } as const
@@ -109,7 +111,8 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Usage & Limits' && showUsage)
+            (item.label === 'Usage & Limits' && showUsage) ||
+            (item.label === 'Settings' && hasTenantRole)
 
           return shouldShow ? (
             <Link
@@ -173,15 +176,6 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Usage &amp; Limits</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/settings"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Tenant Settings</span>
                   </Link>
                 )}
               </div>
