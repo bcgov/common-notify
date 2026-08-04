@@ -359,9 +359,9 @@ export class GcNotifyInternalExecutionService {
       throw new BadRequestException({
         errors: [
           {
-            error: 'BadRequestError',
+            error: 'ValidationError',
             message: `Attachment '${file.filename}' uses sending_method '${file.sending_method}', which is not supported by internal execution. Use sending_method 'attach'.`,
-          },
+          }
         ],
       })
     }
