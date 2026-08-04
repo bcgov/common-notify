@@ -232,7 +232,7 @@ describe('NotificationService', () => {
         },
       )
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
-        2,
+        3,
         'jsonb_exists_any(notification.channel_codes, ARRAY[:...channelCodeValues]::text[])',
         { channelCodeValues: ['EMAIL', 'SMS'] },
       )
