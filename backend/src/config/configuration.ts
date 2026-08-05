@@ -80,6 +80,11 @@ export default () => {
       fromNumber: process.env.TWILIO_FROM_NUMBER || defaultSmsFrom,
     },
 
+    acs: {
+      connectionString: process.env.ACS_CONNECTION_STRING,
+      fromNumber: process.env.ACS_FROM_NUMBER || defaultSmsFrom,
+    },
+
     // Delivery Adapter Selection
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
