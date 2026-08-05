@@ -87,13 +87,13 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'requestRoute',
       label: 'Notification Event',
-      width: '18%',
+      width: '17%',
       render: (_, row) => row.requestRoute ?? '-',
     },
     {
       key: 'channelCodes',
       label: 'Channel',
-      width: '21%',
+      width: '23%',
       filterOptions: [
         { label: 'Email', value: 'EMAIL' },
         { label: 'SMS', value: 'SMS' },
@@ -104,7 +104,7 @@ const NotificationStatusTable: FC = () => {
     {
       key: 'status',
       label: 'Notification Status',
-      width: '17%',
+      width: '16%',
       sortable: true,
       filterOptions: statuses.map((s: CodeTable) => ({ label: s.label, value: s.id })),
       render: (_, row) => (
