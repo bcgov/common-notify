@@ -11,20 +11,22 @@ const Dashboard: FC = () => {
 
   return (
     <div className="dashboard-page">
-      <PageHeading title="Dashboard" />
+      <div className="dashboard-page__layout">
+        <PageHeading title="Dashboard" />
 
-      <div className="dashboard-page__search">
-        <SearchField
-          value={searchInput}
-          onChange={setSearchInput}
-          onSearch={handleSearch}
-          placeholder="Search Notification Events..."
-          ariaLabel="Search Notification Events"
-        />
-      </div>
+        <div className="dashboard-page__search">
+          <SearchField
+            value={searchInput}
+            onChange={setSearchInput}
+            onSearch={handleSearch}
+            placeholder="Search Notification Events..."
+            ariaLabel="Search Notification Events"
+          />
+        </div>
 
-      <div className="dashboard-page__table">
-        <NotificationStatusTable />
+        <div className="dashboard-page__table">
+          <NotificationStatusTable />
+        </div>
       </div>
     </div>
   )
