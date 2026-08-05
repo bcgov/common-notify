@@ -13,7 +13,7 @@ export const fetchTenantSettings = createAsyncThunk<
     if (!tenantId) return null
 
     return await get<TenantSettings | null>({
-      url: '/api/v1/frontend/tenant-settings',
+      url: '/api/v1/frontend/tenant-settings/tenant',
     })
   } catch (error) {
     return rejectWithValue(
@@ -24,12 +24,15 @@ export const fetchTenantSettings = createAsyncThunk<
 
 export const updateTenantSettings = createAsyncThunk<
   TenantSettings,
-  { alertEmail: string | null },
+  { alertEmail: string | null; defaultSenderEmail: string | null },
   { rejectValue: string }
 >('tenantSettings/update', async (payload, { rejectWithValue }) => {
   try {
-    return await patch<TenantSettings, { alertEmail: string | null }>({
-      url: '/api/v1/frontend/tenant-settings',
+    return await patch<
+      TenantSettings,
+      { alertEmail: string | null; defaultSenderEmail: string | null }
+    >({
+      url: '/api/v1/frontend/tenant-settings/tenant',
       params: payload,
     })
   } catch (error) {

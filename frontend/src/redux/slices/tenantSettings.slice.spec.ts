@@ -6,6 +6,7 @@ import type { TenantSettings } from '@/interfaces/tenant-settings.interface'
 describe('tenantSettingsSlice', () => {
   const initialState = {
     alertEmail: null,
+    defaultSenderEmail: null,
     loading: false,
     saving: false,
   }
@@ -14,6 +15,7 @@ describe('tenantSettingsSlice', () => {
     id: 'settings-1',
     tenantId: 'tenant-1',
     alertEmail: 'alerts@example.com',
+    defaultSenderEmail: 'noreply',
     createdAt: '2026-07-21T00:00:00.000Z',
     createdBy: 'user-1',
     updatedAt: '2026-07-21T00:00:00.000Z',
@@ -45,6 +47,7 @@ describe('tenantSettingsSlice', () => {
       )
 
       expect(state.alertEmail).toBe('alerts@example.com')
+      expect(state.defaultSenderEmail).toBe('noreply')
       expect(state.loading).toBe(false)
     })
 
@@ -64,7 +67,11 @@ describe('tenantSettingsSlice', () => {
     it('should handle pending state', () => {
       const state = tenantSettingsReducer(
         initialState,
-        updateTenantSettings.pending('', { alertEmail: 'alerts@example.com' }, {}),
+        updateTenantSettings.pending(
+          '',
+          { alertEmail: 'alerts@example.com', defaultSenderEmail: 'noreply' },
+          {},
+        ),
       )
 
       expect(state.saving).toBe(true)
@@ -73,13 +80,21 @@ describe('tenantSettingsSlice', () => {
     })
 
     it('should handle fulfilled state', () => {
-      const payload = { ...tenantSettings, alertEmail: 'updated@example.com' }
+      const payload = {
+        ...tenantSettings,
+        alertEmail: 'updated@example.com',
+        defaultSenderEmail: 'no-reply',
+      }
       const state = tenantSettingsReducer(
         { ...initialState, saving: true },
-        updateTenantSettings.fulfilled(payload, '', { alertEmail: 'updated@example.com' }),
+        updateTenantSettings.fulfilled(payload, '', {
+          alertEmail: 'updated@example.com',
+          defaultSenderEmail: 'no-reply',
+        }),
       )
 
       expect(state.alertEmail).toBe('updated@example.com')
+      expect(state.defaultSenderEmail).toBe('no-reply')
       expect(state.saving).toBe(false)
     })
 
@@ -87,7 +102,12 @@ describe('tenantSettingsSlice', () => {
       const error = 'Failed to update tenant settings'
       const state = tenantSettingsReducer(
         { ...initialState, saving: true },
-        updateTenantSettings.rejected(new Error(), '', { alertEmail: 'alerts@example.com' }, error),
+        updateTenantSettings.rejected(
+          new Error(),
+          '',
+          { alertEmail: 'alerts@example.com', defaultSenderEmail: 'noreply' },
+          error,
+        ),
       )
 
       expect(state.saving).toBe(false)

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { TenantSettings } from './entities/tenant-settings.entity'
+import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
 
 @Injectable()
 export class TenantSettingsService {
@@ -18,14 +19,15 @@ export class TenantSettingsService {
 
   async upsert(
     tenantId: string,
-    alertEmail: string | null,
+    dto: UpdateTenantSettingsDto,
     updatedBy?: string,
   ): Promise<TenantSettings> {
     try {
       const existing = await this.findByTenantId(tenantId)
 
       if (existing) {
-        existing.alertEmail = alertEmail
+        existing.alertEmail = dto.alertEmail
+        existing.defaultSenderEmail = dto.defaultSenderEmail
         existing.updatedBy = updatedBy ?? existing.updatedBy
 
         const savedSettings = await this.tenantSettingsRepository.save(existing)
@@ -35,7 +37,8 @@ export class TenantSettingsService {
 
       const settings = this.tenantSettingsRepository.create({
         tenantId,
-        alertEmail,
+        alertEmail: dto.alertEmail,
+        defaultSenderEmail: dto.defaultSenderEmail,
         createdBy: updatedBy ?? null,
       })
 

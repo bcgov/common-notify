@@ -11,6 +11,15 @@ describe('TenantSettingsService', () => {
     id: 'settings-uuid-1',
     tenantId: 'tenant-uuid-1',
     alertEmail: 'alerts@example.com',
+    defaultSenderEmail: 'noreply',
+    emailNotificationsEnabled: true,
+    replyToEmail: null,
+    useCustomEmailHeader: false,
+    customEmailHeaderTitle: null,
+    emailAttachmentsEnabled: true,
+    smsNotificationsEnabled: true,
+    includeTenantNameInSms: true,
+    internationalSmsEnabled: false,
     createdAt: new Date(),
     createdBy: 'creator-guid',
     updatedAt: new Date(),
@@ -71,11 +80,16 @@ describe('TenantSettingsService', () => {
       mockRepository.create.mockReturnValue(createdSettings)
       mockRepository.save.mockResolvedValue(createdSettings)
 
-      const result = await service.upsert('tenant-uuid-1', 'new-alerts@example.com', 'updater-guid')
+      const result = await service.upsert(
+        'tenant-uuid-1',
+        { alertEmail: 'new-alerts@example.com', defaultSenderEmail: 'noreply' },
+        'updater-guid',
+      )
 
       expect(mockRepository.create).toHaveBeenCalledWith({
         tenantId: 'tenant-uuid-1',
         alertEmail: 'new-alerts@example.com',
+        defaultSenderEmail: 'noreply',
         createdBy: 'updater-guid',
       })
       expect(mockRepository.save).toHaveBeenCalledWith(createdSettings)
@@ -94,7 +108,7 @@ describe('TenantSettingsService', () => {
 
       const result = await service.upsert(
         'tenant-uuid-1',
-        'updated-alerts@example.com',
+        { alertEmail: 'updated-alerts@example.com', defaultSenderEmail: 'noreply' },
         'updater-guid',
       )
 
@@ -110,7 +124,11 @@ describe('TenantSettingsService', () => {
       mockRepository.findOne.mockResolvedValue(existingSettings)
       mockRepository.save.mockResolvedValue(savedSettings)
 
-      const result = await service.upsert('tenant-uuid-1', null, 'updater-guid')
+      const result = await service.upsert(
+        'tenant-uuid-1',
+        { alertEmail: null, defaultSenderEmail: 'noreply' },
+        'updater-guid',
+      )
 
       expect(existingSettings.alertEmail).toBeNull()
       expect(existingSettings.updatedBy).toBe('updater-guid')
@@ -124,7 +142,10 @@ describe('TenantSettingsService', () => {
       mockRepository.findOne.mockResolvedValue(existingSettings)
       mockRepository.save.mockResolvedValue(savedSettings)
 
-      const result = await service.upsert('tenant-uuid-1', 'updated-alerts@example.com')
+      const result = await service.upsert('tenant-uuid-1', {
+        alertEmail: 'updated-alerts@example.com',
+        defaultSenderEmail: 'noreply',
+      })
 
       expect(existingSettings.alertEmail).toBe('updated-alerts@example.com')
       expect(existingSettings.updatedBy).toBe('previous-updater-guid')

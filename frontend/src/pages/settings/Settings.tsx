@@ -25,6 +25,13 @@ const normalizeEmail = (value: string): string | null => value.trim() || null
 const isValidEmail = (value: string): boolean =>
   value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 
+// Local part (before @gov.bc.ca) of the default sending email address.
+const SENDER_EMAIL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/
+
+const normalizeSenderEmail = (value: string): string | null => value.trim() || null
+
+const isValidSenderEmail = (value: string): boolean => SENDER_EMAIL_PATTERN.test(value)
+
 const Settings: FC = () => {
   const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
@@ -33,6 +40,8 @@ const Settings: FC = () => {
   const canEdit = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   const [savedAlertEmail, setSavedAlertEmail] = useState<string | null>(null)
   const [emailInput, setEmailInput] = useState('')
+  const [savedSenderEmail, setSavedSenderEmail] = useState<string | null>(null)
+  const [senderInput, setSenderInput] = useState('')
   const [loadedTenantId, setLoadedTenantId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -52,6 +61,9 @@ const Settings: FC = () => {
         const nextAlertEmail = settings?.alertEmail ?? null
         setSavedAlertEmail(nextAlertEmail)
         setEmailInput(nextAlertEmail ?? '')
+        const nextSenderEmail = settings?.defaultSenderEmail ?? null
+        setSavedSenderEmail(nextSenderEmail)
+        setSenderInput(nextSenderEmail ?? '')
         setLoadedTenantId(selectedTenant.id)
       })
       .catch(() => {
@@ -93,12 +105,17 @@ const Settings: FC = () => {
           <TenantSettingsForm
             emailInput={emailInput}
             savedAlertEmail={savedAlertEmail}
+            senderInput={senderInput}
+            savedSenderEmail={savedSenderEmail}
             saving={saving}
             canEdit={canEdit}
             onEmailChange={setEmailInput}
-            onSaved={(alertEmail) => {
+            onSenderChange={setSenderInput}
+            onSaved={(alertEmail, defaultSenderEmail) => {
               setSavedAlertEmail(alertEmail)
               setEmailInput(alertEmail ?? '')
+              setSavedSenderEmail(defaultSenderEmail)
+              setSenderInput(defaultSenderEmail ?? '')
             }}
           />
         )}
@@ -110,31 +127,55 @@ const Settings: FC = () => {
 function TenantSettingsForm({
   emailInput,
   savedAlertEmail,
+  senderInput,
+  savedSenderEmail,
   saving,
   canEdit,
   onEmailChange,
+  onSenderChange,
   onSaved,
 }: {
   emailInput: string
   savedAlertEmail: string | null
+  senderInput: string
+  savedSenderEmail: string | null
   saving: boolean
   canEdit: boolean
   onEmailChange: (value: string) => void
-  onSaved: (value: string | null) => void
+  onSenderChange: (value: string) => void
+  onSaved: (alertEmail: string | null, defaultSenderEmail: string | null) => void
 }) {
   const dispatch = useAppDispatch()
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
+  // Sending-email validation is captured on Save only, not while typing.
+  const [senderError, setSenderError] = useState('')
   const normalizedEmail = normalizeEmail(emailInput)
   const validationError =
     normalizedEmail && !isValidEmail(normalizedEmail) ? 'Enter a valid alert email address' : ''
   const emailError = shouldShowValidation ? validationError : ''
-  const isDirty = normalizedEmail !== savedAlertEmail
+  const normalizedSender = normalizeSenderEmail(senderInput)
+  const isDirty = normalizedEmail !== savedAlertEmail || normalizedSender !== savedSenderEmail
   const isSaveDisabled = !canEdit || !isDirty || saving || Boolean(emailError)
+
+  function handleSenderChange(value: string) {
+    onSenderChange(value)
+    if (senderError) {
+      setSenderError('')
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (validationError) {
+    let senderValidationError = ''
+    if (!normalizedSender) {
+      senderValidationError = 'Enter a default sending email address'
+    } else if (!isValidSenderEmail(normalizedSender)) {
+      senderValidationError = 'Enter a valid sending email address'
+    }
+    setSenderError(senderValidationError)
+
+    if (validationError || senderValidationError) {
       setShouldShowValidation(true)
       return
     }
@@ -145,10 +186,11 @@ function TenantSettingsForm({
 
     try {
       const updatedSettings = await dispatch(
-        updateTenantSettings({ alertEmail: normalizedEmail }),
+        updateTenantSettings({ alertEmail: normalizedEmail, defaultSenderEmail: normalizedSender }),
       ).unwrap()
-      onSaved(updatedSettings.alertEmail)
+      onSaved(updatedSettings.alertEmail, updatedSettings.defaultSenderEmail)
       setShouldShowValidation(false)
+      setSenderError('')
       showSuccessToast('Tenant settings updated successfully')
     } catch (updateError) {
       showErrorToast(
@@ -173,7 +215,12 @@ function TenantSettingsForm({
           aria-labelledby="default-sending-email-label"
           aria-describedby="default-sending-email-help"
           iconRight={<span className="settings__field-suffix">@gov.bc.ca</span>}
-          isDisabled={!canEdit}
+          isDisabled={saving || !canEdit}
+          value={senderInput}
+          onChange={handleSenderChange}
+          isInvalid={Boolean(senderError)}
+          errorMessage={senderError || undefined}
+          isRequired
         />
         <p id="default-sending-email-help" className="settings__help">
           Enter the part before &apos;@gov.bc.ca&apos;. Maximum 64 characters. Use letters, numbers,

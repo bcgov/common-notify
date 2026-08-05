@@ -3,6 +3,7 @@ import { fetchTenantSettings, updateTenantSettings } from '../thunks/tenantSetti
 
 interface TenantSettingsState {
   alertEmail: string | null
+  defaultSenderEmail: string | null
   loading: boolean
   saving: boolean
   error?: string
@@ -10,6 +11,7 @@ interface TenantSettingsState {
 
 const initialState: TenantSettingsState = {
   alertEmail: null,
+  defaultSenderEmail: null,
   loading: false,
   saving: false,
 }
@@ -26,6 +28,7 @@ export const tenantSettingsSlice = createSlice({
       })
       .addCase(fetchTenantSettings.fulfilled, (state, action) => {
         state.alertEmail = action.payload?.alertEmail ?? null
+        state.defaultSenderEmail = action.payload?.defaultSenderEmail ?? null
         state.loading = false
       })
       .addCase(fetchTenantSettings.rejected, (state, action) => {
@@ -38,6 +41,7 @@ export const tenantSettingsSlice = createSlice({
       })
       .addCase(updateTenantSettings.fulfilled, (state, action) => {
         state.alertEmail = action.payload.alertEmail
+        state.defaultSenderEmail = action.payload.defaultSenderEmail
         state.saving = false
       })
       .addCase(updateTenantSettings.rejected, (state, action) => {
