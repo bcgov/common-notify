@@ -118,7 +118,7 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
       <div className="request-status-page__header">
         <Breadcrumb
           items={[
-            { label: 'Home', to: '/dashboard' },
+            { label: 'Home', to: '/' },
             { label: 'Dashboard', to: '/dashboard' },
             {
               label: 'Request Status',
