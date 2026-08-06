@@ -130,7 +130,8 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
         event: 'notification.status.changed',
         payload: {
           notifyId: notification.id,
-          status: notification.status,
+          status: notification.status?.code, // Emit the status code rather than the status object
+          statusDisplayName: notification.status?.displayName,
           channel: notification.channelCodes?.join(', '),
           createdAt: notification.createdAt,
           updatedAt: notification.updatedAt,
