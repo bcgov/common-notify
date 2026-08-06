@@ -6,7 +6,7 @@ import PageHeading from '@/components/PageHeading'
 const Dashboard: FC = () => {
   const [searchInput, setSearchInput] = useState<string>('')
 
-  // TODO: wire up notification-event search when it is added.
+  // TODO: wire up notification-event search when it is added
   const handleSearch = () => {}
 
   return (
