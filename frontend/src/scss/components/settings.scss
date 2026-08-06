@@ -71,7 +71,33 @@
 .settings__info-icon {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   color: $text-secondary;
+
+  &:hover,
+  &:focus {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $border-active;
+    outline-offset: 2px;
+  }
+}
+
+.settings__tooltip {
+  max-width: 30rem;
+}
+
+.settings__tooltip--wide {
+  max-width: 38rem;
 }
 
 .settings__field-suffix {
