@@ -3,6 +3,7 @@ import { ChesEmailTransport } from '../../src/adapters/implementations/delivery/
 import { NodemailerEmailTransport } from '../../src/adapters/implementations/delivery/email/nodemailer/nodemailer-email.adapter'
 import { LogEmailTransport } from '../../src/adapters/implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from '../../src/adapters/implementations/delivery/sms/twilio/twilio-sms.adapter'
+import { AcsSmsTransport } from '../../src/adapters/implementations/delivery/sms/acs/acs-sms.adapter'
 
 describe('delivery.registry', () => {
   it('EMAIL_ADAPTER_REGISTRY maps ches to ChesEmailTransport', () => {
@@ -25,7 +26,11 @@ describe('delivery.registry', () => {
     expect(SMS_ADAPTER_REGISTRY.twilio).toBe(TwilioSmsTransport)
   })
 
+  it('SMS_ADAPTER_REGISTRY maps acs to AcsSmsTransport', () => {
+    expect(SMS_ADAPTER_REGISTRY.acs).toBe(AcsSmsTransport)
+  })
+
   it('SMS_ADAPTER_REGISTRY contains only expected keys', () => {
-    expect(Object.keys(SMS_ADAPTER_REGISTRY)).toEqual(['twilio'])
+    expect(Object.keys(SMS_ADAPTER_REGISTRY)).toEqual(['twilio', 'acs'])
   })
 })
