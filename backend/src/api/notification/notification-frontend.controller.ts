@@ -135,6 +135,11 @@ export class NotificationFrontendController {
 
   @Version('1')
   @Get('request_details/:id')
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List notification request detail records for a notification request' })
   @ApiQuery({
     name: 'page',
