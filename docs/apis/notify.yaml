@@ -1,0 +1,2017 @@
+openapi: 3.0.2
+info:
+  title: Notify API v1
+  version: 2.1.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  description: |
+    Multi-tenanted unified notification API which covers everything from  simple single-channel sends 
+    to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides 
+    comprensive defaults through the use of configurable event-types, which free calling applications
+    from the burden of managing recipients, content, channels and subscriptions - however, defaults can 
+    be overridden or augmented by the message payload at any time if required.
+    Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends, 
+    maintenance console and integration with subscription services.
+    The GC Notify interface is supported for legacy applications.
+    Defaults are configured through an administrative UI.
+servers:
+  - url: /api/v1
+    description: Default server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Notify
+    description: Notification send, preview, status, service and callback endpoints.
+  - name: GC Notify
+    description: Passthrough API for GC Notify v2.
+
+paths:
+  /notifysimple:
+    post:
+      summary: Simple multi-channel notification send
+      parameters:
+        - name: preview
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description:
+            Return a preview of the notification(s) as they would be sent. No actual sending takes
+            place.
+      description: |
+        Send a notification via one or more channels using flat, channel-specific
+        payloads. Supports email, sms, and msgApp channels.
+
+        At least one of email, sms, or msgApp must be present.
+      operationId: notify_simpleSend
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleNotifyRequest'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyResponse'
+        '200':
+          description: Resolved channel payloads -  only valid with preview query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedGatewayPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notifysimple/email:
+    post:
+      summary: Simple email send
+      parameters:
+        - name: preview
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description:
+            Return a preview of the notification(s) as they would be sent. No actual sending takes
+            place.
+      description: |
+        Send an email notification.
+      operationId: notify_simpleSend_email
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChannel'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyResponse'
+        '200':
+          description: Resolved email payloads - only valid with preview query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedEmailPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notifysimple/sms:
+    post:
+      summary: Simple sms send
+      parameters:
+        - name: preview
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description:
+            Return a preview of the notification(s) as they would be sent. No actual sending takes
+            place.
+      description: Send an SMS notification.
+      operationId: notify_simpleSend_sms
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmsChannel'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyResponse'
+        '200':
+          description: Resolved SMS payloads - only valid with preview query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedSMSPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notifyevent:
+    post:
+      summary: Send notification using notificationEventType (multi-channel dispatch)
+      description: |
+        Unified endpoint that dispatches to one or more channels in a single
+        call. Requires notificationEventType to resolve defaults. Notification Events are configured in the UI.
+
+        Provide channel-specific overrides or augments under email, sms, or msgApp.
+        params is a top-level object of template variables applied to all channels.
+
+        Query param preview=true previews resolved channel payloads 
+        Returns fully resolved channel payloads (email, sms, msgApp)
+        after applying defaults, overrides, augments, and params. No message is sent.
+
+      parameters:
+        - name: preview
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description:
+            Return a preview of the notification(s) as they would be sent. No actual sending takes
+            place.
+
+      operationId: notify_eventTypeSend
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventTypeNotifyRequest'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyResponse'
+        '200':
+          description: Resolved channel payloads - only valid with preview query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedGatewayPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notifyevent/types:
+    get:
+      summary: List notification event types
+      description: Retrieve all NotificationEventType profiles available to the tenant.
+      operationId: eventTypes_list
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: NotificationEventType list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationEventType'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notifyevent/types/{eventTypeId}:
+    get:
+      summary: Retrieve a notification event type
+      description: Get a single NotificationEventType profile by ID.
+      operationId: eventTypes_get
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: NotificationEventType details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationEventType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: NotificationEventType not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notify:
+    get:
+      summary: List notification history
+      description: |
+        Search and paginate through sent notifications. Filter by status, channel,
+        or date range. Results are ordered by createdAt descending.
+      operationId: notify_eventTypeList
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [accepted, pending, sending, completed, failed, cancelled]
+        - name: channel
+          in: query
+          schema:
+            type: string
+            enum: [email, sms, msgApp]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Notification history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotifyStatus'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notify/{notifyId}:
+    delete:
+      summary: Cancel a pending notification
+      description: Cancel a notification if it has not yet been sent.
+      operationId: notify_cancel
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: notifyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Notification cancelled
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Notification not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notify/status/{notifyId}:
+    get:
+      summary: Retrieve notification status
+      description: Get the status of a previously created notification.
+      operationId: notify_getStatus
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: notifyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Notification not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notify/registerCallback:
+    post:
+      summary: Register a new callback configuration
+      description: Register a callback URL with channelType and trigger filters.
+      operationId: notify_registerCallback
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallbackRegistrationRequest'
+      responses:
+        '201':
+          description: Callback registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackRegistrationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notify/registerCallback/{callbackId}:
+    patch:
+      summary: Update an existing callback configuration
+      description: Partial update of callback URL, headers, channelType, or trigger.
+      operationId: notify_updateCallback
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: callbackId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallbackRegistrationRequest'
+      responses:
+        '200':
+          description: Callback updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackRegistrationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Callback not found
+        default:
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Delete a callback configuration
+      description: Remove a previously registered callback.
+      operationId: notify_deleteCallback
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: callbackId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Callback deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Callback not found
+        default:
+          $ref: '#/components/responses/Error'
+  /templates:
+    get:
+      summary: List templates
+      description: Retrieve all templates available to the tenant.
+      operationId: templates_list
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationTemplate'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /templates/{templateId}:
+    get:
+      summary: Retrieve a template
+      description: Get a single template by ID.
+      operationId: templates_get
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Template not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /service/subscriptions:
+    get:
+      summary: List subscription services
+      description: Retrieve all subscription services available to the tenant.
+      operationId: subscriptions_list
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Subscriptionslist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceTemplate'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /service/subscriptions/{subscriptionId}:
+    get:
+      summary: Retrieve a subscription service
+      description: Get a single subscription service by ID.
+      operationId: subscriptions_get
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTemplate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Subscription not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /service/attachments:
+    get:
+      summary: List attachment services
+      description: Retrieve all attachment services available to the tenant.
+      operationId: attachments_list
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Attachments list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceTemplate'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /service/attachments/{attachmentId}:
+    get:
+      summary: Retrieve an attachment service
+      description: Get a single attachment service by ID.
+      operationId: attachments_get
+      tags: [Notify]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Attachment service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTemplate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Attachment Service not found
+        default:
+          $ref: '#/components/responses/Error'
+
+  /gcnotify/v2/notifications:
+    get:
+      summary: Get list of notifications
+      description: Retrieve a paginated list of notifications with optional filtering
+      operationId: gcnotify_getNotifications
+      tags: [GC Notify]
+      parameters:
+        - name: template_type
+          in: query
+          schema:
+            type: string
+            enum: [sms, email]
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [created, in-transit, pending, sent, delivered, failed]
+        - name: reference
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: older_than
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: include_jobs
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Successfully retrieved notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GCNotification'
+                  links:
+                    $ref: '#/components/schemas/GCLinks'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/notifications/{notification-id}:
+    get:
+      summary: Get notification by ID
+      description: Retrieve a specific notification by its ID
+      operationId: gcnotify_getNotificationById
+      tags: [GC Notify]
+      parameters:
+        - name: notification-id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCNotification'
+        '400':
+          description: Bad request - invalid notification ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/notifications/email:
+    post:
+      summary: Send an email notification
+      description: Create and send an email notification
+      operationId: gcnotify_sendEmailNotification
+      tags: [GC Notify]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GCCreateEmailNotificationRequest'
+      responses:
+        '201':
+          description: Email notification created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCNotificationResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/notifications/sms:
+    post:
+      summary: Send an SMS notification
+      description: Create and send an SMS notification
+      operationId: gcnotify_sendSmsNotification
+      tags: [GC Notify]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GCCreateSmsNotificationRequest'
+      responses:
+        '201':
+          description: SMS notification created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCNotificationResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/templates:
+    get:
+      summary: Get list of templates
+      description: Retrieve a list of templates
+      operationId: gcnotify_getTemplates
+      tags: [GC Notify]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [sms, email]
+      responses:
+        '200':
+          description: Successfully retrieved templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GCTemplate'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/template/{template-id}:
+    get:
+      summary: Get template by ID
+      description: Retrieve a specific template by its ID
+      operationId: gcnotify_getTemplate
+      tags: [GC Notify]
+      parameters:
+        - name: template-id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCTemplate'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '404':
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+  /gcnotify/v2/notifications/bulk:
+    post:
+      summary: Send a batch of notifications
+      description: Send notifications in bulk
+      operationId: gcnotify_sendBulkNotifications
+      tags: [GC Notify]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GCPostBulkRequest'
+      responses:
+        '201':
+          description: Bulk job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCPostBulkResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GCError'
+      security:
+        - apiKey: []
+
+components:
+  schemas:
+    # ------------------------------------------------------------
+    # Core Problem Schema
+    # ------------------------------------------------------------
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties: true
+
+    # ------------------------------------------------------------
+    # Health
+    # ------------------------------------------------------------
+    Health:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [up, down, degraded]
+        details:
+          type: object
+          additionalProperties: true
+
+    # ------------------------------------------------------------
+    # Notify Response + Status
+    # ------------------------------------------------------------
+    NotifyResponse:
+      type: object
+      required: [notifyId, status, channel, createdAt]
+      properties:
+        notifyId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, pending, sending, completed, failed, cancelled]
+        channel:
+          type: string
+          enum: [email, sms, msgApp]
+        createdAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+
+    NotifyStatus:
+      type: object
+      required: [notifyId, status, channel, createdAt]
+      properties:
+        notifyId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, pending, sending, completed, failed, cancelled]
+        channel:
+          type: string
+          enum: [email, sms, msgApp]
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    # ------------------------------------------------------------
+    # Simple Notify Request
+    # ------------------------------------------------------------
+    SimpleNotifyRequest:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+        #        mailmerge:
+        #          $ref: "#/components/schemas/MailMerge"
+        email:
+          $ref: '#/components/schemas/EmailChannel'
+        sms:
+          $ref: '#/components/schemas/SmsChannel'
+        msgApp:
+          $ref: '#/components/schemas/MsgAppChannel'
+      anyOf:
+        - required: [email]
+        - required: [sms]
+        - required: [msgApp]
+
+    # ------------------------------------------------------------
+    # EventType Notify Request
+    # ------------------------------------------------------------
+
+    EventTypeNotifyRequest:
+      type: object
+      required: [notificationEventType]
+      properties:
+        notificationEventType:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        #        mailmerge:
+        #          $ref: "#/components/schemas/MailMerge"
+        overrides:
+          type: object
+          properties:
+            email:
+              $ref: '#/components/schemas/EmailChannel'
+            sms:
+              $ref: '#/components/schemas/SmsChannel'
+            msgApp:
+              $ref: '#/components/schemas/MsgAppChannel'
+        augments:
+          type: object
+          properties:
+            email:
+              $ref: '#/components/schemas/EmailAugmentChannel'
+            sms:
+              $ref: '#/components/schemas/SmsAugmentChannel'
+            msgApp:
+              $ref: '#/components/schemas/MsgAppAugmentChannel'
+
+    # ------------------------------------------------------------
+    # Channel Schemas
+    # ------------------------------------------------------------
+
+    EmailInlineContent: # inline content - might have inline templating - defined by renderer . Mutually exclusive to templateid
+      allOf:
+        - type: object
+          properties:
+            renderer: # only set if inline template substitution is required
+              type: string
+              enum: [gc, handlebar]
+        - $ref: '#/components/schemas/EmailContent'
+
+    EmailContent: # email content as it will be delivered to email gateway.
+      type: object
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+        bodyType:
+          type: string
+          enum: [text, html]
+        encoding:
+          type: string
+
+    SMSInlineContent: # inline content - mutually exclusive to templateid
+      allOf:
+        - type: object
+          properties:
+            renderer: # only set if inline template substitution is required
+              type: string
+              enum: [gc, handlebar]
+        - $ref: '#/components/schemas/SMSContent'
+
+    SMSContent: # SMS content as it will be delivered to SMS gateway.
+      type: object
+      properties:
+        body:
+          type: string
+        bodyType:
+          type: string
+          enum: [text, html]
+        encoding:
+          type: string
+
+    InlineAttachment:
+      type: object
+      description: File attachment for  messages.
+      properties:
+        content:
+          type: string
+          format: byte
+        contentType:
+          type: string
+        filename:
+          type: string
+
+    InlineAttachments: #inline attachment
+      type: array
+      items:
+        $ref: '#/components/schemas/InlineAttachment'
+
+    EmailRecipientFields:
+      type: object
+      properties:
+        to:
+          type: array
+          items:
+            type: string
+        cc:
+          type: array
+          items:
+            type: string
+        bcc:
+          type: array
+          items:
+            type: string
+
+    SMSRecipientFields:
+      type: object
+      properties:
+        to:
+          type: array
+          items:
+            type: string
+
+    EmailChannel:
+      type: object
+      properties:
+        recipients:
+          oneOf:
+            - $ref: '#/components/schemas/EmailRecipients'
+            - $ref: '#/components/schemas/MailMerge'
+
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/EmailInlineContent'
+            - $ref: '#/components/schemas/TemplateService'
+        attachments:
+          anyOf:
+            - $ref: '#/components/schemas/InlineAttachments'
+            - $ref: '#/components/schemas/AttachmentService'
+        delayedSend:
+          type: string
+          format: date-time
+        params:
+          type: object
+          additionalProperties: true
+
+    EmailRecipients:
+      type: object
+      anyOf:
+        - $ref: '#/components/schemas/EmailRecipientFields'
+        - $ref: '#/components/schemas/SubscriptionService'
+
+    MailMerge: #mail merge array - mutually exclusive to emailRecipients and SMSRecipients.
+      type: object
+      properties:
+        mergeArray:
+          type: string
+
+    SmsChannel:
+      type: object
+      properties:
+        recipients:
+          oneOf:
+            - $ref: '#/components/schemas/SMSRecipients'
+            - $ref: '#/components/schemas/MailMerge'
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/SMSInlineContent'
+            - $ref: '#/components/schemas/TemplateService'
+        delayedSend:
+          type: string
+          format: date-time
+        params:
+          type: object
+          additionalProperties: true
+
+    SMSRecipients:
+      type: object
+      anyOf:
+        - $ref: '#/components/schemas/SMSRecipientFields'
+        - $ref: '#/components/schemas/SubscriptionService'
+
+    MsgAppChannel:
+      type: object
+      properties:
+        msgAppId:
+          $ref: '#/components/schemas/MsgAppService'
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/EmailInlineContent'
+            - $ref: '#/components/schemas/TemplateService'
+        attachments:
+          anyOf:
+            - $ref: '#/components/schemas/InlineAttachments'
+            - $ref: '#/components/schemas/AttachmentService'
+        delayedSend:
+          type: string
+          format: date-time
+        params:
+          type: object
+          additionalProperties: true
+
+    EmailAugmentChannel: #cannot augment content or delayed send
+      type: object
+      properties:
+        recipients:
+          oneOf:
+            - $ref: '#/components/schemas/EmailRecipients'
+            - $ref: '#/components/schemas/MailMerge'
+        attachments:
+          anyOf:
+            - $ref: '#/components/schemas/InlineAttachments'
+            - $ref: '#/components/schemas/AttachmentService'
+        params:
+          type: object
+          additionalProperties: true
+
+    SmsAugmentChannel: #cannot augment content or delayed send
+      type: object
+      properties:
+        recipients:
+          oneOf:
+            - $ref: '#/components/schemas/SMSRecipients'
+            - $ref: '#/components/schemas/MailMerge'
+        params:
+          type: object
+          additionalProperties: true
+
+    MsgAppAugmentChannel: #cannot augment content or delayed send
+      type: object
+      properties:
+        msgAppId:
+          $ref: '#/components/schemas/MsgAppService'
+        attachments:
+          anyOf:
+            - $ref: '#/components/schemas/InlineAttachments'
+            - $ref: '#/components/schemas/AttachmentService'
+        params:
+          type: object
+          additionalProperties: true
+
+    # ------------------------------------------------------------
+    # Services
+    # ------------------------------------------------------------
+
+    TemplateService:
+      type: object
+      properties:
+        templateId: # template service can provide content. Mutually exclusive to content
+          type: string
+          format: uuid
+        params: # these params are passed to the template service overriding or supplementing the channel params
+          type: object
+          additionalProperties: true
+
+    SubscriptionService:
+      type: object
+      properties:
+        subscriptionId: # this service can be called to add to recipients
+          type: string
+          format: uuid
+        params: # these params are passed to the subscription service
+          type: object
+          additionalProperties: true
+
+    AttachmentService:
+      type: object
+      properties:
+        attachmentServiceId: # this service can be called to add templated attachments to the notification
+          type: string
+          format: uuid
+        params: # these params are passed to the attachment service
+          type: object
+          additionalProperties: true
+
+    MsgAppService:
+      type: object
+      properties:
+        MsgAppServiceId: # this service is called to send the notification to the channels specified in the params
+          type: string
+          format: uuid
+        params: # these params are passed to the msgApp service
+          type: object
+          additionalProperties: true
+
+    ServiceTemplate: # Returned for any get for any service
+      type: object
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+          format: uri
+        active:
+          type: boolean
+        mandatoryParams:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              defaultVal:
+                type: string
+        optionalParams:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              defaultVal:
+                type: string
+        defaultTool:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+
+    # ------------------------------------------------------------
+    # Resolved Gateway Payload (Preview)
+    # ------------------------------------------------------------
+    ResolvedGatewayPayload:
+      type: object
+      properties:
+        sms:
+          $ref: '#/components/schemas/ResolvedSMSPayload'
+        email:
+          $ref: '#/components/schemas/ResolvedEmailPayload'
+
+    ResolvedEmailPayload:
+      type: array # array of emails for mail merge
+      items:
+        type: object
+        properties:
+          recipients:
+            $ref: '#/components/schemas/EmailRecipientFields'
+          content:
+            $ref: '#/components/schemas/EmailContent'
+
+    ResolvedSMSPayload:
+      type: array # array of SMS for mail merge
+      items:
+        type: object
+        properties:
+          recipients:
+            $ref: '#/components/schemas/SMSRecipientFields'
+          content:
+            $ref: '#/components/schemas/SMSContent'
+
+    # ------------------------------------------------------------
+    # Callback Registration (Option B)
+    # ------------------------------------------------------------
+    CallbackRegistrationRequest:
+      type: object
+      required: [url, channelType, trigger]
+      properties:
+        url:
+          type: string
+          format: uri
+        headers:
+          type: object
+          additionalProperties: true
+        channelType:
+          type: array
+          items:
+            type: string
+            enum: [email, sms, msgApp]
+        trigger:
+          type: array
+          items:
+            type: string
+            enum: [success, failure]
+
+    CallbackRegistrationResponse:
+      type: object
+      required: [callbackId, url, channelType, trigger]
+      properties:
+        callbackId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        headers:
+          type: object
+          additionalProperties: true
+        channelType:
+          type: array
+          items:
+            type: string
+            enum: [email, sms, msgApp]
+        trigger:
+          type: array
+          items:
+            type: string
+            enum: [success, failure]
+
+    # ------------------------------------------------------------
+    # Templates
+    # ------------------------------------------------------------
+    NotificationTemplate:
+      type: object
+      required: [templateId, name, channel, body]
+      properties:
+        templateId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        channel:
+          type: string
+          enum: [email, sms, msgApp]
+        subject:
+          type: string
+        body:
+          type: string
+        bodyType:
+          type: string
+          enum: [text, html]
+        renderer:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # NotificationEventType
+    # ------------------------------------------------------------
+    NotificationEventType:
+      type: object
+      required: [eventTypeId, name]
+      properties:
+        eventTypeId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        defaults:
+          type: object
+          properties:
+            email:
+              $ref: '#/components/schemas/EmailChannel'
+            sms:
+              $ref: '#/components/schemas/SmsChannel'
+            msgApp:
+              $ref: '#/components/schemas/MsgAppChannel'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------------
+    # GCNotify
+    # ------------------------------------------------------------
+
+    GCNotification:
+      type: object
+      description: Represents a single GC Notify notification record.
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        uri:
+          type: string
+        template:
+          $ref: '#/components/schemas/GCTemplateInfo'
+        content:
+          type: object
+          properties:
+            body:
+              type: string
+            subject:
+              type: string
+        status:
+          type: string
+          enum:
+            - created
+            - sending
+            - pending
+            - sent
+            - delivered
+            - failed
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    GCTemplateInfo:
+      type: object
+      description: Basic information about a template used in a notification.
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        uri:
+          type: string
+
+    GCLinks:
+      type: object
+      description: Pagination links for GC Notify list endpoints.
+      properties:
+        next:
+          type: string
+          nullable: true
+        prev:
+          type: string
+          nullable: true
+
+    GCCreateEmailNotificationRequest:
+      type: object
+      description: Request body for sending an email notification.
+      properties:
+        email_address:
+          type: string
+        template_id:
+          type: string
+          format: uuid
+        personalisation:
+          type: object
+          additionalProperties: true
+        scheduled_for:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - email_address
+        - template_id
+
+    GCCreateSmsNotificationRequest:
+      type: object
+      description: Request body for sending an SMS notification.
+      properties:
+        phone_number:
+          type: string
+        template_id:
+          type: string
+          format: uuid
+        personalisation:
+          type: object
+          additionalProperties: true
+        scheduled_for:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - phone_number
+        - template_id
+
+    GCNotificationResponse:
+      type: object
+      description: Response returned when a notification is created.
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        uri:
+          type: string
+        template:
+          $ref: '#/components/schemas/GCTemplateInfo'
+
+    GCTemplate:
+      type: object
+      description: Represents a GC Notify template.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [sms, email]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+        content:
+          type: object
+          properties:
+            subject:
+              type: string
+            body:
+              type: string
+
+    GCPostBulkRequest:
+      type: object
+      description: Request body for bulk notification jobs.
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        csv:
+          type: string
+        scheduled_for:
+          type: string
+          format: date-time
+          nullable: true
+        reference:
+          type: string
+        reply_to_id:
+          type: string
+          format: uuid
+      required:
+        - template_id
+        - name
+
+    GCPostBulkResponse:
+      type: object
+      description: Response returned when a bulk job is created.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        template_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    GCValidationErrorResponse:
+      type: object
+      description: Represents validation or business rule errors.
+      properties:
+        status_code:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/GCValidationError'
+
+    GCValidationError:
+      type: object
+      description: A single validation or authorization error.
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    GCError:
+      type: object
+      description: Generic GC Notify error response.
+      properties:
+        result:
+          type: string
+        message:
+          type: string
+
+  parameters:
+    #Notify##
+
+    QueryLimit:
+      name: limit
+      in: query
+      description: Maximum number of items to return
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+
+    QueryCursor:
+      name: cursor
+      in: query
+      description: Opaque cursor for pagination
+      schema:
+        type: string
+
+    # GCNOTIFY
+
+    NotificationIdPath:
+      name: notification-id
+      in: path
+      required: true
+      description: Unique identifier for a GC Notify notification.
+      schema:
+        type: string
+        format: uuid
+
+    TemplateIdPath:
+      name: template-id
+      in: path
+      required: true
+      description: Unique identifier for a GC Notify template.
+      schema:
+        type: string
+        format: uuid
+
+    TemplateTypeQuery:
+      name: type
+      in: query
+      required: false
+      description: Filter templates by type.
+      schema:
+        type: string
+        enum: [sms, email]
+
+    NotificationStatusQuery:
+      name: status
+      in: query
+      required: false
+      description: Filter notifications by status.
+      schema:
+        type: array
+        items:
+          type: string
+          enum: [created, in-transit, pending, sent, delivered, failed]
+
+    TemplateTypeFilter:
+      name: template_type
+      in: query
+      required: false
+      description: Filter notifications by template type.
+      schema:
+        type: string
+        enum: [sms, email]
+
+    ReferenceQuery:
+      name: reference
+      in: query
+      required: false
+      description: Filter notifications by reference identifier.
+      schema:
+        type: string
+        format: uuid
+
+    OlderThanQuery:
+      name: older_than
+      in: query
+      required: false
+      description: Return notifications older than this ID.
+      schema:
+        type: string
+        format: uuid
+
+    IncludeJobsQuery:
+      name: include_jobs
+      in: query
+      required: false
+      description: Whether to include job records in the response.
+      schema:
+        type: boolean
+
+  responses:
+    #Notify###
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    UnprocessableEntity:
+      description: Validation or business rule error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    Error:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    #GCNotify
+    GCNotifyUnauthorized:
+      description: Unauthorized request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GCValidationErrorResponse'
+
+    GCNotifyForbidden:
+      description: Authentication or authorization failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GCValidationErrorResponse'
+
+    GCNotifyNotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GCError'
+
+    GCNotifyTooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          description: Number of seconds until the request may be retried.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GCValidationErrorResponse'
+
+    GCNotifyInternalError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GCError'
+
+  securitySchemes:
+    # Notify
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    #GCNotify
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        GC Notify API key.  
+        Must be provided as:  
+        'Authorization: ApiKey-v1 <your-key>''
