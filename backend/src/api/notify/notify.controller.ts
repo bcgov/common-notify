@@ -217,33 +217,7 @@ export class NotifySimpleController {
       }
 
       // Return the updated notification DTO
-      return {
-        id: updated.id,
-        tenantId: updated.tenantId,
-        status: updated.statusCode
-          ? {
-              code: updated.statusCode.code,
-              displayName: updated.statusCode.displayName,
-              description: updated.statusCode.description,
-            }
-          : { code: updated.status, displayName: updated.status },
-        channelCodes: updated.channelCodes,
-        recipients: updated.recipients,
-        delayedSendTime: updated.delayedSendTime,
-        payload: updated.payload,
-        createdAt: updated.createdAt,
-        createdBy: updated.createdBy,
-        updatedAt: updated.updatedAt,
-        updatedBy: updated.updatedBy,
-        errorReason: updated.errorReason,
-        tenant: updated.tenant
-          ? {
-              id: updated.tenant.id,
-              name: updated.tenant.name,
-              slug: updated.tenant.slug,
-            }
-          : undefined,
-      }
+      return this.notificationService.mapToDto(updated)
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error

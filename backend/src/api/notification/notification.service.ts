@@ -88,7 +88,7 @@ export class NotificationService {
   /**
    * Maps NotificationRequest entity to NotificationRequestDto with tenant data
    */
-  private mapToDto(entity: NotificationRequest): NotificationRequestDto {
+  mapToDto(entity: NotificationRequest): NotificationRequestDto {
     return {
       id: entity.id,
       tenantId: entity.tenantId,
