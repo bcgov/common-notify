@@ -243,29 +243,24 @@ function TenantSettingsForm({
       </div>
 
       <div className="settings__field">
-        <label htmlFor="alert-email" className="settings__label">
+        <span className="settings__label" id="alert-email-label">
           Alert email
-        </label>
-        <input
-          id="alert-email"
+        </span>
+        <TextField
           type="email"
-          className={`form-control${emailError ? ' is-invalid' : ''}`}
+          aria-labelledby="alert-email-label"
+          aria-describedby="alert-email-help"
           value={emailInput}
-          disabled={saving || !canEdit}
-          onChange={(event) => onEmailChange(event.target.value)}
+          isDisabled={saving || !canEdit}
+          onChange={onEmailChange}
           onBlur={() => {
             if (validationError) {
               setShouldShowValidation(true)
             }
           }}
-          aria-describedby={`alert-email-help${emailError ? ' alert-email-error' : ''}`}
-          aria-invalid={Boolean(emailError)}
+          isInvalid={Boolean(emailError)}
+          errorMessage={emailError || undefined}
         />
-        {emailError && (
-          <span id="alert-email-error" className="bcds-react-aria-TextField--Error">
-            {emailError}
-          </span>
-        )}
         <p id="alert-email-help" className="settings__help">
           System and limit alerts for this tenant will be sent to this address. Leave blank to clear
           it.
