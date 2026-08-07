@@ -17,6 +17,10 @@ RELEASE_NAME=$2
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# The anchor-expansion step (expand-yaml-anchors.py) needs PyYAML. Install it if missing,
+# matching the guard used in the publish workflows, so every caller - CI or local - is covered.
+python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+
 # Function to generate a single environment config
 generate_env_config() {
   local env=$1
@@ -60,6 +64,11 @@ generate_env_config() {
     sed -i.bak '/^---$/d' "$TMP_FILE" && rm -f "$TMP_FILE.bak"
     mv "$TMP_FILE" "$OUTPUT_FILE"
   fi
+
+  # Materialize YAML anchors/aliases so no downstream consumer (gwa apply / gwservice-to-kong /
+  # gwa publish-gateway) depends on anchor support. Runs after the PR sed surgery above so that
+  # line-based editing operates on the original envsubst text, not the reformatted YAML.
+  python3 "${SCRIPT_DIR}/scripts/expand-yaml-anchors.py" "$OUTPUT_FILE"
 
   echo "  ✓ Generated: gw-routes-${env}.yaml"
 }
