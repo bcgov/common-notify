@@ -15,6 +15,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { CstarRole } from '../../enum/cstar-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantSettings } from './entities/tenant-settings.entity'
+import { UpdateSmsSettingsDto } from './schemas/update-sms-settings.dto'
 import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
 import { TenantSettingsService } from './tenant-settings.service'
 
@@ -25,21 +26,21 @@ import { TenantSettingsService } from './tenant-settings.service'
 export class TenantSettingsController {
   constructor(private readonly tenantSettingsService: TenantSettingsService) {}
 
-  // Tenant tab
   @Version('1')
-  @Get('tenant')
+  @Get()
   @Roles(
     CstarRole.NOTIFY_VIEWER,
     CstarRole.NOTIFY_TEMPLATE_EDITOR,
     CstarRole.NOTIFY_OPERATIONS_ADMIN,
   )
-  @ApiOperation({ summary: 'Get tenant settings for the authenticated tenant' })
+  @ApiOperation({ summary: 'Get all settings for the authenticated tenant' })
   @ApiOkResponse({ type: TenantSettings })
-  getTenantSettings(@Req() req: Request): Promise<TenantSettings | null> {
+  getSettings(@Req() req: Request): Promise<TenantSettings | null> {
     const tenant = (req as any).tenant as Tenant
     return this.tenantSettingsService.findByTenantId(tenant.id)
   }
 
+  // Tenant tab update
   @Version('1')
   @Patch('tenant')
   @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
@@ -54,19 +55,7 @@ export class TenantSettingsController {
     return this.tenantSettingsService.upsert(tenant.id, dto, userGuid)
   }
 
-  // Email tab (not yet implemented)
-  @Version('1')
-  @Get('email')
-  @Roles(
-    CstarRole.NOTIFY_VIEWER,
-    CstarRole.NOTIFY_TEMPLATE_EDITOR,
-    CstarRole.NOTIFY_OPERATIONS_ADMIN,
-  )
-  @ApiOperation({ summary: 'Get email settings for the authenticated tenant' })
-  getEmailSettings(): never {
-    throw new NotImplementedException('Email settings are not yet implemented')
-  }
-
+  // Email tab update (not yet implemented)
   @Version('1')
   @Patch('email')
   @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
@@ -75,24 +64,18 @@ export class TenantSettingsController {
     throw new NotImplementedException('Email settings are not yet implemented')
   }
 
-  // SMS tab (not yet implemented)
-  @Version('1')
-  @Get('sms')
-  @Roles(
-    CstarRole.NOTIFY_VIEWER,
-    CstarRole.NOTIFY_TEMPLATE_EDITOR,
-    CstarRole.NOTIFY_OPERATIONS_ADMIN,
-  )
-  @ApiOperation({ summary: 'Get SMS settings for the authenticated tenant' })
-  getSmsSettings(): never {
-    throw new NotImplementedException('SMS settings are not yet implemented')
-  }
-
+  // SMS tab update
   @Version('1')
   @Patch('sms')
   @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Update SMS settings for the authenticated tenant' })
-  updateSmsSettings(): never {
-    throw new NotImplementedException('SMS settings are not yet implemented')
+  @ApiOkResponse({ type: TenantSettings })
+  updateSmsSettings(
+    @Req() req: Request,
+    @Body() dto: UpdateSmsSettingsDto,
+  ): Promise<TenantSettings> {
+    const tenant = (req as any).tenant as Tenant
+    const userGuid = (req as any).userGuid as string | undefined
+    return this.tenantSettingsService.upsertSmsSettings(tenant.id, dto, userGuid)
   }
 }
