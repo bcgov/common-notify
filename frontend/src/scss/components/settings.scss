@@ -64,6 +64,12 @@
   color: $dark-text;
 }
 
+.settings__switch-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
 .settings__label-optional {
   font-weight: 400;
 }

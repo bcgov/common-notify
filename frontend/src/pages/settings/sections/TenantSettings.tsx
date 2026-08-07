@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchTenantSettings, updateTenantSettings } from '@/redux/thunks/tenantSettings.thunks'
+import { updateTenantSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
@@ -32,113 +32,30 @@ const isValidSenderEmail = (value: string): boolean => SENDER_EMAIL_PATTERN.test
 
 const TenantSettings: FC = () => {
   const dispatch = useAppDispatch()
-  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const { loading, saving, error } = useAppSelector((state) => state.tenantSettings)
+  const { alertEmail, defaultSenderEmail, saving, error } = useAppSelector(
+    (state) => state.tenantSettings,
+  )
   const { hasRole } = useCstarRoles()
   const canEdit = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
-  const [savedAlertEmail, setSavedAlertEmail] = useState<string | null>(null)
-  const [emailInput, setEmailInput] = useState('')
-  const [savedSenderEmail, setSavedSenderEmail] = useState<string | null>(null)
-  const [senderInput, setSenderInput] = useState('')
-  const [loadedTenantId, setLoadedTenantId] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-
-    if (!selectedTenant) {
-      return () => {
-        active = false
-      }
-    }
-
-    dispatch(fetchTenantSettings())
-      .unwrap()
-      .then((settings) => {
-        if (!active) return
-
-        const nextAlertEmail = settings?.alertEmail ?? null
-        setSavedAlertEmail(nextAlertEmail)
-        setEmailInput(nextAlertEmail ?? '')
-        const nextSenderEmail = settings?.defaultSenderEmail ?? null
-        setSavedSenderEmail(nextSenderEmail)
-        setSenderInput(nextSenderEmail ?? '')
-        setLoadedTenantId(selectedTenant.id)
-      })
-      .catch(() => {
-        if (active) {
-          // The slice exposes the load error below; keep a clean empty form available.
-          setLoadedTenantId(selectedTenant.id)
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [selectedTenant, dispatch])
-
-  return (
-    <>
-      {error && <div className="alert alert-danger">{error}</div>}
-
-      {loading || loadedTenantId !== selectedTenant?.id ? (
-        <p className="text-muted">Loading tenant settings...</p>
-      ) : (
-        <TenantSettingsForm
-          emailInput={emailInput}
-          savedAlertEmail={savedAlertEmail}
-          senderInput={senderInput}
-          savedSenderEmail={savedSenderEmail}
-          saving={saving}
-          canEdit={canEdit}
-          onEmailChange={setEmailInput}
-          onSenderChange={setSenderInput}
-          onSaved={(alertEmail, defaultSenderEmail) => {
-            setSavedAlertEmail(alertEmail)
-            setEmailInput(alertEmail ?? '')
-            setSavedSenderEmail(defaultSenderEmail)
-            setSenderInput(defaultSenderEmail ?? '')
-          }}
-        />
-      )}
-    </>
-  )
-}
-
-function TenantSettingsForm({
-  emailInput,
-  savedAlertEmail,
-  senderInput,
-  savedSenderEmail,
-  saving,
-  canEdit,
-  onEmailChange,
-  onSenderChange,
-  onSaved,
-}: {
-  emailInput: string
-  savedAlertEmail: string | null
-  senderInput: string
-  savedSenderEmail: string | null
-  saving: boolean
-  canEdit: boolean
-  onEmailChange: (value: string) => void
-  onSenderChange: (value: string) => void
-  onSaved: (alertEmail: string | null, defaultSenderEmail: string | null) => void
-}) {
-  const dispatch = useAppDispatch()
+  // Seeded once at mount. Settings.tsx remounts this section whenever new data lands,
+  // so there is no effect keeping these in sync.
+  const [emailInput, setEmailInput] = useState(alertEmail ?? '')
+  const [senderInput, setSenderInput] = useState(defaultSenderEmail ?? '')
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
   // Sending-email validation is captured on Save only, not while typing.
   const [senderError, setSenderError] = useState('')
+
   const normalizedEmail = normalizeEmail(emailInput)
   const validationError =
     normalizedEmail && !isValidEmail(normalizedEmail) ? 'Enter a valid alert email address' : ''
   const emailError = shouldShowValidation ? validationError : ''
   const normalizedSender = normalizeSenderEmail(senderInput)
-  const isDirty = normalizedEmail !== savedAlertEmail || normalizedSender !== savedSenderEmail
+  // Simple check for whether not a value has changed from the existing value
+  const isDirty = normalizedEmail !== alertEmail || normalizedSender !== defaultSenderEmail
   const isSaveDisabled = !canEdit || !isDirty || saving || Boolean(emailError)
 
   function handleSenderChange(value: string) {
-    onSenderChange(value)
+    setSenderInput(value)
     if (senderError) {
       setSenderError('')
     }
@@ -168,7 +85,9 @@ function TenantSettingsForm({
       const updatedSettings = await dispatch(
         updateTenantSettings({ alertEmail: normalizedEmail, defaultSenderEmail: normalizedSender }),
       ).unwrap()
-      onSaved(updatedSettings.alertEmail, updatedSettings.defaultSenderEmail)
+      // Re-sync the inputs to exactly what was persisted; the slice moves the baseline.
+      setEmailInput(updatedSettings.alertEmail ?? '')
+      setSenderInput(updatedSettings.defaultSenderEmail ?? '')
       setShouldShowValidation(false)
       setSenderError('')
       showSuccessToast('Tenant settings updated successfully')
@@ -182,6 +101,8 @@ function TenantSettingsForm({
   return (
     <form className="settings__form" onSubmit={handleSubmit}>
       <h2 className="settings__section-heading">Tenant Settings</h2>
+
+      {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="settings__field">
         <span className="settings__label">
@@ -259,7 +180,7 @@ function TenantSettingsForm({
           aria-describedby="alert-email-help"
           value={emailInput}
           isDisabled={saving || !canEdit}
-          onChange={onEmailChange}
+          onChange={setEmailInput}
           onBlur={() => {
             if (validationError) {
               setShouldShowValidation(true)
