@@ -4,8 +4,8 @@ import type { SmsSettingsValues } from '@/interfaces/tenant-settings.interface'
 
 /** Matches the tenant_settings column defaults, used until a row exists for the tenant. */
 export const defaultSmsSettings: SmsSettingsValues = {
-  smsNotificationsEnabled: true,
-  includeTenantNameInSms: true,
+  smsNotificationsEnabled: false,
+  includeTenantNameInSms: false,
   internationalSmsEnabled: false,
 }
 
