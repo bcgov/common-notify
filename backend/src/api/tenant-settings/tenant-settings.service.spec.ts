@@ -153,4 +153,66 @@ describe('TenantSettingsService', () => {
       expect(result).toEqual(savedSettings)
     })
   })
+
+  describe('upsertSmsSettings', () => {
+    const smsDto = {
+      smsNotificationsEnabled: false,
+      includeTenantNameInSms: false,
+      internationalSmsEnabled: true,
+    }
+
+    it('should create settings with only the SMS fields when none exist', async () => {
+      const createdSettings = { ...mockTenantSettings, ...smsDto, createdBy: 'updater-guid' }
+      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.create.mockReturnValue(createdSettings)
+      mockRepository.save.mockResolvedValue(createdSettings)
+
+      const result = await service.upsertSmsSettings('tenant-uuid-1', smsDto, 'updater-guid')
+
+      expect(mockRepository.create).toHaveBeenCalledWith({
+        tenantId: 'tenant-uuid-1',
+        ...smsDto,
+        createdBy: 'updater-guid',
+      })
+      expect(mockRepository.save).toHaveBeenCalledWith(createdSettings)
+      expect(result).toEqual(createdSettings)
+    })
+
+    it('should update the SMS fields and updatedBy when settings exist', async () => {
+      const existingSettings = { ...mockTenantSettings }
+      const savedSettings = { ...existingSettings, ...smsDto, updatedBy: 'updater-guid' }
+      mockRepository.findOne.mockResolvedValue(existingSettings)
+      mockRepository.save.mockResolvedValue(savedSettings)
+
+      const result = await service.upsertSmsSettings('tenant-uuid-1', smsDto, 'updater-guid')
+
+      expect(existingSettings.smsNotificationsEnabled).toBe(false)
+      expect(existingSettings.includeTenantNameInSms).toBe(false)
+      expect(existingSettings.internationalSmsEnabled).toBe(true)
+      expect(existingSettings.updatedBy).toBe('updater-guid')
+      expect(mockRepository.save).toHaveBeenCalledWith(existingSettings)
+      expect(result).toEqual(savedSettings)
+    })
+
+    it('should leave the tenant tab fields untouched', async () => {
+      const existingSettings = { ...mockTenantSettings }
+      mockRepository.findOne.mockResolvedValue(existingSettings)
+      mockRepository.save.mockResolvedValue(existingSettings)
+
+      await service.upsertSmsSettings('tenant-uuid-1', smsDto, 'updater-guid')
+
+      expect(existingSettings.alertEmail).toBe('alerts@example.com')
+      expect(existingSettings.defaultSenderEmail).toBe('noreply')
+    })
+
+    it('should preserve existing updatedBy when updatedBy is omitted', async () => {
+      const existingSettings = { ...mockTenantSettings }
+      mockRepository.findOne.mockResolvedValue(existingSettings)
+      mockRepository.save.mockResolvedValue(existingSettings)
+
+      await service.upsertSmsSettings('tenant-uuid-1', smsDto)
+
+      expect(existingSettings.updatedBy).toBe('previous-updater-guid')
+    })
+  })
 })
