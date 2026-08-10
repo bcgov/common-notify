@@ -47,11 +47,11 @@ const SmsSettings: FC = () => {
   }, [dispatch])
 
   // Simple check for whether not a value has changed from the existing value
-  const isDirty =
+  const settingsChanged =
     values.smsNotificationsEnabled !== smsNotificationsEnabled ||
     values.includeTenantNameInSms !== includeTenantNameInSms ||
     values.internationalSmsEnabled !== internationalSmsEnabled
-  const isSaveDisabled = !canEdit || !isDirty || saving
+  const isSaveDisabled = !canEdit || !settingsChanged || saving
   const isFieldDisabled = saving || !canEdit
 
   function setValue(key: keyof SmsSettingsValues, isSelected: boolean) {
@@ -61,7 +61,7 @@ const SmsSettings: FC = () => {
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!isDirty || saving) {
+    if (!settingsChanged || saving) {
       return
     }
 
