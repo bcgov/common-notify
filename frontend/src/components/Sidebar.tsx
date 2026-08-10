@@ -12,7 +12,7 @@ import { SsoRole } from '@/enum/sso-role.enum'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
+// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
@@ -194,12 +194,14 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <Button variant="link" className="sidebar__item">
-          <span className="sidebar__icon" aria-hidden="true">
-            <HelpOutlineOutlinedIcon />
-          </span>
-          <span className="sidebar__label">Help</span>
-        </Button>
+        {/*
+          <Button variant="link" className="sidebar__item">
+            <span className="sidebar__icon" aria-hidden="true">
+              <HelpOutlineOutlinedIcon />
+            </span>
+            <span className="sidebar__label">Help</span>
+          </Button>
+        */}
 
         {/* Bottom section */}
         <div className="sidebar__bottom">
