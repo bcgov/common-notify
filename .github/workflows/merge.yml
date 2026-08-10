@@ -117,33 +117,35 @@ jobs:
           mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
           echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
 
-      # NOTE: DEV intentionally still uses `gwa apply` (unlike TEST/PROD below).
-      # The DEV config bundles the open-PR routes, which are path-based (/pr-N/...) and rely on
-      # gwa-api's own path handling. The raw-Kong conversion used for TEST/PROD cannot reproduce
-      # that prefix-stripping, so converting DEV would break every open PR environment.
-      # DEV's routes are already current, so there is nothing to gain by changing this.
+      # NOTE: DEV now uses `gwa publish-gateway --qualifier dev` (same pattern as TEST/PROD).
+      # The gwservice-to-kong.py converter sets strip_path: false to preserve path-based routing.
+      # Using --qualifier dev properly reconciles the dev environment (create/update/delete services),
+      # avoiding 409 conflicts when services already exist.
       - name: Publish DEV gateway config (with open PRs)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
+          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
+          python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+          python3 api-gateway/scripts/gwservice-to-kong.py \
+            api-gateway/generated/gw-active-services.yaml > api-gateway/generated/gw-kong-dev.yaml
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
           CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
           CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
           gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
           gwa config set gateway gw-fe8c5
-          # Apply ONLY the dev GatewayService (single qualifier tag ns.gw-fe8c5.dev, including
-          # open-PR routes which share the dev tag with path-based isolation). A single-qualifier
-          # file is scoped by its tag, so TEST/PROD routes are left untouched.
-          echo "Applying DEV gateway config…"
+          # Publish the dev qualifier as a partial set. --qualifier scopes the reconcile so
+          # TEST/PROD (other qualifiers) are left untouched.
+          echo "Publishing DEV gateway config (qualifier=dev, including open PRs)…"
           set +e
-          OUT=$(gwa apply -i api-gateway/generated/gw-active-services.yaml 2>&1)
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-dev.yaml --qualifier dev 2>&1)
           STATUS=$?
           set -e
           echo "$OUT"
           # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors"; then
-            echo "::error::gwa apply failed for the dev gateway config"
+          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
+            echo "::error::gwa publish-gateway failed for qualifier=dev"
             exit 1
           fi
 
@@ -223,7 +225,7 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set frontend.secrets.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=2 --set backend.autoscaling.maxReplicas=2 --set frontend.autoscaling.minReplicas=2 --set frontend.autoscaling.maxReplicas=2 --set frontend.secrets.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: test
@@ -298,7 +300,7 @@ jobs:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=5 --set backend.autoscaling.maxReplicas=5 --set frontend.autoscaling.minReplicas=5 --set frontend.autoscaling.maxReplicas=5 --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: prod

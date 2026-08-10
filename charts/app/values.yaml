@@ -30,6 +30,8 @@ backend:
   enabled: true
   #-- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
+  #-- the number of replicas when autoscaling is disabled
+  replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.
   autoscaling:
     #-- enable or disable autoscaling.
@@ -142,6 +144,8 @@ frontend:
   enabled: true
   # -- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
+  #-- the number of replicas when autoscaling is disabled
+  replicaCount: 1
 
   # -- Kubernetes Secret containing Keycloak and API Gateway configuration
   secrets:
