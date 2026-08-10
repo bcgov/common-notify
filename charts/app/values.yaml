@@ -189,6 +189,16 @@ frontend:
         protocol: TCP
         name: metrics
   ingress:
+    #-- vanity hostname served in addition to the default cluster hostname, e.g.
+    # notify.digital.gov.bc.ca. set per environment in the deploy workflow; left
+    # null in PR environments, where no vanity certificate exists. when null,
+    # neither the TLS block nor the extra rule is rendered.
+    vanityHost: ~
+    #-- name of the kubernetes.io/tls secret holding the vanity domain's
+    # certificate and private key. created out-of-band with `oc create secret tls`
+    # (see scripts/generate-csr.sh) — the key is never held in the chart, in
+    # values, or in CI. only used when vanityHost is set.
+    tlsSecretName: notify-tls
     annotations:
       haproxy.router.openshift.io/balance: 'roundrobin'
       route.openshift.io/termination: 'edge'

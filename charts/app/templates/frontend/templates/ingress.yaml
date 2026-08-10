@@ -1,4 +1,12 @@
 {{- if .Values.frontend.enabled }}
+{{- $vanityHost := "" }}
+{{- if .Values.frontend.ingress }}
+{{- $vanityHost = .Values.frontend.ingress.vanityHost | default "" }}
+{{- end }}
+{{- $hosts := list (printf "%s.%s" .Release.Name .Values.global.domain) }}
+{{- if $vanityHost }}
+{{- $hosts = append $hosts $vanityHost }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -13,15 +21,27 @@ metadata:
   {{- end }}
 spec:
   ingressClassName: openshift-default
+  {{- if $vanityHost }}
+  # OpenShift's ingress-to-route controller reads tls.crt and tls.key out of this
+  # secret and puts them on the Route it generates for the vanity host. Only the
+  # vanity host is listed, so the default cluster hostname keeps serving the
+  # router's own wildcard certificate.
+  tls:
+    - hosts:
+        - {{ $vanityHost }}
+      secretName: {{ .Values.frontend.ingress.tlsSecretName }}
+  {{- end }}
   rules:
-    - host: {{ .Release.Name }}.{{ .Values.global.domain }}
+    {{- range $host := $hosts }}
+    - host: {{ $host }}
       http:
         paths:
           - path: /
             pathType: ImplementationSpecific
             backend:
               service:
-                name: {{ include "frontend.fullname" . }}
+                name: {{ include "frontend.fullname" $ }}
                 port:
                   number: 80
+    {{- end }}
 {{- end }}

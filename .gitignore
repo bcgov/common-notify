@@ -380,6 +380,7 @@ pyrightconfig.json
 *.key
 *.pem
 *.pub
+*.csr
 
 # Security-sensitive configuration files (may contain passwords/credentials)
 # Tomcat/Java application server configuration
