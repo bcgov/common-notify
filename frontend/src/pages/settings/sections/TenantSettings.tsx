@@ -51,8 +51,8 @@ const TenantSettings: FC = () => {
   const emailError = shouldShowValidation ? validationError : ''
   const normalizedSender = normalizeSenderEmail(senderInput)
   // Simple check for whether not a value has changed from the existing value
-  const isDirty = normalizedEmail !== alertEmail || normalizedSender !== defaultSenderEmail
-  const isSaveDisabled = !canEdit || !isDirty || saving || Boolean(emailError)
+  const settingsChanged = normalizedEmail !== alertEmail || normalizedSender !== defaultSenderEmail
+  const isSaveDisabled = !canEdit || !settingsChanged || saving || Boolean(emailError)
 
   function handleSenderChange(value: string) {
     setSenderInput(value)
@@ -77,7 +77,7 @@ const TenantSettings: FC = () => {
       return
     }
 
-    if (!isDirty || saving) {
+    if (!settingsChanged || saving) {
       return
     }
 
