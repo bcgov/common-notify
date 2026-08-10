@@ -9,7 +9,8 @@ redis:
   auth:
     enabled: false  # Disabled per BC Gov pattern
   image:
-    registry: artifacts.developer.gov.bc.ca/docker-remote
+    registry: docker.io
+    tag: "7.4.1-debian-12-r1"  # Pinned stable tag (avoid latest)
   master:
     podSecurityContext:
       enabled: true
