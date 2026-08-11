@@ -28,18 +28,12 @@ const notificationListQueryConfig: QueryableFieldsConfig = {
     createdAt: 'notification.createdAt',
     updatedAt: 'notification.updatedAt',
     status: 'notification.status',
-    channelCode: 'notification.channelCode',
   },
   filterableFields: {
     status: {
       column: 'notification.status',
       valueType: 'string',
       operators: ['eq', 'ne', 'in'],
-    },
-    channelCode: {
-      column: 'notification.channelCode',
-      valueType: 'string',
-      operators: ['eq', 'in', 'isnull'],
     },
     createdAt: {
       column: 'notification.createdAt',
@@ -94,19 +88,19 @@ export class NotificationService {
   /**
    * Maps NotificationRequest entity to NotificationRequestDto with tenant data
    */
-  private mapToDto(entity: NotificationRequest): NotificationRequestDto {
+  mapToDto(entity: NotificationRequest): NotificationRequestDto {
     return {
       id: entity.id,
       tenantId: entity.tenantId,
-      status: entity.status,
-      channelCode: entity.channelCode,
-      channel: entity.channel
+      status: entity.statusCode
         ? {
-            channelCode: entity.channel.channelCode,
-            displayName: entity.channel.displayName,
-            description: entity.channel.description,
+            code: entity.statusCode.code,
+            displayName: entity.statusCode.displayName,
+            description: entity.statusCode.description,
           }
-        : undefined,
+        : { code: entity.status, displayName: entity.status },
+      channelCodes: entity.channelCodes,
+      requestRoute: entity.requestRoute,
       recipients: entity.recipients,
       delayedSendTime: entity.delayedSendTime,
       payload: entity.payload,
@@ -134,7 +128,7 @@ export class NotificationService {
    * (mirroring how simple sends store their recipients on the parent request).
    */
   private extractMailMergeChannelAndRecipients(payload: NotifySimpleRequest): {
-    channel: string | null
+    channelCodes: string[] | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
   } {
@@ -143,7 +137,7 @@ export class NotificationService {
     const parsed = this.parseMailMergeRecipients(email?.recipients?.mergeArray ?? [])
     const addresses = parsed.map((r) => r.address)
     return {
-      channel: 'EMAIL',
+      channelCodes: ['EMAIL'],
       recipients: addresses.length > 0 ? { email: addresses } : null,
       delayedSendTime:
         delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
@@ -153,12 +147,12 @@ export class NotificationService {
   private extractChannelAndRecipients(
     payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
   ): {
-    channel: string | null
+    channelCodes: string[] | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
   } {
     if (!payload) {
-      return { channel: null, recipients: null, delayedSendTime: null }
+      return { channelCodes: null, recipients: null, delayedSendTime: null }
     }
 
     const channels: string[] = []
@@ -196,16 +190,8 @@ export class NotificationService {
       }
     }
 
-    // Determine primary channel code
-    let channelCode: string | null = null
-    if (channels.length === 1) {
-      channelCode = channels[0]
-    } else if (channels.length > 1) {
-      channelCode = 'MULTIPLE'
-    }
-
     return {
-      channel: channelCode,
+      channelCodes: channels.length > 0 ? channels : null,
       recipients: Object.keys(recipients).length > 0 ? recipients : null,
       delayedSendTime:
         delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
@@ -216,7 +202,7 @@ export class NotificationService {
     // Extract channel, recipients, and delayed send time from payload. Mail-merge sends (email
     // recipients given as `mergeArray`) take a dedicated extractor since the addressees live in the
     // merge rows rather than to/cc/bcc.
-    const { channel, recipients, delayedSendTime } = Array.isArray(
+    const { channelCodes, recipients, delayedSendTime } = Array.isArray(
       dto.payload?.email?.recipients?.mergeArray,
     )
       ? this.extractMailMergeChannelAndRecipients(dto.payload as NotifySimpleRequest)
@@ -227,10 +213,11 @@ export class NotificationService {
       status: dto.status ?? NotificationStatus.QUEUED,
       createdBy: dto.createdBy,
       payload: dto.payload,
+      channelCodes: channelCodes ?? undefined,
       isInternal: dto.isInternal ?? false,
-      channelCode: channel,
       recipients: recipients,
       delayedSendTime: delayedSendTime,
+      requestRoute: dto.requestRoute,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
@@ -343,11 +330,35 @@ export class NotificationService {
     })
   }
 
+  /**
+   * Parse `channelCodes:eq:...` / `channelCodes:in:A|B` filter tokens into a de-duplicated,
+   * upper-cased list of channel codes (channel codes are stored canonical upper-case).
+   */
+  private extractChannelCodeFilterValues(filterTokens: string[] | undefined): string[] {
+    const values = new Set<string>()
+    for (const token of filterTokens ?? []) {
+      if (!token.startsWith('channelCodes:')) continue
+      const [, operator, ...rest] = token.split(':')
+      if (operator !== 'eq' && operator !== 'in') continue
+      for (const value of rest.join(':').split('|')) {
+        const trimmed = value.trim()
+        if (trimmed) values.add(trimmed.toUpperCase())
+      }
+    }
+    return [...values]
+  }
+
   async findAll(
     tenantExternalId: string,
     query: ListQueryDto,
   ): Promise<PaginatedNotificationResponse> {
-    const parsedQuery = parseListQuery(query, notificationListQueryConfig)
+    // channelCodes is a JSONB array, so it can't go through the generic scalar query builder.
+    // Pull its filter tokens out here and apply them as containment checks below.
+    const channelCodeValues = this.extractChannelCodeFilterValues(query.filter)
+    const parsedQuery = parseListQuery(
+      { ...query, filter: query.filter?.filter((token) => !token.startsWith('channelCodes:')) },
+      notificationListQueryConfig,
+    )
 
     const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
     if (!tenant) {
@@ -366,10 +377,20 @@ export class NotificationService {
     const queryBuilder = this.notificationRepository
       .createQueryBuilder('notification')
       .leftJoinAndSelect('notification.tenant', 'tenant')
+      .leftJoinAndSelect('notification.statusCode', 'statusCode')
       .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('notification.isInternal = :isInternal', { isInternal: false })
 
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
+
+    // Match requests whose channel_codes array contains any of the requested channels.
+    if (channelCodeValues.length > 0) {
+      queryBuilder.andWhere(
+        'jsonb_exists_any(notification.channel_codes, ARRAY[:...channelCodeValues]::text[])',
+        { channelCodeValues },
+      )
+    }
+
     const [notifications, total] = await queryBuilder.getManyAndCount()
 
     const totalPages = Math.ceil(total / parsedQuery.limit)
@@ -392,6 +413,19 @@ export class NotificationService {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
     }
     return notification
+  }
+
+  /**
+   * Retrieve a single notification request for a frontend user, scoped to their tenant.
+   * Resolves the internal tenant from the external ID before delegating to findOne.
+   */
+  async findOneFrontend(id: string, tenantExternalId: string): Promise<NotificationRequestDto> {
+    const tenant = await this.tenantsService.findByExternalId(tenantExternalId)
+    if (!tenant) {
+      throw new NotFoundException(`Notification request with id '${id}' not found`)
+    }
+    const notification = await this.findOne(id, tenant.id)
+    return this.mapToDto(notification)
   }
 
   // Demo route, to be removed

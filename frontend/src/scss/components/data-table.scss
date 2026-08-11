@@ -12,7 +12,8 @@ $table-header-bg: #f1f8fe; // Table header / footer color
   width: 100%;
   border-collapse: collapse;
   background-color: $white;
-  font-size: $font-size-base;
+  font-size: 14px;
+  margin: 29px 0px;
 
   /* Variants */
 
@@ -60,7 +61,7 @@ $table-header-bg: #f1f8fe; // Table header / footer color
   &--md {
     th,
     td {
-      padding: $spacing-sm $spacing-md;
+      padding: $spacing-sm $spacing-sm;
     }
   }
 
@@ -109,6 +110,13 @@ $table-header-bg: #f1f8fe; // Table header / footer color
       color: $dark-text;
       white-space: nowrap;
     }
+  }
+
+  /* Extra right padding on the final column (e.g. Sent Date) */
+
+  thead th:last-child,
+  tbody td:last-child {
+    padding-right: 12px;
   }
 
   /* Footer */

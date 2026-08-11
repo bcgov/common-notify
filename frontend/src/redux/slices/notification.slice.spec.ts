@@ -35,7 +35,7 @@ describe('notificationSlice', () => {
             {
               id: 'notif-1',
               tenantId: 'tenant-1',
-              status: NotificationStatus.QUEUED,
+              status: { code: NotificationStatus.QUEUED, displayName: 'Queued' },
               createdAt: '2026-05-12T00:00:00.000Z',
               updatedAt: '2026-05-12T00:00:00.000Z',
             },

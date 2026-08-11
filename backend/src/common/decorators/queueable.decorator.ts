@@ -14,6 +14,7 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
+import { extractRequestRoute } from '../utils/extract-request-route'
 import type {
   ApiKeyUsageService,
   RecordedUsageResult,
@@ -154,6 +155,7 @@ async function handleEmailMerge(
   tenantId: string,
   dto: NotifySimpleRequest,
   apiKeyConsumerId: string | undefined,
+  requestRoute: string | undefined,
 ) {
   const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
 
@@ -181,6 +183,7 @@ async function handleEmailMerge(
     status: NotificationStatus.PENDING,
     createdBy: tenantId,
     payload: dto as any,
+    requestRoute,
   })
   logger.debug(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
@@ -199,7 +202,13 @@ async function handleEmailMerge(
       .publish(tenantId, {
         id: notificationRecord.id,
         tenantId: notificationRecord.tenantId,
-        status: notificationRecord.status,
+        status: notificationRecord.statusCode
+          ? {
+              code: notificationRecord.statusCode.code,
+              displayName: notificationRecord.statusCode.displayName,
+              description: notificationRecord.statusCode.description,
+            }
+          : { code: notificationRecord.status, displayName: notificationRecord.status },
         createdAt: notificationRecord.createdAt,
         createdBy: notificationRecord.createdBy ?? undefined,
         updatedAt: notificationRecord.updatedAt,
@@ -380,6 +389,7 @@ export function Queueable(
         }
 
         const tenantId = tenant.id
+        const requestRoute = extractRequestRoute(req)
         const uploadedBy =
           typeof req?.user?.sub === 'string'
             ? req.user.sub
@@ -396,6 +406,7 @@ export function Queueable(
             tenantId,
             payload,
             req?.apiKeyConsumerId,
+            requestRoute,
           )
         }
 
@@ -447,6 +458,7 @@ export function Queueable(
             status: NotificationStatus.PENDING,
             createdBy: tenantId,
             payload: processedPayload, // Store sanitized request payload for retry purposes
+            requestRoute,
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,
@@ -459,7 +471,13 @@ export function Queueable(
               .publish(tenantId, {
                 id: notificationRecord.id,
                 tenantId: notificationRecord.tenantId,
-                status: notificationRecord.status,
+                status: notificationRecord.statusCode
+                  ? {
+                      code: notificationRecord.statusCode.code,
+                      displayName: notificationRecord.statusCode.displayName,
+                      description: notificationRecord.statusCode.description,
+                    }
+                  : { code: notificationRecord.status, displayName: notificationRecord.status },
                 createdAt: notificationRecord.createdAt,
                 createdBy: notificationRecord.createdBy ?? undefined,
                 updatedAt: notificationRecord.updatedAt,

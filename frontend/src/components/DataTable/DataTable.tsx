@@ -93,6 +93,7 @@ export function DataTable<T extends object>({
   footerContent,
   activeFilters,
   onFilter,
+  onRowClick,
 }: TableProps<T>) {
   data = data ?? []
 
@@ -116,7 +117,22 @@ export function DataTable<T extends object>({
     }
 
     return data.map((row) => (
-      <TableRow key={keyExtractor(row)}>
+      <TableRow
+        key={keyExtractor(row)}
+        className={onRowClick ? 'data-table__clickable-row' : undefined}
+        onClick={onRowClick ? () => onRowClick(row) : undefined}
+        tabIndex={onRowClick ? 0 : undefined}
+        onKeyDown={
+          onRowClick
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onRowClick(row)
+                }
+              }
+            : undefined
+        }
+      >
         {columns.map((col) => {
           const rawValue = row[col.key as keyof T]
           const cell = col.render ? col.render(rawValue, row) : String(rawValue ?? '')

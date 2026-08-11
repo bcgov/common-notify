@@ -6,8 +6,8 @@ export interface Tenant {
   slug: string
 }
 
-export interface NotificationChannel {
-  channelCode: string
+export interface NotificationStatusCode {
+  code: string
   displayName: string
   description?: string
 }
@@ -16,9 +16,9 @@ export interface NotificationRequest {
   id: string
   tenantId: string
   tenant?: Tenant
-  status: string
-  channelCode?: string
-  channel?: NotificationChannel
+  status: NotificationStatusCode
+  channelCodes?: string[] // array of notification_channel_code.channel_code values
+  requestRoute?: string
   delayedSendTime?: string
   recipients?: {
     email?: string[]
