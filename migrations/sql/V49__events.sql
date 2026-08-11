@@ -1,0 +1,308 @@
+-- V49: Events.
+--
+-- An event is a named, reusable notification definition owned by a tenant. It is configured
+-- through three UI tabs, which map onto three tables:
+--
+--   Event settings tab -> notify.event
+--                         name + description.
+--   Email settings tab -> notify.event_channel_setting (channel_code = 'EMAIL')
+--                         active flag, sender email address, template, recipients.
+--   SMS settings tab   -> notify.event_channel_setting (channel_code = 'SMS')
+--                         active flag, from number (from the V47 pool), template, recipients.
+--
+-- Recipients for both tabs live in notify.event_recipient, one row per recipient, hanging off
+-- the channel setting. Manual entry only for now; imported/dynamic recipient sources are a
+-- later change.
+--
+-- Deliberately NOT in this migration (pending design):
+--   - header/footer overrides on the email tab
+--   - attachment service linkage
+--   - linking a dispatched notification_request back to the event that produced it
+BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- 1. Event (Event settings tab)
+-- ---------------------------------------------------------------------------
+CREATE TABLE
+  notify.event (
+    id UUID NOT NULL DEFAULT gen_random_uuid (),
+    tenant_id UUID NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    created_by VARCHAR(200),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    updated_by VARCHAR(200),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT pk_event PRIMARY KEY (id),
+    CONSTRAINT fk_event_tenant FOREIGN KEY (tenant_id) REFERENCES notify.tenant (id) ON DELETE CASCADE,
+    CONSTRAINT chk_event_name CHECK (length(btrim(name)) > 0)
+  );
+
+-- Event names are unique per tenant, case insensitively. Partial so a deleted event does not
+-- reserve its name forever.
+CREATE UNIQUE INDEX uq_event_tenant_name ON notify.event (tenant_id, lower(btrim(name)))
+WHERE
+  is_deleted = FALSE;
+
+CREATE INDEX idx_event_tenant ON notify.event (tenant_id)
+WHERE
+  is_deleted = FALSE;
+
+CREATE TRIGGER trg_event_updated_at BEFORE
+UPDATE ON notify.event FOR EACH ROW
+EXECUTE FUNCTION notify.set_updated_at ();
+
+COMMENT ON TABLE notify.event IS 'A tenant-owned, named notification definition. Per-channel configuration lives in notify.event_channel_setting and recipients in notify.event_recipient.';
+
+COMMENT ON COLUMN notify.event.id IS 'Unique identifier for the event.';
+
+COMMENT ON COLUMN notify.event.tenant_id IS 'Tenant that owns this event. Cascade deleted with the tenant.';
+
+COMMENT ON COLUMN notify.event.name IS 'Event name entered on the Event settings tab. Unique per tenant, case insensitive, among non-deleted events.';
+
+COMMENT ON COLUMN notify.event.description IS 'Free-text description of what the event is for. Optional.';
+
+COMMENT ON COLUMN notify.event.created_at IS 'Timestamp with timezone when the event was created.';
+
+COMMENT ON COLUMN notify.event.created_by IS 'Identifier of the user or process that created this event.';
+
+COMMENT ON COLUMN notify.event.updated_at IS 'Timestamp with timezone when the event was last updated. Maintained by trg_event_updated_at.';
+
+COMMENT ON COLUMN notify.event.updated_by IS 'Identifier of the user or process that last updated this event.';
+
+COMMENT ON COLUMN notify.event.is_deleted IS 'Soft delete flag. Deleted events are hidden from the UI and are never dispatched.';
+
+-- ---------------------------------------------------------------------------
+-- 2. Per-channel settings (Email settings tab / SMS settings tab)
+-- ---------------------------------------------------------------------------
+-- One row per event per channel. Channel-specific columns are nullable and constrained so an
+-- EMAIL row can only carry a sender email and an SMS row can only carry a from number.
+CREATE TABLE
+  notify.event_channel_setting (
+    id UUID NOT NULL DEFAULT gen_random_uuid (),
+    event_id UUID NOT NULL,
+    channel_code VARCHAR(20) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT FALSE,
+    template_id UUID,
+    sender_email VARCHAR(320),
+    from_phone_number_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    created_by VARCHAR(200),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    updated_by VARCHAR(200),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT pk_event_channel_setting PRIMARY KEY (id),
+    CONSTRAINT fk_event_channel_setting_event FOREIGN KEY (event_id) REFERENCES notify.event (id) ON DELETE CASCADE,
+    CONSTRAINT fk_event_channel_setting_channel FOREIGN KEY (channel_code) REFERENCES notify.notification_channel_code (channel_code),
+    CONSTRAINT fk_event_channel_setting_template FOREIGN KEY (template_id) REFERENCES notify.template (id),
+    CONSTRAINT fk_event_channel_setting_number FOREIGN KEY (from_phone_number_id) REFERENCES notify.provisioned_phone_number (id),
+    CONSTRAINT uq_event_channel_setting UNIQUE (event_id, channel_code),
+    CONSTRAINT chk_event_channel_setting_channel CHECK (channel_code IN ('EMAIL', 'SMS')),
+    -- Channel-appropriate columns only.
+    CONSTRAINT chk_event_channel_setting_shape CHECK (
+      (
+        channel_code = 'EMAIL'
+        AND from_phone_number_id IS NULL
+      )
+      OR (
+        channel_code = 'SMS'
+        AND sender_email IS NULL
+      )
+    ),
+    -- Pragmatic syntax check only; deliverability/ownership of the sender address is verified
+    -- by the application against the mail provider.
+    CONSTRAINT chk_event_channel_setting_sender_email CHECK (
+      sender_email IS NULL
+      OR sender_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+    ),
+    -- A channel cannot be switched on until it is fully configured.
+    CONSTRAINT chk_event_channel_setting_active_complete CHECK (
+      active = FALSE
+      OR (
+        template_id IS NOT NULL
+        AND (
+          (
+            channel_code = 'EMAIL'
+            AND sender_email IS NOT NULL
+          )
+          OR (
+            channel_code = 'SMS'
+            AND from_phone_number_id IS NOT NULL
+          )
+        )
+      )
+    )
+  );
+
+-- Deliberately NOT unique: a tenant holds a single number (V47) and every one of its SMS events
+-- sends from it. This index backs the release guard's "is anything still using this number?"
+-- lookup and the admin view of which events a number serves.
+CREATE INDEX idx_event_channel_setting_number ON notify.event_channel_setting (from_phone_number_id)
+WHERE
+  is_deleted = FALSE
+  AND from_phone_number_id IS NOT NULL;
+
+CREATE INDEX idx_event_channel_setting_event ON notify.event_channel_setting (event_id)
+WHERE
+  is_deleted = FALSE;
+
+-- "Which events use this template?" - guards template deactivation/deletion.
+CREATE INDEX idx_event_channel_setting_template ON notify.event_channel_setting (template_id)
+WHERE
+  is_deleted = FALSE
+  AND template_id IS NOT NULL;
+
+CREATE TRIGGER trg_event_channel_setting_updated_at BEFORE
+UPDATE ON notify.event_channel_setting FOR EACH ROW
+EXECUTE FUNCTION notify.set_updated_at ();
+
+COMMENT ON TABLE notify.event_channel_setting IS 'Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. Channel-specific columns are constrained so EMAIL rows carry sender_email and SMS rows carry from_phone_number_id.';
+
+COMMENT ON COLUMN notify.event_channel_setting.id IS 'Unique identifier for the channel setting row.';
+
+COMMENT ON COLUMN notify.event_channel_setting.event_id IS 'Event these settings belong to. Cascade deleted with the event.';
+
+COMMENT ON COLUMN notify.event_channel_setting.channel_code IS 'Channel these settings configure (EMAIL or SMS).';
+
+COMMENT ON COLUMN notify.event_channel_setting.active IS 'Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template and the channel sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated.';
+
+COMMENT ON COLUMN notify.event_channel_setting.template_id IS 'Template used to render this channel. Must be an active template belonging to the same tenant as the event and matching channel_code; enforced by the application. Templates are authored separately by CSTAR template admins - the event only selects an existing one.';
+
+COMMENT ON COLUMN notify.event_channel_setting.sender_email IS 'From address for EMAIL sends. NULL on SMS rows. Format checked here, ownership verified by the application against the mail provider.';
+
+COMMENT ON COLUMN notify.event_channel_setting.from_phone_number_id IS 'Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant''s single allocated number (V47), shared by all of that tenant''s SMS events, so this is not unique.';
+
+COMMENT ON COLUMN notify.event_channel_setting.created_at IS 'Timestamp with timezone when the channel setting was created.';
+
+COMMENT ON COLUMN notify.event_channel_setting.created_by IS 'Identifier of the user or process that created this record.';
+
+COMMENT ON COLUMN notify.event_channel_setting.updated_at IS 'Timestamp with timezone when the channel setting was last updated. Maintained by trg_event_channel_setting_updated_at.';
+
+COMMENT ON COLUMN notify.event_channel_setting.updated_by IS 'Identifier of the user or process that last updated this record.';
+
+COMMENT ON COLUMN notify.event_channel_setting.is_deleted IS 'Soft delete flag. Deleted rows release their from number back to the picker.';
+
+-- ---------------------------------------------------------------------------
+-- 3. Recipients (both tabs)
+-- ---------------------------------------------------------------------------
+-- Same two-column representation as notify.recipient_safelist (V45): what the user typed, plus
+-- the canonical form used for comparison and uniqueness.
+CREATE TABLE
+  notify.event_recipient (
+    id UUID NOT NULL DEFAULT gen_random_uuid (),
+    event_channel_setting_id UUID NOT NULL,
+    recipient VARCHAR(320) NOT NULL,
+    recipient_normalized VARCHAR(320) NOT NULL,
+    label VARCHAR(200),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    created_by VARCHAR(200),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
+    updated_by VARCHAR(200),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT pk_event_recipient PRIMARY KEY (id),
+    CONSTRAINT fk_event_recipient_setting FOREIGN KEY (event_channel_setting_id) REFERENCES notify.event_channel_setting (id) ON DELETE CASCADE,
+    CONSTRAINT chk_event_recipient_recipient CHECK (length(btrim(recipient)) > 0),
+    CONSTRAINT chk_event_recipient_normalized CHECK (
+      recipient_normalized = btrim(recipient_normalized)
+      AND length(recipient_normalized) > 0
+    )
+  );
+
+-- No duplicate live recipients on a channel. Partial so a removed recipient can be re-added.
+CREATE UNIQUE INDEX uq_event_recipient_active ON notify.event_recipient (event_channel_setting_id, recipient_normalized)
+WHERE
+  is_deleted = FALSE;
+
+CREATE INDEX idx_event_recipient_setting ON notify.event_recipient (event_channel_setting_id)
+WHERE
+  is_deleted = FALSE;
+
+CREATE TRIGGER trg_event_recipient_updated_at BEFORE
+UPDATE ON notify.event_recipient FOR EACH ROW
+EXECUTE FUNCTION notify.set_updated_at ();
+
+COMMENT ON TABLE notify.event_recipient IS 'Recipients configured on an event channel. Manually entered for now; one row per recipient per channel.';
+
+COMMENT ON COLUMN notify.event_recipient.id IS 'Unique identifier for the recipient entry.';
+
+COMMENT ON COLUMN notify.event_recipient.event_channel_setting_id IS 'Event channel setting this recipient belongs to. Cascade deleted with it; the channel is implied by the parent row.';
+
+COMMENT ON COLUMN notify.event_recipient.recipient IS 'Recipient exactly as entered by the user (email address or phone number). Displayed in the UI.';
+
+COMMENT ON COLUMN notify.event_recipient.recipient_normalized IS 'Canonical form used for comparison and de-duplication: lowercased/trimmed for EMAIL, E.164 for SMS. Matches the convention used by notify.recipient_safelist.';
+
+COMMENT ON COLUMN notify.event_recipient.label IS 'Optional free-text label describing the recipient (e.g. "On-call pager"). Nullable.';
+
+COMMENT ON COLUMN notify.event_recipient.created_at IS 'Timestamp with timezone when the recipient was added.';
+
+COMMENT ON COLUMN notify.event_recipient.created_by IS 'Identifier of the user or process that added this recipient.';
+
+COMMENT ON COLUMN notify.event_recipient.updated_at IS 'Timestamp with timezone when the recipient was last updated. Maintained by trg_event_recipient_updated_at.';
+
+COMMENT ON COLUMN notify.event_recipient.updated_by IS 'Identifier of the user or process that last updated this recipient.';
+
+COMMENT ON COLUMN notify.event_recipient.is_deleted IS 'Soft delete flag. Excluded from the active unique index and from dispatch when true.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Guard: releasing a number back to the pool
+-- ---------------------------------------------------------------------------
+-- An sso.notify_admin can release a number back to the pool (tenant_id / allocated_at to NULL)
+-- or retire it (is_deleted). Because a tenant holds one number that all of its SMS events share,
+-- release is only safe when the tenant has *no event with SMS enabled* - otherwise a live event
+-- would keep sending from a number that has been handed to another tenant.
+--
+-- The role check itself (sso.notify_admin) is the application's job; what the database enforces
+-- is the precondition, so no code path can release a number out from under a sending event.
+-- A plain FK cannot express this - the reference is not being deleted, only re-homed - so the
+-- check lives in a trigger.
+--
+-- Events whose SMS tab is merely disabled do not block the release. Their stale pointer is
+-- cleared as part of the same statement, so disabling SMS everywhere is all an admin has to ask
+-- the tenant to do before reclaiming the number.
+CREATE OR REPLACE FUNCTION notify.check_phone_number_release () RETURNS TRIGGER AS $$
+DECLARE
+  v_event_name TEXT;
+BEGIN
+  -- Only guard transitions that take the number away from its current holder: a change of
+  -- tenant (including release to NULL) or a retirement.
+  IF NEW.tenant_id IS NOT DISTINCT FROM OLD.tenant_id
+     AND NOT (NEW.is_deleted AND NOT OLD.is_deleted) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT e.name
+    INTO v_event_name
+    FROM notify.event_channel_setting ecs
+    JOIN notify.event e ON e.id = ecs.event_id
+   WHERE ecs.from_phone_number_id = OLD.id
+     AND ecs.is_deleted = FALSE
+     AND ecs.active = TRUE
+   LIMIT 1;
+
+  IF v_event_name IS NOT NULL THEN
+    RAISE EXCEPTION
+      'Phone number % cannot be released or retired: event "%" still has SMS enabled. Disable SMS on that event first.',
+      OLD.phone_number, v_event_name
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  -- Everything still pointing at the number is a disabled SMS tab. Detach it rather than leave a
+  -- pointer to a number that may be re-allocated to a different tenant. Safe against
+  -- chk_event_channel_setting_active_complete precisely because these rows are inactive.
+  UPDATE notify.event_channel_setting
+     SET from_phone_number_id = NULL
+   WHERE from_phone_number_id = OLD.id
+     AND is_deleted = FALSE;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION notify.check_phone_number_release () IS 'Blocks releasing, re-allocating or retiring a provisioned phone number while any non-deleted event_channel_setting referencing it still has active = TRUE. When every reference is inactive, clears those references so a released number leaves no cross-tenant pointer behind.';
+
+CREATE TRIGGER trg_provisioned_phone_number_release BEFORE
+UPDATE ON notify.provisioned_phone_number FOR EACH ROW
+EXECUTE FUNCTION notify.check_phone_number_release ();
+
+COMMIT;
