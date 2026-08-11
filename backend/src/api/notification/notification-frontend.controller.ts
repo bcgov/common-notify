@@ -12,8 +12,15 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
-import { NotificationRequestDetailService } from './notification-request-detail.service'
+import {
+  NotificationRequestDetailService,
+  notificationRequestDetailListQueryConfig,
+} from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
+import { NotificationRequestDto } from './schemas/notification-request'
+import { PaginatedNotificationRequestDetailResponse } from './schemas/paginated-request-detail-response'
+import { NotificationRequestDetailListQueryDto } from './schemas/notification-request-detail-list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
@@ -127,20 +134,76 @@ export class NotificationFrontendController {
   }
 
   @Version('1')
-  @Get('request_details')
-  @ApiOperation({
-    summary: 'List all notification request detail records for the authenticated tenant',
+  @Get('request_details/:id')
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number (1-indexed)',
   })
-  findAllRequestDetails(@Req() req: Request) {
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page (max 100)',
+  })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    example: '-createdAt,status',
+    description: 'Sort fields separated by commas. Prefix with - for DESC.',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    isArray: true,
+    example: ['status:in:sent|failed', 'channel:eq:EMAIL'],
+    description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    example: 'example@gov.bc.ca',
+    description: 'Case-insensitive search across recipient address.',
+  })
+  @ApiOkResponse({ type: PaginatedNotificationRequestDetailResponse })
+  findRequestDetails(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Query() query: NotificationRequestDetailListQueryDto,
+  ) {
     const frontendUser = (req as any).tenant as Tenant
-    return this.notificationRequestDetailService.findAllByTenantIdFrontend(frontendUser.externalId)
+    const parsedQuery = parseListQuery(query, notificationRequestDetailListQueryConfig)
+    return this.notificationRequestDetailService.findByRequestIdFrontend(
+      id,
+      frontendUser.externalId,
+      parsedQuery,
+      query.search,
+    )
   }
 
   @Version('1')
-  @Get('request_details/:id')
-  @ApiOperation({ summary: 'List notification request detail records for a notification request' })
-  findRequestDetails(@Req() req: Request, @Param('id') id: string) {
-    const frontendUser = (req as any).tenant as Tenant
-    return this.notificationRequestDetailService.findByRequestId(id, frontendUser.externalId)
+  @Get(':id')
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get a single notification request by id for the authenticated tenant' })
+  @ApiOkResponse({ type: NotificationRequestDto })
+  findOne(@Req() req: Request, @Param('id') id: string) {
+    const tenant = (req as any).tenant as Tenant
+    return this.notificationService.findOneFrontend(id, tenant.externalId)
   }
 }

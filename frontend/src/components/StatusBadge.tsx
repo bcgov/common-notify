@@ -7,7 +7,13 @@ import '@/scss/components/status-badge.scss'
  *
  * @param status - The status value: string (e.g., 'completed', 'failed', 'pending') or boolean (for enabled/disabled)
  */
-export function StatusBadge({ status }: { status?: string | boolean }) {
+export function StatusBadge({
+  status,
+  statusLabel,
+}: {
+  status?: string | boolean
+  statusLabel?: string
+}) {
   let label = ''
   let dotClassName = ''
 
@@ -15,17 +21,24 @@ export function StatusBadge({ status }: { status?: string | boolean }) {
     label = status ? 'Enabled' : 'Disabled'
     dotClassName = status ? 'status-badge__dot--enabled' : 'status-badge__dot--disabled'
   } else if (status) {
-    label = status.charAt(0).toUpperCase() + status.slice(1)
+    label = statusLabel ? statusLabel : status.charAt(0).toUpperCase() + status.slice(1)
     // Map status strings to dot class names
     switch (status) {
       case 'completed':
-        dotClassName = 'status-badge__dot--completed'
+      case 'sent':
+      case 'delivered':
+        dotClassName = 'status-badge__dot--success'
+        break
+      case 'partially_completed':
+        dotClassName = 'status-badge__dot--partial'
         break
       case 'failed':
+      case 'quarantined':
+      case 'bounced':
         dotClassName = 'status-badge__dot--failed'
         break
-      case 'pending':
-        dotClassName = 'status-badge__dot--pending'
+      case 'cancelled':
+        dotClassName = 'status-badge__dot--cancelled'
         break
       default:
         dotClassName = 'status-badge__dot--pending'

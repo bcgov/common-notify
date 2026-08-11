@@ -1,8 +1,11 @@
 import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
-import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
-import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import type {
+  PaginatedNotificationResponse,
+  PaginatedNotificationDetailResponse,
+} from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
 
 export interface ListNotificationsOptions {
@@ -10,6 +13,10 @@ export interface ListNotificationsOptions {
   limit?: number
   sort?: string
   filter?: string[]
+}
+
+export interface ListRequestDetailsOptions extends ListNotificationsOptions {
+  search?: string
 }
 
 export const notificationApi = {
@@ -49,23 +56,54 @@ export const notificationApi = {
   },
 
   /**
-   * Fetch individual delivery records for a notification request.
-   * GET /api/v1/frontend/notification_request/:id/request_details
+   * Fetch a single notification request (the parent of the delivery records).
+   * GET /api/v1/frontend/notification_request/:id
    */
-  async listRequestDetails(notificationRequestId: string): Promise<NotificationRequestDetail[]> {
+  async getNotification(notificationRequestId: string): Promise<NotificationRequest> {
     const params = generateApiParameters(
-      `/api/v1/frontend/notification_request/request_details/${notificationRequestId}`,
+      `/api/v1/frontend/notification_request/${notificationRequestId}`,
     )
-    return get<NotificationRequestDetail[]>(params)
+    return await get<NotificationRequest>(params)
   },
 
   /**
-   * Fetch all delivery records for the authenticated tenant.
-   * GET /api/v1/frontend/notification_request/request_details
+   * Fetch individual delivery records for a notification request.
+   * Sorting, filtering, search, and pagination are all applied on the backend.
+   * GET /api/v1/frontend/notification_request/request_details/:id
    */
-  async listAllRequestDetails(): Promise<NotificationRequestDetail[]> {
-    const params = generateApiParameters('/api/v1/frontend/notification_request/request_details')
-    return get<NotificationRequestDetail[]>(params)
+  async listRequestDetails(
+    notificationRequestId: string,
+    options: ListRequestDetailsOptions = {},
+  ): Promise<PaginatedNotificationDetailResponse> {
+    try {
+      const qs = new URLSearchParams()
+      if (options.page) qs.set('page', String(options.page))
+      if (options.limit) qs.set('limit', String(options.limit))
+      if (options.search) qs.set('search', options.search)
+      if (options.sort) qs.set('sort', options.sort)
+      if (options.filter && options.filter.length > 0)
+        options.filter.forEach((f) => qs.append('filter', f))
+      const params = generateApiParameters(
+        `/api/v1/frontend/notification_request/request_details/${notificationRequestId}?${qs.toString()}`,
+      )
+      return await get<PaginatedNotificationDetailResponse>(params)
+    } catch (error) {
+      const axiosError = error as AxiosError
+      if (axiosError.response?.status === STATUS_CODES.NotFound) {
+        return {
+          data: [],
+          count: 0,
+          page: options.page ?? 1,
+          limit: options.limit ?? 15,
+          totalPages: 0,
+        }
+      }
+      throw new Error(
+        `Failed to fetch notification details: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
   },
 
   /**

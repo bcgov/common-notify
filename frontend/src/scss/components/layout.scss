@@ -9,12 +9,16 @@
 .layout-header {
   @include flex-between;
   gap: $spacing-md;
-  // padding: $spacing-md;
   padding-top: $spacing-md;
   padding-left: $spacing-md;
   padding-right: $spacing-md;
   background-color: $secondary-color;
   color: $white;
+
+  // Widen the BCDS header's inner container (default max-width is 1100px)
+  .bcds-header > .bcds-header--container {
+    max-width: 1376px;
+  }
 }
 
 .layout-header-nav {
@@ -127,7 +131,6 @@
 .layout-content {
   flex-grow: 1;
   padding: $spacing-xl $spacing-md;
-  margin-left: 40px;
 }
 
 .layout-footer {
