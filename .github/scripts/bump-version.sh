@@ -1,13 +1,17 @@
 #!/bin/bash
 set -e
 
-# Script to automatically bump version based on conventional commits
+# Script to bump the release version, derived from the latest git tag.
 # Usage: ./bump-version.sh [major|minor|patch|auto]
 #
-# Auto mode (default): Analyzes commits since last tag
-#   - feat: commits -> minor bump (automatic)
-#   - fix: commits -> patch bump (automatic)
-#   - BREAKING CHANGE or major: -> requires manual major bump
+# The latest git tag (vX.Y.Z) is the single source of truth for the current
+# version — NOT frontend/package.json — so the version always advances on every
+# merge without needing to commit package.json back to main.
+#
+#   auto (default): minor bump on every run (project policy: minor per merge).
+#   minor:          X.Y.Z -> X.(Y+1).0
+#   patch:          X.Y.Z -> X.Y.(Z+1)
+#   major:          (X+1).0.0   (must be requested explicitly)
 
 BUMP_TYPE="${1:-auto}"
 PACKAGE_JSON="frontend/package.json"
@@ -18,47 +22,28 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get current version from package.json
-CURRENT_VERSION=$(node -p "require('./$PACKAGE_JSON').version")
+# Derive the current version from the latest git tag (source of truth).
+# Fall back to package.json, then 0.0.0, when no tag exists yet.
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -n "$LAST_TAG" ]; then
+  CURRENT_VERSION="${LAST_TAG#v}"   # strip leading "v"
+  echo "Latest tag: $LAST_TAG"
+else
+  CURRENT_VERSION=$(node -p "require('./$PACKAGE_JSON').version" 2>/dev/null || echo "0.0.0")
+  echo -e "${YELLOW}No previous tag found. Falling back to package.json version.${NC}"
+fi
 echo "Current version: $CURRENT_VERSION"
 
 # Parse version into parts
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+MAJOR="${MAJOR:-0}"
+MINOR="${MINOR:-0}"
+PATCH="${PATCH:-0}"
 
-# Get the last tag to analyze commits since then
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
-if [ -z "$LAST_TAG" ]; then
-  echo -e "${YELLOW}No previous tag found. Using initial commits.${NC}"
-  COMMITS=$(git log --pretty=format:"%s")
-else
-  echo "Last tag: $LAST_TAG"
-  COMMITS=$(git log "$LAST_TAG"..HEAD --pretty=format:"%s")
-fi
-
-# Determine bump type if auto mode
+# Auto mode: project policy is a minor bump on every merge.
 if [ "$BUMP_TYPE" == "auto" ]; then
-  # Check for breaking changes
-  if echo "$COMMITS" | grep -qiE "^(BREAKING CHANGE|major:)"; then
-    echo -e "${RED}⚠️  BREAKING CHANGE detected!${NC}"
-    echo -e "${RED}Major version bumps must be done manually.${NC}"
-    echo -e "${RED}Please run: ./bump-version.sh major${NC}"
-    exit 1
-  fi
-
-  # Check for features (minor bump)
-  if echo "$COMMITS" | grep -qiE "^feat(\(|:)"; then
-    BUMP_TYPE="minor"
-    echo -e "${GREEN}Feature commits detected -> minor bump${NC}"
-  # Check for fixes (patch bump)
-  elif echo "$COMMITS" | grep -qiE "^fix(\(|:)"; then
-    BUMP_TYPE="patch"
-    echo -e "${GREEN}Fix commits detected -> patch bump${NC}"
-  else
-    # No conventional commits found - default to patch
-    BUMP_TYPE="patch"
-    echo -e "${YELLOW}No conventional commits found -> defaulting to patch bump${NC}"
-  fi
+  BUMP_TYPE="minor"
+  echo -e "${GREEN}Auto mode -> minor bump (one minor version per merge)${NC}"
 fi
 
 # Calculate new version
@@ -91,7 +76,9 @@ esac
 NEW_VERSION="$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
 echo "New version: $NEW_VERSION"
 
-# Update package.json using node
+# Update package.json so the workspace reflects the new version (used by the
+# release step to read the version). This is not committed back — the git tag
+# remains the source of truth.
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('$PACKAGE_JSON', 'utf8'));
