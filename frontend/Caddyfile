@@ -19,8 +19,22 @@
 		`
 	}
 
+	# Swagger UI / OpenAPI spec, served straight from the backend.
+	# Kong has no route for /api/docs (every gateway route is an explicit path),
+	# so this deliberately bypasses the gateway and hits the backend Service.
+	# Covers /api/docs, its static assets under /api/docs/*, and the
+	# /api/docs-json + /api/docs-yaml spec endpoints.
+	@docs path /api/docs*
+	reverse_proxy @docs {$BACKEND_URL:http://backend:3000} {
+		header_up X-Real-IP {remote_host}
+	}
+
 	# Proxy requests to API Gateway (Kong)
-	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
+	@gateway {
+		path /api*
+		not path /api/docs*
+	}
+	reverse_proxy @gateway {$VITE_API_GATEWAY_NOTIFY_URL} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
 	}
