@@ -156,7 +156,10 @@ export class TemplatesRepository {
    * Soft delete a template (mark as inactive)
    */
   async softDelete(templateId: string): Promise<void> {
-    await this.templateRepository.update(templateId, { active: false })
+    await this.templateRepository.update(templateId, {
+      active: false,
+      deletedAt: new Date(),
+    })
   }
 
   /**

@@ -367,13 +367,14 @@ describe('TemplatesRepository', () => {
   })
 
   describe('softDelete', () => {
-    it('should mark a template as inactive', async () => {
+    it('should mark a template as inactive and record the deletion time', async () => {
       mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
 
       await repository.softDelete('template-123')
 
       expect(mockTemplateRepository.update).toHaveBeenCalledWith('template-123', {
         active: false,
+        deletedAt: expect.any(Date),
       })
     })
 
@@ -384,6 +385,7 @@ describe('TemplatesRepository', () => {
 
       expect(mockTemplateRepository.update).toHaveBeenCalledWith('non-existent', {
         active: false,
+        deletedAt: expect.any(Date),
       })
     })
   })
