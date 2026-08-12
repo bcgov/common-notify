@@ -8,9 +8,7 @@ on:
       - "docs/**"
       - ".devcontainer/**"
       - "LICENSE"
-      - ".github/**"
       - ".github/graphics/**"
-      - "!.github/workflows/**"
   workflow_dispatch:
     inputs:
       tag:
