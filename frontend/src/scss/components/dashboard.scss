@@ -1,0 +1,96 @@
+@import '../variables.scss';
+
+.dashboard-page__layout {
+  margin-top: 88px;
+  margin-left: 13px;
+}
+
+.dashboard-page__search {
+  margin-bottom: 73px;
+
+  .search-field {
+    margin: 0;
+  }
+}
+
+.dashboard-page__table {
+  .data-table {
+    margin-top: 0;
+  }
+}
+
+/* Keep the table id column width restricted with ellipses */
+.data-table__id-col {
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
+}
+
+.data-table__truncate {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Keep the recipients column width restricted so the comma-separated list truncates */
+.data-table__recipients-col {
+  width: 190px;
+  min-width: 190px;
+  max-width: 190px;
+}
+
+/* Recipient list popover (shown on hover over a Recipients cell) */
+.recipients-popover.popover {
+  max-width: 320px;
+  border: 1px solid $border-default;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+  .popover-arrow {
+    display: none;
+  }
+}
+
+.recipients-popover__title.popover-header {
+  padding: 16px 16px 0;
+  background: $white;
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  color: $dark-text;
+}
+
+.recipients-popover__body {
+  padding: 12px 16px 16px;
+}
+
+.recipients-popover__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipients-popover__item {
+  font-size: 14px;
+  color: $dark-text;
+  word-break: break-word;
+}
+
+.recipients-popover__view-all {
+  margin-top: 12px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: $primary-color;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}

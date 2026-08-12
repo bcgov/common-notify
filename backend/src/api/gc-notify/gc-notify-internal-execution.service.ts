@@ -115,6 +115,7 @@ export class GcNotifyInternalExecutionService {
   async sendEmail(
     body: CreateEmailNotificationRequest,
     tenantId: string,
+    requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(
       tenantId,
@@ -150,6 +151,7 @@ export class GcNotifyInternalExecutionService {
       tenantId,
       notifyRequest,
       body.scheduled_for,
+      requestRoute,
     )
 
     return {
@@ -173,6 +175,7 @@ export class GcNotifyInternalExecutionService {
   async sendSms(
     body: CreateSmsNotificationRequest,
     tenantId: string,
+    requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
     const personalisation = this.toStringPersonalisation(body.personalisation)
@@ -196,6 +199,7 @@ export class GcNotifyInternalExecutionService {
       tenantId,
       notifyRequest,
       body.scheduled_for,
+      requestRoute,
     )
 
     return {
@@ -280,12 +284,14 @@ export class GcNotifyInternalExecutionService {
     tenantId: string,
     notifyRequest: Record<string, unknown>,
     scheduledFor: string | undefined,
+    requestRoute: string | undefined,
   ): Promise<{ id: string; createdAt: Date }> {
     const notificationRecord = await this.notificationService.create({
       tenantId,
       status: NotificationStatus.PENDING,
       createdBy: tenantId,
       payload: notifyRequest,
+      requestRoute,
     })
 
     const hasDelayedSend = !!scheduledFor

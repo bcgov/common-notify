@@ -1,5 +1,14 @@
 @import '../variables.scss';
 
+// Notification Templates list page: 73px between the search bar and the table
+.templates-page__search {
+  margin-bottom: 73px;
+
+  .search-field {
+    margin: 0;
+  }
+}
+
 .desc-above {
   .bcds-react-aria-TextField--container {
     order: 1;

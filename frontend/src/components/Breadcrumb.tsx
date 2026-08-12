@@ -3,7 +3,7 @@ import type { FC } from 'react'
 
 export type BreadcrumbItem = {
   label: string
-  to?: '/dashboard' | '/templates'
+  to?: '/dashboard' | '/templates' | '/'
 }
 
 export type BreadcrumbProps = {

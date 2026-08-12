@@ -18,14 +18,20 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
+    label: 'Home',
+    to: '/',
+    icon: <HomeOutlinedIcon />,
+  },
+  {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <HomeOutlinedIcon />,
+    icon: <WorkspacesOutlinedIcon />,
   },
   {
     label: 'Templates',
@@ -107,6 +113,7 @@ const Sidebar: FC = () => {
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
           const shouldShow =
+            (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
             (item.label === 'Usage & Limits' && showUsage)

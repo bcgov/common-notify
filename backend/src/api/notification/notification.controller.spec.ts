@@ -126,7 +126,7 @@ describe('NotificationController', () => {
 
       await request(app.getHttpServer())
         .get(
-          '/api/v1/notification_request?page=2&limit=20&sort=-createdAt,status&filter=status:eq:QUEUED&filter=channelCode:in:EMAIL|SMS',
+          '/api/v1/notification_request?page=2&limit=20&sort=-createdAt,status&filter=status:eq:QUEUED&filter=channelCodes:in:EMAIL|SMS',
         )
         .expect(200)
 
@@ -136,7 +136,7 @@ describe('NotificationController', () => {
           page: '2',
           limit: '20',
           sort: '-createdAt,status',
-          filter: ['status:eq:QUEUED', 'channelCode:in:EMAIL|SMS'],
+          filter: ['status:eq:QUEUED', 'channelCodes:in:EMAIL|SMS'],
         }),
       )
     })

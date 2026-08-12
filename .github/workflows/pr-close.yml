@@ -57,6 +57,7 @@ jobs:
           if [ -z "$OTHER_OPEN_PRS" ]; then
             echo "No other open PRs - will publish empty dev qualifier"
             # Create empty services list to clear all PR routes from dev qualifier
+            mkdir -p api-gateway/generated
             echo "_format_version: '3.0'" > api-gateway/generated/gw-kong-dev.yaml
             echo "services: []" >> api-gateway/generated/gw-kong-dev.yaml
             exit 0
@@ -66,6 +67,7 @@ jobs:
           echo "Generating config for remaining PRs..."
 
           # Generate combined config for remaining PRs
+          mkdir -p api-gateway/generated
           > api-gateway/generated/gw-active-services.yaml  # Empty the file first
 
           for PR_NUM in $OTHER_OPEN_PRS; do
