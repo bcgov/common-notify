@@ -20,11 +20,11 @@ export class TemplatesRepository {
   ) {}
 
   /**
-   * Find a template by ID and tenant ID
+   * Find an active template by ID and tenant ID
    */
   async findById(tenantId: string, templateId: string): Promise<Template | null> {
     return this.templateRepository.findOne({
-      where: { id: templateId, tenantId },
+      where: { id: templateId, tenantId, active: true },
       relations: ['channel', 'engine'],
     })
   }
