@@ -39,7 +39,16 @@ export class MustacheTemplateRenderer implements ITemplateRenderer {
   }
 
   renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
-    const body = Mustache.render(context.template.body, context.personalisation)
+    // SMS is plain text, never HTML: the pass-through escape keeps personalisation literal.
+    // With Mustache's default escape a value like "O'Brien" is sent as "O&#39;Brien".
+    const body = Mustache.render(
+      context.template.body,
+      context.personalisation,
+      {},
+      {
+        escape: (value: unknown) => String(value),
+      },
+    )
     return Promise.resolve({ body })
   }
 }

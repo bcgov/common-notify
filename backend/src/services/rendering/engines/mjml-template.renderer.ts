@@ -98,8 +98,9 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
   async renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     validateTemplate(context.template.body)
 
+    // SMS is plain text: no MJML compilation and no HTML escaping of personalisation.
     return {
-      body: Handlebars.compile(context.template.body)(context.personalisation),
+      body: Handlebars.compile(context.template.body, { noEscape: true })(context.personalisation),
     }
   }
 }

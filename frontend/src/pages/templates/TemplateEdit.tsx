@@ -24,6 +24,7 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import SmsSegmentEstimate from './SmsSegmentEstimate'
 import '@/scss/components/templates.scss'
 
 interface TemplateEditProps {
@@ -376,6 +377,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
 
               {formErrors.body && (
                 <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
+              )}
+
+              {formData.channelCode === NotificationChannel.SMS && (
+                <SmsSegmentEstimate body={formData.body} />
               )}
             </div>
           </div>

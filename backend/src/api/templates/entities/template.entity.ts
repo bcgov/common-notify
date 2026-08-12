@@ -100,11 +100,12 @@ export class Template {
   engine: TemplateEngineCode
 
   /**
-   * Body content type: 'markdown' (markdown→HTML)
-   * Determines rendering behavior during template rendering
+   * Body content type: 'markdown' (markdown→HTML) for email, 'text' (sent verbatim) for SMS.
+   * Determines rendering behavior during template rendering. Null for MJML, which is
+   * always compiled to HTML.
    */
   @Column({ name: 'body_type', type: 'varchar', length: 20, default: 'markdown', nullable: true })
-  bodyType?: 'markdown' | null
+  bodyType?: 'text' | 'markdown' | null
 
   /**
    * Current version number
