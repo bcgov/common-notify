@@ -19,7 +19,7 @@ import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
-const TEMPLATE_BODY_MAX_LENGTH = 10000
+const TEMPLATE_BODY_MAX_LENGTH = 10_000
 const DEFAULT_TEMPLATE_BODY_PLACEHOLDER = 'Type the template body here'
 const SYNTAX_TYPE_BODY_PLACEHOLDERS: Record<TemplateEngine, string> = {
   [TemplateEngine.MJML]: `<mjml>
