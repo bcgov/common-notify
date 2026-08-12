@@ -31,7 +31,7 @@ interface TemplateEditProps {
 }
 
 const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
-const TEMPLATE_BODY_MAX_LENGTH = 10000
+const TEMPLATE_BODY_MAX_LENGTH = 10_000
 
 const SYNTAX_TOOLTIPS = [
   {
