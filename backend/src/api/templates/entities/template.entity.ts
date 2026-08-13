@@ -119,6 +119,12 @@ export class Template {
   active: boolean
 
   /**
+   * Timestamp when the template was soft-deleted
+   */
+  @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt?: Date | null
+
+  /**
    * User or process that created this template
    */
   @Column({ name: 'created_by', length: 200 })
