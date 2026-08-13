@@ -7,23 +7,32 @@
 #   permanent dev backend and the redis pods have crash-looped for days with
 #   hundreds of restarts and nothing fired.
 #
-#   These rules are METRIC-based, evaluated by Grafana against the platform
-#   Prometheus (via the "Thanos" datasource, see datasources block below).
-#   They route to the existing `common-notify-email` contact point (n8n webhook),
-#   so no new delivery wiring is needed.
+#   These rules are METRIC-based, evaluated by Grafana against the in-namespace
+#   Prometheus (datasource UID "prometheus", deployed via
+#   monitoring/grafana-stack/prometheus/values-tools.yaml). They route to the
+#   existing `common-notify-email` contact point (n8n webhook) — delivery is
+#   already wired, so no new notification setup is needed.
 #
-# DATA SOURCE
-#   Requires the "Thanos" Prometheus datasource (added in values-tools-sso.yaml).
-#   Metrics used are standard OpenShift platform metrics:
+# DATA SOURCE  (UID: prometheus — keep in sync with values-tools-sso.yaml)
+#   Metrics from kube-state-metrics (bundled with the Prometheus chart):
 #     - kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
 #     - kube_pod_container_status_restarts_total
 #     - kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
-#     - container_memory_working_set_bytes / kube_pod_container_resource_limits
-#     - kube_deployment_status_replicas_available vs _replicas
+#     - kube_pod_container_resource_limits{resource="memory"}
+#     - kube_pod_status_phase, kube_deployment_status_replicas_available
+#
+# ⚠️ MEMORY-USAGE-% CAVEAT
+#   The two memory-USAGE rules (cn-mem-high / cn-mem-critical) use
+#   container_memory_working_set_bytes, which comes from cAdvisor/kubelet — NOT
+#   kube-state-metrics. A namespace-scoped Prometheus may NOT be able to scrape
+#   the kubelet (needs node-level RBAC). If those metrics are absent, those two
+#   rules simply never fire (no error). The OOMKilled rule (cn-oomkilled) is the
+#   reliable memory signal — it comes from kube-state-metrics and always works.
+#   If cAdvisor metrics are unavailable, treat cn-oomkilled as the primary memory
+#   alert and drop/disable the two usage-% rules.
 #
 # SCOPE
 #   Namespaces f6bc3f-dev|test|prod. App workloads (backend/frontend/redis/db).
-#   Datasource UID referenced as `thanos` — keep in sync with the datasource.
 # ---------------------------------------------------------------------------
 
 apiVersion: 1
@@ -43,7 +52,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -79,7 +88,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 900, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -113,7 +122,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -148,7 +157,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -190,7 +199,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -228,7 +237,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -266,7 +275,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |
@@ -308,7 +317,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: thanos
+            datasourceUid: prometheus
             model:
               editorMode: code
               expr: |

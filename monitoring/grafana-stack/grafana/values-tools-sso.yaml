@@ -46,6 +46,18 @@ datasources:
         jsonData:
           manageAlerts: true
           alertmanagerUid: alertmanager
+      # Prometheus (in-namespace, deployed via monitoring/grafana-stack/prometheus).
+      # Source for the metric-based pod-state / OOM alerts (infra-alert-rules.yaml).
+      # UID "prometheus" is referenced by those rules' datasourceUid.
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://prometheus-server.f6bc3f-tools.svc.cluster.local
+        jsonData:
+          httpMethod: POST
+          manageAlerts: true
+          timeInterval: 30s
 
 # Alerting - Provision contact points and notification policies
 alerting:

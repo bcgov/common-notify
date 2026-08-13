@@ -1,0 +1,117 @@
+# Prometheus (+ kube-state-metrics) for Common Notify
+# ---------------------------------------------------------------------------
+# WHY: The monitoring stack was Loki-only (logs). Pod state (CrashLoopBackOff,
+# OOMKilled, restarts) and memory/CPU usage are METRICS, not logs — so a
+# crash loop produced no alert. This deploys a small Prometheus that scrapes
+# kube-state-metrics (pod/deployment state) and the app /metrics endpoints,
+# giving Grafana a metrics datasource for the infra-alert-rules.yaml alerts.
+#
+# CHART: prometheus-community/prometheus
+# SCOPE: f6bc3f-tools namespace. Short LOCAL retention (~10 days), no Thanos,
+#        no object storage. Alerting is handled by Grafana (contact point -> n8n),
+#        so Prometheus's own Alertmanager is disabled.
+# DEPLOY: helm upgrade --install prometheus prometheus-community/prometheus \
+#           -n f6bc3f-tools -f monitoring/grafana-stack/prometheus/values-tools.yaml
+# ---------------------------------------------------------------------------
+
+# --- Prometheus server ---
+server:
+  retention: 10d
+  # OpenShift assigns a random UID via SCC; leave user/group unset.
+  securityContext:
+    runAsUser: null
+    runAsNonRoot: true
+    runAsGroup: null
+    fsGroup: null
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+    storageClass: netapp-file-standard
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  # Scrape a bit less frequently than default to keep the footprint small.
+  global:
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    evaluation_interval: 30s
+  service:
+    servicePort: 80
+  # No Prometheus-native alerting; Grafana owns alerts.
+  # (alertmanagers left empty by disabling the subchart below)
+
+# --- kube-state-metrics: the source of pod/deployment state metrics ---
+# This is what exposes kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"},
+# kube_pod_container_status_restarts_total, kube_pod_container_resource_limits, etc.
+kube-state-metrics:
+  enabled: true
+  securityContext:
+    enabled: true
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+    runAsNonRoot: true
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  # Only collect the resource kinds we alert on — keeps cardinality/footprint low.
+  collectors:
+    - pods
+    - deployments
+    - replicasets
+    - statefulsets
+    - nodes
+
+# --- Components we do NOT need (keep the tools namespace light) ---
+alertmanager:
+  enabled: false          # Grafana handles alerting -> n8n
+prometheus-node-exporter:
+  enabled: false          # node-level metrics need host access / privileged SCC; not needed for pod-state alerts
+prometheus-pushgateway:
+  enabled: false
+
+# --- Scrape configuration ---
+# kube-state-metrics is auto-scraped by the chart's built-in job. Add the app
+# workloads' own /metrics (they carry prometheus.io/scrape annotations) so we
+# also get app-level metrics in dev/test/prod.
+extraScrapeConfigs: |
+  - job_name: 'common-notify-app-pods'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - f6bc3f-dev
+            - f6bc3f-test
+            - f6bc3f-prod
+    relabel_configs:
+      # Only pods that opt in with prometheus.io/scrape: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Honour prometheus.io/path
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Honour prometheus.io/port
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: app
