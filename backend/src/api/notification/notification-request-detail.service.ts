@@ -115,6 +115,33 @@ export class NotificationRequestDetailService {
   }
 
   /**
+   * Record recipients that were never attempted because they are not on the tenant safelist.
+   * Written at accept time, so these rows carry no attempt count and no batchId.
+   */
+  async createBlocked(
+    notificationRequestId: string,
+    recipients: Array<{ address: string; channel: string }>,
+    errorMessage: string,
+    createdBy?: string,
+  ): Promise<void> {
+    if (recipients.length === 0) return
+    const entities = recipients.map(({ address, channel }) =>
+      this.detailRepository.create({
+        notificationRequestId,
+        recipientAddress: address,
+        channel,
+        emailAddressType: channel === 'EMAIL' ? 'primary' : undefined,
+        status: 'blocked',
+        attemptCount: 0,
+        errorMessage,
+        createdBy,
+        updatedBy: createdBy,
+      }),
+    )
+    await this.detailRepository.save(entities)
+  }
+
+  /**
    * Mark a single recipient's detail record (within a batch) as sent.
    */
   async markRecipientSent(

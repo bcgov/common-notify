@@ -15,6 +15,7 @@ import adminTenantsReducer from './slices/adminTenants.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
 import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
 import tenantSettingsReducer from './slices/tenantSettings.slice'
+import safelistReducer from './slices/safelist.slice'
 
 export const store = configureStore({
   reducer: {
@@ -34,6 +35,7 @@ export const store = configureStore({
     apiKeys: apiKeysReducer,
     apiKeyUsage: apiKeyUsageReducer,
     tenantSettings: tenantSettingsReducer,
+    safelist: safelistReducer,
   },
 })
 

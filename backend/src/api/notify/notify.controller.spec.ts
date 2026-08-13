@@ -38,6 +38,7 @@ import { WebhookService } from '../../api/webhook/webhook.service'
 import { ValidationExceptionFilter } from '../../common/filters/validation.filter'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
+import { SafelistService } from '../safelist/safelist.service'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -118,6 +119,15 @@ const mockWebhookService = {
 
 const mockNotificationRequestDetailService = {
   createPending: vi.fn().mockResolvedValue(undefined),
+  createBlocked: vi.fn().mockResolvedValue(undefined),
+}
+
+// Safelist enforcement is off unless a test opts in, matching PROD and keeping every existing
+// send test unaffected by the guardrail.
+const mockSafelistService = {
+  isEnforced: vi.fn().mockResolvedValue(false),
+  findBlocked: vi.fn().mockResolvedValue([]),
+  appliesTo: (channel: string) => channel === 'EMAIL' || channel === 'SMS',
 }
 
 const mockApiKeyUsageService = {
@@ -145,6 +155,8 @@ describe('Notify Controllers', () => {
     mockApiKeyUsageService.recordUsage.mockResolvedValue([])
     mockApiKeyUsageService.assertWithinLimits.mockResolvedValue(undefined)
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
+    mockSafelistService.isEnforced.mockResolvedValue(false)
+    mockSafelistService.findBlocked.mockResolvedValue([])
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -178,6 +190,10 @@ describe('Notify Controllers', () => {
         {
           provide: LimitAlertNotificationService,
           useValue: mockLimitAlertNotificationService,
+        },
+        {
+          provide: SafelistService,
+          useValue: mockSafelistService,
         },
       ],
     })
@@ -644,6 +660,114 @@ describe('Notify Controllers', () => {
 
         expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
         expect(mockNotificationService.create).not.toHaveBeenCalled()
+      })
+
+      describe('recipient safelist enforcement (non-production environments)', () => {
+        const standardBody = {
+          email: {
+            recipients: { to: ['stranger@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+          },
+        }
+
+        it('rejects a send to a non-safelisted recipient with 400 and persists nothing', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['stranger@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(400)
+            .expect((res) => {
+              expect(JSON.stringify(res.body)).toContain('stranger@example.com')
+              expect(JSON.stringify(res.body)).toContain('safelist')
+            })
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+          expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+          expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+        })
+
+        it('checks cc and bcc, not just to', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send({
+              email: {
+                recipients: {
+                  to: ['allowed@gov.bc.ca'],
+                  cc: ['cc@example.com'],
+                  bcc: ['bcc@example.com'],
+                },
+                content: { subject: 'Test', body: 'Hello' },
+              },
+            })
+            .expect(202)
+
+          expect(mockSafelistService.findBlocked).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.arrayContaining([
+              { address: 'allowed@gov.bc.ca', channel: 'EMAIL' },
+              { address: 'cc@example.com', channel: 'EMAIL' },
+              { address: 'bcc@example.com', channel: 'EMAIL' },
+            ]),
+          )
+        })
+
+        it('accepts the send when every recipient is safelisted', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+
+          expect(mockNotificationService.create).toHaveBeenCalled()
+        })
+
+        it('drops blocked recipients from a mail merge and records them as blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.message).toContain('1 recipient(s)')
+              expect(res.body.blockedRecipientCount).toBe(1)
+            })
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
+        it('rejects a mail merge whose every recipient is blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([
+            'alice@example.com',
+            'bob@example.com',
+          ])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(400)
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+        })
       })
 
       describe('POST /api/v1/notifysimple/email (mail-merge)', () => {

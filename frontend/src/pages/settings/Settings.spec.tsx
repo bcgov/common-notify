@@ -36,6 +36,11 @@ vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
 
+// The safelist section owns its own state and thunks; it is covered by SafelistSection.spec.tsx.
+vi.mock('./SafelistSection', () => ({
+  default: () => <section data-testid="safelist-section" />,
+}))
+
 function tenant(id: string, name: string) {
   return { id, name }
 }

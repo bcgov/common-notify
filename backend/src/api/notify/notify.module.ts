@@ -28,6 +28,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { AttachmentModule } from '../attachment/attachment.module'
+import { SafelistModule } from '../safelist/safelist.module'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AttachmentModule } from '../attachment/attachment.module'
     WebhookModule,
     ApiKeysModule,
     AttachmentModule,
+    SafelistModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
   ],

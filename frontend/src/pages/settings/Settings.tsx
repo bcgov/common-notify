@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FC, FormEvent } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
+import SafelistSection from './SafelistSection'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchTenantSettings, updateTenantSettings } from '@/redux/thunks/tenantSettings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -75,6 +76,8 @@ const Settings: FC = () => {
           }}
         />
       )}
+
+      {selectedTenant && <SafelistSection />}
     </div>
   )
 }
