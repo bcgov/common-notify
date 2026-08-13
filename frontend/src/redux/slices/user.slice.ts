@@ -8,6 +8,13 @@ interface UserState {
   current: UserResponse | null
   isLoading: boolean
   rolesLoading: boolean
+  /**
+   * Tenant the roles in `current.cstarRoles` (or `rolesError`) belong to, set only
+   * once the lookup settles. Authorization checks must gate on this rather than on
+   * "a fetch was dispatched", otherwise they can run against another tenant's roles
+   * — or against no roles at all — while the request is still in flight.
+   */
+  rolesTenantId: string | null
   error: string | null
   rolesError: string | null
 }
@@ -16,6 +23,7 @@ const initialState: UserState = {
   current: null,
   isLoading: false,
   rolesLoading: false,
+  rolesTenantId: null,
   error: null,
   rolesError: null,
 }
@@ -50,6 +58,7 @@ export const userSlice = createSlice({
       // Fetch CSTAR roles
       .addCase(fetchCstarRoles.pending, (state) => {
         state.rolesLoading = true
+        state.rolesTenantId = null
         state.rolesError = null
       })
       .addCase(fetchCstarRoles.fulfilled, (state, action) => {
@@ -57,10 +66,12 @@ export const userSlice = createSlice({
           state.current.cstarRoles = action.payload
         }
         state.rolesLoading = false
+        state.rolesTenantId = action.meta.arg.tenantId
         state.rolesError = null
       })
       .addCase(fetchCstarRoles.rejected, (state, action) => {
         state.rolesLoading = false
+        state.rolesTenantId = action.meta.arg.tenantId
         state.rolesError = action.payload || 'Failed to fetch roles'
       })
   },
