@@ -1,0 +1,67 @@
+@import '../variables.scss';
+
+// Events list page
+.events-page__search {
+  margin-bottom: 24px;
+}
+
+.events-page__description {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+// Create / edit event pages
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 24px;
+  padding-left: 284px;
+}
+
+.events__title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: $dark-text;
+}
+
+.events__tabs {
+  .bcds-react-aria-ToggleButtonGroup {
+    width: fit-content;
+  }
+}
+
+.events__section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 418px;
+}
+
+.events__form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  .bcds-react-aria-Button {
+    align-self: flex-start;
+  }
+}
+
+.events__section-heading {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: $dark-text;
+}
+
+.events__help {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}

@@ -1,0 +1,114 @@
+import { useEffect, useState } from 'react'
+import type { FC } from 'react'
+import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
+import Breadcrumb from '@/components/Breadcrumb'
+import EventsTab from './sections/EventsTab'
+import type { EventSettingsValues } from './sections/EventsTab'
+import EventsEmailTab from './sections/EventsEmailTab'
+import EventsSmsTab from './sections/EventsSmsTab'
+import { getEventById, updateEvent } from '@/api/events.api'
+import type { EventResponse } from '@/api/events.api'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import { useCstarRoles } from '@/hooks/useCstarRoles'
+import '@/scss/components/events.scss'
+
+type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
+
+interface EditEventProps {
+  eventId: string
+}
+
+const EditEvent: FC<EditEventProps> = ({ eventId }) => {
+  const { canEdit } = useCstarRoles()
+  const [selectedTab, setSelectedTab] = useState<EventTab>('settings')
+  const [event, setEvent] = useState<EventResponse | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // The page owns the single event fetch, so the title, breadcrumb and every tab read
+  // from one request and switching tabs re-fetches nothing.
+  useEffect(() => {
+    let active = true
+    setEvent(null)
+    setLoadError(null)
+
+    getEventById(eventId)
+      .then((loaded) => {
+        if (active) setEvent(loaded)
+      })
+      .catch((error) => {
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : 'Failed to load event')
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [eventId])
+
+  async function handleSave(values: EventSettingsValues) {
+    try {
+      const updated = await updateEvent(eventId, values)
+      // Re-sync to exactly what was persisted; this also moves the tab's change baseline.
+      setEvent(updated)
+      showSuccessToast('Event updated successfully')
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to update event')
+    }
+  }
+
+  return (
+    <div className="events">
+      <Breadcrumb
+        items={[
+          { label: 'Home', to: '/dashboard' },
+          { label: 'Event', to: '/events' },
+          { label: event?.name ?? 'Event' },
+        ]}
+      />
+
+      <h1 className="events__title">{event?.name ?? 'Event'}</h1>
+
+      <div className="events__tabs">
+        <ToggleButtonGroup
+          selectionMode="single"
+          selectedKeys={[selectedTab]}
+          onSelectionChange={(keys) => {
+            const [key] = [...keys]
+            if (key) {
+              setSelectedTab(key as EventTab)
+            }
+          }}
+          disallowEmptySelection
+        >
+          <ToggleButton id="settings">Event Settings</ToggleButton>
+          <ToggleButton id="email">Email Notification</ToggleButton>
+          <ToggleButton id="sms">SMS Notification</ToggleButton>
+          <ToggleButton id="third-party">Third-party Notification</ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+
+      <section className="events__section">
+        {loadError ? (
+          <div className="alert alert-danger">{loadError}</div>
+        ) : !event ? (
+          <p className="events__help">Loading event...</p>
+        ) : selectedTab === 'settings' ? (
+          <EventsTab
+            values={{ name: event.name, description: event.description }}
+            onSave={handleSave}
+            isDisabled={!canEdit}
+          />
+        ) : selectedTab === 'email' ? (
+          <EventsEmailTab />
+        ) : selectedTab === 'sms' ? (
+          <EventsSmsTab />
+        ) : (
+          <p className="events__help">Not yet implemented</p>
+        )}
+      </section>
+    </div>
+  )
+}
+
+export default EditEvent

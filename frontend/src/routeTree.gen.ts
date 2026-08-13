@@ -15,8 +15,11 @@ import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
 import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
+import { Route as EventsCreateRouteImport } from './routes/events/create'
+import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
@@ -51,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   id: '/template-edit/$templateId',
   path: '/template-edit/$templateId',
@@ -62,6 +70,16 @@ const RequestStatusNotificationRequestIdRoute =
     path: '/request-status/$notificationRequestId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const EventsCreateRoute = EventsCreateRouteImport.update({
+  id: '/events/create',
+  path: '/events/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsEventIdRoute = EventsEventIdRouteImport.update({
+  id: '/events/$eventId',
+  path: '/events/$eventId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsageRoute = AdminUsageRouteImport.update({
   id: '/admin/usage',
   path: '/admin/usage',
@@ -88,8 +106,11 @@ export interface FileRoutesByFullPath {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,8 +122,11 @@ export interface FileRoutesByTo {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/events': typeof EventsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,8 +139,11 @@ export interface FileRoutesById {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -130,8 +157,11 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/settings'
     | '/admin/usage'
+    | '/events/$eventId'
+    | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/events/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -143,8 +173,11 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/settings'
     | '/admin/usage'
+    | '/events/$eventId'
+    | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/events'
   id:
     | '__root__'
     | '/'
@@ -156,8 +189,11 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/settings'
     | '/admin/usage'
+    | '/events/$eventId'
+    | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/events/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -170,8 +206,11 @@ export interface RootRouteChildren {
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsageRoute: typeof AdminUsageRoute
+  EventsEventIdRoute: typeof EventsEventIdRoute
+  EventsCreateRoute: typeof EventsCreateRoute
   RequestStatusNotificationRequestIdRoute: typeof RequestStatusNotificationRequestIdRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
+  EventsIndexRoute: typeof EventsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -218,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/template-edit/$templateId': {
       id: '/template-edit/$templateId'
       path: '/template-edit/$templateId'
@@ -230,6 +276,20 @@ declare module '@tanstack/react-router' {
       path: '/request-status/$notificationRequestId'
       fullPath: '/request-status/$notificationRequestId'
       preLoaderRoute: typeof RequestStatusNotificationRequestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/create': {
+      id: '/events/create'
+      path: '/events/create'
+      fullPath: '/events/create'
+      preLoaderRoute: typeof EventsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$eventId': {
+      id: '/events/$eventId'
+      path: '/events/$eventId'
+      fullPath: '/events/$eventId'
+      preLoaderRoute: typeof EventsEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/usage': {
@@ -266,9 +326,12 @@ const rootRouteChildren: RootRouteChildren = {
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsageRoute: AdminUsageRoute,
+  EventsEventIdRoute: EventsEventIdRoute,
+  EventsCreateRoute: EventsCreateRoute,
   RequestStatusNotificationRequestIdRoute:
     RequestStatusNotificationRequestIdRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
+  EventsIndexRoute: EventsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
