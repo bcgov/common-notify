@@ -44,12 +44,14 @@ function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = [
       cstar: {
         tenants: [],
         isLoading: false,
+        hasLoaded: true,
         error: null,
       },
       user: {
         current: cstarRoles.length > 0 ? ({ cstarRoles } as any) : null,
         isLoading: false,
         rolesLoading: false,
+        rolesTenantId: null,
         error: null,
         rolesError: null,
       },
