@@ -6,6 +6,7 @@ import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
@@ -31,6 +32,11 @@ const navItems = [
   {
     label: 'Dashboard',
     to: '/dashboard',
+    icon: <WorkspacesOutlinedIcon />,
+  },
+  {
+    label: 'Events',
+    to: '/events',
     icon: <WorkspacesOutlinedIcon />,
   },
   {
@@ -70,8 +76,11 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+  // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
+  const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -115,6 +124,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
+            (item.label === 'Events' && hasTenantRole && eventsEnabled) ||
             (item.label === 'Templates' && hasTenantRole) ||
             (item.label === 'Usage & Limits' && showUsage)
 

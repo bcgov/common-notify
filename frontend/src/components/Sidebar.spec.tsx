@@ -6,6 +6,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
 import cstarReducer from '@/redux/slices/cstar.slice'
 import userReducer from '@/redux/slices/user.slice'
+import tenantReducer from '@/redux/slices/tenant.slice'
+import featureFlagsReducer from '@/redux/slices/featureFlags.slice'
 import UserService from '@/service/user-service'
 import Sidebar from './Sidebar'
 
@@ -31,9 +33,19 @@ const mockUser = {
   displayName: 'Test User',
 }
 
-function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
+function makeStore(
+  user: typeof mockUser | null = null,
+  cstarRoles: string[] = [],
+  eventsEnabled = false,
+) {
   return configureStore({
-    reducer: { auth: authReducer, cstar: cstarReducer, user: userReducer },
+    reducer: {
+      auth: authReducer,
+      cstar: cstarReducer,
+      user: userReducer,
+      tenant: tenantReducer,
+      featureFlags: featureFlagsReducer,
+    },
     preloadedState: {
       auth: {
         user,
@@ -55,13 +67,27 @@ function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = [
         error: null,
         rolesError: null,
       },
+      tenant: {
+        selectedTenant: null,
+        showTenantModal: false,
+      },
+      featureFlags: {
+        byCode: { events: eventsEnabled },
+        flagsList: [],
+        loading: false,
+        synced: true,
+      },
     },
   })
 }
 
-function renderSidebar(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
+function renderSidebar(
+  user: typeof mockUser | null = null,
+  cstarRoles: string[] = [],
+  eventsEnabled = false,
+) {
   return render(
-    <Provider store={makeStore(user, cstarRoles)}>
+    <Provider store={makeStore(user, cstarRoles, eventsEnabled)}>
       <Sidebar />
     </Provider>,
   )
@@ -78,6 +104,18 @@ describe('Sidebar', () => {
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
+  })
+
+  it('hides Events when the events feature flag is disabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'])
+
+    expect(screen.queryByRole('link', { name: /events/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Events when the events feature flag is enabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'], true)
+
+    expect(screen.getByRole('link', { name: /events/i })).toBeInTheDocument()
   })
 
   it('hides tenant pages when user has no CSTAR roles', () => {
