@@ -18,14 +18,21 @@
 #       the same cross-namespace today).
 #
 # CHART: prometheus-community/prometheus
-# SCOPE: f6bc3f-tools. ~10d local retention, no Thanos, no object storage.
+# SCOPE: f6bc3f-tools. ~7d local retention (5Gi, fits the namespace storage quota),
+#        no Thanos, no object storage.
 #        Grafana owns alerting (-> n8n), so Prometheus Alertmanager is disabled.
 # DEPLOY: helm upgrade --install prometheus prometheus-community/prometheus \
 #           -n f6bc3f-tools -f monitoring/grafana-stack/prometheus/values-tools.yaml
 # ---------------------------------------------------------------------------
 
+# No cluster-scoped RBAC. BC Gov tenants cannot create ClusterRole/CRB, and this
+# Prometheus does not need the Kubernetes API — it scrapes everything via static
+# DNS (static_configs below), so no ClusterRole/ServiceDiscovery is required.
+rbac:
+  create: false
+
 server:
-  retention: 10d
+  retention: 7d
   securityContext:
     runAsUser: null
     runAsNonRoot: true
@@ -33,8 +40,12 @@ server:
     fsGroup: null
   persistentVolume:
     enabled: true
-    size: 10Gi
-    storageClass: netapp-file-standard
+    # f6bc3f-tools has an AGGREGATE storage-quota of 10Gi (all classes combined);
+    # Loki already uses 5Gi, leaving 5Gi. Block storage is a better fit for the
+    # Prometheus TSDB (RWO). 5Gi holds ~10d of these low-cardinality metrics
+    # (kube-state-metrics + a handful of app targets) comfortably.
+    size: 5Gi
+    storageClass: netapp-block-standard
     accessModes:
       - ReadWriteOnce
   resources:
@@ -66,15 +77,13 @@ prometheus-pushgateway:
 # so the Prometheus server needs NO Kubernetes API access at all.
 serverFiles:
   prometheus.yml:
-    global:
-      scrape_interval: 30s
-      scrape_timeout: 10s
-      evaluation_interval: 30s
+    # NOTE: do NOT set `global:` here — the chart injects its own global block
+    # from server.global, and a second one makes prometheus.yml invalid
+    # ("field global already set"). Only scrape_configs belongs here.
     scrape_configs:
-      # Prometheus scraping itself
-      - job_name: prometheus
-        static_configs:
-          - targets: ['localhost:9090']
+      # NOTE: the chart already defines a `prometheus` self-scrape job; do not
+      # redefine it here or config load fails ("multiple scrape configs with job
+      # name prometheus"). Helm merges this list with the chart defaults.
 
       # Per-namespace kube-state-metrics (pod/deployment state).
       # Service name is "<release>-kube-state-metrics"; released as "ksm" in each

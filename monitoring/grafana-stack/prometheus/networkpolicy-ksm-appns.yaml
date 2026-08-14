@@ -1,0 +1,24 @@
+# Allow the central Prometheus (f6bc3f-tools) to scrape kube-state-metrics in an
+# app namespace. Apply this in EACH app namespace (dev/test/prod). Mirrors the
+# existing loki-ingress cross-namespace pattern (promtail dev/test/prod -> loki tools).
+#
+# Apply: oc apply -f networkpolicy-ksm-appns.yaml -n f6bc3f-<env>
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tools-prometheus-to-ksm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: f6bc3f-tools
+      ports:
+        - protocol: TCP
+          port: 8080

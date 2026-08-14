@@ -120,6 +120,7 @@ jobs:
               --namespace ${{ secrets.OC_DEV_NAMESPACE }} \
               --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
               --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_DEV_NAMESPACE }}
             oc get pods -n ${{ secrets.OC_DEV_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
 
   deploy-ksm-test:
@@ -145,6 +146,7 @@ jobs:
               --namespace ${{ secrets.OC_TEST_NAMESPACE }} \
               --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
               --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_TEST_NAMESPACE }}
             oc get pods -n ${{ secrets.OC_TEST_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
 
   deploy-ksm-prod:
@@ -170,6 +172,7 @@ jobs:
               --namespace ${{ secrets.OC_PROD_NAMESPACE }} \
               --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
               --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_PROD_NAMESPACE }}
             oc get pods -n ${{ secrets.OC_PROD_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
 
   deploy-prometheus-centralized:
