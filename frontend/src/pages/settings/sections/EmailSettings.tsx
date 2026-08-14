@@ -163,6 +163,7 @@ const EmailSettings: FC = () => {
           }}
           isInvalid={Boolean(replyToError)}
           errorMessage={replyToError || undefined}
+          maxLength={64}
           // Workaround to get placeholder to work with BCDS TextField
           {...({ placeholder: 'Enter a reply to email address' } as { placeholder: string })}
         />

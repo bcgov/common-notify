@@ -137,6 +137,7 @@ const TenantSettings: FC = () => {
           isInvalid={Boolean(senderError)}
           errorMessage={senderError || undefined}
           isRequired
+          maxLength={64}
         />
         <p id="default-sending-email-help" className="settings__help">
           Enter the part before &apos;@gov.bc.ca&apos;. Maximum 64 characters. Use letters, numbers,
@@ -188,6 +189,7 @@ const TenantSettings: FC = () => {
           }}
           isInvalid={Boolean(emailError)}
           errorMessage={emailError || undefined}
+          maxLength={320}
         />
         <p id="alert-email-help" className="settings__help">
           System and limit alerts for this tenant will be sent to this address. Leave blank to clear
