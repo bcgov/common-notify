@@ -3,7 +3,7 @@ import NotificationStatusTable from './NotificationStatusTable'
 import PageSubHeading from '../../../components/PageSubHeading'
 
 /**
- * Used on the Dashboard page
+ * Used on the Homepage
  */
 export const NotificationStatusSection: FC = () => {
   return (

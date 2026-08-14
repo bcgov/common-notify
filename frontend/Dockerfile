@@ -29,6 +29,11 @@ COPY --from=static /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY coraza.conf /etc/caddy/coraza.conf
 
+# Copy API documentation files (self-contained Swagger UI; assets served same-origin to satisfy CSP)
+COPY docs/apis/notify.html /srv/api-docs/index.html
+COPY docs/apis/notify.yaml /srv/api-docs/notify.yaml
+COPY docs/apis/assets /srv/api-docs/assets
+
 # Set permissions for static files (OpenShift-compatible)
 # OpenShift uses random UIDs but assigns them to root group (GID 0)
 RUN chown -R 1001:0 /srv && \

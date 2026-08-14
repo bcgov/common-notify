@@ -34,14 +34,14 @@ describe('notificationApi.listNotifications', () => {
       page: 2,
       limit: 25,
       sort: '-createdAt',
-      filter: ['status:in:SENT|FAILED', 'channelCode:in:EMAIL'],
+      filter: ['status:in:SENT|FAILED', 'channelCodes:in:EMAIL'],
     })
 
     const qs = calledQuery()
     expect(qs.get('page')).toBe('2')
     expect(qs.get('limit')).toBe('25')
     expect(qs.get('sort')).toBe('-createdAt')
-    expect(qs.getAll('filter')).toEqual(['status:in:SENT|FAILED', 'channelCode:in:EMAIL'])
+    expect(qs.getAll('filter')).toEqual(['status:in:SENT|FAILED', 'channelCodes:in:EMAIL'])
   })
 
   it('omits sort and filter when not provided', async () => {

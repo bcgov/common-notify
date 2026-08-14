@@ -14,11 +14,13 @@ import { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-requ
 import type { ProcessedNotifySimpleRequest } from '../../api/notify/schemas/stored-notify-attachment'
 import type { AttachmentProcessingService } from '../../api/notify/services/attachment-processing.service'
 import type { AttachmentValidationService } from '../../api/notify/services/attachment-validation.service'
+import { extractRequestRoute } from '../utils/extract-request-route'
 import type {
   ApiKeyUsageService,
   RecordedUsageResult,
 } from '../../api/api-keys/api-key-usage.service'
 import type { LimitAlertNotificationService } from '../../api/notify/services/limit-alert-notification.service'
+import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -35,7 +37,33 @@ export interface QueueableContext {
   notificationPubSubService?: NotificationPubSubService
   apiKeyUsageService?: ApiKeyUsageService
   limitAlertNotificationService?: LimitAlertNotificationService
+  smsSegmentService?: SmsSegmentService
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+/**
+ * Billable segments a single SMS recipient of this request will cost.
+ *
+ * A message over the single-segment budget is concatenated and every segment is billed as its
+ * own message by the carrier, so usage is attributed in segments. Falls back to 1 when the
+ * service is unavailable or the body cannot be resolved — never blocks a send.
+ */
+async function resolveSmsSegments(
+  ctx: QueueableContext,
+  tenantId: string,
+  payload: ProcessedNotifySimpleRequest,
+): Promise<number> {
+  if (!ctx.smsSegmentService) return 1
+  try {
+    return Math.max(1, await ctx.smsSegmentService.countSegmentsPerRecipient(tenantId, payload))
+  } catch (error) {
+    new Logger('Queueable[sms-segments]').warn(
+      `Failed to count SMS segments, billing as a single segment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+    return 1
+  }
 }
 
 /**
@@ -154,6 +182,7 @@ async function handleEmailMerge(
   tenantId: string,
   dto: NotifySimpleRequest,
   apiKeyConsumerId: string | undefined,
+  requestRoute: string | undefined,
 ) {
   const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
 
@@ -181,6 +210,7 @@ async function handleEmailMerge(
     status: NotificationStatus.PENDING,
     createdBy: tenantId,
     payload: dto as any,
+    requestRoute,
   })
   logger.debug(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
@@ -199,7 +229,13 @@ async function handleEmailMerge(
       .publish(tenantId, {
         id: notificationRecord.id,
         tenantId: notificationRecord.tenantId,
-        status: notificationRecord.status,
+        status: notificationRecord.statusCode
+          ? {
+              code: notificationRecord.statusCode.code,
+              displayName: notificationRecord.statusCode.displayName,
+              description: notificationRecord.statusCode.description,
+            }
+          : { code: notificationRecord.status, displayName: notificationRecord.status },
         createdAt: notificationRecord.createdAt,
         createdBy: notificationRecord.createdBy ?? undefined,
         updatedAt: notificationRecord.updatedAt,
@@ -380,6 +416,7 @@ export function Queueable(
         }
 
         const tenantId = tenant.id
+        const requestRoute = extractRequestRoute(req)
         const uploadedBy =
           typeof req?.user?.sub === 'string'
             ? req.user.sub
@@ -396,6 +433,7 @@ export function Queueable(
             tenantId,
             payload,
             req?.apiKeyConsumerId,
+            requestRoute,
           )
         }
 
@@ -423,6 +461,27 @@ export function Queueable(
         }
 
         // Primary (to) recipient count per channel — used for both limit enforcement and usage.
+        // SMS is counted in billable segments: a body over the single-segment budget is sent (and
+        // billed by ACS) as several concatenated messages, so one request to one recipient can
+        // consume several of the tenant's SMS allowance.
+        //
+        // INVARIANT: every SMS recipient of a request receives the same body — the SMS channel has
+        // one content block and one params set, and mail merge is email-only (NotifySmsRecipients
+        // has no mergeArray). So the segment count is uniform and recipients x segments is exact.
+        // If per-recipient SMS personalisation is ever added, this must become a per-recipient sum.
+        const smsRecipientCount = processedPayload.sms?.recipients?.to?.length ?? 0
+        const smsSegments =
+          smsRecipientCount > 0
+            ? await resolveSmsSegments(this as QueueableContext, tenantId, processedPayload)
+            : 1
+        if (smsSegments > 1) {
+          logger.debug(
+            `SMS body spans ${smsSegments} segments; billing ${smsRecipientCount} recipient(s) as ${
+              smsRecipientCount * smsSegments
+            } message(s) (tenant=${tenantId})`,
+          )
+        }
+
         const usageEntries = [
           {
             channel: NotificationChannel.EMAIL,
@@ -430,7 +489,13 @@ export function Queueable(
           },
           {
             channel: NotificationChannel.SMS,
-            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+            count: smsRecipientCount * smsSegments,
+            // Explains a 429 when a short-looking request costs several messages.
+            countExplanation:
+              smsSegments > 1
+                ? `${smsRecipientCount} recipient(s) x ${smsSegments} segments, ` +
+                  `because the message is too long to send as one SMS`
+                : undefined,
           },
         ]
 
@@ -447,6 +512,7 @@ export function Queueable(
             status: NotificationStatus.PENDING,
             createdBy: tenantId,
             payload: processedPayload, // Store sanitized request payload for retry purposes
+            requestRoute,
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,
@@ -459,7 +525,13 @@ export function Queueable(
               .publish(tenantId, {
                 id: notificationRecord.id,
                 tenantId: notificationRecord.tenantId,
-                status: notificationRecord.status,
+                status: notificationRecord.statusCode
+                  ? {
+                      code: notificationRecord.statusCode.code,
+                      displayName: notificationRecord.statusCode.displayName,
+                      description: notificationRecord.statusCode.description,
+                    }
+                  : { code: notificationRecord.status, displayName: notificationRecord.status },
                 createdAt: notificationRecord.createdAt,
                 createdBy: notificationRecord.createdBy ?? undefined,
                 updatedAt: notificationRecord.updatedAt,

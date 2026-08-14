@@ -36,11 +36,19 @@ window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE="{$VITE_MAX_NOTIFICATION_RESULTS_P
 window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	}
 
+	# Serve API documentation (OpenAPI/Swagger)
+	handle_path /api-docs* {
+		root * /srv/api-docs
+		encode zstd gzip
+		file_server browse
+	}
+
 	root * /srv
 	encode zstd gzip
 	file_server
 	@spa_router {
 		not path /api*
+		not path /api-docs*
 		not path /static/config.js
 		file {
 			try_files {path} /index.html
