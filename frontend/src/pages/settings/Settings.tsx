@@ -18,6 +18,15 @@ const Settings: FC = () => {
   const [selectedTab, setSelectedTab] = useState<SettingsTab>('tenant')
   const [loadedTenantId, setLoadedTenantId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [prevTenantId, setPrevTenantId] = useState(tenantId)
+
+  // Reset the loaded/error state synchronously during render when the tenant changes,
+  // ahead of the fetch effect below.
+  if (tenantId !== prevTenantId) {
+    setPrevTenantId(tenantId)
+    setLoadedTenantId(null)
+    setLoadError(null)
+  }
 
   // The page owns the single settings fetch, so every tab reads from one request and
   // switching tabs re-fetches nothing. Sections seed their edit state from the slices at
@@ -26,8 +35,6 @@ const Settings: FC = () => {
     if (!tenantId) return
 
     let active = true
-    setLoadedTenantId(null)
-    setLoadError(null)
 
     dispatch(fetchSettings())
       .unwrap()

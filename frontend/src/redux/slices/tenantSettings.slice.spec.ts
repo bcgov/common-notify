@@ -60,10 +60,7 @@ describe('tenantSettingsSlice', () => {
     })
 
     it('should fall back to defaults when no settings row exists yet', () => {
-      const state = tenantSettingsReducer(
-        loadedState,
-        fetchSettings.fulfilled(null, '', undefined),
-      )
+      const state = tenantSettingsReducer(loadedState, fetchSettings.fulfilled(null, '', undefined))
 
       expect(state.alertEmail).toBeNull()
       expect(state.defaultSenderEmail).toBeNull()
