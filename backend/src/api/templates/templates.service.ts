@@ -101,7 +101,8 @@ export class TemplatesService {
     }
 
     const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
-    const bodyType = engineCode === TemplateEngine.MJML ? null : 'markdown'
+    // SMS carries no formatting, so its body is stored and sent as plain text.
+    const bodyType = this.defaultBodyType(engineCode, createDto.channelCode)
 
     const template = await this.templatesRepository.create({
       tenantId,
@@ -178,7 +179,10 @@ export class TemplatesService {
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = nextEngineCode
-    if (nextEngineCode === TemplateEngine.MJML) {
+    if (template.channelCode === NotificationChannel.SMS) {
+      // SMS carries no formatting; the body is always sent verbatim.
+      template.bodyType = 'text'
+    } else if (nextEngineCode === TemplateEngine.MJML) {
       template.bodyType = null
     } else {
       template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'markdown'
@@ -271,16 +275,21 @@ export class TemplatesService {
    * Render template content (subject and/or body) with personalisation data
    * Used by delivery workers to render templates before sending
    * Returns raw body with bodyType flag - adapter will handle format conversion
+   *
+   * SMS templates render through the renderer's SMS path and always come back as 'text':
+   * an SMS carries no formatting, so the body is sent exactly as written with no markdown
+   * conversion, no MJML compilation, and no HTML escaping of personalisation values.
+   *
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
-   * @param bodyType Optional override for body content type
+   * @param bodyType Optional override for body content type. Ignored for SMS templates.
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
     template: Template,
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
-  ): Promise<{ subject?: string; body: string; bodyType: 'markdown' | 'html' }> {
+  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
     const normalizedPersonalisation = personalisation ?? {}
 
     this.validateTemplatePersonalisation(template, normalizedPersonalisation)
@@ -323,6 +332,13 @@ export class TemplatesService {
       personalisation: renderPersonalisation,
     }
 
+    // SMS goes through the renderer's plain-text path; the stored bodyType and any caller
+    // override do not apply, because an SMS is only ever plain text.
+    if (template.channelCode === NotificationChannel.SMS) {
+      const renderedSms = await renderer.renderSms(renderContext)
+      return { body: renderedSms.body, bodyType: 'text' }
+    }
+
     const rendered = await renderer.renderEmail(renderContext)
 
     // Use provided bodyType or fall back to template's bodyType setting
@@ -337,6 +353,18 @@ export class TemplatesService {
       body: rendered.body,
       bodyType: effectiveBodyType,
     }
+  }
+
+  /**
+   * Body type a new template is stored with. SMS is always plain text — it has no formatting
+   * and is sent verbatim. MJML is null because it compiles to HTML on its own.
+   */
+  private defaultBodyType(
+    engineCode: TemplateEngine,
+    channelCode: NotificationChannel,
+  ): 'text' | 'markdown' | null {
+    if (channelCode === NotificationChannel.SMS) return 'text'
+    return engineCode === TemplateEngine.MJML ? null : 'markdown'
   }
 
   /**
