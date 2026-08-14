@@ -144,7 +144,9 @@ const SmsSettings: FC = () => {
             onChange={(isSelected) => setValue('includeTenantNameInSms', isSelected)}
           />
         </div>
-        <p className="settings__help">Start all SMS notifications with '{selectedTenant?.name}'</p>
+        <p className="settings__help">
+          Start all SMS notifications with &apos;{selectedTenant?.name}&apos;
+        </p>
       </div>
 
       <div className="settings__field">

@@ -24,13 +24,20 @@ vi.mock('@/redux/utils/toastUtils', () => ({
 }))
 
 vi.mock('@bcgov/design-system-react-components', () => ({
-  Button: ({ children, isDisabled, isIconButton, ...props }: any) => (
+  Button: ({ children, isDisabled, isIconButton: _isIconButton, ...props }: any) => (
     <button disabled={isDisabled} {...props}>
       {children}
     </button>
   ),
   // BCDS TextField hands onChange the value, not the event.
-  TextField: ({ onChange, isInvalid, errorMessage, isDisabled, iconRight, ...props }: any) => (
+  TextField: ({
+    onChange,
+    isInvalid,
+    errorMessage,
+    isDisabled,
+    iconRight: _iconRight,
+    ...props
+  }: any) => (
     <>
       <input
         aria-invalid={Boolean(isInvalid)}

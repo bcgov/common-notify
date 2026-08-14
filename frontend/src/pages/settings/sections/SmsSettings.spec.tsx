@@ -29,7 +29,7 @@ vi.mock('@/redux/utils/toastUtils', () => ({
 }))
 
 vi.mock('@bcgov/design-system-react-components', () => ({
-  Button: ({ children, isDisabled, isIconButton, ...props }: any) => (
+  Button: ({ children, isDisabled, isIconButton: _isIconButton, ...props }: any) => (
     <button disabled={isDisabled} {...props}>
       {children}
     </button>
