@@ -1,10 +1,12 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import {
   getSettings,
+  updateEmailSettings as updateEmailSettingsApi,
   updateSmsSettings as updateSmsSettingsApi,
   updateTenantSettings as updateTenantSettingsApi,
 } from '@/api/settings.api'
 import type {
+  EmailSettingsValues,
   SmsSettingsValues,
   TenantSettings,
   TenantSettingsValues,
@@ -41,6 +43,20 @@ export const updateTenantSettings = createAsyncThunk<
   } catch (error) {
     return rejectWithValue(
       error instanceof Error ? error.message : 'Failed to update tenant settings',
+    )
+  }
+})
+
+export const updateEmailSettings = createAsyncThunk<
+  TenantSettings,
+  EmailSettingsValues,
+  { rejectValue: string }
+>('emailSettings/update', async (payload, { rejectWithValue }) => {
+  try {
+    return await updateEmailSettingsApi(payload)
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Failed to update email settings',
     )
   }
 })

@@ -1,6 +1,7 @@
 import type { AxiosError } from 'axios'
 import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type {
+  EmailSettingsValues,
   SmsSettingsValues,
   TenantSettings,
   TenantSettingsValues,
@@ -40,6 +41,19 @@ export async function updateTenantSettings(data: TenantSettingsValues): Promise<
     return await patch<TenantSettings, TenantSettingsValues>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant settings', 'update')
+  }
+}
+
+/**
+ * Update the Email tab fields. Requires NOTIFY_OPERATIONS_ADMIN.
+ * Returns the refreshed row.
+ */
+export async function updateEmailSettings(data: EmailSettingsValues): Promise<TenantSettings> {
+  try {
+    const params = generateApiParameters(`${BASE_URL}/email`, data)
+    return await patch<TenantSettings, EmailSettingsValues>(params)
+  } catch (error) {
+    throw toReadableError(error, 'email settings', 'update')
   }
 }
 
