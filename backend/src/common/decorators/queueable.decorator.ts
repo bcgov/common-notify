@@ -22,6 +22,7 @@ import type {
 import type { LimitAlertNotificationService } from '../../api/notify/services/limit-alert-notification.service'
 import type { SafelistCandidate, SafelistService } from '../../api/safelist/safelist.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
+import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -40,7 +41,33 @@ export interface QueueableContext {
   limitAlertNotificationService?: LimitAlertNotificationService
   safelistService?: SafelistService
   notificationRequestDetailService?: NotificationRequestDetailService
+  smsSegmentService?: SmsSegmentService
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+/**
+ * Billable segments a single SMS recipient of this request will cost.
+ *
+ * A message over the single-segment budget is concatenated and every segment is billed as its
+ * own message by the carrier, so usage is attributed in segments. Falls back to 1 when the
+ * service is unavailable or the body cannot be resolved — never blocks a send.
+ */
+async function resolveSmsSegments(
+  ctx: QueueableContext,
+  tenantId: string,
+  payload: ProcessedNotifySimpleRequest,
+): Promise<number> {
+  if (!ctx.smsSegmentService) return 1
+  try {
+    return Math.max(1, await ctx.smsSegmentService.countSegmentsPerRecipient(tenantId, payload))
+  } catch (error) {
+    new Logger('Queueable[sms-segments]').warn(
+      `Failed to count SMS segments, billing as a single segment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+    return 1
+  }
 }
 
 /**
@@ -545,6 +572,27 @@ export function Queueable(
         }
 
         // Primary (to) recipient count per channel — used for both limit enforcement and usage.
+        // SMS is counted in billable segments: a body over the single-segment budget is sent (and
+        // billed by ACS) as several concatenated messages, so one request to one recipient can
+        // consume several of the tenant's SMS allowance.
+        //
+        // INVARIANT: every SMS recipient of a request receives the same body — the SMS channel has
+        // one content block and one params set, and mail merge is email-only (NotifySmsRecipients
+        // has no mergeArray). So the segment count is uniform and recipients x segments is exact.
+        // If per-recipient SMS personalisation is ever added, this must become a per-recipient sum.
+        const smsRecipientCount = processedPayload.sms?.recipients?.to?.length ?? 0
+        const smsSegments =
+          smsRecipientCount > 0
+            ? await resolveSmsSegments(this as QueueableContext, tenantId, processedPayload)
+            : 1
+        if (smsSegments > 1) {
+          logger.debug(
+            `SMS body spans ${smsSegments} segments; billing ${smsRecipientCount} recipient(s) as ${
+              smsRecipientCount * smsSegments
+            } message(s) (tenant=${tenantId})`,
+          )
+        }
+
         const usageEntries = [
           {
             channel: NotificationChannel.EMAIL,
@@ -552,7 +600,13 @@ export function Queueable(
           },
           {
             channel: NotificationChannel.SMS,
-            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+            count: smsRecipientCount * smsSegments,
+            // Explains a 429 when a short-looking request costs several messages.
+            countExplanation:
+              smsSegments > 1
+                ? `${smsRecipientCount} recipient(s) x ${smsSegments} segments, ` +
+                  `because the message is too long to send as one SMS`
+                : undefined,
           },
         ]
 

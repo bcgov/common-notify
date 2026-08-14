@@ -42,6 +42,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SafelistService } from '../safelist/safelist.service'
+import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -75,6 +76,7 @@ export class NotifySimpleController {
     readonly apiKeyUsageService: ApiKeyUsageService,
     readonly limitAlertNotificationService: LimitAlertNotificationService,
     readonly safelistService: SafelistService,
+    readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -260,6 +262,7 @@ export class NotifySimpleFrontendController {
     readonly apiKeyUsageService: ApiKeyUsageService,
     readonly limitAlertNotificationService: LimitAlertNotificationService,
     readonly safelistService: SafelistService,
+    readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -296,6 +299,7 @@ export class NotifySimpleFrontendController {
       this.apiKeyUsageService,
       this.limitAlertNotificationService,
       this.safelistService,
+      this.smsSegmentService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)

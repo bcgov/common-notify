@@ -39,6 +39,7 @@ import { ValidationExceptionFilter } from '../../common/filters/validation.filte
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SafelistService } from '../safelist/safelist.service'
+import { SmsSegmentService } from './services/sms-segment.service'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -139,6 +140,10 @@ const mockLimitAlertNotificationService = {
   processAcceptedUsage: vi.fn().mockResolvedValue(undefined),
 }
 
+const mockSmsSegmentService = {
+  countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -157,6 +162,7 @@ describe('Notify Controllers', () => {
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
+    mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -194,6 +200,10 @@ describe('Notify Controllers', () => {
         {
           provide: SafelistService,
           useValue: mockSafelistService,
+        },
+        {
+          provide: SmsSegmentService,
+          useValue: mockSmsSegmentService,
         },
       ],
     })
@@ -345,6 +355,64 @@ describe('Notify Controllers', () => {
               sentCount: 102,
             },
           ],
+        })
+      })
+
+      describe('SMS segment billing', () => {
+        const smsBody = {
+          sms: {
+            recipients: { to: ['+12505550123', '+12505550124'] },
+            content: { body: 'Hello' },
+          },
+        }
+
+        it('bills each recipient for every segment of a multi-segment SMS', async () => {
+          mockApiKeyConsumerId = 'consumer-sms'
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(3)
+
+          await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
+
+          // 2 recipients x 3 segments = 6 billable messages, enforced and recorded.
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-sms', [
+            { channel: NotificationChannel.EMAIL, count: 0 },
+            {
+              channel: NotificationChannel.SMS,
+              count: 6,
+              // Explains the 429 a caller would otherwise find baffling.
+              countExplanation: expect.stringContaining('2 recipient(s) x 3 segments'),
+            },
+          ])
+          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+            'consumer-sms',
+            NotificationChannel.SMS,
+            6,
+          )
+        })
+
+        it('bills a single segment when segment counting fails', async () => {
+          mockApiKeyConsumerId = 'consumer-sms-failure'
+          mockSmsSegmentService.countSegmentsPerRecipient.mockRejectedValue(
+            new Error('render blew up'),
+          )
+
+          await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
+
+          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+            'consumer-sms-failure',
+            NotificationChannel.SMS,
+            2,
+          )
+        })
+
+        it('does not count segments for a request with no SMS recipients', async () => {
+          mockApiKeyConsumerId = 'consumer-email-only'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+
+          expect(mockSmsSegmentService.countSegmentsPerRecipient).not.toHaveBeenCalled()
         })
       })
 
