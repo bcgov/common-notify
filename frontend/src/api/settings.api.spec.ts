@@ -84,19 +84,19 @@ describe('settings.api', () => {
           internationalSmsEnabled: false,
         }),
     ],
-  ])('builds the %s request through generateApiParameters so it is authenticated', async (
-    _name,
-    call,
-  ) => {
-    vi.mocked(get).mockResolvedValue({})
-    vi.mocked(patch).mockResolvedValue({})
+  ])(
+    'builds the %s request through generateApiParameters so it is authenticated',
+    async (_name, call) => {
+      vi.mocked(get).mockResolvedValue({})
+      vi.mocked(patch).mockResolvedValue({})
 
-    await call()
+      await call()
 
-    expect(generateApiParameters).toHaveBeenCalledTimes(1)
-    const built = vi.mocked(generateApiParameters).mock.results[0].value
-    expect(built.requiresAuthentication).toBe(true)
-  })
+      expect(generateApiParameters).toHaveBeenCalledTimes(1)
+      const built = vi.mocked(generateApiParameters).mock.results[0].value
+      expect(built.requiresAuthentication).toBe(true)
+    },
+  )
 
   it('surfaces a readable message when the user lacks permission', async () => {
     vi.mocked(patch).mockRejectedValue({ response: { status: 403 } })
