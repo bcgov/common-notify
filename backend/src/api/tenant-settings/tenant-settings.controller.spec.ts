@@ -1,5 +1,4 @@
 import { GUARDS_METADATA, PATH_METADATA } from '@nestjs/common/constants'
-import { NotImplementedException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ROLES_KEY } from '../../common/decorators/roles.decorator'
@@ -14,6 +13,7 @@ describe('TenantSettingsController', () => {
   const mockService = {
     findByTenantId: vi.fn(),
     upsert: vi.fn(),
+    upsertEmailSettings: vi.fn(),
     upsertSmsSettings: vi.fn(),
   }
 
@@ -58,6 +58,9 @@ describe('TenantSettingsController', () => {
       Reflect.getMetadata(PATH_METADATA, TenantSettingsController.prototype.updateTenantSettings),
     ).toBe('tenant')
     expect(
+      Reflect.getMetadata(PATH_METADATA, TenantSettingsController.prototype.updateEmailSettings),
+    ).toBe('email')
+    expect(
       Reflect.getMetadata(PATH_METADATA, TenantSettingsController.prototype.updateSmsSettings),
     ).toBe('sms')
   })
@@ -101,8 +104,22 @@ describe('TenantSettingsController', () => {
     expect(mockService.upsertSmsSettings).toHaveBeenCalledWith('tenant-1', dto, 'user-1')
   })
 
-  it('throws NotImplemented for the unbuilt updateEmailSettings route', () => {
-    expect(() => controller.updateEmailSettings()).toThrow(NotImplementedException)
+  it('uses the resolved tenant and user for the email PATCH', async () => {
+    const settings = { emailNotificationsEnabled: false }
+    mockService.upsertEmailSettings.mockResolvedValue(settings)
+
+    const dto = {
+      emailNotificationsEnabled: false,
+      replyToEmail: 'noreply',
+      emailAttachmentsEnabled: true,
+    }
+    await expect(
+      controller.updateEmailSettings(
+        { tenant: { id: 'tenant-1' }, userGuid: 'user-1' } as any,
+        dto,
+      ),
+    ).resolves.toBe(settings)
+    expect(mockService.upsertEmailSettings).toHaveBeenCalledWith('tenant-1', dto, 'user-1')
   })
 
   it('retains the tenant-aware frontend guard', () => {

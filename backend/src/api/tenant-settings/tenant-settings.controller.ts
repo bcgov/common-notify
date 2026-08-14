@@ -1,20 +1,11 @@
-import {
-  Body,
-  Controller,
-  Get,
-  NotImplementedException,
-  Patch,
-  Req,
-  Request,
-  UseGuards,
-  Version,
-} from '@nestjs/common'
+import { Body, Controller, Get, Patch, Req, Request, UseGuards, Version } from '@nestjs/common'
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { CstarRole } from '../../enum/cstar-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantSettings } from './entities/tenant-settings.entity'
+import { UpdateEmailSettingsDto } from './schemas/update-email-settings.dto'
 import { UpdateSmsSettingsDto } from './schemas/update-sms-settings.dto'
 import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
 import { TenantSettingsService } from './tenant-settings.service'
@@ -55,13 +46,19 @@ export class TenantSettingsController {
     return this.tenantSettingsService.upsert(tenant.id, dto, userGuid)
   }
 
-  // Email tab update (not yet implemented)
+  // Email tab update
   @Version('1')
   @Patch('email')
   @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Update email settings for the authenticated tenant' })
-  updateEmailSettings(): never {
-    throw new NotImplementedException('Email settings are not yet implemented')
+  @ApiOkResponse({ type: TenantSettings })
+  updateEmailSettings(
+    @Req() req: Request,
+    @Body() dto: UpdateEmailSettingsDto,
+  ): Promise<TenantSettings> {
+    const tenant = (req as any).tenant as Tenant
+    const userGuid = (req as any).userGuid as string | undefined
+    return this.tenantSettingsService.upsertEmailSettings(tenant.id, dto, userGuid)
   }
 
   // SMS tab update
