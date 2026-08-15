@@ -337,7 +337,6 @@
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert"/>
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
-            <child column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
             <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
             <child column="channel_code" foreignKey="fk_template_version_channel" implied="false" onDeleteCascade="false" schema="notify" table="template_version"/>
@@ -393,19 +392,18 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="User or system that last updated the request" size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="payload" nullable="true" remarks="Stores the request payload as JSON for retry purposes when Redis is temporarily unavailable" size="2147483647" type="jsonb" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="error_reason" nullable="true" remarks="Stores the error message when a notification fails, useful for debugging and monitoring" size="2147483647" type="text" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="channel_code" nullable="true" remarks="The primary channel type for this notification (EMAIL, SMS, MSGAPP, or MULTIPLE if multiple channels)" size="20" type="varchar" typeCode="12">
-            <parent column="channel_code" foreignKey="fk_notification_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
-         </column>
-         <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="delayed_send_time" nullable="true" remarks="When set, indicates the notification should be delivered at this time instead of immediately" size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="recipients" nullable="true" remarks="Stores recipients as JSONB object with channels as keys (email, sms, msgApp), each containing an array of recipient addresses/identifiers" size="2147483647" type="jsonb" typeCode="1111"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="quarantine_details" nullable="true" remarks="JSONB data structure storing ClamAV quarantine information. Example: {&quot;viruses&quot;: [&quot;Win.Test.EICAR_HDB-1&quot;], &quot;filename&quot;: &quot;document.pdf&quot;, &quot;scannedAt&quot;: &quot;2026-05-19T10:30:00Z&quot;, &quot;reason&quot;: &quot;Malware detected during content scanning&quot;}" size="2147483647" type="jsonb" typeCode="1111"/>
-         <column autoUpdated="false" defaultValue="false" digits="0" id="13" name="is_internal" nullable="false" remarks="Whether the notification was generated internally rather than initiated by a tenant." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="9" name="delayed_send_time" nullable="true" remarks="When set, indicates the notification should be delivered at this time instead of immediately" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="10" name="recipients" nullable="true" remarks="Stores recipients as JSONB object with channels as keys (email, sms, msgApp), each containing an array of recipient addresses/identifiers" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="quarantine_details" nullable="true" remarks="JSONB data structure storing ClamAV quarantine information. Example: {&quot;viruses&quot;: [&quot;Win.Test.EICAR_HDB-1&quot;], &quot;filename&quot;: &quot;document.pdf&quot;, &quot;scannedAt&quot;: &quot;2026-05-19T10:30:00Z&quot;, &quot;reason&quot;: &quot;Malware detected during content scanning&quot;}" size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="12" name="is_internal" nullable="false" remarks="Whether the notification was generated internally rather than initiated by a tenant." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="13" name="request_route" nullable="true" remarks="API route that accepted the request, relative to the versioned prefix (e.g. 'notifysimple', 'notifysimple/email', 'notifysimple/sms'). Nullable for records created before this column existed." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="14" name="channel_codes" nullable="true" remarks="Channels this request targeted, as a JSONB array of channel codes (e.g. [&quot;EMAIL&quot;,&quot;SMS&quot;]). Values reference notification_channel_code.channel_code but are not FK-enforced." size="2147483647" type="jsonb" typeCode="1111"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="notification_request_pkey" unique="true">
             <column ascending="true" name="id"/>
          </index>
-         <index name="idx_notification_request_channel" unique="false">
-            <column ascending="true" name="channel_code"/>
+         <index name="idx_notification_request_channel_codes" unique="false">
+            <column ascending="true" name="channel_codes"/>
          </index>
          <index name="idx_notification_request_delayed_send" unique="false">
             <column ascending="true" name="delayed_send_time"/>
@@ -562,6 +560,7 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="updated_by" nullable="false" remarks="User or process that last updated this template." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the template was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="'markdown'::character varying" digits="0" id="14" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="15" name="deleted_at" nullable="true" remarks="Timestamp when the template was soft-deleted." size="35" type="timestamptz" typeCode="93"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_pkey" unique="true">
             <column ascending="true" name="id"/>

@@ -3,11 +3,8 @@ digraph "twoDegreesRelationshipsDiagram" {
   "api_key_limit":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_limit_alert":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_limit_alert_log":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
-  "api_key_limit_alert_log":"elipses":w -> "notification_request":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "api_key_usage":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
-  "notification_request":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "notification_request_detail":"elipses":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
-  "notification_request_detail":"elipses":w -> "notification_request":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "template":"channel_code":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "template":"engine_code":w -> "template_engine_code":"engine_code":e [arrowhead=none dir=back arrowtail=crowodot];
   "template_version":"channel_code":w -> "notification_channel_code":"channel_code":e [arrowhead=none dir=back arrowtail=crowodot];
@@ -62,22 +59,11 @@ digraph "twoDegreesRelationshipsDiagram" {
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
       <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="156" HEIGHT="16"><B>notification_channel_code</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
       <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">8 &gt;</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">7 &gt;</TD></TR>
     </TABLE>>
     URL="notification_channel_code.html"
     target="_top"
     tooltip="notification_channel_code"
-  ];
-  "notification_request" [
-   label=<
-    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
-      <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="121" HEIGHT="16"><B>notification_request</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
-      <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 3</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">3 &gt;</TD></TR>
-    </TABLE>>
-    URL="notification_request.html"
-    target="_top"
-    tooltip="notification_request"
   ];
   "notification_request_detail" [
    label=<
@@ -109,6 +95,7 @@ digraph "twoDegreesRelationshipsDiagram" {
       <TR><TD PORT="updated_by" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="81" HEIGHT="16">updated_by</TD></TR></TABLE></TD><TD PORT="updated_by.type" ALIGN="LEFT">varchar[200]</TD></TR>
       <TR><TD PORT="updated_at" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="81" HEIGHT="16">updated_at</TD></TR></TABLE></TD><TD PORT="updated_at.type" ALIGN="LEFT">timestamptz[35,6]</TD></TR>
       <TR><TD PORT="body_type" COLSPAN="2" BGCOLOR="#ffffff" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="81" HEIGHT="16">body_type</TD></TR></TABLE></TD><TD PORT="body_type.type" ALIGN="LEFT">varchar[20]</TD></TR>
+      <TR><TD PORT="deleted_at" COLSPAN="2" ALIGN="LEFT"><TABLE BORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR ALIGN="LEFT"><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="15" HEIGHT="16"></TD><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="81" HEIGHT="16">deleted_at</TD></TR></TABLE></TD><TD PORT="deleted_at.type" ALIGN="LEFT">timestamptz[35,6]</TD></TR>
       <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 2</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">1 &gt;</TD></TR>
     </TABLE>>
     URL="template.html"
