@@ -40,8 +40,8 @@ export class EventResponseDto {
   description: string
 
   /**
-   * Channels the event is configured on, from its channel settings.
-   * Empty until a notification tab is configured.
+   * Channels the event actively sends on, from its channel settings.
+   * Excludes channels that are configured but switched off.
    * @example ["EMAIL", "SMS"]
    */
   channelCodes: string[]

@@ -251,5 +251,23 @@ describe('EventsService', () => {
 
       expect(result.emailSettings).toBeNull()
     })
+
+    it('excludes a configured but inactive channel from channelCodes', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(
+        buildEvent([
+          {
+            channelCode: NotificationChannel.EMAIL,
+            active: false,
+            senderEmail: 'a@gov.bc.ca',
+            isDeleted: false,
+          },
+        ]),
+      )
+
+      const result = await service.getEvent(tenantId, eventId)
+
+      expect(result.channelCodes).toEqual([])
+      expect(result.status).toBe(EventStatus.DRAFT)
+    })
   })
 })

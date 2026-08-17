@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
@@ -10,9 +10,15 @@ import {
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
+import { getTemplates, NotificationChannel } from '@/api/templates.api'
+import type { TemplateResponse } from '@/api/templates.api'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
+
+// Tenant default_sender_email stores only the local part (before @gov.bc.ca); matches the
+// suffix shown on the Settings > Email tab.
+const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
 // Header, footer and attachment service are not implemented yet.
 const NOT_IMPLEMENTED_ITEMS = [{ id: 'not-implemented', label: 'Not implemented' }]
@@ -34,15 +40,46 @@ type EventsEmailTabProps = {
   /** Saves the email channel settings. Must not reject. */
   onSave: (values: EmailSettingsValues) => Promise<void>
   isDisabled?: boolean
+  /** Tenant's default_sender_email (local part only), shown as a placeholder when set. */
+  defaultSenderEmail?: string | null
 }
 
-const EventsEmailTab: FC<EventsEmailTabProps> = ({ values, onSave, isDisabled = false }) => {
+const EventsEmailTab: FC<EventsEmailTabProps> = ({
+  values,
+  onSave,
+  isDisabled = false,
+  defaultSenderEmail,
+}) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
   const [channelActive, setChannelActive] = useState(values.active)
   const [senderEmail, setSenderEmail] = useState(values.senderEmail)
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [templates, setTemplates] = useState<TemplateResponse[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>()
+
+  // Template selection isn't persisted yet (the save payload has no templateId field), so this
+  // only populates the dropdown and preview. Failures are not surfaced since the form is still
+  // usable without it.
+  useEffect(() => {
+    let active = true
+
+    getTemplates(1, 100, undefined, 'name', [`channelCode:eq:${NotificationChannel.EMAIL}`])
+      .then((response) => {
+        if (active) {
+          setTemplates(response.data)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const trimmedSenderEmail = senderEmail.trim()
   const settingsChanged =
@@ -110,6 +147,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({ values, onSave, isDisabled = 
         isDisabled={areFieldsDisabled}
         isRequired
         errorMessage="Sender email address cannot be empty."
+        // Workaround to get placeholder to work with BCDS TextField
+        {...(defaultSenderEmail
+          ? ({ placeholder: `${defaultSenderEmail}@${SENDER_EMAIL_DOMAIN}` } as {
+              placeholder: string
+            })
+          : {})}
       />
 
       <Select
@@ -131,11 +174,28 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({ values, onSave, isDisabled = 
       <Select
         label="Template"
         placeholder="Select a template..."
-        items={[]}
+        items={templateItems}
+        value={selectedTemplateId}
+        onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
         size="small"
         isDisabled={areFieldsDisabled}
         isRequired
       />
+
+      {selectedTemplate && (
+        <div className="events__template-preview">
+          <span className="events__template-preview-label">Template Preview</span>
+          <div className="events__template-preview-box">
+            <p className="events__template-preview-subject">
+              <strong>Subject line:</strong> {selectedTemplate.subject}
+            </p>
+            <p className="events__template-preview-body-label">
+              <strong>Body text:</strong>
+            </p>
+            <p className="events__template-preview-content">{selectedTemplate.body}</p>
+          </div>
+        </div>
+      )}
 
       <Select
         label="Header"

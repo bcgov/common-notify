@@ -11,6 +11,8 @@ import { getEventById, updateEvent, updateEventEmailSettings } from '@/api/event
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
 
 type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
@@ -21,9 +23,17 @@ interface EditEventProps {
 
 const EditEvent: FC<EditEventProps> = ({ eventId }) => {
   const { canEdit } = useCstarRoles()
+  const dispatch = useAppDispatch()
+  const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
   const [selectedTab, setSelectedTab] = useState<EventTab>('settings')
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Placeholder only, for the email tab's sender field. Failures are not surfaced here since
+  // the page's own load state doesn't depend on it.
+  useEffect(() => {
+    dispatch(fetchSettings())
+  }, [dispatch])
 
   // The page owns the single event fetch, so the title, breadcrumb and every tab read
   // from one request and switching tabs re-fetches nothing.
@@ -122,6 +132,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             }}
             onSave={handleSaveEmailSettings}
             isDisabled={!canEdit}
+            defaultSenderEmail={defaultSenderEmail}
           />
         ) : selectedTab === 'sms' ? (
           <EventsSmsTab />

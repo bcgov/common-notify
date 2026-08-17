@@ -297,14 +297,17 @@ export class EventsService {
    */
   private toResponseDto(event: NotifyEvent): EventResponseDto {
     const settings = (event.channelSettings ?? []).filter((setting) => !setting.isDeleted)
+    const activeChannelCodes = settings
+      .filter((setting) => setting.active)
+      .map((setting) => setting.channelCode)
     const emailSetting = this.findEmailSetting(event)
 
     return {
       id: event.id,
       name: event.name,
       description: event.description ?? '',
-      channelCodes: settings.map((setting) => setting.channelCode),
-      status: settings.some((setting) => setting.active) ? EventStatus.ACTIVE : EventStatus.DRAFT,
+      channelCodes: activeChannelCodes,
+      status: activeChannelCodes.length > 0 ? EventStatus.ACTIVE : EventStatus.DRAFT,
       emailSettings: emailSetting
         ? { active: emailSetting.active, senderEmail: emailSetting.senderEmail }
         : null,
