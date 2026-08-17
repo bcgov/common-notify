@@ -1,4 +1,3 @@
 # Production environment overrides
-redis:
-  replica:
-    replicaCount: 2
+replica:
+  replicaCount: 2
