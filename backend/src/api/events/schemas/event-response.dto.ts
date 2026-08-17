@@ -1,6 +1,23 @@
 import { EventStatus } from '../../../enum/event-status.enum'
 
 /**
+ * The event's EMAIL channel settings, backing the Email Notification tab
+ */
+export class EventEmailSettingsDto {
+  /**
+   * Whether the event sends on the email channel
+   * @example false
+   */
+  active: boolean
+
+  /**
+   * From address for email sends. Null while the tab is still a draft.
+   * @example "no-reply@gov.bc.ca"
+   */
+  senderEmail: string | null
+}
+
+/**
  * DTO for event responses from the API
  */
 export class EventResponseDto {
@@ -34,6 +51,11 @@ export class EventResponseDto {
    * @example "DRAFT"
    */
   status: EventStatus
+
+  /**
+   * EMAIL channel settings, or null until the Email Notification tab is first saved
+   */
+  emailSettings: EventEmailSettingsDto | null
 
   /**
    * Timestamp when the event was created

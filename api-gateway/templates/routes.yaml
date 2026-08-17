@@ -862,6 +862,23 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/events/:eventId/channels/email (frontend variant - email tab settings)
+  # Declared explicitly rather than relying on the by-id route's prefix match, same
+  # convention as the auth tenant roles route.
+  - name: ${ROUTE_PREFIX}events-frontend-email-channel
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/email
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # ============================================================================
   # API KEY MANAGEMENT ROUTES
   # ============================================================================

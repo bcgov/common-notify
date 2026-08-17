@@ -1,13 +1,20 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
+import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -52,6 +59,8 @@ export class EventsService {
   constructor(
     @InjectRepository(NotifyEvent)
     private readonly eventRepository: Repository<NotifyEvent>,
+    @InjectRepository(EventChannelSetting)
+    private readonly channelSettingRepository: Repository<EventChannelSetting>,
   ) {}
 
   /**
@@ -191,6 +200,58 @@ export class EventsService {
   }
 
   /**
+   * Update an event's EMAIL channel settings (Email Notification tab)
+   *
+   * Creates the channel setting row the first time the tab is saved, so an event only gains an
+   * EMAIL row once the user configures one.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto Email channel settings, replacing what is stored
+   * @param userId User updating the settings (for audit trail)
+   */
+  async updateEmailChannelSetting(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateEmailChannelSettingDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+    const senderEmail = updateDto.senderEmail?.trim() || null
+
+    // uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
+    // (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
+    const setting =
+      (event.channelSettings ?? []).find(
+        (existing) => existing.channelCode === NotificationChannel.EMAIL,
+      ) ??
+      this.channelSettingRepository.create({
+        eventId: event.id,
+        channelCode: NotificationChannel.EMAIL,
+        createdBy: userId,
+      })
+
+    // Mirrors chk_event_channel_setting_active_complete so an incomplete channel fails with a
+    // usable message rather than a constraint violation. The template is not selectable yet,
+    // so activation is blocked on it for now.
+    if (updateDto.active && (!senderEmail || !setting.templateId)) {
+      throw new BadRequestException(
+        'The email channel cannot be activated until a sender email address and a template are set',
+      )
+    }
+
+    setting.active = updateDto.active
+    setting.senderEmail = senderEmail
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    // Re-read so the derived channelCodes and status reflect the row that was just written.
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
    * Load an event with its channel settings, or throw
    */
   private async findEvent(tenantId: string, eventId: string): Promise<NotifyEvent> {
@@ -236,6 +297,7 @@ export class EventsService {
    */
   private toResponseDto(event: NotifyEvent): EventResponseDto {
     const settings = (event.channelSettings ?? []).filter((setting) => !setting.isDeleted)
+    const emailSetting = this.findEmailSetting(event)
 
     return {
       id: event.id,
@@ -243,8 +305,20 @@ export class EventsService {
       description: event.description ?? '',
       channelCodes: settings.map((setting) => setting.channelCode),
       status: settings.some((setting) => setting.active) ? EventStatus.ACTIVE : EventStatus.DRAFT,
+      emailSettings: emailSetting
+        ? { active: emailSetting.active, senderEmail: emailSetting.senderEmail }
+        : null,
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
     }
+  }
+
+  /**
+   * The event's live EMAIL channel setting, if it has one
+   */
+  private findEmailSetting(event: NotifyEvent): EventChannelSetting | undefined {
+    return (event.channelSettings ?? []).find(
+      (setting) => setting.channelCode === NotificationChannel.EMAIL && !setting.isDeleted,
+    )
   }
 }

@@ -27,6 +27,7 @@ import { EventsService, eventListQueryConfig } from './events.service'
 import type { DerivedEventFilters } from './events.service'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
+import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
@@ -168,6 +169,25 @@ export class EventsFrontendController {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.eventsService.updateEvent(tenant.id, eventId, updateEventDto, user)
+  }
+
+  /**
+   * Update an event's email channel settings (Email Notification tab)
+   */
+  @Version('1')
+  @Post(':eventId/channels/email')
+  @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({ summary: "Update an event's email channel settings" })
+  @ApiOkResponse({ type: EventResponseDto })
+  async updateEmailChannelSetting(
+    @Req() req: express.Request,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() updateDto: UpdateEmailChannelSettingDto,
+  ): Promise<EventResponseDto> {
+    const tenant = this.getTenant(req)
+    const user = JwtUserExtractor.extractUser(req)
+    return this.eventsService.updateEmailChannelSetting(tenant.id, eventId, updateDto, user)
   }
 
   private getTenant(req: Request | express.Request): Tenant {

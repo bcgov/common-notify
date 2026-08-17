@@ -5,8 +5,9 @@ import Breadcrumb from '@/components/Breadcrumb'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
+import type { EmailSettingsValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
-import { getEventById, updateEvent } from '@/api/events.api'
+import { getEventById, updateEvent, updateEventEmailSettings } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -57,6 +58,19 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     }
   }
 
+  async function handleSaveEmailSettings(values: EmailSettingsValues) {
+    try {
+      const updated = await updateEventEmailSettings(eventId, {
+        active: values.active,
+        senderEmail: values.senderEmail || null,
+      })
+      setEvent(updated)
+      showSuccessToast('Email settings saved')
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to save email settings')
+    }
+  }
+
   return (
     <div className="events">
       <Breadcrumb
@@ -100,7 +114,15 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             isDisabled={!canEdit}
           />
         ) : selectedTab === 'email' ? (
-          <EventsEmailTab />
+          // The email channel starts disabled until the tab has been saved with it switched on.
+          <EventsEmailTab
+            values={{
+              active: event.emailSettings?.active ?? false,
+              senderEmail: event.emailSettings?.senderEmail ?? '',
+            }}
+            onSave={handleSaveEmailSettings}
+            isDisabled={!canEdit}
+          />
         ) : selectedTab === 'sms' ? (
           <EventsSmsTab />
         ) : (
