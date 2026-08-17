@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,7 +22,6 @@ import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes
 import { Route as EventsCreateRouteImport } from './routes/events/create'
 import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
-import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 
 const UsageRoute = UsageRouteImport.update({
@@ -37,6 +37,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
 const TemplateCreateRoute = TemplateCreateRouteImport.update({
   id: '/template-create',
   path: '/template-create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
@@ -85,11 +90,6 @@ const AdminUsageRoute = AdminUsageRouteImport.update({
   path: '/admin/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/admin/settings',
-  path: '/admin/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   id: '/admin/feature-flags',
   path: '/admin/feature-flags',
@@ -100,11 +100,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
+  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/create': typeof EventsCreateRoute
@@ -116,11 +116,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
+  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/create': typeof EventsCreateRoute
@@ -133,11 +133,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
+  '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/create': typeof EventsCreateRoute
@@ -151,11 +151,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/not-authorized'
+    | '/settings'
     | '/template-create'
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
-    | '/admin/settings'
     | '/admin/usage'
     | '/events/$eventId'
     | '/events/create'
@@ -167,11 +167,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/not-authorized'
+    | '/settings'
     | '/template-create'
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
-    | '/admin/settings'
     | '/admin/usage'
     | '/events/$eventId'
     | '/events/create'
@@ -183,11 +183,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/not-authorized'
+    | '/settings'
     | '/template-create'
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
-    | '/admin/settings'
     | '/admin/usage'
     | '/events/$eventId'
     | '/events/create'
@@ -200,11 +200,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   NotAuthorizedRoute: typeof NotAuthorizedRoute
+  SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRoute
   UsageRoute: typeof UsageRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsageRoute: typeof AdminUsageRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
   EventsCreateRoute: typeof EventsCreateRoute
@@ -234,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/template-create'
       fullPath: '/template-create'
       preLoaderRoute: typeof TemplateCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/not-authorized': {
@@ -299,13 +306,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/admin/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/feature-flags': {
       id: '/admin/feature-flags'
       path: '/admin/feature-flags'
@@ -320,11 +320,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   NotAuthorizedRoute: NotAuthorizedRoute,
+  SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRoute,
   UsageRoute: UsageRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsageRoute: AdminUsageRoute,
   EventsEventIdRoute: EventsEventIdRoute,
   EventsCreateRoute: EventsCreateRoute,

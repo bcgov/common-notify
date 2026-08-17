@@ -117,6 +117,24 @@
   resize: vertical;
 }
 
+.template-form__sms-estimate {
+  width: 100%;
+  max-width: 572px;
+  margin-top: 8px;
+}
+
+.template-form__sms-estimate-counts,
+.template-form__sms-estimate-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.template-form__sms-estimate-note {
+  margin-top: 4px;
+  color: #474543;
+}
+
 .template-form__actions {
   display: flex;
   align-items: center;

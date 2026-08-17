@@ -28,16 +28,6 @@ import { StructuredLoggerService } from '../../common/logger'
 export class SmsDeliveryWorker {
   private readonly logger = new Logger(SmsDeliveryWorker.name)
 
-  private static normalizeTemplateBodyType(
-    bodyType: 'text' | 'markdown' | 'html' | undefined,
-  ): 'markdown' | undefined {
-    if (bodyType === 'markdown' || bodyType === 'text') {
-      return 'markdown'
-    }
-
-    return undefined
-  }
-
   private static isPermanentValidationError(error: unknown): error is HttpException {
     return error instanceof HttpException && error.getStatus() === 400
   }
@@ -129,13 +119,12 @@ export class SmsDeliveryWorker {
 
             // Merge template content into SMS payload if channel matches
             if (template.channelCode === 'SMS') {
-              // Render the template with personalisation data from request.params
-              // Normalize legacy body types before entering the markdown-only render path.
-              const rendered = await templatesService.renderTemplateContent(
-                template,
-                { ...request?.params, ...payload.params },
-                SmsDeliveryWorker.normalizeTemplateBodyType(payload.content?.bodyType),
-              )
+              // Render the template with personalisation data from request.params.
+              // SMS always renders as plain text, so no bodyType override applies here.
+              const rendered = await templatesService.renderTemplateContent(template, {
+                ...request?.params,
+                ...payload.params,
+              })
 
               resolvedPayload = {
                 ...payload,

@@ -1,0 +1,351 @@
+# Grafana-managed infrastructure (pod-state / resource) alert rules
+# ---------------------------------------------------------------------------
+# WHY THIS FILE EXISTS
+#   The existing alerting (monitoring/grafana-stack/loki/alert-rules.yaml) is
+#   entirely LOG-BASED (Loki). Log rules cannot see Kubernetes pod state, so a
+#   CrashLoopBackOff / OOMKill / memory pressure produced NO alert — e.g. the
+#   permanent dev backend and the redis pods have crash-looped for days with
+#   hundreds of restarts and nothing fired.
+#
+#   These rules are METRIC-based, evaluated by Grafana against the in-namespace
+#   Prometheus (datasource UID "prometheus", deployed via
+#   monitoring/grafana-stack/prometheus/values-tools.yaml). They route to the
+#   existing `common-notify-email` contact point (n8n webhook) — delivery is
+#   already wired, so no new notification setup is needed.
+#
+# DATA SOURCE  (UID: prometheus — keep in sync with values-tools-sso.yaml)
+#   Metrics from kube-state-metrics (bundled with the Prometheus chart):
+#     - kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
+#     - kube_pod_container_status_restarts_total
+#     - kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
+#     - kube_pod_container_resource_limits{resource="memory"}
+#     - kube_pod_status_phase, kube_deployment_status_replicas_available
+#
+# ⚠️ MEMORY-USAGE-% CAVEAT
+#   The two memory-USAGE rules (cn-mem-high / cn-mem-critical) use
+#   container_memory_working_set_bytes, which comes from cAdvisor/kubelet — NOT
+#   kube-state-metrics. A namespace-scoped Prometheus may NOT be able to scrape
+#   the kubelet (needs node-level RBAC). If those metrics are absent, those two
+#   rules simply never fire (no error). The OOMKilled rule (cn-oomkilled) is the
+#   reliable memory signal — it comes from kube-state-metrics and always works.
+#   If cAdvisor metrics are unavailable, treat cn-oomkilled as the primary memory
+#   alert and drop/disable the two usage-% rules.
+#
+# SCOPE
+#   Namespaces f6bc3f-dev|test|prod. App workloads (backend/frontend/redis/db).
+# ---------------------------------------------------------------------------
+
+apiVersion: 1
+groups:
+  # =========================================================================
+  # POD STATE — the category that was completely missing
+  # =========================================================================
+  - orgId: 1
+    name: pod-state
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-pod-crashloop
+        title: PodCrashLoopBackOff
+        condition: C
+        for: 2m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  kube_pod_container_status_waiting_reason{
+                    namespace=~"f6bc3f-(dev|test|prod)",
+                    reason="CrashLoopBackOff"
+                  }
+                )
+              instant: true
+              intervalMs: 1000
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: pod-state
+        annotations:
+          summary: "CrashLoopBackOff: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} ({{ $labels.namespace }}) is in CrashLoopBackOff. It is repeatedly starting and crashing."
+
+      - uid: cn-pod-restarts-high
+        title: PodRestartsHigh
+        condition: C
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod, container) (
+                  increase(kube_pod_container_status_restarts_total{
+                    namespace=~"f6bc3f-(dev|test|prod)"
+                  }[15m])
+                )
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: pod-state
+        annotations:
+          summary: "Frequent restarts: {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) restarted more than 3 times in the last 15 minutes."
+
+      - uid: cn-pod-not-ready
+        title: PodNotReady
+        condition: C
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod) (
+                  kube_pod_status_phase{
+                    namespace=~"f6bc3f-(dev|test|prod)",
+                    phase=~"Pending|Unknown|Failed"
+                  }
+                ) > 0
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: pod-state
+        annotations:
+          summary: "Pod not ready: {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has been in a non-running phase for over 10 minutes."
+
+      - uid: cn-deployment-replicas
+        title: DeploymentReplicasMismatch
+        condition: C
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                (
+                  kube_deployment_status_replicas_available{namespace=~"f6bc3f-(dev|test|prod)"}
+                  <
+                  kube_deployment_spec_replicas{namespace=~"f6bc3f-(dev|test|prod)"}
+                )
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: pod-state
+        annotations:
+          summary: "Deployment under-replicated: {{ $labels.namespace }}/{{ $labels.deployment }}"
+          description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has fewer available replicas than desired for 10+ minutes."
+
+  # =========================================================================
+  # MEMORY / OOM — the memory check you asked for. Limits are 8Gi per container.
+  # =========================================================================
+  - orgId: 1
+    name: memory
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-mem-high
+        title: ContainerMemoryHigh
+        condition: C
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace=~"f6bc3f-(dev|test|prod)", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: memory
+        annotations:
+          summary: "High memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is using {{ printf \"%.0f\" $values.A.Value }}% of its memory limit (threshold 85%). Risk of OOMKill."
+
+      - uid: cn-mem-critical
+        title: ContainerMemoryCritical
+        condition: C
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace=~"f6bc3f-(dev|test|prod)", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: memory
+        annotations:
+          summary: "CRITICAL memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is above 95% of its memory limit and likely to be OOMKilled imminently."
+
+      - uid: cn-oomkilled
+        title: ContainerOOMKilled
+        condition: C
+        for: 1m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod, container) (
+                  increase(kube_pod_container_status_last_terminated_reason{
+                    namespace=~"f6bc3f-(dev|test|prod)", reason="OOMKilled"
+                  }[10m])
+                )
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: memory
+        annotations:
+          summary: "OOMKilled: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) was OOMKilled in the last 10 minutes. Increase memory limits or investigate a leak."
+
+  # =========================================================================
+  # CPU — throttling (limits are 4 CPU per container)
+  # =========================================================================
+  - orgId: 1
+    name: cpu
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-cpu-throttling
+        title: ContainerCPUThrottlingHigh
+        condition: C
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_throttled_periods_total{
+                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                  }[5m])
+                )
+                /
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_periods_total{
+                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                  }[5m])
+                ) * 100 > 25
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [25] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: cpu
+        annotations:
+          summary: "CPU throttling: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is being CPU-throttled >25% of the time for 15+ minutes."
