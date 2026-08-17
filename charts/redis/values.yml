@@ -9,7 +9,13 @@ global:
     # the chart's image-verification guard. Allow it explicitly.
     allowInsecureImages: true
 auth:
-  enabled: false  # Disabled per BC Gov pattern
+  # Keep auth ENABLED. Before un-nesting, this whole block was ignored and the
+  # chart default (auth ON) applied, so a `common-notify-redis` secret with a
+  # `redis-password` key was always created. The backend REQUIRES that secret
+  # (REDIS_PASSWORD secretKeyRef, non-optional — charts/app/.../backend/deployment.yaml).
+  # Disabling auth removes the secret and breaks the backend
+  # (CreateContainerConfigError: secret "common-notify-redis" not found).
+  enabled: true
 image:
   # Pin by DIGEST, not a floating tag. Redis previously ran on :latest (Bitnami
   # deleted the old numbered tags from Docker Hub, so this chart's config had been
