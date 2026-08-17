@@ -80,7 +80,13 @@ replica:
       cpu: 500m
       memory: 1Gi
 sentinel:
-  enabled: true
+  # Sentinel is DISABLED. Every environment actually runs the replication
+  # architecture (separate redis-master + redis-replicas StatefulSets), and the
+  # app connects to `common-notify-redis-master`. This value used to say `true`,
+  # but the whole redis: block was nested and ignored, so Sentinel never ran.
+  # Enabling it now would switch to the `redis-node` topology, remove the
+  # `-redis-master` service the backend targets, and break the app. Keep it off.
+  enabled: false
   quorum: 1
   podSecurityContext:
     enabled: true
