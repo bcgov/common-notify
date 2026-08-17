@@ -53,6 +53,100 @@
   }
 }
 
+.events__actions {
+  display: flex;
+  gap: 8px;
+}
+
+// Borrowed from templates info icon scss
+.events__tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--icons-color-primary, #2d2d2d);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &[data-hovered],
+  &[data-pressed],
+  &[data-selected],
+  &[data-disabled] {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+// Additional recipients section
+.events__additional-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.events__field-label {
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
+.events__recipient-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Wraps the tags and the input so they read as a single field, the way the mockup shows them.
+.events__recipient-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+
+  &:focus-within {
+    border-color: var(--surface-color-border-active);
+  }
+}
+
+.events__recipient-field--disabled {
+  background: var(--surface-color-forms-disabled);
+}
+
+.events__recipient-input {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+  resize: vertical;
+
+  &::placeholder {
+    color: var(--typography-color-placeholder);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:disabled {
+    color: var(--typography-color-placeholder);
+    cursor: not-allowed;
+  }
+}
+
 .events__section-heading {
   margin: 0;
   font-size: 1.5rem;

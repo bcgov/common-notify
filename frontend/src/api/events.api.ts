@@ -7,6 +7,11 @@ export enum EventStatus {
   DRAFT = 'DRAFT',
 }
 
+export interface EventEmailSettings {
+  active: boolean
+  senderEmail: string | null
+}
+
 export interface EventResponse {
   id: string
   name: string
@@ -14,6 +19,8 @@ export interface EventResponse {
   /** Channels the event notifies on; empty until a notification tab is configured. */
   channelCodes: string[]
   status: EventStatus
+  /** Email channel settings, null until the Email Notification tab is first saved. */
+  emailSettings: EventEmailSettings | null
   createdAt: string
   updatedAt: string
 }
@@ -169,6 +176,54 @@ export async function updateEvent(
 
     throw new Error(
       `Failed to update event: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
+/**
+ * Update an event's email channel settings (Email Notification tab)
+ *
+ * Replaces the stored settings, so the tab must send every field it owns.
+ *
+ * @param eventId Event ID
+ * @param settings Email channel settings
+ * @returns Updated event, including the saved email settings
+ * @throws Error if update fails
+ */
+export async function updateEventEmailSettings(
+  eventId: string,
+  settings: EventEmailSettings,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email`)
+    return await post<EventResponse>({ ...params, data: settings })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    // The backend rejects activating a channel that is not fully configured; its message
+    // names the missing piece, so surface it as-is.
+    if (axiosError.response?.status === STATUS_CODES.BadRequest && responseData.message) {
+      throw new Error(
+        Array.isArray(responseData.message)
+          ? responseData.message.join(', ')
+          : responseData.message,
+      )
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to update email settings: ${
         responseData.message || (error instanceof Error ? error.message : 'Unknown error')
       }`,
     )
