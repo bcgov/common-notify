@@ -1,0 +1,111 @@
+# Central Prometheus for Common Notify (f6bc3f-tools)
+# ---------------------------------------------------------------------------
+# WHY: The stack was Loki-only (logs). Pod state (CrashLoopBackOff, OOMKilled,
+# restarts) and resource usage are METRICS, not logs — so a crash loop produced
+# no alert. This Prometheus gives Grafana a metrics datasource for the
+# infra-alert-rules.yaml alerts.
+#
+# RBAC-SAFE DESIGN (important):
+#   BC Gov tenants CANNOT create cluster-scoped RBAC (ClusterRole/CRB), and the
+#   pipeline SA cannot create RBAC in dev/test/prod from tools. So:
+#     - kube-state-metrics is NOT bundled here. It is deployed separately INTO
+#       each app namespace (values-kube-state-metrics.yaml) using that namespace's
+#       own token — exactly like the existing grafana-agent jobs. Namespaced RBAC.
+#     - This Prometheus does NOT use kubernetes_sd_configs (that needs cluster
+#       RBAC for pod discovery). It scrapes the per-namespace kube-state-metrics
+#       and the app /metrics via STATIC DNS (static_configs) — no k8s RBAC needed,
+#       only network reachability (same license plate, already allowed; Loki does
+#       the same cross-namespace today).
+#
+# CHART: prometheus-community/prometheus
+# SCOPE: f6bc3f-tools. ~7d local retention (5Gi, fits the namespace storage quota),
+#        no Thanos, no object storage.
+#        Grafana owns alerting (-> n8n), so Prometheus Alertmanager is disabled.
+# DEPLOY: helm upgrade --install prometheus prometheus-community/prometheus \
+#           -n f6bc3f-tools -f monitoring/grafana-stack/prometheus/values-tools.yaml
+# ---------------------------------------------------------------------------
+
+# No cluster-scoped RBAC. BC Gov tenants cannot create ClusterRole/CRB, and this
+# Prometheus does not need the Kubernetes API — it scrapes everything via static
+# DNS (static_configs below), so no ClusterRole/ServiceDiscovery is required.
+rbac:
+  create: false
+
+server:
+  retention: 7d
+  securityContext:
+    runAsUser: null
+    runAsNonRoot: true
+    runAsGroup: null
+    fsGroup: null
+  persistentVolume:
+    enabled: true
+    # f6bc3f-tools has an AGGREGATE storage-quota of 10Gi (all classes combined);
+    # Loki already uses 5Gi, leaving 5Gi. Block storage is a better fit for the
+    # Prometheus TSDB (RWO). 5Gi holds ~10d of these low-cardinality metrics
+    # (kube-state-metrics + a handful of app targets) comfortably.
+    size: 5Gi
+    storageClass: netapp-block-standard
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  global:
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    evaluation_interval: 30s
+  service:
+    servicePort: 80
+
+# --- Disable everything that needs cluster-scoped RBAC or host access ---
+kube-state-metrics:
+  enabled: false          # deployed per-namespace instead (see values-kube-state-metrics.yaml)
+alertmanager:
+  enabled: false          # Grafana handles alerting -> n8n
+prometheus-node-exporter:
+  enabled: false          # needs privileged host access
+prometheus-pushgateway:
+  enabled: false
+
+# The chart's default server config includes kubernetes_sd_configs scrape jobs
+# that require cluster RBAC. Replace the whole scrape config with static targets
+# so the Prometheus server needs NO Kubernetes API access at all.
+serverFiles:
+  prometheus.yml:
+    # NOTE: do NOT set `global:` here — the chart injects its own global block
+    # from server.global, and a second one makes prometheus.yml invalid
+    # ("field global already set"). Only scrape_configs belongs here.
+    scrape_configs:
+      # NOTE: the chart already defines a `prometheus` self-scrape job; do not
+      # redefine it here or config load fails ("multiple scrape configs with job
+      # name prometheus"). Helm merges this list with the chart defaults.
+
+      # Per-namespace kube-state-metrics (pod/deployment state).
+      # Service name is "<release>-kube-state-metrics"; released as "ksm" in each
+      # app namespace, so the service DNS is ksm-kube-state-metrics.<ns>.svc:8080.
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: ['ksm-kube-state-metrics.f6bc3f-dev.svc.cluster.local:8080']
+            labels: { cluster_namespace: f6bc3f-dev }
+          - targets: ['ksm-kube-state-metrics.f6bc3f-test.svc.cluster.local:8080']
+            labels: { cluster_namespace: f6bc3f-test }
+          - targets: ['ksm-kube-state-metrics.f6bc3f-prod.svc.cluster.local:8080']
+            labels: { cluster_namespace: f6bc3f-prod }
+
+      # App /metrics (backend exposes /api/metrics on :3000). Static per-service
+      # DNS avoids pod service-discovery RBAC. Add per-PR targets as needed, or
+      # rely on kube-state-metrics for PR pod-state (no app metrics for PRs).
+      - job_name: common-notify-app
+        metrics_path: /api/metrics
+        static_configs:
+          - targets: ['common-notify-dev-backend.f6bc3f-dev.svc.cluster.local:80']
+            labels: { namespace: f6bc3f-dev, app: backend }
+          - targets: ['common-notify-test-backend.f6bc3f-test.svc.cluster.local:80']
+            labels: { namespace: f6bc3f-test, app: backend }
+          - targets: ['common-notify-prod-backend.f6bc3f-prod.svc.cluster.local:80']
+            labels: { namespace: f6bc3f-prod, app: backend }
