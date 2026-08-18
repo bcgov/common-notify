@@ -64,10 +64,7 @@ const SafelistSection: FC = () => {
       {!enforced ? (
         // Nothing below this is shown when the safelist has no effect: a list of recipients that
         // does not gate anything invites the reader to believe it does.
-        <Alert variant="info">
-          This environment does not enforce the safelist — notifications are sent to whoever they
-          are addressed to.
-        </Alert>
+        <Alert variant="info">This environment does not enforce the safelist.</Alert>
       ) : (
         <>
           <Alert variant="warning">
