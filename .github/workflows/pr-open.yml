@@ -123,7 +123,20 @@ jobs:
       oc_server: ${{ vars.oc_server }}
       tag: ${{ github.event.number }}
       db_user: app-${{ github.event.number }}
-      params: --set global.secrets.persist=false --set frontend.secrets.enabled=true --set backend.clamav.enabled=false --set backend.clamav.host=common-notify-dev-clamav
+      # PR frontends must point at the DEV gateway host — that is where the
+      # path-prefixed PR routes (/pr-<n>/api/*) live. The shared
+      # notify-frontend-config secret points at TEST, so use secrets.enabled=false
+      # and set the frontend config explicitly to dev. Caddy then prepends
+      # /pr-<n> (GATEWAY_PATH_PREFIX) to reach this PR's own Kong route.
+      params: >-
+        --set global.secrets.persist=false
+        --set frontend.secrets.enabled=false
+        --set frontend.apiGatewayNotifyUrl=https://gw-fe8c5-notify.dev.api.gov.bc.ca
+        --set frontend.keycloakUrl=https://dev.loginproxy.gov.bc.ca/auth
+        --set frontend.keycloakRealm=standard
+        --set frontend.keycloakClientId=notify-6388
+        --set backend.clamav.enabled=false
+        --set backend.clamav.host=common-notify-dev-clamav
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
