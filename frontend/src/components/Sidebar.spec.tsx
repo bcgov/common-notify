@@ -87,26 +87,16 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument()
   })
 
-  it('shows Tenant Settings for NOTIFY_ADMIN users', async () => {
-    const user = userEvent.setup()
-    const UserService = (await import('@/service/user-service')).default
-    vi.mocked(UserService.hasRole).mockReturnValue(true)
-
-    renderSidebar()
-
-    await user.click(screen.getByRole('button', { name: /admin/i }))
-
-    expect(screen.getByRole('link', { name: /tenant settings/i })).toHaveAttribute(
-      'href',
-      '/admin/settings',
-    )
-  })
-
-  it('does not show Admin or Tenant Settings for NOTIFY_OPERATIONS_ADMIN-only users', () => {
+  it('shows the Settings link for users with a CSTAR role', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
 
-    expect(screen.queryByRole('button', { name: /admin/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /tenant settings/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /settings/i })).toHaveAttribute('href', '/settings')
+  })
+
+  it('hides the Settings link for users with no CSTAR role', () => {
+    renderSidebar()
+
+    expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {
