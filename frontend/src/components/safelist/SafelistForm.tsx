@@ -53,54 +53,43 @@ export const SafelistForm: FC<SafelistFormProps> = ({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="row g-2 align-items-end mb-3">
-      <div className="col-12 col-md-3">
+    <form onSubmit={handleSubmit} noValidate className="d-flex flex-wrap align-items-end gap-2 mb-3">
+      <div style={{ minWidth: '9rem' }}>
         <Select
           label="Channel"
           items={CHANNEL_ITEMS}
           value={channelCode}
-          onChange={(value: string) => setChannelCode(value as SafelistChannel)}
+          onChange={(value) => setChannelCode(value as SafelistChannel)}
           isDisabled={isSubmitting}
-          size="small"
           style={{ width: '100%' }}
         />
       </div>
 
-      <div className="col-12 col-md-4">
+      <div className="flex-grow-1" style={{ minWidth: '14rem' }}>
         <TextField
           label={isEmail ? 'Email address' : 'Phone number'}
           value={recipient}
           onChange={setRecipient}
           isDisabled={isSubmitting}
-          size="small"
           style={{ width: '100%' }}
           {...({ placeholder: isEmail ? 'name@gov.bc.ca' : '(250) 555-0100' } as any)}
         />
       </div>
 
-      <div className="col-12 col-md-3">
+      <div style={{ minWidth: '12rem' }}>
         <TextField
           label="Label (optional)"
           value={label}
           onChange={setLabel}
           isDisabled={isSubmitting}
-          size="small"
           style={{ width: '100%' }}
           {...({ placeholder: 'QA mailbox' } as any)}
         />
       </div>
 
-      <div className="col-12 col-md-2">
-        <Button
-          type="submit"
-          variant="primary"
-          size="small"
-          isDisabled={!canSubmit}
-          style={{ width: '100%' }}
-        >
-          {isSubmitting ? 'Adding…' : 'Add'}
-        </Button>
-      </div>
+      <Button type="submit" variant="primary" isDisabled={!canSubmit}>
+        {isSubmitting ? 'Adding…' : 'Add'}
+      </Button>
     </form>
   )
 }
