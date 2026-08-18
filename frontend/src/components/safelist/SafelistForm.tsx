@@ -54,13 +54,14 @@ export const SafelistForm: FC<SafelistFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="row g-2 align-items-end mb-3">
-      <div className="col-12 col-md-2">
+      <div className="col-12 col-md-3">
         <Select
           label="Channel"
           items={CHANNEL_ITEMS}
           value={channelCode}
           onChange={(value: string) => setChannelCode(value as SafelistChannel)}
           isDisabled={isSubmitting}
+          size="small"
           style={{ width: '100%' }}
         />
       </div>
@@ -77,7 +78,7 @@ export const SafelistForm: FC<SafelistFormProps> = ({
         />
       </div>
 
-      <div className="col-12 col-md-4">
+      <div className="col-12 col-md-3">
         <TextField
           label="Label (optional)"
           value={label}
@@ -90,7 +91,13 @@ export const SafelistForm: FC<SafelistFormProps> = ({
       </div>
 
       <div className="col-12 col-md-2">
-        <Button type="submit" variant="primary" isDisabled={!canSubmit}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="small"
+          isDisabled={!canSubmit}
+          style={{ width: '100%' }}
+        >
           {isSubmitting ? 'Adding…' : 'Add'}
         </Button>
       </div>

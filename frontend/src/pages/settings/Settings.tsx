@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react'
-import type { FC, FormEvent } from 'react'
-import { Button } from '@bcgov/design-system-react-components'
-import PageHeading from '@/components/PageHeading'
-import { Alert } from '@/components/Alert'
-import SafelistSection from './SafelistSection'
+import type { FC } from 'react'
 import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmailSettings from './sections/EmailSettings'
 import SmsSettings from './sections/SmsSettings'
 import TenantSettings from './sections/TenantSettings'
+import SafelistSection from './SafelistSection'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/settings.scss'
 
-type SettingsTab = 'tenant' | 'email' | 'sms'
+type SettingsTab = 'tenant' | 'email' | 'sms' | 'safelist'
 
 const Settings: FC = () => {
   const dispatch = useAppDispatch()
@@ -52,69 +49,6 @@ const Settings: FC = () => {
     return () => {
       active = false
     }
-  }, [selectedTenant, dispatch])
-
-  return (
-    <div>
-      <PageHeading title="Tenant Settings" />
-
-      {selectedTenant && <p className="text-muted mb-3">{selectedTenant.name}</p>}
-
-      {error && (
-        <Alert variant="danger" className="mb-3">
-          {error}
-        </Alert>
-      )}
-
-      {loading || loadedTenantId !== selectedTenant?.id ? (
-        <p className="text-muted">Loading tenant settings...</p>
-      ) : (
-        <SettingsForm
-          emailInput={emailInput}
-          savedAlertEmail={savedAlertEmail}
-          saving={saving}
-          onEmailChange={setEmailInput}
-          onSaved={(alertEmail) => {
-            setSavedAlertEmail(alertEmail)
-            setEmailInput(alertEmail ?? '')
-          }}
-        />
-      )}
-
-      {selectedTenant && <SafelistSection />}
-    </div>
-  )
-}
-
-function SettingsForm({
-  emailInput,
-  savedAlertEmail,
-  saving,
-  onEmailChange,
-  onSaved,
-}: {
-  emailInput: string
-  savedAlertEmail: string | null
-  saving: boolean
-  onEmailChange: (value: string) => void
-  onSaved: (value: string | null) => void
-}) {
-  const dispatch = useAppDispatch()
-  const [shouldShowValidation, setShouldShowValidation] = useState(false)
-  const normalizedEmail = normalizeEmail(emailInput)
-  const validationError =
-    normalizedEmail && !isValidEmail(normalizedEmail) ? 'Enter a valid alert email address' : ''
-  const emailError = shouldShowValidation ? validationError : ''
-  const isDirty = normalizedEmail !== savedAlertEmail
-  const isSaveDisabled = !isDirty || saving || Boolean(emailError)
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (validationError) {
-      setShouldShowValidation(true)
-      return
-    }
   }, [tenantId, dispatch])
 
   // Ensure we have a tenantId and that it is for the current tenant
@@ -141,11 +75,16 @@ function SettingsForm({
           <ToggleButton id="tenant">Tenant Settings</ToggleButton>
           <ToggleButton id="email">Email Settings</ToggleButton>
           <ToggleButton id="sms">SMS Settings</ToggleButton>
+          <ToggleButton id="safelist">Recipient Safelist</ToggleButton>
         </ToggleButtonGroup>
       </div>
 
       <section className="settings__section">
-        {loadError ? (
+        {/* The safelist owns its own fetch/loading/error, so it renders independently of the
+            shared tenant-settings load below. */}
+        {selectedTab === 'safelist' ? (
+          <SafelistSection key={tenantId} />
+        ) : loadError ? (
           <div className="alert alert-danger">{loadError}</div>
         ) : !isLoaded ? (
           <p className="text-muted">Loading settings...</p>
