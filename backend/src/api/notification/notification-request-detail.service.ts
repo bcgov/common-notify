@@ -125,7 +125,15 @@ export class NotificationRequestDetailService {
     createdBy?: string,
   ): Promise<void> {
     if (recipients.length === 0) return
-    const entities = recipients.map(({ address, channel }) =>
+
+    // A mail merge may list the same address more than once. Saving duplicates would violate
+    // uq_notification_request_detail_recipient and fail the whole insert, losing the record of
+    // every blocked recipient — so collapse them on the same key the constraint uses.
+    const unique = new Map(
+      recipients.map((recipient) => [`${recipient.channel}::${recipient.address}`, recipient]),
+    )
+
+    const entities = [...unique.values()].map(({ address, channel }) =>
       this.detailRepository.create({
         notificationRequestId,
         recipientAddress: address,

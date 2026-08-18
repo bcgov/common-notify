@@ -310,7 +310,8 @@ async function handleEmailMerge(
     try {
       await ctx.notificationRequestDetailService.createBlocked(
         notificationRecord.id,
-        blockedAddresses.map((address) => ({ address, channel: NotificationChannel.EMAIL })),
+        // blockedSet, not blockedAddresses: a merge can list the same address on several rows.
+        [...blockedSet].map((address) => ({ address, channel: NotificationChannel.EMAIL })),
         'Recipient is not on the tenant safelist',
         tenantId,
       )

@@ -5,6 +5,7 @@ import { vi } from 'vitest'
 import { SafelistService } from './safelist.service'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { NotifyUser } from '../admin/users/entities/notify-user.entity'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 
@@ -25,6 +26,10 @@ describe('SafelistService', () => {
     findOne: vi.fn(),
   }
 
+  const notifyUserRepository = {
+    find: vi.fn(),
+  }
+
   const featureFlagService = {
     isEnabled: vi.fn(),
   }
@@ -42,6 +47,7 @@ describe('SafelistService', () => {
         SafelistService,
         { provide: getRepositoryToken(RecipientSafelist), useValue: safelistRepository },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: configurationRepository },
+        { provide: getRepositoryToken(NotifyUser), useValue: notifyUserRepository },
         { provide: FeatureFlagService, useValue: featureFlagService },
       ],
     }).compile()
@@ -50,6 +56,7 @@ describe('SafelistService', () => {
     vi.clearAllMocks()
     featureFlagService.isEnabled.mockResolvedValue(true)
     configurationRepository.findOne.mockResolvedValue({ config: { value: 50 } })
+    notifyUserRepository.find.mockResolvedValue([])
   })
 
   describe('findBlocked', () => {
@@ -132,6 +139,98 @@ describe('SafelistService', () => {
 
       expect(blocked).toEqual([])
       expect(safelistRepository.find).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('isEnforced caching', () => {
+    it('reads the flag once for a burst of sends instead of once per send', async () => {
+      const candidates = [{ address: 'someone@gov.bc.ca', channel: NotificationChannel.EMAIL }]
+      givenEntries([])
+
+      await Promise.all([
+        service.findBlocked(TENANT, candidates),
+        service.findBlocked(TENANT, candidates),
+      ])
+      await service.findBlocked(TENANT, candidates)
+
+      expect(featureFlagService.isEnabled).toHaveBeenCalledTimes(1)
+    })
+
+    it('re-reads the flag once the cache expires, so a toggle takes effect', async () => {
+      vi.useFakeTimers()
+      try {
+        featureFlagService.isEnabled.mockResolvedValue(false)
+        expect(await service.isEnforced()).toBe(false)
+
+        // Operator enables the guardrail in the admin screen.
+        featureFlagService.isEnabled.mockResolvedValue(true)
+        expect(await service.isEnforced()).toBe(false) // still cached
+
+        vi.advanceTimersByTime(31_000)
+        expect(await service.isEnforced()).toBe(true)
+        expect(featureFlagService.isEnabled).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('listByTenant', () => {
+    const GUID = '2f1a0b7c-9d3e-4f5a-8b6c-1d2e3f4a5b6c'
+
+    it('resolves the adding user GUID to a display name', async () => {
+      safelistRepository.find.mockResolvedValue([
+        { id: 'entry-1', recipient: 'qa@gov.bc.ca', createdBy: GUID },
+      ])
+      notifyUserRepository.find.mockResolvedValue([
+        { externalId: GUID, displayName: 'Falk, Barrett CITZ:EX', username: 'bfalk' },
+      ])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBe('Falk, Barrett CITZ:EX')
+    })
+
+    it('falls back to the username when there is no display name', async () => {
+      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: GUID }])
+      notifyUserRepository.find.mockResolvedValue([
+        { externalId: GUID, displayName: null, username: 'bfalk' },
+      ])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBe('bfalk')
+    })
+
+    it('returns null rather than exposing a GUID for an unknown user', async () => {
+      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: GUID }])
+      notifyUserRepository.find.mockResolvedValue([])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBeNull()
+    })
+
+    it('passes through non-GUID markers like the seed user', async () => {
+      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: 'system' }])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBe('system')
+      expect(notifyUserRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('looks the directory up once for a page of entries', async () => {
+      safelistRepository.find.mockResolvedValue([
+        { id: 'entry-1', createdBy: GUID },
+        { id: 'entry-2', createdBy: GUID },
+      ])
+      notifyUserRepository.find.mockResolvedValue([{ externalId: GUID, displayName: 'Barrett' }])
+
+      const entries = await service.listByTenant(TENANT)
+
+      expect(notifyUserRepository.find).toHaveBeenCalledTimes(1)
+      expect(entries.map((e) => e.createdByName)).toEqual(['Barrett', 'Barrett'])
     })
   })
 

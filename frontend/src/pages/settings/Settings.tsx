@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FC, FormEvent } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
+import { Alert } from '@/components/Alert'
 import SafelistSection from './SafelistSection'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchTenantSettings, updateTenantSettings } from '@/redux/thunks/tenantSettings.thunks'
@@ -60,7 +61,11 @@ const Settings: FC = () => {
 
       {selectedTenant && <p className="text-muted mb-3">{selectedTenant.name}</p>}
 
-      {error && <div className="alert alert-danger mb-3">{error}</div>}
+      {error && (
+        <Alert variant="danger" className="mb-3">
+          {error}
+        </Alert>
+      )}
 
       {loading || loadedTenantId !== selectedTenant?.id ? (
         <p className="text-muted">Loading tenant settings...</p>

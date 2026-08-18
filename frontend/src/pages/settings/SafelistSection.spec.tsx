@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SafelistSection from './SafelistSection'
 import { addSafelistEntry, removeSafelistEntry } from '@/redux/thunks/safelist.thunks'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import type { SafelistEntry } from '@/interfaces/safelist.interface'
 
 const dispatchMock = vi.fn()
 
@@ -23,15 +25,31 @@ vi.mock('@/redux/utils/toastUtils', () => ({
   showSuccessToast: vi.fn(),
 }))
 
-vi.mock('@bcgov/design-system-react-components', () => ({
-  Button: ({ children, isDisabled, onPress, ...props }: any) => (
-    <button disabled={isDisabled} onClick={onPress} {...props}>
-      {children}
+// The form and table have their own specs; here we only care that this component wires them up.
+vi.mock('@/components/safelist', () => ({
+  SafelistForm: ({ onSubmit, isFull }: any) => (
+    <button
+      data-testid="add"
+      data-full={String(Boolean(isFull))}
+      onClick={() => onSubmit({ channelCode: 'EMAIL', recipient: 'qa@gov.bc.ca', label: null })}
+    >
+      add
     </button>
+  ),
+  SafelistTable: ({ entries, onRemove, emptyMessage }: any) => (
+    <div>
+      <span data-testid="entry-count">{entries.length}</span>
+      <span data-testid="empty-message">{emptyMessage}</span>
+      {entries.map((entry: SafelistEntry) => (
+        <button key={entry.id} data-testid={`remove-${entry.id}`} onClick={() => onRemove(entry)}>
+          remove
+        </button>
+      ))}
+    </div>
   ),
 }))
 
-function entry(overrides: Partial<Record<string, unknown>> = {}) {
+function entry(overrides: Partial<SafelistEntry> = {}): SafelistEntry {
   return {
     id: 'entry-1',
     tenantId: 'tenant-1',
@@ -39,15 +57,16 @@ function entry(overrides: Partial<Record<string, unknown>> = {}) {
     recipient: 'qa.mailbox@gov.bc.ca',
     recipientNormalized: 'qa.mailbox@gov.bc.ca',
     label: 'QA mailbox',
-    createdAt: '2026-08-13T00:00:00.000Z',
-    createdBy: 'admin-guid',
-    updatedAt: '2026-08-13T00:00:00.000Z',
+    createdAt: '2026-08-17T00:00:00.000Z',
+    createdBy: '2f1a0b7c-9d3e-4f5a-8b6c-1d2e3f4a5b6c',
+    createdByName: 'Falk, Barrett CITZ:EX',
+    updatedAt: '2026-08-17T00:00:00.000Z',
     updatedBy: 'admin-guid',
     ...overrides,
   }
 }
 
-function setState(safelist: Partial<Record<string, unknown>> = {}) {
+function setState(safelist: Record<string, unknown> = {}) {
   state = {
     tenant: { selectedTenant: { id: 'tenant-1', name: 'Test Ministry' } },
     safelist: {
@@ -84,84 +103,86 @@ describe('SafelistSection', () => {
     expect(screen.getByText(/does not enforce the safelist/i)).toBeInTheDocument()
   })
 
+  it('hides the list and the form entirely when enforcement is off', () => {
+    setState({ enforced: false, entries: [entry()], maxEntries: 50 })
+
+    render(<SafelistSection />)
+
+    expect(screen.queryByTestId('add')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('entry-count')).not.toBeInTheDocument()
+    expect(screen.queryByText(/entries used/)).not.toBeInTheDocument()
+  })
+
+  it('does not promise the list applies elsewhere', () => {
+    setState({ enforced: false })
+
+    render(<SafelistSection />)
+
+    expect(screen.queryByText(/applies in test environments/i)).not.toBeInTheDocument()
+  })
+
   it('spells out that an empty safelist blocks all sending when enforced', () => {
     render(<SafelistSection />)
 
-    expect(screen.getByText(/cannot send any notifications/i)).toBeInTheDocument()
+    expect(screen.getByTestId('empty-message')).toHaveTextContent(/cannot send any notifications/i)
   })
 
-  it('lists existing entries with their channel and label', () => {
-    setState({
-      entries: [
-        entry(),
-        entry({ id: 'entry-2', channelCode: 'SMS', recipient: '+12505550100', label: null }),
-      ],
-    })
+  it('passes the entries through to the table', () => {
+    setState({ entries: [entry(), entry({ id: 'entry-2' })] })
 
     render(<SafelistSection />)
 
-    const rows = screen.getAllByRole('row').slice(1) // drop the header row
-    expect(rows[0]).toHaveTextContent('qa.mailbox@gov.bc.ca')
-    expect(rows[0]).toHaveTextContent('Email')
-    expect(rows[0]).toHaveTextContent('QA mailbox')
-    expect(rows[1]).toHaveTextContent('+12505550100')
-    expect(rows[1]).toHaveTextContent('SMS')
+    expect(screen.getByTestId('entry-count')).toHaveTextContent('2')
   })
 
-  it('adds a trimmed entry for the selected channel', async () => {
+  it('dispatches the add and reports success back to the form', async () => {
     render(<SafelistSection />)
 
-    fireEvent.change(screen.getByLabelText(/channel/i), { target: { value: 'SMS' } })
-    fireEvent.change(screen.getByLabelText(/phone number/i), {
-      target: { value: '  (250) 555-0100  ' },
-    })
-    fireEvent.change(screen.getByLabelText(/label/i), { target: { value: ' QA phone ' } })
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    fireEvent.click(screen.getByTestId('add'))
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(addSafelistEntry).toHaveBeenCalledWith({
-        channelCode: 'SMS',
-        recipient: '(250) 555-0100',
-        label: 'QA phone',
-      })
-    })
+        channelCode: 'EMAIL',
+        recipient: 'qa@gov.bc.ca',
+        label: null,
+      }),
+    )
+    expect(showSuccessToast).toHaveBeenCalledWith('Recipient added to the safelist')
   })
 
-  it('does not submit an empty recipient', () => {
+  it('surfaces an add failure as a toast without clearing the form', async () => {
+    dispatchMock.mockReturnValue({ unwrap: () => Promise.reject('Already on the safelist') })
+
     render(<SafelistSection />)
+    fireEvent.click(screen.getByTestId('add'))
 
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
-
-    expect(addSafelistEntry).not.toHaveBeenCalled()
+    await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith('Already on the safelist'))
   })
 
-  it('blocks adding once the cap is reached and says why', () => {
+  it('removes an entry and names it in the confirmation', async () => {
+    setState({ entries: [entry()] })
+
+    render(<SafelistSection />)
+    fireEvent.click(screen.getByTestId('remove-entry-1'))
+
+    await waitFor(() => expect(removeSafelistEntry).toHaveBeenCalledWith('entry-1'))
+    expect(showSuccessToast).toHaveBeenCalledWith('qa.mailbox@gov.bc.ca removed from the safelist')
+  })
+
+  it('tells the form when the tenant is at its cap', () => {
     setState({ entries: [entry()], maxEntries: 1 })
 
     render(<SafelistSection />)
 
+    expect(screen.getByTestId('add')).toHaveAttribute('data-full', 'true')
     expect(screen.getByText(/1 of 1 entries used/)).toBeInTheDocument()
-    expect(screen.getByText(/remove an entry before adding another/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add/i })).toBeDisabled()
   })
 
-  it('removes an entry', async () => {
-    setState({ entries: [entry()] })
+  it('surfaces a load error', () => {
+    setState({ error: 'Failed to load the safelist' })
 
     render(<SafelistSection />)
 
-    fireEvent.click(screen.getByRole('button', { name: /remove/i }))
-
-    await waitFor(() => {
-      expect(removeSafelistEntry).toHaveBeenCalledWith('entry-1')
-    })
-  })
-
-  it('surfaces a load or save error', () => {
-    setState({ error: 'Safelist is full (50 entries).' })
-
-    render(<SafelistSection />)
-
-    expect(screen.getByText('Safelist is full (50 entries).')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to load the safelist')
   })
 })

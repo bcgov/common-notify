@@ -27,6 +27,7 @@ import { SsoRole } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
+import { SafelistListResponseDto } from './schemas/safelist-entry.dto'
 import { SafelistService } from './safelist.service'
 
 /**
@@ -48,15 +49,11 @@ export class SafelistController {
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'List safelisted recipients for the authenticated tenant' })
   @ApiQuery({ name: 'channel', required: false, enum: ['EMAIL', 'SMS'] })
-  @ApiOkResponse({ type: [RecipientSafelist] })
+  @ApiOkResponse({ type: SafelistListResponseDto })
   async list(
     @Req() req: Request,
     @Query('channel') channel?: string,
-  ): Promise<{
-    entries: RecipientSafelist[]
-    enforced: boolean
-    maxEntries: number
-  }> {
+  ): Promise<SafelistListResponseDto> {
     const tenant = (req as any).tenant as Tenant
     const [entries, enforced, maxEntries] = await Promise.all([
       this.safelistService.listByTenant(tenant.id, channel),

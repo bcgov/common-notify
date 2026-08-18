@@ -11,6 +11,8 @@ export interface SafelistEntry {
   label: string | null
   createdAt: string
   createdBy: string | null
+  /** Display name of whoever added the entry, resolved from the user directory by the API. */
+  createdByName: string | null
   updatedAt: string
   updatedBy: string | null
 }

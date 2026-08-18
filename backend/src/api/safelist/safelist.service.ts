@@ -6,16 +6,21 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { NotifyUser } from '../admin/users/entities/notify-user.entity'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
+import { SafelistEntryDto } from './schemas/safelist-entry.dto'
 import { isValidRecipient, normalizeRecipient } from './safelist.util'
 
 const MAX_ENTRIES_KEY = 'safelist_max_entries'
 const DEFAULT_MAX_ENTRIES = 50
+/** How long the enforcement flag is trusted before it is re-read. See isEnforced(). */
+const ENFORCED_CACHE_TTL_MS = 30_000
+const UUID_PATTERN = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i
 
 /** One recipient of an outbound request, as the send path sees it. */
 export interface SafelistCandidate {
@@ -39,17 +44,52 @@ export interface SafelistCandidate {
 export class SafelistService {
   private readonly logger = new Logger(SafelistService.name)
 
+  /** Memoized enforcement flag; see isEnforced(). */
+  private enforcedCache?: { value: boolean; expiresAt: number }
+  private enforcedLookup?: Promise<boolean>
+
   constructor(
     @InjectRepository(RecipientSafelist)
     private readonly safelistRepository: Repository<RecipientSafelist>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
+    @InjectRepository(NotifyUser)
+    private readonly notifyUserRepository: Repository<NotifyUser>,
     private readonly featureFlagService: FeatureFlagService,
   ) {}
 
-  /** Whether this environment enforces the safelist at all. False in PROD. */
+  /**
+   * Whether this environment enforces the safelist at all. False in PROD.
+   *
+   * Cached for ENFORCED_CACHE_TTL_MS because this is consulted on every send, and the answer is
+   * a property of the environment that changes only when an operator toggles the flag. Without
+   * the cache PROD pays a feature_flag query per notification to be told "no" every time.
+   *
+   * Consequences of the cache, both deliberate:
+   *   - Toggling the flag takes up to the TTL to take effect. Acceptable for a switch that is
+   *     flipped when an environment is set up, not per request.
+   *   - FeatureFlagService.isEnabled already fails to `false` (open) on a database error, so a
+   *     blip during a refresh can leave enforcement off for up to the TTL rather than for the
+   *     length of the blip. The TTL is kept short to bound that.
+   */
   async isEnforced(): Promise<boolean> {
-    return this.featureFlagService.isEnabled(FeatureFlagCode.RECIPIENT_SAFELIST)
+    const now = Date.now()
+    if (this.enforcedCache && this.enforcedCache.expiresAt > now) {
+      return this.enforcedCache.value
+    }
+
+    // Share one in-flight lookup so a burst of concurrent sends does not each hit the database.
+    this.enforcedLookup ??= this.featureFlagService
+      .isEnabled(FeatureFlagCode.RECIPIENT_SAFELIST)
+      .then((value) => {
+        this.enforcedCache = { value, expiresAt: Date.now() + ENFORCED_CACHE_TTL_MS }
+        return value
+      })
+      .finally(() => {
+        this.enforcedLookup = undefined
+      })
+
+    return this.enforcedLookup
   }
 
   /**
@@ -85,14 +125,55 @@ export class SafelistService {
     return channel === 'EMAIL' || channel === 'SMS'
   }
 
-  async listByTenant(tenantId: string, channelCode?: string): Promise<RecipientSafelist[]> {
+  async listByTenant(tenantId: string, channelCode?: string): Promise<SafelistEntryDto[]> {
     const where: Record<string, unknown> = { tenantId, isDeleted: false }
     if (channelCode) where.channelCode = channelCode
 
-    return this.safelistRepository.find({
+    const entries = await this.safelistRepository.find({
       where,
       order: { channelCode: 'ASC', recipientNormalized: 'ASC' },
     })
+
+    return this.withCreatedByNames(entries)
+  }
+
+  /**
+   * Attach a human-readable name for whoever added each entry. `created_by` holds the IDIR GUID
+   * from the request, which is not something to put on screen; notify_user.external_id is the
+   * same GUID, so one lookup covers the whole page.
+   *
+   * Non-GUID values (the 'system' and 'migration' markers used by seed data) are passed through
+   * as-is; an unrecognized GUID resolves to null rather than leaking the raw identifier.
+   */
+  private async withCreatedByNames(entries: RecipientSafelist[]): Promise<SafelistEntryDto[]> {
+    const guids = [
+      ...new Set(
+        entries
+          .map((entry) => entry.createdBy)
+          .filter((value): value is string => Boolean(value && UUID_PATTERN.test(value))),
+      ),
+    ]
+
+    const namesByGuid = new Map<string, string>()
+    if (guids.length > 0) {
+      const users = await this.notifyUserRepository.find({
+        where: { externalId: In(guids) },
+        select: { externalId: true, displayName: true, username: true, email: true },
+      })
+      for (const user of users) {
+        const name = user.displayName || user.username || user.email
+        if (name) namesByGuid.set(user.externalId, name)
+      }
+    }
+
+    return entries.map((entry) => ({
+      ...entry,
+      createdByName: entry.createdBy
+        ? UUID_PATTERN.test(entry.createdBy)
+          ? (namesByGuid.get(entry.createdBy) ?? null)
+          : entry.createdBy
+        : null,
+    }))
   }
 
   async add(

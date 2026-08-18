@@ -818,6 +818,41 @@ describe('Notify Controllers', () => {
           )
         })
 
+        it('records a repeated blocked address once', async () => {
+          // findBlocked echoes one entry per candidate, so a merge listing the same address on
+          // two rows reports it twice; only one detail row may be written for it.
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com', 'bob@example.com'])
+          mockNotificationService.parseMailMergeRecipients.mockReturnValue(
+            ['alice@example.com', 'bob@example.com', 'bob@example.com'].map((address) => ({
+              address,
+              params: {},
+            })),
+          )
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [
+                  ['to'],
+                  ['alice@example.com'],
+                  ['bob@example.com'],
+                  ['bob@example.com'],
+                ],
+              },
+            })
+            .expect(202)
+            .expect((res) => expect(res.body.blockedRecipientCount).toBe(1))
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
         it('rejects a mail merge whose every recipient is blocked', async () => {
           mockSafelistService.findBlocked.mockResolvedValue([
             'alice@example.com',
