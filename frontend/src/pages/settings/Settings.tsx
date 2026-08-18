@@ -8,6 +8,7 @@ import TenantSettings from './sections/TenantSettings'
 import SafelistSection from './SafelistSection'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchSettings } from '@/redux/thunks/settings.thunks'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import '@/scss/components/settings.scss'
 
 type SettingsTab = 'tenant' | 'email' | 'sms' | 'safelist'
@@ -17,6 +18,7 @@ const Settings: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const tenantId = selectedTenant?.id
   const [selectedTab, setSelectedTab] = useState<SettingsTab>('tenant')
+  const safelistEnabled = useFeatureFlag('recipient_safelist', tenantId)
   const [loadedTenantId, setLoadedTenantId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [prevTenantId, setPrevTenantId] = useState(tenantId)
@@ -54,6 +56,11 @@ const Settings: FC = () => {
   // Ensure we have a tenantId and that it is for the current tenant
   const isLoaded = Boolean(tenantId) && loadedTenantId === tenantId
 
+  // The safelist tab is hidden when the recipient_safelist flag is off (e.g. production).
+  // Fall back to the tenant tab so we never sit on a tab that isn't shown.
+  const activeTab: SettingsTab =
+    selectedTab === 'safelist' && !safelistEnabled ? 'tenant' : selectedTab
+
   return (
     <div className="settings">
       <Breadcrumb items={[{ label: 'Home', to: '/dashboard' }, { label: 'Settings' }]} />
@@ -63,7 +70,7 @@ const Settings: FC = () => {
       <div className="settings__tabs">
         <ToggleButtonGroup
           selectionMode="single"
-          selectedKeys={[selectedTab]}
+          selectedKeys={[activeTab]}
           onSelectionChange={(keys) => {
             const [key] = [...keys]
             if (key) {
@@ -75,14 +82,14 @@ const Settings: FC = () => {
           <ToggleButton id="tenant">Tenant Settings</ToggleButton>
           <ToggleButton id="email">Email Settings</ToggleButton>
           <ToggleButton id="sms">SMS Settings</ToggleButton>
-          <ToggleButton id="safelist">Recipient Safelist</ToggleButton>
+          {safelistEnabled && <ToggleButton id="safelist">Recipient Safelist</ToggleButton>}
         </ToggleButtonGroup>
       </div>
 
       <section className="settings__section">
         {/* The safelist owns its own fetch/loading/error, so it renders independently of the
             shared tenant-settings load below. */}
-        {selectedTab === 'safelist' ? (
+        {activeTab === 'safelist' ? (
           <SafelistSection key={tenantId} />
         ) : loadError ? (
           <div className="alert alert-danger">{loadError}</div>
@@ -90,9 +97,9 @@ const Settings: FC = () => {
           <p className="text-muted">Loading settings...</p>
         ) : (
           <>
-            {selectedTab === 'tenant' && <TenantSettings key={tenantId} />}
-            {selectedTab === 'email' && <EmailSettings key={tenantId} />}
-            {selectedTab === 'sms' && <SmsSettings key={tenantId} />}
+            {activeTab === 'tenant' && <TenantSettings key={tenantId} />}
+            {activeTab === 'email' && <EmailSettings key={tenantId} />}
+            {activeTab === 'sms' && <SmsSettings key={tenantId} />}
           </>
         )}
       </section>
