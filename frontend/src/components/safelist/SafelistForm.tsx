@@ -53,7 +53,11 @@ export const SafelistForm: FC<SafelistFormProps> = ({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="d-flex flex-wrap align-items-end gap-2 mb-3">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="d-flex flex-wrap align-items-end gap-2 mb-3"
+    >
       <div style={{ minWidth: '9rem' }}>
         <Select
           label="Channel"
