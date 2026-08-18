@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsObject, IsUUID, Matches, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsE164 } from '../../notify/schemas/validators/e164.validator'
 
 export class CreateSmsNotificationRequest {
   @ApiProperty({
@@ -7,8 +8,7 @@ export class CreateSmsNotificationRequest {
     example: '+1234567890',
   })
   @IsString()
-  @MaxLength(15, { message: 'Phone number must not exceed 15 characters' })
-  @Matches(/^\+[1-9]\d{1,14}$/, {
+  @IsE164({
     message: 'Phone number must be in E.164 format',
   })
   phone_number: string

@@ -54,7 +54,7 @@ describe('GcNotifyPassthroughController', () => {
   describe('sendSms', () => {
     it('always calls GcNotifyApiClient.sendSms and forwards the auth header', async () => {
       const body: CreateSmsNotificationRequest = {
-        phone_number: '+15555550100',
+        phone_number: '+491512345678901',
         template_id: 'tpl-2',
       }
       const expected = { id: 'notif-2' }

@@ -508,6 +508,31 @@ describe('Notify Controllers', () => {
     })
 
     describe('POST /api/v1/notifysimple', () => {
+      it('returns a 400 identifying a malformed SMS recipient index and value', async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            sms: {
+              recipients: { to: ['+12505550123', '250-555-1234', '+12505550124'] },
+              content: { body: 'Hello' },
+            },
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body).toEqual({
+              statusCode: 400,
+              message: 'Validation failed',
+              errors: ["'250-555-1234' is not a valid E.164 phone number"],
+              fieldErrors: {
+                'sms.recipients.to[1]': "'250-555-1234' is not a valid E.164 phone number",
+              },
+            })
+          })
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
       it('should return 201 status with a valid email payload', async () => {
         mockEmailAdapter.send.mockResolvedValue({
           messageId: 'ches-123456',
