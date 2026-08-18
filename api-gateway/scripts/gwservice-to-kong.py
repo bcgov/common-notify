@@ -52,11 +52,12 @@ def _pr_prefix_for_route(route):
     return prefixes.pop() if len(prefixes) == 1 else None
 
 
-def _pr_strip_plugin(prefix):
+def _pr_strip_plugin(prefix, tags):
     """A pre-function plugin that removes the leading /pr-<n> from the request path.
 
     strip_path stays false so /api/v1/... is preserved; this only trims the
-    /pr-<n> segment, leaving the path the backend expects.
+    /pr-<n> segment, leaving the path the backend expects. Carries the route's
+    ns.<gateway>.<env> tags — gwa rejects any plugin without them ("no tags found").
     """
     lua = (
         "local p = kong.request.get_path()\n"
@@ -67,7 +68,10 @@ def _pr_strip_plugin(prefix):
         "  kong.service.request.set_path(p:sub(#prefix + 1))\n"
         "end\n"
     ) % (prefix,)
-    return {"name": "pre-function", "enabled": True, "config": {"access": [lua]}}
+    plugin = {"name": "pre-function", "enabled": True, "config": {"access": [lua]}}
+    if tags:
+        plugin["tags"] = list(tags)
+    return plugin
 
 
 # The source template (routes.yaml) uses YAML anchors/aliases to DRY shared plugin
@@ -103,7 +107,9 @@ def convert(path):
             # that prefix. No-op for permanent envs (no prefix -> None).
             pr_prefix = _pr_prefix_for_route(route)
             if pr_prefix:
-                route.setdefault("plugins", []).append(_pr_strip_plugin(pr_prefix))
+                route.setdefault("plugins", []).append(
+                    _pr_strip_plugin(pr_prefix, route.get("tags"))
+                )
             route_by_name[route["name"]] = route
 
     unresolved = []
