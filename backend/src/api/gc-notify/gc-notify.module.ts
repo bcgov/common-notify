@@ -14,6 +14,8 @@ import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guar
 import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>
@@ -43,6 +45,8 @@ export class GcNotifyModule {
         ApiKeyGuard,
         GcNotifyRoutingService,
         GcNotifyInternalExecutionService,
+        GcNotifyBulkValidationService,
+        PhoneNumberService,
       ],
       exports: [GcNotifyApiClient],
     }

@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UseGuards,
   UseFilters,
+  UnprocessableEntityException,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -39,6 +40,7 @@ import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { extractRequestRoute } from '../../common/utils/extract-request-route'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
 
 interface GcNotifyRequest extends express.Request {
   gcNotifyAuthHeader: string
@@ -56,6 +58,7 @@ export class GcNotifyController {
     private readonly gcNotifyApiClient: GcNotifyApiClient,
     private readonly gcNotifyRoutingService: GcNotifyRoutingService,
     private readonly gcNotifyInternalExecutionService: GcNotifyInternalExecutionService,
+    private readonly gcNotifyBulkValidationService: GcNotifyBulkValidationService,
   ) {}
 
   @Get('notifications')
@@ -193,6 +196,18 @@ export class GcNotifyController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async sendBulk(@Body() body: PostBulkRequest, @Req() req: GcNotifyRequest) {
+    if (body.rows) {
+      const validation = this.gcNotifyBulkValidationService.validateRows(body.rows)
+      if (!validation.valid) {
+        throw new UnprocessableEntityException({
+          errors: validation.errors.map((message) => ({
+            error: 'ValidationError',
+            message,
+          })),
+        })
+      }
+    }
+
     // Bulk send is passthrough-only; a native mail-merge job runner is being built separately.
     return this.gcNotifyApiClient.sendBulk(body, req.gcNotifyAuthHeader)
   }
