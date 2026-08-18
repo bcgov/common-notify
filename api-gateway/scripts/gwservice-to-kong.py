@@ -19,12 +19,55 @@ What this does:
     /api + version v1) expects the full `/api/v1/...` path; a literal `strip_path: true`
     strips it and the backend returns `Cannot POST /` (404). The gwa-api's own apply
     path does not strip, so this restores the working behaviour.
+  - PR routes only: strips the `/pr-<number>` path prefix before forwarding.
+    PR environments are isolated by a path prefix on the shared dev host
+    (e.g. /pr-123/api/v1/...), but the backend still expects /api/v1/... (its
+    global prefix is /api). Since strip_path is false (needed for the /api part),
+    we add a `pre-function` plugin that removes only the leading /pr-<number>
+    segment from the request path. Permanent envs (dev/test/prod) have no such
+    prefix, so this is a no-op there.
 
 Usage:
   python3 gwservice-to-kong.py <gw-routes-file.yaml> > <gw-kong-file.yaml>
 """
+import re
 import sys
 import yaml
+
+# Matches a leading /pr-<digits> prefix on a route path, for both literal
+# ("/pr-123/api/...") and regex ("~/pr-123/api/...") Kong path forms.
+_PR_PREFIX_RE = re.compile(r"^~?(/pr-\d+)(/|$)")
+
+
+def _pr_prefix_for_route(route):
+    """Return the '/pr-<n>' prefix if all of the route's paths carry one, else None."""
+    paths = route.get("paths") or []
+    prefixes = set()
+    for p in paths:
+        m = _PR_PREFIX_RE.match(p)
+        if not m:
+            return None  # a path without the PR prefix -> don't strip (permanent env)
+        prefixes.add(m.group(1))
+    # All paths must share the same single prefix to strip it unambiguously.
+    return prefixes.pop() if len(prefixes) == 1 else None
+
+
+def _pr_strip_plugin(prefix):
+    """A pre-function plugin that removes the leading /pr-<n> from the request path.
+
+    strip_path stays false so /api/v1/... is preserved; this only trims the
+    /pr-<n> segment, leaving the path the backend expects.
+    """
+    lua = (
+        "local p = kong.request.get_path()\n"
+        "local prefix = %r\n"
+        "if p == prefix then\n"
+        "  kong.service.request.set_path('/')\n"
+        "elseif p:sub(1, #prefix + 1) == prefix .. '/' then\n"
+        "  kong.service.request.set_path(p:sub(#prefix + 1))\n"
+        "end\n"
+    ) % (prefix,)
+    return {"name": "pre-function", "enabled": True, "config": {"access": [lua]}}
 
 
 # The source template (routes.yaml) uses YAML anchors/aliases to DRY shared plugin
@@ -55,6 +98,12 @@ def convert(path):
     for svc in services:
         for route in svc.get("routes", []) or []:
             route["strip_path"] = False
+            # PR routes carry a /pr-<n> path prefix that the backend does not
+            # expect. Since strip_path is false, add a pre-function to trim just
+            # that prefix. No-op for permanent envs (no prefix -> None).
+            pr_prefix = _pr_prefix_for_route(route)
+            if pr_prefix:
+                route.setdefault("plugins", []).append(_pr_strip_plugin(pr_prefix))
             route_by_name[route["name"]] = route
 
     unresolved = []
