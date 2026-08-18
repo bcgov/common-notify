@@ -25,9 +25,8 @@ import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { SsoRole } from '../../enum/sso-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
-import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
-import { SafelistListResponseDto } from './schemas/safelist-entry.dto'
+import { SafelistEntryDto, SafelistListResponseDto } from './schemas/safelist-entry.dto'
 import { SafelistService } from './safelist.service'
 
 /**
@@ -67,8 +66,8 @@ export class SafelistController {
   @Post()
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Add a recipient to the tenant safelist' })
-  @ApiCreatedResponse({ type: RecipientSafelist })
-  add(@Req() req: Request, @Body() dto: CreateSafelistEntryDto): Promise<RecipientSafelist> {
+  @ApiCreatedResponse({ type: SafelistEntryDto })
+  add(@Req() req: Request, @Body() dto: CreateSafelistEntryDto): Promise<SafelistEntryDto> {
     const tenant = (req as any).tenant as Tenant
     const userGuid = (req as any).userGuid as string | undefined
     return this.safelistService.add(tenant.id, dto, userGuid)

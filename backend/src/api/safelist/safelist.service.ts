@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, SelectQueryBuilder } from 'typeorm'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -137,19 +137,7 @@ export class SafelistService {
    * rather than leaking the raw identifier.
    */
   async listByTenant(tenantId: string, channelCode?: string): Promise<SafelistEntryDto[]> {
-    const query = this.safelistRepository
-      .createQueryBuilder('entry')
-      // Alias is 'adder', not 'user': `user` is a reserved word in Postgres and an unquoted
-      // reference to it is a syntax error. All-lowercase so the unquoted references below match
-      // the alias TypeORM emits quoted.
-      .leftJoin(
-        NotifyUser,
-        'adder',
-        'adder.external_id = entry.created_by AND adder.is_deleted = FALSE',
-      )
-      .addSelect('COALESCE(adder.display_name, adder.username, adder.email)', 'createdByName')
-      .where('entry.tenant_id = :tenantId', { tenantId })
-      .andWhere('entry.is_deleted = FALSE')
+    const query = this.entriesWithNames(tenantId)
       .orderBy('entry.channel_code', 'ASC')
       .addOrderBy('entry.recipient_normalized', 'ASC')
 
@@ -157,6 +145,35 @@ export class SafelistService {
       query.andWhere('entry.channel_code = :channelCode', { channelCode })
     }
 
+    return this.mapEntries(query)
+  }
+
+  /**
+   * Active entries for a tenant with the adding user's name joined on. Shared by the list and by
+   * add(), so a newly created entry comes back in exactly the same shape the table renders -
+   * without it, the row the UI appends after a create has no name until the page is reloaded.
+   */
+  private entriesWithNames(tenantId: string): SelectQueryBuilder<RecipientSafelist> {
+    return (
+      this.safelistRepository
+        .createQueryBuilder('entry')
+        // Alias is 'adder', not 'user': `user` is a reserved word in Postgres and an unquoted
+        // reference to it is a syntax error. All-lowercase so the unquoted references below match
+        // the alias TypeORM emits quoted.
+        .leftJoin(
+          NotifyUser,
+          'adder',
+          'adder.external_id = entry.created_by AND adder.is_deleted = FALSE',
+        )
+        .addSelect('COALESCE(adder.display_name, adder.username, adder.email)', 'createdByName')
+        .where('entry.tenant_id = :tenantId', { tenantId })
+        .andWhere('entry.is_deleted = FALSE')
+    )
+  }
+
+  private async mapEntries(
+    query: SelectQueryBuilder<RecipientSafelist>,
+  ): Promise<SafelistEntryDto[]> {
     // Row order is shared between `entities` and `raw`, and the unique index guarantees at most
     // one user per entry, so the two line up index for index.
     const { entities, raw } = await query.getRawAndEntities()
@@ -180,7 +197,7 @@ export class SafelistService {
     tenantId: string,
     dto: CreateSafelistEntryDto,
     createdBy?: string,
-  ): Promise<RecipientSafelist> {
+  ): Promise<SafelistEntryDto> {
     const recipient = dto.recipient.trim()
 
     if (!isValidRecipient(dto.channelCode, recipient)) {
@@ -229,7 +246,14 @@ export class SafelistService {
     this.logger.log(
       `Safelist entry added (tenant=${tenantId}, channel=${dto.channelCode}, id=${saved.id})`,
     )
-    return saved
+
+    // Re-read through the same join so the response carries createdByName. The UI appends this
+    // object straight into its table; returning the bare entity leaves 'Added by' blank until
+    // the next reload.
+    const [created] = await this.mapEntries(
+      this.entriesWithNames(tenantId).andWhere('entry.id = :id', { id: saved.id }),
+    )
+    return created ?? { ...saved, createdByName: this.fallbackCreatedByName(saved.createdBy) }
   }
 
   /** Soft delete: the row stays for the audit trail and stops permitting sends immediately. */

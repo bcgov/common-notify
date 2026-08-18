@@ -268,6 +268,27 @@ describe('SafelistService', () => {
   })
 
   describe('add', () => {
+    it('returns the created entry with the adding user resolved, not the bare row', async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+      safelistRepository.count.mockResolvedValue(0)
+      givenListRows([
+        {
+          entity: { id: 'entry-uuid-1', recipient: 'qa@gov.bc.ca', createdBy: 'guid' },
+          createdByName: 'Falk, Barrett CITZ:EX',
+        },
+      ])
+
+      const created = await service.add(
+        TENANT,
+        { channelCode: NotificationChannel.EMAIL, recipient: 'qa@gov.bc.ca' },
+        'guid',
+      )
+
+      // The UI appends this object straight into its table, so it must carry the name.
+      expect(created.createdByName).toBe('Falk, Barrett CITZ:EX')
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('entry.id = :id', { id: 'entry-uuid-1' })
+    })
+
     it('stores the value as typed alongside its normalized form', async () => {
       safelistRepository.findOne.mockResolvedValue(null)
       safelistRepository.count.mockResolvedValue(0)
