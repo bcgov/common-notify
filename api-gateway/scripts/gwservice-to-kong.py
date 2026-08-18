@@ -52,14 +52,13 @@ def _pr_prefix_for_route(route):
     return prefixes.pop() if len(prefixes) == 1 else None
 
 
-def _pr_strip_plugin(prefix, tags):
-    """A pre-function plugin that removes the leading /pr-<n> from the request path.
+def _pr_strip_lua(prefix):
+    """Lua (Kong access phase) that removes the leading /pr-<n> from the request path.
 
     strip_path stays false so /api/v1/... is preserved; this only trims the
-    /pr-<n> segment, leaving the path the backend expects. Carries the route's
-    ns.<gateway>.<env> tags — gwa rejects any plugin without them ("no tags found").
+    /pr-<n> segment, leaving the path the backend expects.
     """
-    lua = (
+    return (
         "local p = kong.request.get_path()\n"
         "local prefix = %r\n"
         "if p == prefix then\n"
@@ -68,10 +67,6 @@ def _pr_strip_plugin(prefix, tags):
         "  kong.service.request.set_path(p:sub(#prefix + 1))\n"
         "end\n"
     ) % (prefix,)
-    plugin = {"name": "pre-function", "enabled": True, "config": {"access": [lua]}}
-    if tags:
-        plugin["tags"] = list(tags)
-    return plugin
 
 
 # The source template (routes.yaml) uses YAML anchors/aliases to DRY shared plugin
@@ -102,14 +97,6 @@ def convert(path):
     for svc in services:
         for route in svc.get("routes", []) or []:
             route["strip_path"] = False
-            # PR routes carry a /pr-<n> path prefix that the backend does not
-            # expect. Since strip_path is false, add a pre-function to trim just
-            # that prefix. No-op for permanent envs (no prefix -> None).
-            pr_prefix = _pr_prefix_for_route(route)
-            if pr_prefix:
-                route.setdefault("plugins", []).append(
-                    _pr_strip_plugin(pr_prefix, route.get("tags"))
-                )
             route_by_name[route["name"]] = route
 
     unresolved = []
@@ -125,6 +112,32 @@ def convert(path):
         sys.stderr.write(
             f"WARN {len(unresolved)} plugin(s) had no matching route/service: {unresolved[:5]}\n"
         )
+
+    # PR routes carry a /pr-<n> path prefix the backend doesn't expect. Add the
+    # prefix-strip Lua AFTER plugin nesting: a route may already have a
+    # pre-function (e.g. the gcnotify X-API-KEY extractor), and Kong allows only
+    # ONE pre-function per route — so merge our strip into that plugin's `access`
+    # list rather than adding a second pre-function (which deck rejects with
+    # "entity already exists"). No-op for permanent envs (no /pr- prefix).
+    for route in route_by_name.values():
+        pr_prefix = _pr_prefix_for_route(route)
+        if not pr_prefix:
+            continue
+        strip_lua = _pr_strip_lua(pr_prefix)
+        existing = next(
+            (p for p in route.get("plugins", []) if p.get("name") == "pre-function"),
+            None,
+        )
+        if existing:
+            # Run the path strip FIRST, before any existing access logic.
+            existing.setdefault("config", {}).setdefault("access", [])
+            existing["config"]["access"].insert(0, strip_lua)
+        else:
+            plugin = {"name": "pre-function", "enabled": True, "config": {"access": [strip_lua]}}
+            tags = route.get("tags")
+            if tags:
+                plugin["tags"] = list(tags)
+            route.setdefault("plugins", []).append(plugin)
 
     return {"_format_version": "3.0", "services": services}
 
