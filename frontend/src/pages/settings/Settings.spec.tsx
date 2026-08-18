@@ -1,11 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
-import { showSuccessToast } from '@/redux/utils/toastUtils'
-import { updateTenantSettings } from '@/redux/thunks/tenantSettings.thunks'
+import { fetchSettings } from '@/redux/thunks/settings.thunks'
 
 const dispatchMock = vi.fn()
-const fetchResults: Record<string, { alertEmail: string | null }> = {}
+const tenantMounts = vi.fn()
 
 let state: any
 
@@ -14,19 +13,34 @@ vi.mock('@/redux/hooks', () => ({
   useAppSelector: (selector: (value: unknown) => unknown) => selector(state),
 }))
 
-vi.mock('@/redux/thunks/tenantSettings.thunks', () => ({
-  fetchTenantSettings: vi.fn(() => ({ type: 'tenantSettings/fetch' })),
-  updateTenantSettings: vi.fn((payload) => ({ type: 'tenantSettings/update', payload })),
+vi.mock('@/redux/thunks/settings.thunks', () => ({
+  fetchSettings: vi.fn(() => ({ type: 'settings/fetch' })),
 }))
 
-vi.mock('@/redux/utils/toastUtils', () => ({
-  showErrorToast: vi.fn(),
-  showSuccessToast: vi.fn(),
+// The sections are covered by their own specs; this file only exercises the page's
+// single-fetch + loading-gate responsibility.
+vi.mock('./sections/TenantSettings', () => ({
+  default: () => {
+    tenantMounts()
+    return <div>tenant section</div>
+  },
 }))
+vi.mock('./sections/EmailSettings', () => ({ default: () => <div>email section</div> }))
+vi.mock('./sections/SmsSettings', () => ({ default: () => <div>sms section</div> }))
+
+vi.mock('@/components/Breadcrumb', () => ({ default: () => null }))
 
 vi.mock('@bcgov/design-system-react-components', () => ({
-  Button: ({ children, isDisabled, ...props }: any) => (
-    <button disabled={isDisabled} {...props}>
+  ToggleButtonGroup: ({ children, onSelectionChange }: any) => (
+    <div
+      data-testid="tabs"
+      onClick={(event: any) => onSelectionChange(new Set([event.target.dataset.id]))}
+    >
+      {children}
+    </div>
+  ),
+  ToggleButton: ({ id, children }: any) => (
+    <button type="button" data-id={id}>
       {children}
     </button>
   ),
@@ -45,161 +59,91 @@ function tenant(id: string, name: string) {
   return { id, name }
 }
 
-describe('Tenant Settings', () => {
+/** A promise whose settlement this test controls, so the pending frame is assertable. */
+function deferred() {
+  let resolve!: (value?: unknown) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise((res, rej) => {
+    resolve = res as typeof resolve
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+describe('Settings page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    state = {
-      tenant: { selectedTenant: tenant('tenant-1', 'Tenant One') },
-      tenantSettings: { alertEmail: null, loading: false, saving: false },
-    }
-    fetchResults['tenant-1'] = { alertEmail: 'saved@example.com' }
-    fetchResults['tenant-2'] = { alertEmail: 'other@example.com' }
-
-    dispatchMock.mockImplementation((action) => {
-      if (action.type === 'tenantSettings/fetch') {
-        const tenantId = state.tenant.selectedTenant.id
-        return { unwrap: () => Promise.resolve(fetchResults[tenantId]) }
-      }
-
-      return {
-        unwrap: () => Promise.resolve({ alertEmail: action.payload.alertEmail }),
-      }
-    })
+    state = { tenant: { selectedTenant: tenant('tenant-1', 'Tenant One') } }
+    dispatchMock.mockImplementation(() => ({ unwrap: () => Promise.resolve(null) }))
   })
 
-  async function renderLoadedSettings() {
-    const result = render(<Settings />)
-    await screen.findByDisplayValue('saved@example.com')
-    return result
-  }
+  it('fetches settings once for the selected tenant', async () => {
+    render(<Settings />)
 
-  it('keeps Save disabled while the loaded value is unchanged', async () => {
-    await renderLoadedSettings()
-
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await screen.findByText('tenant section')
+    expect(fetchSettings).toHaveBeenCalledTimes(1)
   })
 
-  it('enables Save after a valid edit', async () => {
-    await renderLoadedSettings()
+  it('shows the loading placeholder and no section while the fetch is in flight', async () => {
+    const { promise, resolve } = deferred()
+    dispatchMock.mockImplementation(() => ({ unwrap: () => promise }))
 
-    fireEvent.change(screen.getByLabelText('Alert email'), {
-      target: { value: 'changed@example.com' },
-    })
+    render(<Settings />)
 
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument()
+    expect(screen.queryByText('tenant section')).not.toBeInTheDocument()
+
+    resolve()
+    expect(await screen.findByText('tenant section')).toBeInTheDocument()
   })
 
-  it('does not show an error during initial invalid typing', async () => {
-    await renderLoadedSettings()
+  it('renders the load error instead of the section when the fetch rejects', async () => {
+    dispatchMock.mockImplementation(() => ({
+      unwrap: () => Promise.reject('You are not authorized to view settings'),
+    }))
 
-    fireEvent.change(screen.getByLabelText('Alert email'), { target: { value: 'invalid-email' } })
+    render(<Settings />)
 
-    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Alert email')).toHaveAttribute('aria-invalid', 'false')
+    expect(await screen.findByText('You are not authorized to view settings')).toBeInTheDocument()
+    expect(screen.queryByText('tenant section')).not.toBeInTheDocument()
   })
 
-  it('shows the inline error after leaving an invalid field', async () => {
-    await renderLoadedSettings()
+  it('does not fetch when no tenant is selected', () => {
+    state = { tenant: { selectedTenant: null } }
 
-    const input = screen.getByLabelText('Alert email')
-    fireEvent.change(input, { target: { value: 'invalid-email' } })
-    fireEvent.blur(input)
+    render(<Settings />)
 
-    expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
-    expect(input).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(fetchSettings).not.toHaveBeenCalled()
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument()
   })
 
-  it('shows the error on submit without blur and sends no PATCH request', async () => {
-    await renderLoadedSettings()
+  it('switches sections without re-fetching', async () => {
+    render(<Settings />)
+    await screen.findByText('tenant section')
 
-    fireEvent.change(screen.getByLabelText('Alert email'), { target: { value: 'invalid-email' } })
-    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!)
+    fireEvent.click(screen.getByText('SMS Settings'))
 
-    expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(updateTenantSettings).not.toHaveBeenCalled()
+    expect(await screen.findByText('sms section')).toBeInTheDocument()
+    expect(screen.queryByText('tenant section')).not.toBeInTheDocument()
+    expect(fetchSettings).toHaveBeenCalledTimes(1)
   })
 
-  it('clears a visible error immediately when the value becomes valid', async () => {
-    await renderLoadedSettings()
+  it('re-fetches and remounts the section when the selected tenant changes', async () => {
+    const { rerender } = render(<Settings />)
+    await screen.findByText('tenant section')
+    expect(tenantMounts).toHaveBeenCalledTimes(1)
 
-    const input = screen.getByLabelText('Alert email')
-    fireEvent.change(input, { target: { value: 'invalid-email' } })
-    fireEvent.blur(input)
-    fireEvent.change(input, { target: { value: 'valid@example.com' } })
-
-    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
-    expect(input).toHaveAttribute('aria-invalid', 'false')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-  })
-
-  it('treats blank input as a valid clear operation', async () => {
-    await renderLoadedSettings()
-
-    const input = screen.getByLabelText('Alert email')
-    fireEvent.change(input, { target: { value: '' } })
-    fireEvent.blur(input)
-
-    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-  })
-
-  it('makes the saved value the new clean baseline after a successful save', async () => {
-    await renderLoadedSettings()
-
-    const input = screen.getByLabelText('Alert email')
-    fireEvent.change(input, { target: { value: 'invalid-email' } })
-    fireEvent.blur(input)
-    fireEvent.change(input, {
-      target: { value: 'changed@example.com' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => {
-      expect(showSuccessToast).toHaveBeenCalledWith('Tenant settings updated successfully')
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    })
-
-    fireEvent.change(input, { target: { value: 'invalid-again' } })
-    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
-  })
-
-  it('resets to the newly loaded value when the selected tenant changes', async () => {
-    const { rerender } = await renderLoadedSettings()
-
-    const input = screen.getByLabelText('Alert email')
-    fireEvent.change(input, { target: { value: 'invalid-email' } })
-    fireEvent.blur(input)
-    expect(screen.getByText('Enter a valid alert email address')).toBeInTheDocument()
-    state = {
-      ...state,
-      tenant: { selectedTenant: tenant('tenant-2', 'Tenant Two') },
-    }
+    state = { tenant: { selectedTenant: tenant('tenant-2', 'Tenant Two') } }
     rerender(<Settings />)
 
-    expect(await screen.findByDisplayValue('other@example.com')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('unsaved@example.com')).not.toBeInTheDocument()
-    expect(screen.queryByText('Enter a valid alert email address')).not.toBeInTheDocument()
+    // The gate closes on the render the tenant changes, before the effect even runs.
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument()
+    expect(screen.queryByText('tenant section')).not.toBeInTheDocument()
+
+    await screen.findByText('tenant section')
+    await waitFor(() => expect(fetchSettings).toHaveBeenCalledTimes(2))
+    // Remounted rather than reused, so it reseeds from the newly loaded slice values.
+    expect(tenantMounts).toHaveBeenCalledTimes(2)
     expect(screen.getByText('Tenant Two')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-  })
-
-  it('disables Save while saving to prevent duplicate submissions', async () => {
-    const { rerender } = await renderLoadedSettings()
-
-    fireEvent.change(screen.getByLabelText('Alert email'), {
-      target: { value: 'changed@example.com' },
-    })
-    state = {
-      ...state,
-      tenantSettings: { ...state.tenantSettings, saving: true },
-    }
-    rerender(<Settings />)
-
-    const saveButton = screen.getByRole('button', { name: 'Saving…' })
-    expect(saveButton).toBeDisabled()
-    fireEvent.click(saveButton)
-    expect(updateTenantSettings).not.toHaveBeenCalled()
   })
 })
