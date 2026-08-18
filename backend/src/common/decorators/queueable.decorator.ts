@@ -170,8 +170,7 @@ function safelistRejection(blocked: string[]): BadRequestException {
     message: 'Request validation failed',
     errors: [
       `Recipient(s) not on this tenant's safelist: ${blocked.join(', ')}. This environment only ` +
-        'sends to safelisted recipients — add them under Settings, or send to an address that is ' +
-        'already on the list.',
+        'sends to safelisted recipients.  You can safelist recipients by adding them under Settings.',
     ],
   })
 }
