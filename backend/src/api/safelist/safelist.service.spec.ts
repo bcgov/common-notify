@@ -5,7 +5,6 @@ import { vi } from 'vitest'
 import { SafelistService } from './safelist.service'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
-import { NotifyUser } from '../admin/users/entities/notify-user.entity'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 
@@ -16,6 +15,7 @@ describe('SafelistService', () => {
 
   const safelistRepository = {
     find: vi.fn(),
+    createQueryBuilder: vi.fn(() => queryBuilder),
     findOne: vi.fn(),
     count: vi.fn(),
     create: vi.fn((entity) => entity),
@@ -26,8 +26,25 @@ describe('SafelistService', () => {
     findOne: vi.fn(),
   }
 
-  const notifyUserRepository = {
-    find: vi.fn(),
+  /** Chainable query-builder stub; getRawAndEntities() is set per test. */
+  const queryBuilder = {
+    leftJoin: vi.fn(() => queryBuilder),
+    addSelect: vi.fn(() => queryBuilder),
+    where: vi.fn(() => queryBuilder),
+    andWhere: vi.fn(() => queryBuilder),
+    orderBy: vi.fn(() => queryBuilder),
+    addOrderBy: vi.fn(() => queryBuilder),
+    getRawAndEntities: vi.fn().mockResolvedValue({ entities: [], raw: [] }),
+  }
+
+  /** What listByTenant's join returns: entities alongside their joined name column. */
+  const givenListRows = (
+    rows: Array<{ entity: Record<string, unknown>; createdByName: string | null }>,
+  ): void => {
+    queryBuilder.getRawAndEntities.mockResolvedValue({
+      entities: rows.map((row) => row.entity),
+      raw: rows.map((row) => ({ createdByName: row.createdByName })),
+    })
   }
 
   const featureFlagService = {
@@ -47,7 +64,6 @@ describe('SafelistService', () => {
         SafelistService,
         { provide: getRepositoryToken(RecipientSafelist), useValue: safelistRepository },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: configurationRepository },
-        { provide: getRepositoryToken(NotifyUser), useValue: notifyUserRepository },
         { provide: FeatureFlagService, useValue: featureFlagService },
       ],
     }).compile()
@@ -56,7 +72,7 @@ describe('SafelistService', () => {
     vi.clearAllMocks()
     featureFlagService.isEnabled.mockResolvedValue(true)
     configurationRepository.findOne.mockResolvedValue({ config: { value: 50 } })
-    notifyUserRepository.find.mockResolvedValue([])
+    queryBuilder.getRawAndEntities.mockResolvedValue({ entities: [], raw: [] })
   })
 
   describe('findBlocked', () => {
@@ -178,33 +194,51 @@ describe('SafelistService', () => {
   describe('listByTenant', () => {
     const GUID = '2f1a0b7c-9d3e-4f5a-8b6c-1d2e3f4a5b6c'
 
-    it('resolves the adding user GUID to a display name', async () => {
-      safelistRepository.find.mockResolvedValue([
-        { id: 'entry-1', recipient: 'qa@gov.bc.ca', createdBy: GUID },
-      ])
-      notifyUserRepository.find.mockResolvedValue([
-        { externalId: GUID, displayName: 'Falk, Barrett CITZ:EX', username: 'bfalk' },
+    it('returns the display name the join resolved for the adding user', async () => {
+      givenListRows([
+        {
+          entity: { id: 'entry-1', recipient: 'qa@gov.bc.ca', createdBy: GUID },
+          createdByName: 'Falk, Barrett CITZ:EX',
+        },
       ])
 
       const [entry] = await service.listByTenant(TENANT)
 
       expect(entry.createdByName).toBe('Falk, Barrett CITZ:EX')
+      expect(entry.recipient).toBe('qa@gov.bc.ca')
     })
 
-    it('falls back to the username when there is no display name', async () => {
-      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: GUID }])
-      notifyUserRepository.find.mockResolvedValue([
-        { externalId: GUID, displayName: null, username: 'bfalk' },
-      ])
+    it('resolves the name in one query rather than a second lookup', async () => {
+      givenListRows([{ entity: { id: 'entry-1', createdBy: GUID }, createdByName: 'Barrett' }])
 
-      const [entry] = await service.listByTenant(TENANT)
+      await service.listByTenant(TENANT)
 
-      expect(entry.createdByName).toBe('bfalk')
+      expect(queryBuilder.getRawAndEntities).toHaveBeenCalledTimes(1)
+      expect(safelistRepository.find).not.toHaveBeenCalled()
     })
 
-    it('returns null rather than exposing a GUID for an unknown user', async () => {
-      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: GUID }])
-      notifyUserRepository.find.mockResolvedValue([])
+    it('prefers display name, then username, then email', async () => {
+      await service.listByTenant(TENANT)
+
+      // The fallback chain lives in SQL; assert it is the one we intend.
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        'COALESCE(adder.display_name, adder.username, adder.email)',
+        'createdByName',
+      )
+    })
+
+    // `user` is reserved in Postgres; an unquoted reference to it is a syntax error, so the
+    // alias must stay non-reserved and all-lowercase.
+    it('does not resolve names from soft deleted user records', async () => {
+      await service.listByTenant(TENANT)
+
+      const [, , condition] = queryBuilder.leftJoin.mock.calls[0]
+      expect(condition).toContain('adder.is_deleted = FALSE')
+      expect(condition).toContain('adder.external_id = entry.created_by')
+    })
+
+    it('returns null rather than exposing a GUID when the join found no user', async () => {
+      givenListRows([{ entity: { id: 'entry-1', createdBy: GUID }, createdByName: null }])
 
       const [entry] = await service.listByTenant(TENANT)
 
@@ -212,25 +246,24 @@ describe('SafelistService', () => {
     })
 
     it('passes through non-GUID markers like the seed user', async () => {
-      safelistRepository.find.mockResolvedValue([{ id: 'entry-1', createdBy: 'system' }])
+      givenListRows([{ entity: { id: 'entry-1', createdBy: 'system' }, createdByName: null }])
 
       const [entry] = await service.listByTenant(TENANT)
 
       expect(entry.createdByName).toBe('system')
-      expect(notifyUserRepository.find).not.toHaveBeenCalled()
     })
 
-    it('looks the directory up once for a page of entries', async () => {
-      safelistRepository.find.mockResolvedValue([
-        { id: 'entry-1', createdBy: GUID },
-        { id: 'entry-2', createdBy: GUID },
-      ])
-      notifyUserRepository.find.mockResolvedValue([{ externalId: GUID, displayName: 'Barrett' }])
+    it('filters by channel only when one was asked for', async () => {
+      await service.listByTenant(TENANT)
+      expect(queryBuilder.andWhere).not.toHaveBeenCalledWith(
+        'entry.channel_code = :channelCode',
+        expect.anything(),
+      )
 
-      const entries = await service.listByTenant(TENANT)
-
-      expect(notifyUserRepository.find).toHaveBeenCalledTimes(1)
-      expect(entries.map((e) => e.createdByName)).toEqual(['Barrett', 'Barrett'])
+      await service.listByTenant(TENANT, 'SMS')
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('entry.channel_code = :channelCode', {
+        channelCode: 'SMS',
+      })
     })
   })
 

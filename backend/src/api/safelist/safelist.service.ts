@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -53,8 +53,6 @@ export class SafelistService {
     private readonly safelistRepository: Repository<RecipientSafelist>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
-    @InjectRepository(NotifyUser)
-    private readonly notifyUserRepository: Repository<NotifyUser>,
     private readonly featureFlagService: FeatureFlagService,
   ) {}
 
@@ -125,55 +123,57 @@ export class SafelistService {
     return channel === 'EMAIL' || channel === 'SMS'
   }
 
+  /**
+   * List a tenant's entries, resolving `created_by` to a display name in the same query.
+   *
+   * `created_by` holds the IDIR GUID from the request, which is not something to put on screen.
+   * notify_user.external_id is that same GUID, so the name comes from a join — safe because V51
+   * makes external_id unique among active users; without that constraint a duplicate user row
+   * would silently duplicate the safelist entry.
+   *
+   * The join is written here rather than declared as a relation on the entity on purpose:
+   * `created_by` is not a foreign key. It also carries non-user markers ('system', 'migration')
+   * written by seed data, which are passed through as-is below; an unresolved GUID becomes null
+   * rather than leaking the raw identifier.
+   */
   async listByTenant(tenantId: string, channelCode?: string): Promise<SafelistEntryDto[]> {
-    const where: Record<string, unknown> = { tenantId, isDeleted: false }
-    if (channelCode) where.channelCode = channelCode
+    const query = this.safelistRepository
+      .createQueryBuilder('entry')
+      // Alias is 'adder', not 'user': `user` is a reserved word in Postgres and an unquoted
+      // reference to it is a syntax error. All-lowercase so the unquoted references below match
+      // the alias TypeORM emits quoted.
+      .leftJoin(
+        NotifyUser,
+        'adder',
+        'adder.external_id = entry.created_by AND adder.is_deleted = FALSE',
+      )
+      .addSelect('COALESCE(adder.display_name, adder.username, adder.email)', 'createdByName')
+      .where('entry.tenant_id = :tenantId', { tenantId })
+      .andWhere('entry.is_deleted = FALSE')
+      .orderBy('entry.channel_code', 'ASC')
+      .addOrderBy('entry.recipient_normalized', 'ASC')
 
-    const entries = await this.safelistRepository.find({
-      where,
-      order: { channelCode: 'ASC', recipientNormalized: 'ASC' },
-    })
+    if (channelCode) {
+      query.andWhere('entry.channel_code = :channelCode', { channelCode })
+    }
 
-    return this.withCreatedByNames(entries)
+    // Row order is shared between `entities` and `raw`, and the unique index guarantees at most
+    // one user per entry, so the two line up index for index.
+    const { entities, raw } = await query.getRawAndEntities()
+
+    return entities.map((entry, index) => ({
+      ...entry,
+      createdByName: raw[index]?.createdByName ?? this.fallbackCreatedByName(entry.createdBy),
+    }))
   }
 
   /**
-   * Attach a human-readable name for whoever added each entry. `created_by` holds the IDIR GUID
-   * from the request, which is not something to put on screen; notify_user.external_id is the
-   * same GUID, so one lookup covers the whole page.
-   *
-   * Non-GUID values (the 'system' and 'migration' markers used by seed data) are passed through
-   * as-is; an unrecognized GUID resolves to null rather than leaking the raw identifier.
+   * What to show when the join found no user: the stored value if it is one of the non-GUID
+   * markers seed data writes, otherwise null so a bare GUID never reaches the screen.
    */
-  private async withCreatedByNames(entries: RecipientSafelist[]): Promise<SafelistEntryDto[]> {
-    const guids = [
-      ...new Set(
-        entries
-          .map((entry) => entry.createdBy)
-          .filter((value): value is string => Boolean(value && UUID_PATTERN.test(value))),
-      ),
-    ]
-
-    const namesByGuid = new Map<string, string>()
-    if (guids.length > 0) {
-      const users = await this.notifyUserRepository.find({
-        where: { externalId: In(guids) },
-        select: { externalId: true, displayName: true, username: true, email: true },
-      })
-      for (const user of users) {
-        const name = user.displayName || user.username || user.email
-        if (name) namesByGuid.set(user.externalId, name)
-      }
-    }
-
-    return entries.map((entry) => ({
-      ...entry,
-      createdByName: entry.createdBy
-        ? UUID_PATTERN.test(entry.createdBy)
-          ? (namesByGuid.get(entry.createdBy) ?? null)
-          : entry.createdBy
-        : null,
-    }))
+  private fallbackCreatedByName(createdBy: string | null): string | null {
+    if (!createdBy) return null
+    return UUID_PATTERN.test(createdBy) ? null : createdBy
   }
 
   async add(
