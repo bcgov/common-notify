@@ -28,6 +28,7 @@ on:
         options:
           - all
           - loki
+          - prometheus
           - grafana
           - grafana-agent
         default: 'all'
@@ -92,12 +93,135 @@ jobs:
             # Verify
             oc get pods -n ${NAMESPACE} -l app.kubernetes.io/name=loki
 
-  deploy-grafana-centralized:
-    name: Deploy Grafana (Centralized - Tools)
-    needs: [deploy-loki-centralized]
+  # kube-state-metrics is deployed PER APP NAMESPACE using that namespace's own
+  # token (like the grafana-agent jobs), because BC Gov tenants cannot create
+  # cluster-scoped RBAC and the pipeline SA cannot create RBAC cross-namespace.
+  # Central Prometheus (below) scrapes these via static DNS.
+  deploy-ksm-dev:
+    name: Deploy kube-state-metrics (Dev)
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+       (inputs.component == 'all' || inputs.component == 'prometheus')) ||
+      (github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: DEV
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy kube-state-metrics to Dev
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+            helm repo update
+            helm upgrade --install ksm prometheus-community/kube-state-metrics \
+              --namespace ${{ secrets.OC_DEV_NAMESPACE }} \
+              --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
+              --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_DEV_NAMESPACE }}
+            oc get pods -n ${{ secrets.OC_DEV_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
+
+  deploy-ksm-test:
+    name: Deploy kube-state-metrics (Test)
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+       (inputs.component == 'all' || inputs.component == 'prometheus')) ||
+      (github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: TEST
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy kube-state-metrics to Test
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.OC_TEST_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TEST_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+            helm repo update
+            helm upgrade --install ksm prometheus-community/kube-state-metrics \
+              --namespace ${{ secrets.OC_TEST_NAMESPACE }} \
+              --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
+              --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_TEST_NAMESPACE }}
+            oc get pods -n ${{ secrets.OC_TEST_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
+
+  deploy-ksm-prod:
+    name: Deploy kube-state-metrics (Prod)
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+       (inputs.component == 'all' || inputs.component == 'prometheus')) ||
+      (github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    environment: PROD
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy kube-state-metrics to Prod
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.OC_PROD_NAMESPACE }}
+          oc_token: ${{ secrets.OC_PROD_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+            helm repo update
+            helm upgrade --install ksm prometheus-community/kube-state-metrics \
+              --namespace ${{ secrets.OC_PROD_NAMESPACE }} \
+              --values monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml \
+              --wait --timeout 5m
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-ksm-appns.yaml -n ${{ secrets.OC_PROD_NAMESPACE }}
+            oc get pods -n ${{ secrets.OC_PROD_NAMESPACE }} -l app.kubernetes.io/name=kube-state-metrics
+
+  deploy-prometheus-centralized:
+    name: Deploy Prometheus (Centralized - Tools)
+    needs: [deploy-ksm-dev, deploy-ksm-test, deploy-ksm-prod]
     if: |
       !cancelled() &&
-      (needs.deploy-loki-centralized.result == 'success' || needs.deploy-loki-centralized.result == 'skipped')
+      (needs.deploy-ksm-dev.result == 'success' || needs.deploy-ksm-dev.result == 'skipped') &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'centralized' &&
+        (inputs.component == 'all' || inputs.component == 'prometheus')) ||
+       (github.event_name == 'push'))
+    runs-on: ubuntu-24.04
+    environment: TOOLS
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy Prometheus to Tools Namespace
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.OC_TOOLS_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOOLS_TOKEN }}
+          oc_server: ${{ vars.oc_server }}
+          commands: |
+            NAMESPACE="${{ secrets.OC_TOOLS_NAMESPACE }}"
+            echo "📊 Deploying central Prometheus to ${NAMESPACE} (scrapes per-namespace kube-state-metrics via static DNS)"
+
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+            helm repo update
+
+            helm upgrade --install prometheus prometheus-community/prometheus \
+              --namespace ${NAMESPACE} \
+              --values monitoring/grafana-stack/prometheus/values-tools.yaml \
+              --wait \
+              --timeout 10m
+
+            echo "✅ Prometheus deployed successfully"
+
+            echo "🔒 Applying Prometheus NetworkPolicies..."
+            oc apply -f monitoring/grafana-stack/prometheus/networkpolicy-tools.yaml
+
+            oc get pods -n ${NAMESPACE} -l app.kubernetes.io/name=prometheus
+
+  deploy-grafana-centralized:
+    name: Deploy Grafana (Centralized - Tools)
+    needs: [deploy-loki-centralized, deploy-prometheus-centralized]
+    if: |
+      !cancelled() &&
+      (needs.deploy-loki-centralized.result == 'success' || needs.deploy-loki-centralized.result == 'skipped') &&
+      (needs.deploy-prometheus-centralized.result == 'success' || needs.deploy-prometheus-centralized.result == 'skipped')
     runs-on: ubuntu-24.04
     environment: TOOLS
     steps:

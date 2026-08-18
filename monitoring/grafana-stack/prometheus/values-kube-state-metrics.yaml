@@ -1,0 +1,56 @@
+# kube-state-metrics — deployed PER APP NAMESPACE (dev/test/prod)
+# ---------------------------------------------------------------------------
+# WHY PER-NAMESPACE: BC Gov tenants cannot create cluster-scoped RBAC, and the
+# pipeline SA cannot create RBAC in dev/test/prod from tools. Deploying KSM into
+# each namespace with THAT namespace's own token (like the grafana-agent jobs)
+# lets it use namespaced RBAC (Role/RoleBinding in its own namespace) to read
+# pod/deployment state there.
+#
+# The central Prometheus in f6bc3f-tools scrapes each of these via static DNS:
+#   ksm-kube-state-metrics.<namespace>.svc.cluster.local:8080
+#
+# CHART: prometheus-community/kube-state-metrics
+# DEPLOY (per namespace, release name "ksm"):
+#   helm upgrade --install ksm prometheus-community/kube-state-metrics \
+#     -n <namespace> -f monitoring/grafana-stack/prometheus/values-kube-state-metrics.yaml
+# ---------------------------------------------------------------------------
+
+# Namespaced RBAC: Role/RoleBinding in the release namespace, no ClusterRole.
+rbac:
+  create: true
+  useClusterRole: false
+
+# Watch only the namespace this instance is deployed into.
+# (empty releaseNamespace defaults to the install namespace)
+namespaces: ""            # chart interprets empty as "release namespace only" in namespaced mode
+releaseNamespace: true
+
+# OpenShift assigns a random UID via SCC.
+securityContext:
+  enabled: true
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+  runAsNonRoot: true
+
+# Only the resource kinds our alerts use. No "nodes" (cluster-scoped).
+collectors:
+  - pods
+  - deployments
+  - replicasets
+  - statefulsets
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 256Mi
+
+# Small, single replica — this is per-namespace and low-cardinality.
+replicas: 1
+
+# The service the central Prometheus scrapes (port 8080 by default).
+service:
+  port: 8080
