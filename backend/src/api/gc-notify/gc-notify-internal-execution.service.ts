@@ -24,6 +24,13 @@ import { NotificationResponse } from './schemas/notification-response'
 import { Notification as GcNotification } from './schemas/notification'
 import { Template as GcTemplate } from './schemas/template'
 import { Links } from './schemas/links'
+import type { FileAttachment } from './schemas/file-attachment'
+import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
+import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
+import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
+import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
 
 const TEMPLATE_LIST_QUERY_CONFIG: QueryableFieldsConfig = {
   sortableFields: { name: 'template.name', updatedAt: 'template.updatedAt' },
@@ -68,6 +75,27 @@ function toGcNotifyResponseStatus(status: string): string {
   }
 }
 
+// GC Notify's FileAttachment carries only file/filename/sending_method - no MIME
+// type - but the native attachment pipeline (validation, storage) requires one and
+// checks it against the mime_type_code allow-list. We derive it from the filename
+// extension. Kept in lockstep with the mime_type_code seed (migrations V33) and the
+// MIME_TYPE_EXTENSION_MAP in attachment.service.ts; an extension not listed here is
+// rejected rather than guessed.
+const GC_NOTIFY_EXTENSION_MIME_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+}
+
 interface MappableNotification {
   id: string
   tenantId: string
@@ -96,8 +124,17 @@ interface MappableNotification {
  * Known gap: there is no tenant-level default sender identity resolution yet
  * (see NotifyEmailChannel.identityId, which nothing currently consumes), so
  * from_email/from_number fall back to an optionally-configured NotifyConfiguration
- * value or an explicit placeholder. File-attachment personalisation is not
- * forwarded by internal execution - keep attachment-bearing sends on passthrough.
+ * value or an explicit placeholder.
+ *
+ * Email file-attachment personalisation IS forwarded: file-valued personalisation
+ * entries are lifted out, validated + stored via the shared attachment pipeline
+ * (AttachmentValidationService / AttachmentProcessingService), and enqueued as
+ * stored-attachment references on the ingestion payload, so the existing ClamAV
+ * scan (ingestion worker) and attachment resolution (email delivery worker) apply
+ * unchanged. Two GC Notify features are intentionally not supported here and are
+ * rejected with a 400: sending_method 'link' (needs GC Notify-style file hosting,
+ * which we don't do) and file types whose extension isn't in the mime_type_code
+ * allow-list. SMS attachments aren't a GC Notify feature and aren't handled.
  */
 @Injectable()
 export class GcNotifyInternalExecutionService {
@@ -112,6 +149,8 @@ export class GcNotifyInternalExecutionService {
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
+    private readonly attachmentValidationService: AttachmentValidationService,
+    private readonly attachmentProcessingService: AttachmentProcessingService,
   ) {}
 
   async sendEmail(
@@ -124,9 +163,10 @@ export class GcNotifyInternalExecutionService {
       body.template_id,
       NotificationChannel.EMAIL,
     )
-    const personalisation = this.toStringPersonalisation(body.personalisation)
+    const { params: personalisation, files } = this.splitPersonalisation(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromEmail = await this.resolveDefaultSender('gc_notify_default_from_email')
+    const attachments = await this.storeAttachments(files, tenantId)
     // No top-level templateId: the delivery worker has two modes — template mode
     // (re-renders at delivery time when request.templateId is set) and pre-rendered
     // mode (uses request.email.content directly). GC Notify's 201 response already
@@ -144,7 +184,12 @@ export class GcNotifyInternalExecutionService {
         content: {
           subject: rendered.subject ?? '',
           body: rendered.body,
+          // Carry the rendered body type through to delivery. Without it the CHES
+          // adapter can't tell the body is markdown, skips markdown->HTML conversion,
+          // and ships raw markdown (## H1, **bold**, - lists) in the email.
+          bodyType: rendered.bodyType,
         },
+        ...(attachments.length > 0 && { attachments }),
         delayedSend: body.scheduled_for,
       },
     }
@@ -253,16 +298,105 @@ export class GcNotifyInternalExecutionService {
   private toStringPersonalisation(
     personalisation: Record<string, unknown> | undefined,
   ): Record<string, string> {
-    if (!personalisation) return {}
-    const result: Record<string, string> = {}
+    return this.splitPersonalisation(personalisation).params
+  }
+
+  /**
+   * GC Notify overloads the personalisation map: each entry is either a template
+   * variable (string) or a file attachment (object). Split them - string values
+   * feed template rendering; file-valued entries become attachments. Any other
+   * non-string value is dropped rather than stringified into garbage (unchanged
+   * from the previous string-only behaviour).
+   */
+  private splitPersonalisation(personalisation: Record<string, unknown> | undefined): {
+    params: Record<string, string>
+    files: FileAttachment[]
+  } {
+    const params: Record<string, string> = {}
+    const files: FileAttachment[] = []
+    if (!personalisation) return { params, files }
     for (const [key, value] of Object.entries(personalisation)) {
       if (typeof value === 'string') {
-        result[key] = value
+        params[key] = value
+      } else if (this.isFileAttachment(value)) {
+        files.push(value)
       }
-      // Non-string values (GC Notify file attachments) aren't supported by
-      // internal execution yet - omitted rather than stringified into garbage.
     }
-    return result
+    return { params, files }
+  }
+
+  private isFileAttachment(value: unknown): value is FileAttachment {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as FileAttachment).file === 'string' &&
+      typeof (value as FileAttachment).filename === 'string'
+    )
+  }
+
+  /**
+   * Validate and persist GC Notify file attachments through the shared attachment
+   * pipeline, returning the stored-attachment references to enqueue on the email
+   * payload (the ingestion/delivery workers resolve these downstream). Returns an
+   * empty array when there are no attachments, so callers can omit the field.
+   */
+  private async storeAttachments(
+    files: FileAttachment[],
+    tenantId: string,
+  ): Promise<StoredNotifyAttachment[]> {
+    if (files.length === 0) return []
+
+    const notifyAttachments = files.map((file) => this.toNotifyAttachment(file))
+    // Only email.attachments is populated; the shared services read exactly that,
+    // so the required-but-unused recipients field is intentionally left off.
+    const request: NotifySimpleRequest = {
+      email: { attachments: notifyAttachments } as NotifyEmailChannel,
+    }
+    await this.attachmentValidationService.validateAttachments(request)
+    const processed = await this.attachmentProcessingService.processAttachments(
+      request,
+      tenantId,
+      tenantId,
+    )
+    return processed.email?.attachments ?? []
+  }
+
+  private toNotifyAttachment(file: FileAttachment): NotifyAttachment {
+    // sending_method is optional at runtime (personalisation isn't deeply validated
+    // by class-validator); treat a missing method as the default 'attach'.
+    if (file.sending_method && file.sending_method !== 'attach') {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: `Attachment '${file.filename}' uses sending_method '${file.sending_method}', which is not supported by internal execution. Use sending_method 'attach'.`,
+          },
+        ],
+      })
+    }
+    return {
+      filename: file.filename,
+      mimeType: this.deriveMimeType(file.filename),
+      content: file.file,
+    }
+  }
+
+  private deriveMimeType(filename: string): string {
+    const extension = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : ''
+    const mimeType = GC_NOTIFY_EXTENSION_MIME_TYPES[extension]
+    if (!mimeType) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'BadRequestError',
+            message: `Attachment '${filename}' has an unsupported or missing file extension. Allowed extensions: ${Object.keys(
+              GC_NOTIFY_EXTENSION_MIME_TYPES,
+            ).join(', ')}.`,
+          },
+        ],
+      })
+    }
+    return mimeType
   }
 
   private async resolveDefaultSender(configKey: string): Promise<string> {
