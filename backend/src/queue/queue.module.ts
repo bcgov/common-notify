@@ -32,6 +32,7 @@ import { ClamavService } from '../services/clamav.service'
 import { AttachmentModule } from '../api/attachment/attachment.module'
 import { AttachmentService } from '../api/attachment/attachment.service'
 import { StructuredLoggerService } from '../common/logger'
+import { PhoneNumberService } from '../api/notify/services/phone-number.service'
 
 /**
  * Queue Module
@@ -62,6 +63,7 @@ import { StructuredLoggerService } from '../common/logger'
     NotificationRequestDetailService,
     NotificationPubSubService,
     ClamavService,
+    PhoneNumberService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -232,6 +234,7 @@ export class QueueModule implements OnModuleInit {
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly notificationRequestDetailService?: NotificationRequestDetailService,
     private readonly clamavService?: ClamavService,
+    private readonly phoneNumberService?: PhoneNumberService,
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
@@ -268,6 +271,7 @@ export class QueueModule implements OnModuleInit {
         this.clamavService,
         concurrency,
         this.attachmentService,
+        this.phoneNumberService,
       )
       this.logger.debug('Ingestion worker initialization started')
 

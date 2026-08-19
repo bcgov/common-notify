@@ -14,6 +14,15 @@ describe('GcNotifyBulkValidationService', () => {
     ).toEqual({ valid: true, errors: [] })
   })
 
+  it('accepts a normalizable non-canonical SMS recipient', () => {
+    expect(
+      service.validateRows([
+        ['phone number', 'name'],
+        ['250-555-1234', 'Alice'],
+      ]),
+    ).toEqual({ valid: true, errors: [] })
+  })
+
   it('reports one invalid recipient with its data-row number and value', () => {
     expect(
       service.validateRows([
@@ -33,13 +42,13 @@ describe('GcNotifyBulkValidationService', () => {
         ['name', 'phone number'],
         ['Alice', '12345'],
         ['Bob', '+12505551234'],
-        ['Carol', '250-555-1234'],
+        ['Carol', 'not-a-number'],
       ]),
     ).toEqual({
       valid: false,
       errors: [
         'Row 1: "12345" is not a valid E.164 phone number',
-        'Row 3: "250-555-1234" is not a valid E.164 phone number',
+        'Row 3: "not-a-number" is not a valid E.164 phone number',
       ],
     })
   })

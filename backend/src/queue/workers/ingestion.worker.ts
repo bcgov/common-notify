@@ -9,6 +9,7 @@ import { NotificationService } from '../../api/notification/notification.service
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
 import { AttachmentService } from '../../api/attachment/attachment.service'
+import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 
 /**
  * Ingestion Worker
@@ -24,6 +25,26 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
  */
 export class IngestionWorker {
   private readonly logger = new Logger(IngestionWorker.name)
+
+  private static normalizeSmsRecipients(
+    request: IngestionJobPayload['request'],
+    phoneNumberService: PhoneNumberService,
+  ): IngestionJobPayload['request'] {
+    if (!request.sms?.recipients?.to) return request
+
+    return {
+      ...request,
+      sms: {
+        ...request.sms,
+        recipients: {
+          ...request.sms.recipients,
+          to: request.sms.recipients.to.map(
+            (recipient) => phoneNumberService.normalize(recipient) ?? recipient,
+          ),
+        },
+      },
+    } as IngestionJobPayload['request']
+  }
 
   private static hasAttachmentReferences(
     attachments: unknown,
@@ -59,6 +80,7 @@ export class IngestionWorker {
     clamavService?: ClamavService,
     concurrency: number = 1,
     attachmentService?: AttachmentService,
+    phoneNumberService: PhoneNumberService = new PhoneNumberService(),
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -91,6 +113,7 @@ export class IngestionWorker {
         if (!request || typeof request !== 'object') {
           throw new Error('Invalid request: request payload is missing or invalid')
         }
+        let processedRequest = request
 
         // Mail merge email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
@@ -150,14 +173,16 @@ export class IngestionWorker {
           logger.log(`[${notifyId}] Mail merge email job fanned out into ${batchIndex} batch(es)`)
           return { success: true, deliveryJobsQueued: batchIndex }
         } else {
+          processedRequest = IngestionWorker.normalizeSmsRecipients(request, phoneNumberService)
+
           // Create notification request detail entries for regular notification request
-          await requestDetailService.createPending(notifyId, request, tenantId)
+          await requestDetailService.createPending(notifyId, processedRequest, tenantId)
         }
 
         const channelAttachments = [
-          ...(request.email?.attachments ?? []),
-          ...(request.sms?.attachments ?? []),
-          ...(request.msgApp?.attachments ?? []),
+          ...(processedRequest.email?.attachments ?? []),
+          ...(processedRequest.sms?.attachments ?? []),
+          ...(processedRequest.msgApp?.attachments ?? []),
         ]
 
         if (channelAttachments.length > 0) {
@@ -258,22 +283,22 @@ export class IngestionWorker {
         }> = []
 
         // Email channel
-        if (request.email) {
+        if (processedRequest.email) {
           logger.log(`[${notifyId}] Adding email delivery job`)
           deliveryJobs.push({
             queue: emailQueue,
             channel: NotificationChannel.EMAIL,
-            payload: request.email,
+            payload: processedRequest.email,
           })
         }
 
         // SMS channel
-        if (request.sms) {
+        if (processedRequest.sms) {
           logger.log(`[${notifyId}] Adding SMS delivery job`)
           deliveryJobs.push({
             queue: smsQueue,
             channel: NotificationChannel.SMS,
-            payload: request.sms,
+            payload: processedRequest.sms,
           })
         }
 
@@ -291,7 +316,7 @@ export class IngestionWorker {
             notifyId,
             tenantId,
             channel,
-            request, // Include original request so delivery workers can resolve templates
+            request: processedRequest,
             payload,
             attempt: 0,
           }

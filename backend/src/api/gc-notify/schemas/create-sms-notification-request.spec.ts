@@ -23,15 +23,24 @@ describe('CreateSmsNotificationRequest', () => {
     expect(errors).toHaveLength(0)
   })
 
+  it.each(['250-555-1234', '(250) 555-1234', '12505551234'])(
+    'accepts resolvable non-canonical number %s',
+    async (phoneNumber) => {
+      expect(await validate(requestWith(phoneNumber))).toHaveLength(0)
+    },
+  )
+
   it.each([
-    ['12505551234', 'a missing plus prefix'],
+    ['491512345678901', 'an unresolvable international number missing its plus prefix'],
     ['+1250555ABC4', 'non-numeric characters'],
     ['12345', 'a short code'],
-    ['+4915123456789012', 'more than 15 digits'],
+    ['+49151234567890123', 'an overlong unresolvable number'],
   ])('rejects %s (%s)', async (phoneNumber) => {
     const errors = await validate(requestWith(phoneNumber))
     const phoneNumberError = errors.find((error) => error.property === 'phone_number')
 
-    expect(phoneNumberError?.constraints?.isE164).toBe('Phone number must be in E.164 format')
+    expect(phoneNumberError?.constraints?.isNormalizablePhoneNumber).toBe(
+      'Phone number must be resolvable to E.164 format',
+    )
   })
 })

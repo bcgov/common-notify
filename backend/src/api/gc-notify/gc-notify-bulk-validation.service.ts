@@ -35,7 +35,7 @@ export class GcNotifyBulkValidationService {
     for (let rowNumber = 1; rowNumber < rows.length; rowNumber++) {
       const row = rows[rowNumber]
       const value = Array.isArray(row) ? row[phoneNumberColumn] : undefined
-      if (typeof value !== 'string' || !this.phoneNumberService.isValid(value)) {
+      if (typeof value !== 'string' || this.phoneNumberService.normalize(value) === null) {
         errors.push(`Row ${rowNumber}: "${String(value ?? '')}" is not a valid E.164 phone number`)
       }
     }

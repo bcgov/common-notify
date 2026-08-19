@@ -218,6 +218,16 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyInternalExecutionService.sendSms).not.toHaveBeenCalled()
     })
 
+    it('forwards a normalizable non-canonical phone number unchanged to upstream GC Notify', async () => {
+      mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(false)
+      mockGcNotifyApiClient.sendSms.mockResolvedValue({ id: 'notif-sms-raw' })
+      const body = { ...smsBody, phone_number: '250-555-1234' }
+
+      await controller.sendSms(body, makeReq())
+
+      expect(mockGcNotifyApiClient.sendSms).toHaveBeenCalledWith(body, AUTH_HEADER)
+    })
+
     it('routes to GcNotifyInternalExecutionService when internal routing is enabled', async () => {
       mockGcNotifyRoutingService.shouldExecuteInternally.mockResolvedValue(true)
       const expected = {
@@ -262,10 +272,26 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyRoutingService.shouldExecuteInternally).not.toHaveBeenCalled()
     })
 
+    it('forwards accepted non-canonical bulk rows unchanged', async () => {
+      const body: PostBulkRequest = {
+        ...bulkBody,
+        rows: [
+          ['phone number', 'name'],
+          ['250-555-1234', 'Alice'],
+        ],
+      }
+      mockGcNotifyApiClient.sendBulk.mockResolvedValue({ data: { id: 'job-id-raw' } })
+
+      await controller.sendBulk(body, makeReq())
+
+      expect(mockGcNotifyBulkValidationService.validateRows).toHaveBeenCalledWith(body.rows)
+      expect(mockGcNotifyApiClient.sendBulk).toHaveBeenCalledWith(body, AUTH_HEADER)
+    })
+
     it('rejects all invalid rows atomically with 422 and never calls the upstream client', async () => {
       const messages = [
         'Row 1: "12345" is not a valid E.164 phone number',
-        'Row 3: "250-555-1234" is not a valid E.164 phone number',
+        'Row 3: "not-a-number" is not a valid E.164 phone number',
       ]
       mockGcNotifyBulkValidationService.validateRows.mockReturnValue({
         valid: false,

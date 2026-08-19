@@ -10,15 +10,15 @@ describe('NotifySmsRecipients', () => {
     expect(await validate(recipients)).toHaveLength(0)
   })
 
-  it('rejects one malformed entry and identifies its index and value', async () => {
+  it('rejects one unresolvable entry and identifies its index and value', async () => {
     const recipients = Object.assign(new NotifySmsRecipients(), {
-      to: ['+12505550123', '250-555-1234', '+12505550124'],
+      to: ['+12505550123', '12345', '+12505550124'],
     })
     const errors = await validate(recipients)
 
     expect(errors).toHaveLength(1)
-    expect(errors[0].constraints?.isE164).toBe(
-      "to[1] '250-555-1234' is not a valid E.164 phone number",
+    expect(errors[0].constraints?.isNormalizablePhoneNumber).toBe(
+      "to[1] '12345' is not a valid phone number",
     )
   })
 
@@ -31,14 +31,12 @@ describe('NotifySmsRecipients', () => {
   })
 
   it.each(['250-555-1234', '(250) 555-1234'])(
-    'rejects plausible but non-E.164 recipient %s without normalizing it',
+    'accepts normalizable non-canonical recipient %s without mutating the DTO',
     async (value) => {
       const recipients = Object.assign(new NotifySmsRecipients(), { to: [value] })
       const errors = await validate(recipients)
 
-      expect(errors[0].constraints?.isE164).toBe(
-        `to[0] '${value}' is not a valid E.164 phone number`,
-      )
+      expect(errors).toHaveLength(0)
       expect(recipients.to[0]).toBe(value)
     },
   )

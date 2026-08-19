@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsE164 } from '../../notify/schemas/validators/e164.validator'
+import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
 
 export class CreateSmsNotificationRequest {
   @ApiProperty({
@@ -8,8 +8,8 @@ export class CreateSmsNotificationRequest {
     example: '+1234567890',
   })
   @IsString()
-  @IsE164({
-    message: 'Phone number must be in E.164 format',
+  @IsNormalizablePhoneNumber({
+    message: 'Phone number must be resolvable to E.164 format',
   })
   phone_number: string
 
