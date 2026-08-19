@@ -29,6 +29,7 @@ import { NotifyEvent } from './api/events/entities/event.entity'
 import { EventChannelSetting } from './api/events/entities/event-channel-setting.entity'
 import { EventRecipient } from './api/events/entities/event-recipient.entity'
 import { ProvisionedPhoneNumber } from './api/events/entities/provisioned-phone-number.entity'
+import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -77,6 +78,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         EventChannelSetting,
         EventRecipient,
         ProvisionedPhoneNumber,
+        RecipientSafelist,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

@@ -18,4 +18,7 @@ export enum FeatureFlagCode {
   GC_NOTIFY_ROUTE_LIST_NOTIFICATIONS = 'gc_notify_route_list_notifications',
   GC_NOTIFY_ROUTE_GET_TEMPLATE = 'gc_notify_route_get_template',
   GC_NOTIFY_ROUTE_LIST_TEMPLATES = 'gc_notify_route_list_templates',
+  // Non-production guardrail: when enabled, every tenant in the environment can only send to
+  // recipients on its own safelist. Enabled in PR/DEV/TEST, off in PROD.
+  RECIPIENT_SAFELIST = 'recipient_safelist',
 }

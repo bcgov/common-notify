@@ -941,6 +941,42 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/safelist (frontend variant)
+  # Recipient safelist management from the Settings page. Called by the Notify web app with a
+  # frontend user JWT (never a service API key) - the safelist is administered by tenant admins,
+  # not by integrating services.
+  - name: ${ROUTE_PREFIX}safelist-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/safelist
+    methods:
+      - GET
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/safelist/{id} (frontend variant)
+  # Separate route because DELETE is not a method on the collection path above; same reason
+  # the notifysimple cancel/reschedule PATCH gets its own regex route.
+  - name: ${ROUTE_PREFIX}safelist-entry-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/api/v1/frontend/safelist/[^/]+
+    methods:
+      - DELETE
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/admin/api-key-usage (admin variant - all tenants' usage)
   # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Same jwt-keycloak plugin
   # as the other frontend admin routes. Kong prefix-matches, so PATCH also covers
@@ -1611,4 +1647,18 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-api-key-usage-frontend
+    config: *jwtConfig
+
+  # Safelist Frontend - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}safelist-frontend
+    config: *jwtConfig
+
+  # Safelist Entry Frontend - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}safelist-entry-frontend
     config: *jwtConfig
