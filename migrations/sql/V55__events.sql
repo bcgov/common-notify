@@ -1,4 +1,4 @@
--- V49: Events.
+-- V55: Events.
 --
 -- An event is a named, reusable notification definition owned by a tenant. It is configured
 -- through three UI tabs, which map onto three tables:

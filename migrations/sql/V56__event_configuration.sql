@@ -1,4 +1,4 @@
--- V50: Configuration that turns the V48/V49 event feature on.
+-- V56: Configuration that turns the V48/V49 event feature on.
 --
 --   1. configuration 'event_max_recipients' - global cap on manually entered recipients per
 --                                             event channel.

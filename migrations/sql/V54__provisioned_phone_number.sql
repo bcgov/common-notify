@@ -1,4 +1,4 @@
--- V48: Pool of provisioned SMS phone numbers.
+-- V54: Pool of provisioned SMS phone numbers.
 --
 -- Numbers are provisioned centrally (by the platform team / SMS provider) into a pool. A row is:
 --   available  - tenant_id IS NULL, free for any tenant to claim.
@@ -10,7 +10,7 @@
 -- configures sends from it, and the tab shows it rather than a choice. Per-event numbers are not
 -- supported.
 --
--- Releasing a number back to the pool is an sso.notify_admin action, guarded in V48 so it can
+-- Releasing a number back to the pool is an sso.notify_admin action, guarded in V54 so it can
 -- only happen while the tenant has no event with SMS enabled. A number always travels through
 -- the pool between holders - see notify.check_phone_number_allocation() below.
 --
