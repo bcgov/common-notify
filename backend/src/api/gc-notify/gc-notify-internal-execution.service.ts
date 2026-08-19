@@ -28,6 +28,7 @@ import type { FileAttachment } from './schemas/file-attachment'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
+import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
 import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
 
@@ -346,8 +347,11 @@ export class GcNotifyInternalExecutionService {
     if (files.length === 0) return []
 
     const notifyAttachments = files.map((file) => this.toNotifyAttachment(file))
-    // Only email.attachments is populated; the shared services read exactly that.
-    const request: NotifySimpleRequest = { email: { attachments: notifyAttachments } }
+    // Only email.attachments is populated; the shared services read exactly that,
+    // so the required-but-unused recipients field is intentionally left off.
+    const request: NotifySimpleRequest = {
+      email: { attachments: notifyAttachments } as NotifyEmailChannel,
+    }
     await this.attachmentValidationService.validateAttachments(request)
     const processed = await this.attachmentProcessingService.processAttachments(
       request,
