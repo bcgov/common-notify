@@ -19,8 +19,12 @@
 		`
 	}
 
-	# Proxy requests to API Gateway (Kong)
+	# Proxy requests to API Gateway (Kong).
+	# On PR deploys GATEWAY_PATH_PREFIX is "/pr-<n>" so requests are proxied to the
+	# PR-specific Kong route (/pr-<n>/api/*). It is empty on dev/test/prod, which
+	# makes the rewrite an identity no-op. {uri} preserves the query string.
 	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
+		rewrite {$GATEWAY_PATH_PREFIX:}{uri}
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
 	}

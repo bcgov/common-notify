@@ -51,6 +51,14 @@ spec:
               value: "http://{{ .Release.Name }}-backend"
             - name: LOG_LEVEL
               value: "info"
+            # PR deploys (release name common-notify-<number>) proxy API calls to the
+            # PR-specific Kong route via a /pr-<number> path prefix; empty everywhere else.
+            - name: GATEWAY_PATH_PREFIX
+              {{- if regexMatch "^common-notify-[0-9]+$" .Release.Name }}
+              value: "/pr-{{ trimPrefix "common-notify-" .Release.Name }}"
+              {{- else }}
+              value: ""
+              {{- end }}
             {{- if .Values.frontend.secrets.enabled }}
             - name: VITE_API_GATEWAY_NOTIFY_URL
               valueFrom:
