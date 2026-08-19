@@ -77,14 +77,14 @@ describe('TemplatesRepository', () => {
   })
 
   describe('findById', () => {
-    it('should find a template by ID and tenant ID', async () => {
+    it('should find an active template by ID and tenant ID', async () => {
       mockTemplateRepository.findOne.mockResolvedValue(mockTemplate)
 
       const result = await repository.findById('tenant-123', 'template-123')
 
       expect(result).toEqual(mockTemplate)
       expect(mockTemplateRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'template-123', tenantId: 'tenant-123' },
+        where: { id: 'template-123', tenantId: 'tenant-123', active: true },
         relations: ['channel', 'engine'],
       })
     })
@@ -367,13 +367,14 @@ describe('TemplatesRepository', () => {
   })
 
   describe('softDelete', () => {
-    it('should mark a template as inactive', async () => {
+    it('should mark a template as inactive and record the deletion time', async () => {
       mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
 
       await repository.softDelete('template-123')
 
       expect(mockTemplateRepository.update).toHaveBeenCalledWith('template-123', {
         active: false,
+        deletedAt: expect.any(Date),
       })
     })
 
@@ -384,6 +385,7 @@ describe('TemplatesRepository', () => {
 
       expect(mockTemplateRepository.update).toHaveBeenCalledWith('non-existent', {
         active: false,
+        deletedAt: expect.any(Date),
       })
     })
   })

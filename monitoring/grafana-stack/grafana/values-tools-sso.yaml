@@ -46,6 +46,18 @@ datasources:
         jsonData:
           manageAlerts: true
           alertmanagerUid: alertmanager
+      # Prometheus (in-namespace, deployed via monitoring/grafana-stack/prometheus).
+      # Source for the metric-based pod-state / OOM alerts (infra-alert-rules.yaml).
+      # UID "prometheus" is referenced by those rules' datasourceUid.
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://prometheus-server.f6bc3f-tools.svc.cluster.local
+        jsonData:
+          httpMethod: POST
+          manageAlerts: true
+          timeInterval: 30s
 
 # Alerting - Provision contact points and notification policies
 alerting:
@@ -75,7 +87,7 @@ alerting:
                 **Summary:** {{ `{{ .Annotations.summary }}` }}
                 {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
 
-                **Status:** Firing for {{ `{{ .StartsAt | since }}` }}
+                **Status:** Firing since {{ `{{ .StartsAt }}` }}
                 [View in Grafana]({{ `{{ .GeneratorURL }}` }})
                 {{ `{{ end }}` }}
                 {{ `{{ end }}` }}
@@ -126,7 +138,7 @@ dashboardProviders:
 dashboards:
   default: {}
 
-# Sidecar for auto-loading dashboards
+# Sidecar for auto-loading dashboards and alert rules from ConfigMaps.
 sidecar:
   dashboards:
     enabled: true
@@ -137,6 +149,16 @@ sidecar:
     searchNamespace: f6bc3f-tools
     provider:
       foldersFromFilesStructure: false
+    resource: configmap
+  # Provision Grafana-managed alert rules from ConfigMaps labeled grafana_alert=1.
+  # Rules live in ConfigMaps (not inlined in these values) so their {{ $labels }}
+  # templates are NOT processed by Helm's tpl (which fails on "$labels").
+  # See monitoring/grafana-stack/grafana/infra-alert-rules.yaml.
+  alerts:
+    enabled: true
+    label: grafana_alert
+    labelValue: "1"
+    searchNamespace: f6bc3f-tools
     resource: configmap
 
 # Grafana configuration with SSO enabled

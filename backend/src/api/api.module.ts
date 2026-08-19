@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module'
 import { ApiKeysModule } from './api-keys/api-keys.module'
 import { AttachmentModule } from './attachment/attachment.module'
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
+import { SafelistModule } from './safelist/safelist.module'
 
 /**
  * API Module
@@ -30,6 +31,7 @@ import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
     ApiKeysModule,
     AttachmentModule,
     TenantSettingsModule,
+    SafelistModule,
   ],
   exports: [
     NotifyModule,
@@ -39,6 +41,7 @@ import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
     ApiKeysModule,
     AttachmentModule,
     TenantSettingsModule,
+    SafelistModule,
   ],
 })
 export class ApiModule {}

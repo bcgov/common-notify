@@ -2,9 +2,9 @@ import { Module, OnModuleInit, Inject, Logger, Optional, forwardRef } from '@nes
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import Bull from 'bull'
-import Redis from 'ioredis'
+import type Bull from 'bull'
 import { QueueName } from '../enum/queue-name.enum'
+import { createQueue, createRedisClient } from './redis-connection'
 import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
@@ -71,12 +71,7 @@ import { StructuredLoggerService } from '../common/logger'
         if (!redisConfig) {
           return null
         }
-        return new Redis({
-          host: redisConfig.host,
-          port: redisConfig.port,
-          password: redisConfig.password,
-          db: redisConfig.db,
-        })
+        return createRedisClient(redisConfig, 'RedisClient')
       },
       inject: [ConfigService],
     },
@@ -93,30 +88,14 @@ import { StructuredLoggerService } from '../common/logger'
     {
       provide: QueueName.INGESTION,
       useFactory: (configService: ConfigService) => {
-        // Bull manages its own Redis connections
-        // Pass Redis config directly without pre-created clients
         const redisConfig = configService.get('redis')
 
-        // If no redis config (e.g., in tests), return null to skip queue initialization
+        // No redis config (e.g. in tests): skip queue initialization
         if (!redisConfig) {
           return null
         }
 
-        // Only include password if it's defined
-        const redisOptions: any = {
-          host: redisConfig.host,
-          port: redisConfig.port,
-          db: redisConfig.db,
-          enableReadyCheck: false,
-          maxRetriesPerRequest: null,
-        }
-        if (redisConfig.password) {
-          redisOptions.password = redisConfig.password
-        }
-
-        return new Bull(QueueName.INGESTION, {
-          redis: redisOptions,
-        })
+        return createQueue(QueueName.INGESTION, redisConfig)
       },
       inject: [ConfigService],
     },
@@ -125,25 +104,12 @@ import { StructuredLoggerService } from '../common/logger'
       useFactory: (configService: ConfigService) => {
         const redisConfig = configService.get('redis')
 
-        // If no redis config (e.g., in tests), return null to skip queue initialization
+        // No redis config (e.g. in tests): skip queue initialization
         if (!redisConfig) {
           return null
         }
 
-        const redisOptions: any = {
-          host: redisConfig.host,
-          port: redisConfig.port,
-          db: redisConfig.db,
-          enableReadyCheck: false,
-          maxRetriesPerRequest: null,
-        }
-        if (redisConfig.password) {
-          redisOptions.password = redisConfig.password
-        }
-
-        return new Bull(QueueName.EMAIL_DELIVERY, {
-          redis: redisOptions,
-        })
+        return createQueue(QueueName.EMAIL_DELIVERY, redisConfig)
       },
       inject: [ConfigService],
     },
@@ -152,25 +118,12 @@ import { StructuredLoggerService } from '../common/logger'
       useFactory: (configService: ConfigService) => {
         const redisConfig = configService.get('redis')
 
-        // If no redis config (e.g., in tests), return null to skip queue initialization
+        // No redis config (e.g. in tests): skip queue initialization
         if (!redisConfig) {
           return null
         }
 
-        const redisOptions: any = {
-          host: redisConfig.host,
-          port: redisConfig.port,
-          db: redisConfig.db,
-          enableReadyCheck: false,
-          maxRetriesPerRequest: null,
-        }
-        if (redisConfig.password) {
-          redisOptions.password = redisConfig.password
-        }
-
-        return new Bull(QueueName.SMS_DELIVERY, {
-          redis: redisOptions,
-        })
+        return createQueue(QueueName.SMS_DELIVERY, redisConfig)
       },
       inject: [ConfigService],
     },
@@ -179,25 +132,12 @@ import { StructuredLoggerService } from '../common/logger'
       useFactory: (configService: ConfigService) => {
         const redisConfig = configService.get('redis')
 
-        // If no redis config (e.g., in tests), return null to skip queue initialization
+        // No redis config (e.g. in tests): skip queue initialization
         if (!redisConfig) {
           return null
         }
 
-        const redisOptions: any = {
-          host: redisConfig.host,
-          port: redisConfig.port,
-          db: redisConfig.db,
-          enableReadyCheck: false,
-          maxRetriesPerRequest: null,
-        }
-        if (redisConfig.password) {
-          redisOptions.password = redisConfig.password
-        }
-
-        return new Bull(QueueName.WEBHOOK_DELIVERY, {
-          redis: redisOptions,
-        })
+        return createQueue(QueueName.WEBHOOK_DELIVERY, redisConfig)
       },
       inject: [ConfigService],
     },

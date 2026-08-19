@@ -12,6 +12,7 @@ import { vi } from 'vitest'
 import request from 'supertest'
 import {
   NotifySimpleController,
+  NotifySimpleFrontendController,
   NotifyEventController,
   NotifyController,
   ChesEmailController,
@@ -25,6 +26,7 @@ import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feat
 import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
@@ -35,13 +37,19 @@ import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { WebhookService } from '../../api/webhook/webhook.service'
 import { ValidationExceptionFilter } from '../../common/filters/validation.filter'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
+import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
+import { SafelistService } from '../safelist/safelist.service'
+import { SmsSegmentService } from './services/sms-segment.service'
+import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
+let mockApiKeyConsumerId: string | undefined
 const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest()
     // Attach a mock tenant to the request
     request.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
+    request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
 }
@@ -112,6 +120,28 @@ const mockWebhookService = {
 
 const mockNotificationRequestDetailService = {
   createPending: vi.fn().mockResolvedValue(undefined),
+  createBlocked: vi.fn().mockResolvedValue(undefined),
+}
+
+// Safelist enforcement is off unless a test opts in, matching PROD and keeping every existing
+// send test unaffected by the guardrail.
+const mockSafelistService = {
+  isEnforced: vi.fn().mockResolvedValue(false),
+  findBlocked: vi.fn().mockResolvedValue([]),
+  appliesTo: (channel: string) => channel === 'EMAIL' || channel === 'SMS',
+}
+
+const mockApiKeyUsageService = {
+  recordUsage: vi.fn().mockResolvedValue([]),
+  assertWithinLimits: vi.fn().mockResolvedValue(undefined),
+}
+
+const mockLimitAlertNotificationService = {
+  processAcceptedUsage: vi.fn().mockResolvedValue(undefined),
+}
+
+const mockSmsSegmentService = {
+  countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
 }
 
 describe('Notify Controllers', () => {
@@ -126,11 +156,19 @@ describe('Notify Controllers', () => {
     )
     mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
     mockNotificationService.update.mockResolvedValue(undefined)
+    mockApiKeyConsumerId = undefined
+    mockApiKeyUsageService.recordUsage.mockResolvedValue([])
+    mockApiKeyUsageService.assertWithinLimits.mockResolvedValue(undefined)
+    mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
+    mockSafelistService.isEnforced.mockResolvedValue(false)
+    mockSafelistService.findBlocked.mockResolvedValue([])
+    mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
       controllers: [
         NotifySimpleController,
+        NotifySimpleFrontendController,
         NotifyEventController,
         NotifyController,
         ChesEmailController,
@@ -153,7 +191,19 @@ describe('Notify Controllers', () => {
         { provide: WebhookService, useValue: mockWebhookService },
         {
           provide: ApiKeyUsageService,
-          useValue: { recordUsage: vi.fn(), assertWithinLimits: vi.fn() },
+          useValue: mockApiKeyUsageService,
+        },
+        {
+          provide: LimitAlertNotificationService,
+          useValue: mockLimitAlertNotificationService,
+        },
+        {
+          provide: SafelistService,
+          useValue: mockSafelistService,
+        },
+        {
+          provide: SmsSegmentService,
+          useValue: mockSmsSegmentService,
         },
       ],
     })
@@ -196,6 +246,281 @@ describe('Notify Controllers', () => {
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()
+    })
+
+    it('receives the limit-alert provider through Nest injection', () => {
+      const controller = app.get(NotifySimpleController)
+      expect(controller.limitAlertNotificationService).toBe(mockLimitAlertNotificationService)
+    })
+
+    it('passes the same provider to the manually constructed frontend delegate', async () => {
+      const frontendController = app.get(NotifySimpleFrontendController)
+      const delegate = vi
+        .spyOn(NotifySimpleController.prototype as any, 'doCancelOrReschedule')
+        .mockResolvedValue({ id: 'notification-1' })
+
+      try {
+        await frontendController.cancelOrRescheduleNotification(
+          { user: { tenantId: 'tenant-1', sub: 'user-1' } },
+          'notification-1',
+          { action: 'cancel' },
+        )
+
+        expect(
+          (delegate.mock.instances[0] as NotifySimpleController).limitAlertNotificationService,
+        ).toBe(mockLimitAlertNotificationService)
+      } finally {
+        delegate.mockRestore()
+      }
+    })
+
+    describe('accepted usage limit-alert wiring', () => {
+      const dayPeriodStart = new Date('2026-07-29T00:00:00.000Z')
+      const yearPeriodStart = new Date('2026-04-01T00:00:00.000Z')
+      const standardBody = {
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Hello' },
+        },
+      }
+
+      it('forwards exact standard-send usage results and API-key consumer ID', async () => {
+        mockApiKeyConsumerId = 'consumer-standard'
+        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+          {
+            periodTypeCode: UsagePeriodType.DAY,
+            periodStart: dayPeriodStart,
+            sentCount: 81,
+          },
+          {
+            periodTypeCode: UsagePeriodType.YEAR,
+            periodStart: yearPeriodStart,
+            sentCount: 901,
+          },
+        ])
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(standardBody)
+          .expect(202)
+
+        expect(response.body.status).toBe('accepted')
+        expect(mockLimitAlertNotificationService.processAcceptedUsage).toHaveBeenCalledWith({
+          apiKeyConsumerId: 'consumer-standard',
+          usageResults: [
+            {
+              channelCode: 'EMAIL',
+              periodTypeCode: UsagePeriodType.DAY,
+              periodStart: dayPeriodStart,
+              sentCount: 81,
+            },
+            {
+              channelCode: 'EMAIL',
+              periodTypeCode: UsagePeriodType.YEAR,
+              periodStart: yearPeriodStart,
+              sentCount: 901,
+            },
+          ],
+        })
+      })
+
+      it('forwards exact email-merge usage results', async () => {
+        mockApiKeyConsumerId = 'consumer-merge'
+        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+          {
+            periodTypeCode: UsagePeriodType.DAY,
+            periodStart: dayPeriodStart,
+            sentCount: 102,
+          },
+        ])
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send({
+            content: { templateId: '12345678-1234-4234-8234-123456789012' },
+            recipients: {
+              mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+            },
+          })
+          .expect(202)
+
+        expect(response.body.status).toBe('accepted')
+        expect(mockLimitAlertNotificationService.processAcceptedUsage).toHaveBeenCalledWith({
+          apiKeyConsumerId: 'consumer-merge',
+          usageResults: [
+            {
+              channelCode: 'EMAIL',
+              periodTypeCode: UsagePeriodType.DAY,
+              periodStart: dayPeriodStart,
+              sentCount: 102,
+            },
+          ],
+        })
+      })
+
+      describe('SMS segment billing', () => {
+        const smsBody = {
+          sms: {
+            recipients: { to: ['+12505550123', '+12505550124'] },
+            content: { body: 'Hello' },
+          },
+        }
+
+        it('bills each recipient for every segment of a multi-segment SMS', async () => {
+          mockApiKeyConsumerId = 'consumer-sms'
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(3)
+
+          await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
+
+          // 2 recipients x 3 segments = 6 billable messages, enforced and recorded.
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-sms', [
+            { channel: NotificationChannel.EMAIL, count: 0 },
+            {
+              channel: NotificationChannel.SMS,
+              count: 6,
+              // Explains the 429 a caller would otherwise find baffling.
+              countExplanation: expect.stringContaining('2 recipient(s) x 3 segments'),
+            },
+          ])
+          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+            'consumer-sms',
+            NotificationChannel.SMS,
+            6,
+          )
+        })
+
+        it('bills a single segment when segment counting fails', async () => {
+          mockApiKeyConsumerId = 'consumer-sms-failure'
+          mockSmsSegmentService.countSegmentsPerRecipient.mockRejectedValue(
+            new Error('render blew up'),
+          )
+
+          await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
+
+          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+            'consumer-sms-failure',
+            NotificationChannel.SMS,
+            2,
+          )
+        })
+
+        it('does not count segments for a request with no SMS recipients', async () => {
+          mockApiKeyConsumerId = 'consumer-email-only'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+
+          expect(mockSmsSegmentService.countSegmentsPerRecipient).not.toHaveBeenCalled()
+        })
+      })
+
+      it('does not process alerts when recorded usage is empty', async () => {
+        mockApiKeyConsumerId = 'consumer-empty'
+        mockApiKeyUsageService.recordUsage.mockResolvedValue([])
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(standardBody)
+          .expect(202)
+
+        expect(mockLimitAlertNotificationService.processAcceptedUsage).not.toHaveBeenCalled()
+      })
+
+      it('does not process alerts without an API-key consumer ID', async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(standardBody)
+          .expect(202)
+
+        expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+        expect(mockLimitAlertNotificationService.processAcceptedUsage).not.toHaveBeenCalled()
+      })
+
+      it('does not fail the original response when orchestration rejects', async () => {
+        mockApiKeyConsumerId = 'consumer-failure'
+        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+          {
+            periodTypeCode: UsagePeriodType.DAY,
+            periodStart: dayPeriodStart,
+            sentCount: 85,
+          },
+        ])
+        mockLimitAlertNotificationService.processAcceptedUsage.mockRejectedValue(
+          new Error('alert orchestration failed'),
+        )
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(standardBody)
+          .expect(202)
+
+        expect(response.body.status).toBe('accepted')
+      })
+
+      it('does not fail when the optional orchestration service is unavailable', async () => {
+        mockApiKeyConsumerId = 'consumer-no-provider'
+        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+          {
+            periodTypeCode: UsagePeriodType.DAY,
+            periodStart: dayPeriodStart,
+            sentCount: 85,
+          },
+        ])
+        const controller = app.get(NotifySimpleController)
+        const provider = controller.limitAlertNotificationService
+        ;(controller as any).limitAlertNotificationService = undefined
+
+        try {
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+          expect(response.body.status).toBe('accepted')
+        } finally {
+          ;(controller as any).limitAlertNotificationService = provider
+        }
+      })
+
+      it('processes a successful channel when another usage write fails', async () => {
+        mockApiKeyConsumerId = 'consumer-partial'
+        mockApiKeyUsageService.recordUsage.mockImplementation((_consumerId, channel) => {
+          if (channel === NotificationChannel.EMAIL) {
+            return Promise.reject(new Error('email usage write failed'))
+          }
+          return Promise.resolve([
+            {
+              periodTypeCode: UsagePeriodType.DAY,
+              periodStart: dayPeriodStart,
+              sentCount: 44,
+            },
+          ])
+        })
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            ...standardBody,
+            sms: {
+              recipients: { to: ['+12505550123'] },
+              content: { body: 'Hello' },
+            },
+          })
+          .expect(202)
+
+        expect(mockLimitAlertNotificationService.processAcceptedUsage).toHaveBeenCalledWith({
+          apiKeyConsumerId: 'consumer-partial',
+          usageResults: [
+            {
+              channelCode: 'SMS',
+              periodTypeCode: UsagePeriodType.DAY,
+              periodStart: dayPeriodStart,
+              sentCount: 44,
+            },
+          ],
+        })
+      })
     })
 
     describe('POST /api/v1/notifysimple', () => {
@@ -403,6 +728,149 @@ describe('Notify Controllers', () => {
 
         expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
         expect(mockNotificationService.create).not.toHaveBeenCalled()
+      })
+
+      describe('recipient safelist enforcement (non-production environments)', () => {
+        const standardBody = {
+          email: {
+            recipients: { to: ['stranger@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+          },
+        }
+
+        it('rejects a send to a non-safelisted recipient with 400 and persists nothing', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['stranger@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(400)
+            .expect((res) => {
+              expect(JSON.stringify(res.body)).toContain('stranger@example.com')
+              expect(JSON.stringify(res.body)).toContain('safelist')
+            })
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+          expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+          expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+        })
+
+        it('checks cc and bcc, not just to', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send({
+              email: {
+                recipients: {
+                  to: ['allowed@gov.bc.ca'],
+                  cc: ['cc@example.com'],
+                  bcc: ['bcc@example.com'],
+                },
+                content: { subject: 'Test', body: 'Hello' },
+              },
+            })
+            .expect(202)
+
+          expect(mockSafelistService.findBlocked).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.arrayContaining([
+              { address: 'allowed@gov.bc.ca', channel: 'EMAIL' },
+              { address: 'cc@example.com', channel: 'EMAIL' },
+              { address: 'bcc@example.com', channel: 'EMAIL' },
+            ]),
+          )
+        })
+
+        it('accepts the send when every recipient is safelisted', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+
+          expect(mockNotificationService.create).toHaveBeenCalled()
+        })
+
+        it('drops blocked recipients from a mail merge and records them as blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.message).toContain('1 recipient(s)')
+              expect(res.body.blockedRecipientCount).toBe(1)
+            })
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
+        it('records a repeated blocked address once', async () => {
+          // findBlocked echoes one entry per candidate, so a merge listing the same address on
+          // two rows reports it twice; only one detail row may be written for it.
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com', 'bob@example.com'])
+          mockNotificationService.parseMailMergeRecipients.mockReturnValue(
+            ['alice@example.com', 'bob@example.com', 'bob@example.com'].map((address) => ({
+              address,
+              params: {},
+            })),
+          )
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [
+                  ['to'],
+                  ['alice@example.com'],
+                  ['bob@example.com'],
+                  ['bob@example.com'],
+                ],
+              },
+            })
+            .expect(202)
+            .expect((res) => expect(res.body.blockedRecipientCount).toBe(1))
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
+        it('rejects a mail merge whose every recipient is blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([
+            'alice@example.com',
+            'bob@example.com',
+          ])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(400)
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+        })
       })
 
       describe('POST /api/v1/notifysimple/email (mail-merge)', () => {

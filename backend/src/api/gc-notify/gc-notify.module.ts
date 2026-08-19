@@ -18,6 +18,7 @@ import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution
 import { AttachmentModule } from '../attachment/attachment.module'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import { SafelistModule } from '../safelist/safelist.module'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>
@@ -39,6 +40,7 @@ export class GcNotifyModule {
         NotificationModule,
         AttachmentModule,
         TypeOrmModule.forFeature([NotifyConfiguration, MimeTypeCode]),
+        SafelistModule,
         forwardRef(() => QueueModule),
       ],
       controllers: [GcNotifyController, GcNotifyPassthroughController],

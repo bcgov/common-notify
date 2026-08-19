@@ -356,7 +356,6 @@ describe('SmsDeliveryWorker', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'template-sms-uuid' }),
         { code: '123456' },
-        undefined,
       )
       expect(mockSmsAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -415,7 +414,6 @@ describe('SmsDeliveryWorker', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'template-sms-uuid' }),
         { code: 'channel', shared: 'global' },
-        undefined,
       )
     })
 

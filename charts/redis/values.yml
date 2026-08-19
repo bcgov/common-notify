@@ -9,7 +9,8 @@ redis:
   auth:
     enabled: false  # Disabled per BC Gov pattern
   image:
-    registry: artifacts.developer.gov.bc.ca/docker-remote
+    registry: docker.io
+    tag: "7.4.1-debian-12-r1"  # Pinned stable tag (avoid latest)
   master:
     podSecurityContext:
       enabled: true
@@ -23,13 +24,16 @@ redis:
       enabled: true
       size: 1Gi
       storageClass: netapp-block-standard
+    # Sized for the Bull/BullMQ job queue (~67k keys) plus RediSearch + ReJSON
+    # modules and replication resync headroom. 512Mi OOM-looped in dev (CCP: redis
+    # OOMKilled x300+). maxmemory (in commonConfiguration) caps usage below the limit.
     resources:
       requests:
         cpu: 100m
-        memory: 128Mi
+        memory: 512Mi
       limits:
         cpu: 500m
-        memory: 512Mi
+        memory: 1Gi
   replica:
     shareProcessNamespace: true
     replicaCount: 2
@@ -49,13 +53,15 @@ redis:
       accessMode: ReadWriteOnce
       size: 1Gi
       storageClass: netapp-block-standard
+    # Match master sizing — replicas load the full dataset and perform full resync,
+    # which is when memory peaks. 512Mi OOM-looped in dev.
     resources:
       requests:
         cpu: 100m
-        memory: 128Mi
+        memory: 512Mi
       limits:
         cpu: 500m
-        memory: 512Mi
+        memory: 1Gi
   sentinel:
     enabled: true
     quorum: 1
@@ -93,6 +99,14 @@ redis:
     appendfilename "appendonly.aof"
     # Disable RDB persistence
     save ""
+    # Cap Redis memory BELOW the 1Gi container limit so Redis manages memory itself
+    # instead of being OOMKilled by the kernel (which caused a 300+ restart crash loop).
+    # Headroom (1Gi - 768mb) covers RediSearch/ReJSON module overhead and resync buffers.
+    maxmemory 768mb
+    # This Redis backs a durable Bull/BullMQ job queue (ingestion/email/sms), NOT a
+    # disposable cache. noeviction => reject new writes when full rather than silently
+    # dropping queued jobs. If writes start failing, raise the limit — do not switch to LRU.
+    maxmemory-policy noeviction
   metrics:
     enabled: true
     podSecurityContext:

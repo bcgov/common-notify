@@ -12,20 +12,27 @@ import { SsoRole } from '@/enum/sso-role.enum'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
+// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
 
 const navItems = [
   {
+    label: 'Home',
+    to: '/',
+    icon: <HomeOutlinedIcon />,
+  },
+  {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <HomeOutlinedIcon />,
+    icon: <WorkspacesOutlinedIcon />,
   },
   {
     label: 'Templates',
@@ -36,6 +43,11 @@ const navItems = [
     label: 'Usage & Limits',
     to: '/usage',
     icon: <SpeedOutlinedIcon />,
+  },
+  {
+    label: 'Settings',
+    to: '/settings',
+    icon: <SettingsOutlinedIcon />,
   },
 ]
 
@@ -50,10 +62,6 @@ const adminItems = {
     {
       label: 'Usage & Limits',
       to: '/admin/usage',
-    },
-    {
-      label: 'Tenant Settings',
-      to: '/admin/settings',
     },
   ],
 } as const
@@ -107,9 +115,11 @@ const Sidebar: FC = () => {
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
           const shouldShow =
+            (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Usage & Limits' && showUsage)
+            (item.label === 'Usage & Limits' && showUsage) ||
+            (item.label === 'Settings' && hasTenantRole)
 
           return shouldShow ? (
             <Link
@@ -175,15 +185,6 @@ const Sidebar: FC = () => {
                     <span className="sidebar__label">Usage &amp; Limits</span>
                   </Link>
                 )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/settings"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Tenant Settings</span>
-                  </Link>
-                )}
               </div>
             )}
           </div>
@@ -194,12 +195,14 @@ const Sidebar: FC = () => {
       <div className="sidebar__footer">
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
-        <Button variant="link" className="sidebar__item">
-          <span className="sidebar__icon" aria-hidden="true">
-            <HelpOutlineOutlinedIcon />
-          </span>
-          <span className="sidebar__label">Help</span>
-        </Button>
+        {/*
+          <Button variant="link" className="sidebar__item">
+            <span className="sidebar__icon" aria-hidden="true">
+              <HelpOutlineOutlinedIcon />
+            </span>
+            <span className="sidebar__label">Help</span>
+          </Button>
+        */}
 
         {/* Bottom section */}
         <div className="sidebar__bottom">

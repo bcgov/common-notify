@@ -1,0 +1,382 @@
+import { Test, TestingModule } from '@nestjs/testing'
+import { getRepositoryToken } from '@nestjs/typeorm'
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
+import { vi } from 'vitest'
+import { SafelistService } from './safelist.service'
+import { RecipientSafelist } from './entities/recipient-safelist.entity'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
+
+describe('SafelistService', () => {
+  let service: SafelistService
+
+  const TENANT = 'tenant-uuid-1'
+
+  const safelistRepository = {
+    find: vi.fn(),
+    createQueryBuilder: vi.fn(() => queryBuilder),
+    findOne: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn((entity) => entity),
+    save: vi.fn((entity) => Promise.resolve({ id: 'entry-uuid-1', ...entity })),
+  }
+
+  const configurationRepository = {
+    findOne: vi.fn(),
+  }
+
+  /** Chainable query-builder stub; getRawAndEntities() is set per test. */
+  const queryBuilder = {
+    leftJoin: vi.fn(() => queryBuilder),
+    addSelect: vi.fn(() => queryBuilder),
+    where: vi.fn(() => queryBuilder),
+    andWhere: vi.fn(() => queryBuilder),
+    orderBy: vi.fn(() => queryBuilder),
+    addOrderBy: vi.fn(() => queryBuilder),
+    getRawAndEntities: vi.fn().mockResolvedValue({ entities: [], raw: [] }),
+  }
+
+  /** What listByTenant's join returns: entities alongside their joined name column. */
+  const givenListRows = (
+    rows: Array<{ entity: Record<string, unknown>; createdByName: string | null }>,
+  ): void => {
+    queryBuilder.getRawAndEntities.mockResolvedValue({
+      entities: rows.map((row) => row.entity),
+      raw: rows.map((row) => ({ createdByName: row.createdByName })),
+    })
+  }
+
+  const featureFlagService = {
+    isEnabled: vi.fn(),
+  }
+
+  /** Entries the tenant has safelisted, as loadAllowed() would read them. */
+  const givenEntries = (
+    entries: Array<{ channelCode: string; recipientNormalized: string }>,
+  ): void => {
+    safelistRepository.find.mockResolvedValue(entries)
+  }
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SafelistService,
+        { provide: getRepositoryToken(RecipientSafelist), useValue: safelistRepository },
+        { provide: getRepositoryToken(NotifyConfiguration), useValue: configurationRepository },
+        { provide: FeatureFlagService, useValue: featureFlagService },
+      ],
+    }).compile()
+
+    service = module.get<SafelistService>(SafelistService)
+    vi.clearAllMocks()
+    featureFlagService.isEnabled.mockResolvedValue(true)
+    configurationRepository.findOne.mockResolvedValue({ config: { value: 50 } })
+    queryBuilder.getRawAndEntities.mockResolvedValue({ entities: [], raw: [] })
+  })
+
+  describe('findBlocked', () => {
+    it('blocks nothing when the environment does not enforce the safelist (PROD)', async () => {
+      featureFlagService.isEnabled.mockResolvedValue(false)
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'anyone@example.com', channel: NotificationChannel.EMAIL },
+      ])
+
+      expect(blocked).toEqual([])
+      expect(safelistRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('blocks every recipient when the tenant has no entries (fail closed)', async () => {
+      givenEntries([])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'someone@gov.bc.ca', channel: NotificationChannel.EMAIL },
+      ])
+
+      expect(blocked).toEqual(['someone@gov.bc.ca'])
+    })
+
+    it('allows a safelisted recipient regardless of the casing used to send', async () => {
+      givenEntries([{ channelCode: 'EMAIL', recipientNormalized: 'person@gov.bc.ca' }])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'PERSON@GOV.BC.CA', channel: NotificationChannel.EMAIL },
+      ])
+
+      expect(blocked).toEqual([])
+    })
+
+    it('allows a safelisted phone number regardless of formatting', async () => {
+      givenEntries([{ channelCode: 'SMS', recipientNormalized: '+12505550100' }])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: '(250) 555-0100', channel: NotificationChannel.SMS },
+      ])
+
+      expect(blocked).toEqual([])
+    })
+
+    it('does not let an EMAIL entry permit an SMS send to the same value', async () => {
+      givenEntries([{ channelCode: 'EMAIL', recipientNormalized: '+12505550100' }])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: '+12505550100', channel: NotificationChannel.SMS },
+      ])
+
+      expect(blocked).toEqual(['+12505550100'])
+    })
+
+    it('returns only the blocked recipients from a mixed request', async () => {
+      givenEntries([{ channelCode: 'EMAIL', recipientNormalized: 'allowed@gov.bc.ca' }])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'allowed@gov.bc.ca', channel: NotificationChannel.EMAIL },
+        { address: 'stranger@example.com', channel: NotificationChannel.EMAIL },
+      ])
+
+      expect(blocked).toEqual(['stranger@example.com'])
+    })
+
+    it('blocks a recipient that cannot be normalized rather than letting it through', async () => {
+      givenEntries([{ channelCode: 'SMS', recipientNormalized: '+12505550100' }])
+
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'not-a-number', channel: NotificationChannel.SMS },
+      ])
+
+      expect(blocked).toEqual(['not-a-number'])
+    })
+
+    it('ignores channels the safelist does not cover', async () => {
+      const blocked = await service.findBlocked(TENANT, [
+        { address: 'user-123', channel: 'MSGAPP' },
+      ])
+
+      expect(blocked).toEqual([])
+      expect(safelistRepository.find).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('isEnforced caching', () => {
+    it('reads the flag once for a burst of sends instead of once per send', async () => {
+      const candidates = [{ address: 'someone@gov.bc.ca', channel: NotificationChannel.EMAIL }]
+      givenEntries([])
+
+      await Promise.all([
+        service.findBlocked(TENANT, candidates),
+        service.findBlocked(TENANT, candidates),
+      ])
+      await service.findBlocked(TENANT, candidates)
+
+      expect(featureFlagService.isEnabled).toHaveBeenCalledTimes(1)
+    })
+
+    it('re-reads the flag once the cache expires, so a toggle takes effect', async () => {
+      vi.useFakeTimers()
+      try {
+        featureFlagService.isEnabled.mockResolvedValue(false)
+        expect(await service.isEnforced()).toBe(false)
+
+        // Operator enables the guardrail in the admin screen.
+        featureFlagService.isEnabled.mockResolvedValue(true)
+        expect(await service.isEnforced()).toBe(false) // still cached
+
+        vi.advanceTimersByTime(31_000)
+        expect(await service.isEnforced()).toBe(true)
+        expect(featureFlagService.isEnabled).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('listByTenant', () => {
+    const GUID = '2f1a0b7c-9d3e-4f5a-8b6c-1d2e3f4a5b6c'
+
+    it('returns the display name the join resolved for the adding user', async () => {
+      givenListRows([
+        {
+          entity: { id: 'entry-1', recipient: 'qa@gov.bc.ca', createdBy: GUID },
+          createdByName: 'Falk, Barrett CITZ:EX',
+        },
+      ])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBe('Falk, Barrett CITZ:EX')
+      expect(entry.recipient).toBe('qa@gov.bc.ca')
+    })
+
+    it('resolves the name in one query rather than a second lookup', async () => {
+      givenListRows([{ entity: { id: 'entry-1', createdBy: GUID }, createdByName: 'Barrett' }])
+
+      await service.listByTenant(TENANT)
+
+      expect(queryBuilder.getRawAndEntities).toHaveBeenCalledTimes(1)
+      expect(safelistRepository.find).not.toHaveBeenCalled()
+    })
+
+    it('prefers display name, then username, then email', async () => {
+      await service.listByTenant(TENANT)
+
+      // The fallback chain lives in SQL; assert it is the one we intend.
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        'COALESCE(adder.display_name, adder.username, adder.email)',
+        'createdByName',
+      )
+    })
+
+    // `user` is reserved in Postgres; an unquoted reference to it is a syntax error, so the
+    // alias must stay non-reserved and all-lowercase.
+    it('does not resolve names from soft deleted user records', async () => {
+      await service.listByTenant(TENANT)
+
+      const [, , condition] = queryBuilder.leftJoin.mock.calls[0]
+      expect(condition).toContain('adder.is_deleted = FALSE')
+      expect(condition).toContain('adder.external_id = entry.created_by')
+    })
+
+    it('returns null rather than exposing a GUID when the join found no user', async () => {
+      givenListRows([{ entity: { id: 'entry-1', createdBy: GUID }, createdByName: null }])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBeNull()
+    })
+
+    it('passes through non-GUID markers like the seed user', async () => {
+      givenListRows([{ entity: { id: 'entry-1', createdBy: 'system' }, createdByName: null }])
+
+      const [entry] = await service.listByTenant(TENANT)
+
+      expect(entry.createdByName).toBe('system')
+    })
+
+    it('filters by channel only when one was asked for', async () => {
+      await service.listByTenant(TENANT)
+      expect(queryBuilder.andWhere).not.toHaveBeenCalledWith(
+        'entry.channel_code = :channelCode',
+        expect.anything(),
+      )
+
+      await service.listByTenant(TENANT, 'SMS')
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('entry.channel_code = :channelCode', {
+        channelCode: 'SMS',
+      })
+    })
+  })
+
+  describe('add', () => {
+    it('returns the created entry with the adding user resolved, not the bare row', async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+      safelistRepository.count.mockResolvedValue(0)
+      givenListRows([
+        {
+          entity: { id: 'entry-uuid-1', recipient: 'qa@gov.bc.ca', createdBy: 'guid' },
+          createdByName: 'Falk, Barrett CITZ:EX',
+        },
+      ])
+
+      const created = await service.add(
+        TENANT,
+        { channelCode: NotificationChannel.EMAIL, recipient: 'qa@gov.bc.ca' },
+        'guid',
+      )
+
+      // The UI appends this object straight into its table, so it must carry the name.
+      expect(created.createdByName).toBe('Falk, Barrett CITZ:EX')
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('entry.id = :id', { id: 'entry-uuid-1' })
+    })
+
+    it('stores the value as typed alongside its normalized form', async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+      safelistRepository.count.mockResolvedValue(0)
+
+      await service.add(
+        TENANT,
+        {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: '  Person@GOV.BC.CA ',
+          label: ' QA mailbox ',
+        },
+        'user-guid',
+      )
+
+      expect(safelistRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipient: 'Person@GOV.BC.CA',
+          recipientNormalized: 'person@gov.bc.ca',
+          label: 'QA mailbox',
+          createdBy: 'user-guid',
+        }),
+      )
+    })
+
+    it('rejects a recipient that is not valid for the channel', async () => {
+      await expect(
+        service.add(TENANT, {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: 'not-an-email',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException)
+    })
+
+    it('rejects a duplicate that differs only by formatting', async () => {
+      safelistRepository.findOne.mockResolvedValue({ id: 'existing' })
+
+      await expect(
+        service.add(TENANT, {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: 'PERSON@gov.bc.ca',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException)
+    })
+
+    it('rejects an entry once the cap is reached', async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+      configurationRepository.findOne.mockResolvedValue({ config: { value: 2 } })
+      safelistRepository.count.mockResolvedValue(2)
+
+      await expect(
+        service.add(TENANT, {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: 'one.more@gov.bc.ca',
+        }),
+      ).rejects.toThrow('Safelist is full (2 entries)')
+    })
+  })
+
+  describe('remove', () => {
+    it('soft deletes the entry so the audit trail survives', async () => {
+      const entry = { id: 'entry-uuid-1', tenantId: TENANT, isDeleted: false, updatedBy: null }
+      safelistRepository.findOne.mockResolvedValue(entry)
+
+      await service.remove(TENANT, 'entry-uuid-1', 'user-guid')
+
+      expect(safelistRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isDeleted: true, updatedBy: 'user-guid' }),
+      )
+    })
+
+    it('does not remove an entry belonging to another tenant', async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+
+      await expect(service.remove(TENANT, 'someone-elses-entry')).rejects.toBeInstanceOf(
+        NotFoundException,
+      )
+    })
+  })
+
+  describe('getMaxEntries', () => {
+    it('falls back to the default when the configuration row is missing', async () => {
+      configurationRepository.findOne.mockResolvedValue(null)
+      expect(await service.getMaxEntries()).toBe(50)
+    })
+
+    it('falls back to the default when the configured value is unusable', async () => {
+      configurationRepository.findOne.mockResolvedValue({ config: { value: 'lots' } })
+      expect(await service.getMaxEntries()).toBe(50)
+    })
+  })
+})

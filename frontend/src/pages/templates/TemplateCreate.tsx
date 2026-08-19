@@ -14,6 +14,7 @@ import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templ
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import SmsSegmentEstimate from './SmsSegmentEstimate'
 import Breadcrumb from '@/components/Breadcrumb'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
@@ -318,6 +319,9 @@ const TemplateCreate: FC = () => {
               />
               {formErrors.body && (
                 <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
+              )}
+              {formData.channelCode === NotificationChannel.SMS && (
+                <SmsSegmentEstimate body={formData.body} />
               )}
             </div>
           </div>

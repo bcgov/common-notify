@@ -308,6 +308,41 @@ describe('HandlebarsTemplateRenderer', () => {
       expect(result.body).toBe('Verified')
     })
 
+    it('should not HTML-escape personalisation, because SMS is plain text', async () => {
+      const context: RenderContext & { personalisation: Record<string, string> } = {
+        template: {
+          id: 'template-1',
+          name: 'SMS',
+          type: 'sms',
+          body: 'Hi {{name}}, see {{url}}',
+          active: true,
+        },
+        personalisation: { name: "O'Brien & Sons", url: 'https://x.test/a?b=1&c=2' },
+      }
+
+      const result = await renderer.renderSms(context)
+
+      expect(result.body).toBe("Hi O'Brien & Sons, see https://x.test/a?b=1&c=2")
+    })
+
+    it('should pass emoji and markdown characters through untouched', async () => {
+      const context: RenderContext & { personalisation: Record<string, string> } = {
+        template: {
+          id: 'template-1',
+          name: 'SMS',
+          type: 'sms',
+          body: '*Reminder* 🎉 {{name}}',
+          active: true,
+        },
+        personalisation: { name: 'Jo 👋' },
+      }
+
+      const result = await renderer.renderSms(context)
+
+      // Markdown is never rendered for SMS: the asterisks are sent as typed.
+      expect(result.body).toBe('*Reminder* 🎉 Jo 👋')
+    })
+
     it('should handle Handlebars iteration in SMS', async () => {
       const context: RenderContext & { personalisation: Record<string, string> } = {
         template: {

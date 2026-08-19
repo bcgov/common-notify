@@ -1,15 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { NotificationStatus } from './create-notification-request'
 import { TenantDto } from './tenant'
 
-export class NotificationChannelCodeDto {
-  @ApiProperty({ description: 'Channel code identifier' })
-  channelCode: string
+export class NotificationStatusCodeDto {
+  @ApiProperty({ description: 'Status code identifier' })
+  code: string
 
-  @ApiProperty({ description: 'Display name for the channel' })
+  @ApiProperty({ description: 'Display name for the status' })
   displayName: string
 
-  @ApiPropertyOptional({ description: 'Description of the channel' })
+  @ApiPropertyOptional({ description: 'Description of the status' })
   description?: string
 }
 
@@ -24,23 +23,24 @@ export class NotificationRequestDto {
   tenant?: TenantDto
 
   @ApiProperty({
-    enum: NotificationStatus,
-    description: 'Processing status of the notification request',
+    type: NotificationStatusCodeDto,
+    description: 'Processing status of the notification request, including code and display name',
   })
-  status: string
+  status: NotificationStatusCodeDto
 
   @ApiPropertyOptional({
-    description: 'Primary notification channel code',
-    example: 'EMAIL',
-    enum: ['EMAIL', 'SMS', 'MSGAPP', 'MULTIPLE'],
+    description: 'Channels this request targeted',
+    example: ['EMAIL', 'SMS'],
+    isArray: true,
+    enum: ['EMAIL', 'SMS', 'MSGAPP'],
   })
-  channelCode?: string
+  channelCodes?: string[]
 
   @ApiPropertyOptional({
-    type: NotificationChannelCodeDto,
-    description: 'Channel code details including display name',
+    description: 'API route that accepted the request',
+    example: 'notifysimple/email',
   })
-  channel?: NotificationChannelCodeDto
+  requestRoute?: string
 
   @ApiPropertyOptional({
     description: 'Recipients by channel (email, sms, msgApp)',

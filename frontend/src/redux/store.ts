@@ -6,6 +6,7 @@ import cstarReducer from './slices/cstar.slice'
 import loadingReducer from './slices/loading.slice'
 import toastReducer from './slices/toast.slice'
 import notificationReducer from './slices/notification.slice'
+import notificationDetailReducer from './slices/notificationDetail.slice'
 import codeTablesReducer from './slices/codeTables.slice'
 import tenantReducer from './slices/tenant.slice'
 import templatesReducer from './slices/templates.slice'
@@ -14,6 +15,9 @@ import adminTenantsReducer from './slices/adminTenants.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
 import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
 import tenantSettingsReducer from './slices/tenantSettings.slice'
+import safelistReducer from './slices/safelist.slice'
+import emailSettingsReducer from './slices/emailSettings.slice'
+import smsSettingsReducer from './slices/smsSettings.slice'
 
 export const store = configureStore({
   reducer: {
@@ -24,6 +28,7 @@ export const store = configureStore({
     loading: loadingReducer,
     toast: toastReducer,
     notification: notificationReducer,
+    notificationDetail: notificationDetailReducer,
     codeTables: codeTablesReducer,
     tenant: tenantReducer,
     templates: templatesReducer,
@@ -32,6 +37,9 @@ export const store = configureStore({
     apiKeys: apiKeysReducer,
     apiKeyUsage: apiKeyUsageReducer,
     tenantSettings: tenantSettingsReducer,
+    safelist: safelistReducer,
+    emailSettings: emailSettingsReducer,
+    smsSettings: smsSettingsReducer,
   },
 })
 

@@ -70,7 +70,7 @@ export const notificationSlice = createSlice({
         if (
           !statusFilters ||
           statusFilters.length === 0 ||
-          statusFilters.includes(action.payload.status)
+          statusFilters.includes(action.payload.status.code)
         ) {
           state.items.unshift(action.payload)
         }

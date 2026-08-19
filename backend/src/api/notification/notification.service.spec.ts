@@ -108,7 +108,7 @@ describe('NotificationService', () => {
         tenantId: 'tenant-uuid',
         status: NotificationStatus.QUEUED,
         createdBy: 'user1',
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       }
@@ -122,7 +122,8 @@ describe('NotificationService', () => {
         status: NotificationStatus.QUEUED,
         createdBy: dto.createdBy,
         payload: undefined,
-        channelCode: null,
+        isInternal: false,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       })
@@ -140,7 +141,7 @@ describe('NotificationService', () => {
         tenantId: 'tenant-uuid',
         status: NotificationStatus.PROCESSING,
         createdBy: 'user1',
-        channelCode: null,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       }
@@ -154,7 +155,8 @@ describe('NotificationService', () => {
         status: NotificationStatus.PROCESSING,
         createdBy: dto.createdBy,
         payload: undefined,
-        channelCode: null,
+        isInternal: false,
+        channelCodes: undefined,
         recipients: null,
         delayedSendTime: null,
       })
@@ -187,6 +189,9 @@ describe('NotificationService', () => {
       expect(queryBuilder.where).toHaveBeenCalledWith('notification.tenantId = :tenantId', {
         tenantId: 'tenant-uuid',
       })
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('notification.isInternal = :isInternal', {
+        isInternal: false,
+      })
       expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('notification.createdAt', 'DESC')
       expect(queryBuilder.skip).toHaveBeenCalledWith(0)
       expect(queryBuilder.take).toHaveBeenCalledWith(10)
@@ -211,20 +216,25 @@ describe('NotificationService', () => {
         page: 2,
         limit: 5,
         sort: '-createdAt,status',
-        filter: ['status:eq:COMPLETED', 'channelCode:in:EMAIL|SMS'],
+        filter: ['status:eq:COMPLETED', 'channelCodes:in:EMAIL|SMS'],
       })
 
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
         1,
+        'notification.isInternal = :isInternal',
+        { isInternal: false },
+      )
+      expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
+        2,
         'LOWER(notification.status) = :filter_0',
         {
           filter_0: 'completed',
         },
       )
       expect(queryBuilder.andWhere).toHaveBeenNthCalledWith(
-        2,
-        'LOWER(notification.channelCode) IN (:...filter_1)',
-        { filter_1: ['email', 'sms'] },
+        3,
+        'jsonb_exists_any(notification.channel_codes, ARRAY[:...channelCodeValues]::text[])',
+        { channelCodeValues: ['EMAIL', 'SMS'] },
       )
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(1, 'notification.createdAt', 'DESC')
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(2, 'notification.status', 'ASC')
@@ -1150,7 +1160,7 @@ describe('NotificationService', () => {
 
       expect(dto.id).toBe('notif-123')
       expect(dto.tenantId).toBe('tenant-456')
-      expect(dto.status).toBe(NotificationStatus.QUEUED)
+      expect(dto.status.code).toBe(NotificationStatus.QUEUED)
       expect(dto.createdAt).toEqual(new Date('2024-01-01'))
       expect(dto.createdBy).toBe('user1')
       expect(dto.updatedAt).toEqual(new Date('2024-01-02'))
@@ -1238,7 +1248,7 @@ describe('NotificationService', () => {
 
         const dto = (service as any).mapToDto(entity)
 
-        expect(dto.status).toBe(status)
+        expect(dto.status.code).toBe(status)
       })
     })
 

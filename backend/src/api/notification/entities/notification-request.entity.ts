@@ -8,7 +8,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { NotificationStatusCode } from './notification-status-code.entity'
-import { NotificationChannelCode } from './notification-channel-code.entity'
 import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
 /**
@@ -40,12 +39,11 @@ export class NotificationRequest {
   @JoinColumn({ name: 'status', referencedColumnName: 'code' })
   statusCode: NotificationStatusCode
 
-  @Column({ name: 'channel_code', nullable: true, length: 20 })
-  channelCode?: string
+  @Column({ name: 'channel_codes', type: 'jsonb', nullable: true })
+  channelCodes?: string[]
 
-  @ManyToOne(() => NotificationChannelCode, { eager: true })
-  @JoinColumn({ name: 'channel_code', referencedColumnName: 'channelCode' })
-  channel?: NotificationChannelCode
+  @Column({ name: 'request_route', nullable: true, length: 255 })
+  requestRoute?: string
 
   @Column({ name: 'delayed_send_time', type: 'timestamptz', nullable: true })
   delayedSendTime?: Date
@@ -59,6 +57,9 @@ export class NotificationRequest {
 
   @Column({ name: 'payload', type: 'jsonb', nullable: true })
   payload?: any
+
+  @Column({ name: 'is_internal', type: 'boolean', default: false })
+  isInternal: boolean
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date

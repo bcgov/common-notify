@@ -5,6 +5,35 @@ import { NotificationRequestDetail } from './entities/notification-request-detai
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
+import { PaginatedNotificationRequestDetailResponse } from './schemas/paginated-request-detail-response'
+
+/**
+ * Queryable fields for the per-recipient request detail list. Sorting/filtering/search all run
+ * in the database via the shared list-query utilities.
+ */
+export const notificationRequestDetailListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {
+    recipientAddress: 'detail.recipientAddress',
+    channel: 'detail.channel',
+    status: 'detail.status',
+    createdAt: 'detail.createdAt',
+  },
+  filterableFields: {
+    channel: {
+      column: 'detail.channel',
+      valueType: 'string',
+      operators: ['eq', 'in'],
+    },
+    status: {
+      column: 'detail.status',
+      valueType: 'string',
+      operators: ['eq', 'in'],
+    },
+  },
+  defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
+}
 
 @Injectable()
 export class NotificationRequestDetailService {
@@ -78,6 +107,41 @@ export class NotificationRequestDetailService {
         status: 'pending',
         attemptCount: 1,
         lastAttemptAt: now,
+        createdBy,
+        updatedBy: createdBy,
+      }),
+    )
+    await this.detailRepository.save(entities)
+  }
+
+  /**
+   * Record recipients that were never attempted because they are not on the tenant safelist.
+   * Written at accept time, so these rows carry no attempt count and no batchId.
+   */
+  async createBlocked(
+    notificationRequestId: string,
+    recipients: Array<{ address: string; channel: string }>,
+    errorMessage: string,
+    createdBy?: string,
+  ): Promise<void> {
+    if (recipients.length === 0) return
+
+    // A mail merge may list the same address more than once. Saving duplicates would violate
+    // uq_notification_request_detail_recipient and fail the whole insert, losing the record of
+    // every blocked recipient — so collapse them on the same key the constraint uses.
+    const unique = new Map(
+      recipients.map((recipient) => [`${recipient.channel}::${recipient.address}`, recipient]),
+    )
+
+    const entities = [...unique.values()].map(({ address, channel }) =>
+      this.detailRepository.create({
+        notificationRequestId,
+        recipientAddress: address,
+        channel,
+        emailAddressType: channel === 'EMAIL' ? 'primary' : undefined,
+        status: 'blocked',
+        attemptCount: 0,
+        errorMessage,
         createdBy,
         updatedBy: createdBy,
       }),
@@ -190,12 +254,70 @@ export class NotificationRequestDetailService {
     })
   }
 
+  /**
+   * Retrieve request detail records for a notification request with sorting, filtering, search,
+   * and pagination applied in the database.
+   */
+  async findByRequestIdPaginated(
+    notificationRequestId: string,
+    tenantId: string,
+    parsedQuery: ParsedListQuery,
+    search?: string,
+  ): Promise<PaginatedNotificationRequestDetailResponse> {
+    const queryBuilder = this.detailRepository
+      .createQueryBuilder('detail')
+      .innerJoin('detail.notificationRequest', 'request')
+      .where('detail.notificationRequestId = :notificationRequestId', { notificationRequestId })
+      .andWhere('request.tenantId = :tenantId', { tenantId })
+
+    // search applies to recipients
+    if (search) {
+      const escaped = search.replace(/[\\%_]/g, '\\$&')
+      queryBuilder.andWhere(`detail.recipientAddress ILIKE :search ESCAPE '\\'`, {
+        search: `%${escaped}%`,
+      })
+    }
+
+    applyParsedListQueryToQueryBuilder(
+      queryBuilder,
+      parsedQuery,
+      notificationRequestDetailListQueryConfig,
+    )
+    const [details, total] = await queryBuilder.getManyAndCount()
+
+    return {
+      data: details.map((detail) => ({
+        id: detail.id,
+        notificationRequestId: detail.notificationRequestId,
+        recipientAddress: detail.recipientAddress,
+        channel: detail.channel,
+        status: detail.status,
+        providerResponseId: detail.providerResponseId,
+        errorMessage: detail.errorMessage,
+        attemptCount: detail.attemptCount,
+        lastAttemptAt: detail.lastAttemptAt,
+        createdAt: detail.createdAt,
+        updatedAt: detail.updatedAt,
+      })),
+      count: total,
+      page: parsedQuery.page,
+      limit: parsedQuery.limit,
+      totalPages: Math.ceil(total / parsedQuery.limit),
+    }
+  }
+
+  /**
+   * Get the user's tenant id and then retrieve request detail records for a notification request
+   * belonging to a tenant with sorting and filtering.
+   */
   async findByRequestIdFrontend(
     notificationRequestId: string,
-    frontendId: string,
-  ): Promise<NotificationRequestDetail[]> {
-    const tenant = await this.tenantsService.findByExternalId(frontendId)
-    return this.findByRequestId(notificationRequestId, tenant.id)
+    userId: string,
+    parsedQuery: ParsedListQuery,
+    search?: string,
+  ): Promise<PaginatedNotificationRequestDetailResponse> {
+    const tenant = await this.tenantsService.findByExternalId(userId)
+    return this.findByRequestIdPaginated(notificationRequestId, tenant.id, parsedQuery, search)
   }
 
   /**
@@ -207,16 +329,6 @@ export class NotificationRequestDetailService {
       relations: { notificationRequest: true },
       order: { createdAt: 'DESC' },
     })
-  }
-
-  /**
-   * The frontend (CSS / IDIR) id is not the same as the cstar tenant id
-   * @param frontendId
-   * @returns
-   */
-  async findAllByTenantIdFrontend(frontendId: string): Promise<NotificationRequestDetail[]> {
-    const tenant = await this.tenantsService.findByExternalId(frontendId)
-    return this.findAllByTenantId(tenant.id)
   }
 
   /**

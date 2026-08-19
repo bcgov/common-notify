@@ -10,6 +10,7 @@ import { NotificationRequestDetailService } from '../notification/notification-r
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import { SafelistService } from '../safelist/safelist.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -38,6 +39,7 @@ describe('GcNotifyInternalExecutionService', () => {
   let mockIngestionQueue: { add: ReturnType<typeof vi.fn> }
   let mockAttachmentValidationService: { validateAttachments: ReturnType<typeof vi.fn> }
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
+  let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
 
   const TENANT_ID = 'tenant-1'
 
@@ -64,6 +66,9 @@ describe('GcNotifyInternalExecutionService', () => {
         email: { attachments: [{ attachmentId: 'att-1' }] },
       }),
     }
+    // Nothing blocked by default: PROD does not enforce the safelist, and neither do the
+    // existing expectations in this suite.
+    mockSafelistService = { findBlocked: vi.fn().mockResolvedValue([]) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,6 +80,7 @@ describe('GcNotifyInternalExecutionService', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
+        { provide: SafelistService, useValue: mockSafelistService },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: mockConfigurationRepository },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -294,6 +300,63 @@ describe('GcNotifyInternalExecutionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException)
 
       expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('recipient safelist enforcement', () => {
+    it('rejects a GC Notify email send to a non-safelisted recipient without persisting it', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 1,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Hi',
+        body: 'Hello',
+        bodyType: 'text',
+      })
+      mockSafelistService.findBlocked.mockResolvedValue(['user@example.com'])
+
+      await expect(
+        service.sendEmail({ email_address: 'user@example.com', template_id: 'tpl-1' }, TENANT_ID),
+      ).rejects.toMatchObject({
+        response: {
+          errors: [
+            {
+              error: 'ValidationError',
+              message: expect.stringContaining('user@example.com'),
+            },
+          ],
+        },
+      })
+
+      expect(mockSafelistService.findBlocked).toHaveBeenCalledWith(TENANT_ID, [
+        { address: 'user@example.com', channel: NotificationChannel.EMAIL },
+      ])
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+      expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('checks the SMS recipient against the SMS safelist', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-2',
+        version: 1,
+        channelCode: NotificationChannel.SMS,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        body: 'Your code is 123456',
+        bodyType: 'text',
+      })
+      mockSafelistService.findBlocked.mockResolvedValue(['+15555550100'])
+
+      await expect(
+        service.sendSms({ phone_number: '+15555550100', template_id: 'tpl-2' }, TENANT_ID),
+      ).rejects.toBeInstanceOf(BadRequestException)
+
+      expect(mockSafelistService.findBlocked).toHaveBeenCalledWith(TENANT_ID, [
+        { address: '+15555550100', channel: NotificationChannel.SMS },
+      ])
       expect(mockNotificationService.create).not.toHaveBeenCalled()
     })
   })

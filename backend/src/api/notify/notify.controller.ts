@@ -40,6 +40,9 @@ import { NotificationRequestDetailService } from '../notification/notification-r
 import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
+import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
+import { SafelistService } from '../safelist/safelist.service'
+import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -71,6 +74,9 @@ export class NotifySimpleController {
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
+    readonly limitAlertNotificationService: LimitAlertNotificationService,
+    readonly safelistService: SafelistService,
+    readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -215,34 +221,7 @@ export class NotifySimpleController {
       }
 
       // Return the updated notification DTO
-      return {
-        id: updated.id,
-        tenantId: updated.tenantId,
-        status: updated.status,
-        channelCode: updated.channelCode,
-        channel: updated.channel
-          ? {
-              channelCode: updated.channel.channelCode,
-              displayName: updated.channel.displayName,
-              description: updated.channel.description,
-            }
-          : undefined,
-        recipients: updated.recipients,
-        delayedSendTime: updated.delayedSendTime,
-        payload: updated.payload,
-        createdAt: updated.createdAt,
-        createdBy: updated.createdBy,
-        updatedAt: updated.updatedAt,
-        updatedBy: updated.updatedBy,
-        errorReason: updated.errorReason,
-        tenant: updated.tenant
-          ? {
-              id: updated.tenant.id,
-              name: updated.tenant.name,
-              slug: updated.tenant.slug,
-            }
-          : undefined,
-      }
+      return this.notificationService.mapToDto(updated)
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error
@@ -281,6 +260,9 @@ export class NotifySimpleFrontendController {
     readonly attachmentProcessingService: AttachmentProcessingService,
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
+    readonly limitAlertNotificationService: LimitAlertNotificationService,
+    readonly safelistService: SafelistService,
+    readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -315,6 +297,9 @@ export class NotifySimpleFrontendController {
       this.attachmentProcessingService,
       this.notificationRequestDetailService,
       this.apiKeyUsageService,
+      this.limitAlertNotificationService,
+      this.safelistService,
+      this.smsSegmentService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)

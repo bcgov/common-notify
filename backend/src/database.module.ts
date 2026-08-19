@@ -22,8 +22,10 @@ import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './api/api-keys/entities/api-key-limit.entity'
 import { ApiKeyUsage } from './api/api-keys/entities/api-key-usage.entity'
 import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.entity'
+import { ApiKeyLimitAlertLog } from './api/api-keys/entities/api-key-limit-alert-log.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
+import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -65,8 +67,10 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         ApiKeyLimit,
         ApiKeyUsage,
         ApiKeyLimitAlert,
+        ApiKeyLimitAlertLog,
         AttachmentEntity,
         TenantSettings,
+        RecipientSafelist,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

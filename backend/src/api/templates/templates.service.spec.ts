@@ -129,6 +129,40 @@ describe('TemplatesService', () => {
       expect(result.bodyType).toBe('markdown')
     })
 
+    it('should render an SMS template as plain text, ignoring the stored bodyType', async () => {
+      const smsTemplate: Template = {
+        ...mockTemplate,
+        channelCode: NotificationChannel.SMS,
+        subject: undefined,
+        // A legacy row still carrying the old markdown default.
+        bodyType: 'markdown',
+        body: '*Reminder* for {{userName}} 🎉',
+      }
+
+      const result = await service.renderTemplateContent(smsTemplate, { userName: "O'Brien" })
+
+      // Sent verbatim: markdown is not rendered and the apostrophe is not HTML-escaped.
+      expect(result.body).toBe("*Reminder* for O'Brien 🎉")
+      expect(result.bodyType).toBe('text')
+    })
+
+    it('should ignore a markdown bodyType override for SMS', async () => {
+      const smsTemplate: Template = {
+        ...mockTemplate,
+        channelCode: NotificationChannel.SMS,
+        subject: undefined,
+        body: 'Hi {{userName}}',
+      }
+
+      const result = await service.renderTemplateContent(
+        smsTemplate,
+        { userName: 'Jo' },
+        'markdown',
+      )
+
+      expect(result.bodyType).toBe('text')
+    })
+
     it('should fall back to html when stored MJML bodyType is null', async () => {
       const result = await service.renderTemplateContent(mockMjmlTemplate, {
         userName: 'John',
@@ -255,13 +289,13 @@ describe('TemplatesService', () => {
       expect(result.bodyType).toBe('html')
     })
 
-    it('should render stored MJML SMS templates as plain text through renderEmail path', async () => {
+    it('should render stored MJML SMS templates as plain text, never HTML', async () => {
       const result = await service.renderTemplateContent(mockMjmlSmsTemplate, {
         code: '123456',
       })
 
       expect(result.body).toBe('Your code is 123456')
-      expect(result.bodyType).toBe('html')
+      expect(result.bodyType).toBe('text')
     })
 
     it('should throw BadRequestException for missing Legacy GC Notify personalisation', async () => {
