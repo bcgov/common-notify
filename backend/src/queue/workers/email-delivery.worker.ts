@@ -385,8 +385,8 @@ export class EmailDeliveryWorker {
       )
     })
 
-    emailQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
-      const { notifyId } = job.data
+    emailQueue.on('failed', async (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
+      const { notifyId, tenantId } = job.data
       logger.error(
         `[${notifyId}] Email delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
       )
@@ -397,6 +397,33 @@ export class EmailDeliveryWorker {
         attemptsMade: job.attemptsMade,
         maxAttempts: job.opts.attempts,
       })
+
+      // Safety net: once Bull has exhausted all retries the job is permanently failed, so the
+      // notification must never be left stuck in SENDING. Mark it FAILED here (idempotent) so a
+      // send error always reaches a terminal status — even if the in-processor final-attempt
+      // handler didn't run (e.g. a job enqueued without a retry count, or a different worker
+      // processed the last attempt).
+      const attemptsMade = job.attemptsMade ?? 0
+      const maxAttempts = job.opts.attempts ?? 1
+      if (attemptsMade >= maxAttempts) {
+        try {
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.FAILED,
+            updatedBy: 'system',
+            errorReason: err.message,
+          })
+          await requestDetailService.markFailed(notifyId, err.message)
+          logger.error(
+            `[${notifyId}] Notification marked as FAILED (delivery job exhausted after ${attemptsMade} attempt(s))`,
+          )
+        } catch (markError) {
+          logger.error(
+            `[${notifyId}] Failed to mark notification FAILED after job exhaustion: ${
+              markError instanceof Error ? markError.message : String(markError)
+            }`,
+          )
+        }
+      }
     })
 
     logger.log('Email delivery worker initialized')
