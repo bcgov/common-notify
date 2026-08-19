@@ -64,22 +64,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate PR config from PR branch
+      - name: Generate DEV + all open-PR config (preserve DEV)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Generate PR config only from PR branch code
-          # PR shares tag ns.gw-fe8c5.dev with DEV (path-based routing)
-          # DEV service already exists from merge workflow - only apply PR service
-          chmod +x api-gateway/scripts/generate-gateway-config.sh
-          api-gateway/scripts/generate-gateway-config.sh pr common-notify-${{ github.event.number }}
+          # publish-gateway --qualifier dev is a FULL RECONCILE of the dev slice:
+          # anything not in the published file is DELETED. Publishing only this PR's
+          # service therefore prunes the permanent DEV service and every other PR.
+          # So we rebuild the full dev set — DEV + all open PRs — and publish that,
+          # exactly like the merge workflow's DEV gateway job. (CCP-5589 / preserves
+          # DEV service on PR publish.)
+          chmod +x api-gateway/scripts/generate-gateway-config.sh api-gateway/scripts/generate-gateway-for-stage.sh
 
-      - name: Publish PR config (path-based routing)
+          # Permanent DEV service
+          api-gateway/scripts/generate-gateway-for-stage.sh dev
+          cp api-gateway/generated/gw-active-services.yaml api-gateway/generated/gw-dev-with-prs.yaml
+
+          # Fold in every open PR (includes this one)
+          OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
+          echo "Open PRs to include: ${OPEN_PRS:-<none>}"
+          for PR_NUM in $OPEN_PRS; do
+            api-gateway/scripts/generate-gateway-config.sh pr common-notify-${PR_NUM}
+            echo "---" >> api-gateway/generated/gw-dev-with-prs.yaml
+            cat api-gateway/generated/gw-routes-pr.yaml >> api-gateway/generated/gw-dev-with-prs.yaml
+          done
+          mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
+
+      - name: Publish DEV + PR config (path-based routing, preserves DEV)
         env:
           GWA_ACCT: ${{ secrets.GWA_ACCT }}
         run: |
-          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
+          # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false,
+          # and the /pr-<n> path strip for PR routes).
           python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
           python3 api-gateway/scripts/gwservice-to-kong.py \
-            api-gateway/generated/gw-routes-pr.yaml > api-gateway/generated/gw-kong-pr.yaml
+            api-gateway/generated/gw-active-services.yaml > api-gateway/generated/gw-kong-dev.yaml
 
           # Install gwa CLI
           curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
@@ -93,13 +112,12 @@ jobs:
           # Set gateway context
           gwa config set gateway gw-fe8c5
 
-          # Publish PR config using dev qualifier (all PRs share dev qualifier)
-          # PRs are isolated by path prefix (/pr-111/, /pr-112/), not by qualifier
-          # This avoids "too many qualified gateways" error and tag conflicts
-          echo "✅ Publishing PR config (qualifier=dev, path-based routing /pr-${{ github.event.number }}/)"
+          # Publish the combined DEV + all-PR set. PRs share the dev qualifier and are
+          # isolated by path prefix (/pr-111/, /pr-112/), not by qualifier.
+          echo "✅ Publishing DEV + all open PRs (qualifier=dev, this PR at /pr-${{ github.event.number }}/)"
 
           set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-pr.yaml --qualifier dev 2>&1)
+          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-dev.yaml --qualifier dev 2>&1)
           STATUS=$?
           set -e
 
@@ -111,7 +129,7 @@ jobs:
             exit 1
           fi
 
-          echo "✅ PR gateway config published successfully"
+          echo "✅ Gateway config published successfully (DEV preserved)"
           echo "   Routes available at: https://gw-fe8c5-notify.dev.api.gov.bc.ca/pr-${{ github.event.number }}/"
 
   deploys:
