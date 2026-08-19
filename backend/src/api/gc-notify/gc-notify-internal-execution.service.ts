@@ -366,7 +366,7 @@ export class GcNotifyInternalExecutionService {
           {
             error: 'ValidationError',
             message: `Attachment '${file.filename}' uses sending_method '${file.sending_method}', which is not supported by internal execution. Use sending_method 'attach'.`,
-          }
+          },
         ],
       })
     }
