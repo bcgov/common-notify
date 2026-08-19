@@ -150,7 +150,7 @@ jobs:
         --set global.secrets.persist=false
         --set frontend.secrets.enabled=false
         --set frontend.apiGatewayNotifyUrl=https://gw-fe8c5-notify.dev.api.gov.bc.ca
-        --set frontend.keycloakUrl=https://dev.loginproxy.gov.bc.ca/auth
+        --set frontend.keycloakUrl=https://test.loginproxy.gov.bc.ca/auth
         --set frontend.keycloakRealm=standard
         --set frontend.keycloakClientId=notify-6388
         --set frontend.cstarApiUrl=https://test.connect.digital.gov.bc.ca
