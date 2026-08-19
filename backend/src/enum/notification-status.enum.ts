@@ -15,6 +15,7 @@
  * accepted: Notification request has been accepted but not yet queued
  * scheduled: Notification request has been accepted and scheduled for future processing
  * quarantined: Notification blocked due to malware detected in attachment by ClamAV
+ * blocked: Recipient was not on the tenant safelist (non-production environments only)
  */
 export enum NotificationStatus {
   PENDING = 'pending',
@@ -27,4 +28,5 @@ export enum NotificationStatus {
   ACCEPTED = 'accepted',
   SCHEDULED = 'scheduled',
   QUARANTINED = 'quarantined',
+  BLOCKED = 'blocked',
 }
