@@ -10,10 +10,15 @@ import { TemplatesModule } from '../templates/templates.module'
 import { NotificationModule } from '../notification/notification.module'
 import { QueueModule } from '../../queue/queue.module'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
 import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guard'
 import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { AttachmentModule } from '../attachment/attachment.module'
+import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
+import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import { SafelistModule } from '../safelist/safelist.module'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>
@@ -33,7 +38,9 @@ export class GcNotifyModule {
         FeatureFlagModule,
         TemplatesModule,
         NotificationModule,
-        TypeOrmModule.forFeature([NotifyConfiguration]),
+        AttachmentModule,
+        TypeOrmModule.forFeature([NotifyConfiguration, MimeTypeCode]),
+        SafelistModule,
         forwardRef(() => QueueModule),
       ],
       controllers: [GcNotifyController, GcNotifyPassthroughController],
@@ -43,6 +50,8 @@ export class GcNotifyModule {
         ApiKeyGuard,
         GcNotifyRoutingService,
         GcNotifyInternalExecutionService,
+        AttachmentValidationService,
+        AttachmentProcessingService,
       ],
       exports: [GcNotifyApiClient],
     }

@@ -41,6 +41,7 @@ import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
+import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -74,6 +75,7 @@ export class NotifySimpleController {
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
     readonly limitAlertNotificationService: LimitAlertNotificationService,
+    readonly safelistService: SafelistService,
     readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
@@ -259,6 +261,7 @@ export class NotifySimpleFrontendController {
     readonly notificationRequestDetailService: NotificationRequestDetailService,
     readonly apiKeyUsageService: ApiKeyUsageService,
     readonly limitAlertNotificationService: LimitAlertNotificationService,
+    readonly safelistService: SafelistService,
     readonly smsSegmentService: SmsSegmentService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
@@ -295,6 +298,7 @@ export class NotifySimpleFrontendController {
       this.notificationRequestDetailService,
       this.apiKeyUsageService,
       this.limitAlertNotificationService,
+      this.safelistService,
       this.smsSegmentService,
       this.ingestionQueue,
     )
