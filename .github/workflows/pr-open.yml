@@ -153,6 +153,8 @@ jobs:
         --set frontend.keycloakUrl=https://dev.loginproxy.gov.bc.ca/auth
         --set frontend.keycloakRealm=standard
         --set frontend.keycloakClientId=notify-6388
+        --set frontend.cstarApiUrl=https://test.connect.digital.gov.bc.ca
+        --set frontend.cstarTenantSetupUrl=https://test.connect.digital.gov.bc.ca
         --set backend.clamav.enabled=false
         --set backend.clamav.host=common-notify-dev-clamav
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' '.github/workflows/.deployer.yml')
