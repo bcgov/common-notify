@@ -7,19 +7,13 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
-import { EventRecipient } from './entities/event-recipient.entity'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { EventsFrontendController } from './events-frontend.controller'
 import { EventsService } from './events.service'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      NotifyEvent,
-      EventChannelSetting,
-      EventRecipient,
-      ProvisionedPhoneNumber,
-    ]),
+    TypeOrmModule.forFeature([NotifyEvent, EventChannelSetting, ProvisionedPhoneNumber]),
     TenantsModule,
     CstarModule,
     FeatureFlagModule,

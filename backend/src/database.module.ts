@@ -27,7 +27,6 @@ import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
 import { NotifyEvent } from './api/events/entities/event.entity'
 import { EventChannelSetting } from './api/events/entities/event-channel-setting.entity'
-import { EventRecipient } from './api/events/entities/event-recipient.entity'
 import { ProvisionedPhoneNumber } from './api/events/entities/provisioned-phone-number.entity'
 import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
 
@@ -76,7 +75,6 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TenantSettings,
         NotifyEvent,
         EventChannelSetting,
-        EventRecipient,
         ProvisionedPhoneNumber,
         RecipientSafelist,
       ],

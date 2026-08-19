@@ -1,4 +1,4 @@
--- V56: Configuration that turns the V48/V49 event feature on.
+-- V56: Configuration that turns the V54/V55 event feature on.
 --
 --   1. configuration 'event_max_recipients' - global cap on manually entered recipients per
 --                                             event channel.
@@ -9,7 +9,7 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- 1. Global recipient cap (same pattern as safelist_max_entries in V46)
+-- 1. Global recipient cap (same pattern as safelist_max_entries in V51)
 -- ---------------------------------------------------------------------------
 INSERT INTO
   notify.configuration (key, config, created_by, updated_by)

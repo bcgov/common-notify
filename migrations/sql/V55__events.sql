@@ -10,9 +10,10 @@
 --   SMS settings tab   -> notify.event_channel_setting (channel_code = 'SMS')
 --                         active flag, from number (from the V47 pool), template, recipients.
 --
--- Recipients for both tabs live in notify.event_recipient, one row per recipient, hanging off
--- the channel setting. Manual entry only for now; imported/dynamic recipient sources are a
--- later change.
+-- Recipients for both tabs live directly on notify.event_channel_setting as to/cc/bcc columns:
+-- comma-separated, normalized values (lowercased/trimmed emails for EMAIL, E.164 phone numbers
+-- for SMS's "to"). Manual entry only for now; imported/dynamic recipient sources are a later
+-- change.
 --
 -- Deliberately NOT in this migration (pending design):
 --   - header/footer overrides on the email tab
@@ -53,7 +54,7 @@ CREATE TRIGGER trg_event_updated_at BEFORE
 UPDATE ON notify.event FOR EACH ROW
 EXECUTE FUNCTION notify.set_updated_at ();
 
-COMMENT ON TABLE notify.event IS 'A tenant-owned, named notification definition. Per-channel configuration lives in notify.event_channel_setting and recipients in notify.event_recipient.';
+COMMENT ON TABLE notify.event IS 'A tenant-owned, named notification definition. Per-channel configuration, including recipients, lives in notify.event_channel_setting.';
 
 COMMENT ON COLUMN notify.event.id IS 'Unique identifier for the event.';
 
@@ -87,6 +88,9 @@ CREATE TABLE
     template_id UUID,
     sender_email VARCHAR(320),
     from_phone_number_id UUID,
+    "to" VARCHAR(10000),
+    cc VARCHAR(10000),
+    bcc VARCHAR(10000),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
     created_by VARCHAR(200),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
@@ -108,6 +112,8 @@ CREATE TABLE
       OR (
         channel_code = 'SMS'
         AND sender_email IS NULL
+        AND cc IS NULL
+        AND bcc IS NULL
       )
     ),
     -- Pragmatic syntax check only; deliverability/ownership of the sender address is verified
@@ -116,11 +122,26 @@ CREATE TABLE
       sender_email IS NULL
       OR sender_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
     ),
+    -- Comma-separated recipient lists cannot be blank once set; the application is
+    -- responsible for normalizing entries before writing them here.
+    CONSTRAINT chk_event_channel_setting_to CHECK (
+      "to" IS NULL
+      OR btrim("to") <> ''
+    ),
+    CONSTRAINT chk_event_channel_setting_cc CHECK (
+      cc IS NULL
+      OR btrim(cc) <> ''
+    ),
+    CONSTRAINT chk_event_channel_setting_bcc CHECK (
+      bcc IS NULL
+      OR btrim(bcc) <> ''
+    ),
     -- A channel cannot be switched on until it is fully configured.
     CONSTRAINT chk_event_channel_setting_active_complete CHECK (
       active = FALSE
       OR (
         template_id IS NOT NULL
+        AND "to" IS NOT NULL
         AND (
           (
             channel_code = 'EMAIL'
@@ -157,7 +178,7 @@ CREATE TRIGGER trg_event_channel_setting_updated_at BEFORE
 UPDATE ON notify.event_channel_setting FOR EACH ROW
 EXECUTE FUNCTION notify.set_updated_at ();
 
-COMMENT ON TABLE notify.event_channel_setting IS 'Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. Channel-specific columns are constrained so EMAIL rows carry sender_email and SMS rows carry from_phone_number_id.';
+COMMENT ON TABLE notify.event_channel_setting IS 'Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. Channel-specific columns are constrained so EMAIL rows carry sender_email/cc/bcc and SMS rows carry from_phone_number_id.';
 
 COMMENT ON COLUMN notify.event_channel_setting.id IS 'Unique identifier for the channel setting row.';
 
@@ -173,6 +194,12 @@ COMMENT ON COLUMN notify.event_channel_setting.sender_email IS 'From address for
 
 COMMENT ON COLUMN notify.event_channel_setting.from_phone_number_id IS 'Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant''s single allocated number (V47), shared by all of that tenant''s SMS events, so this is not unique.';
 
+COMMENT ON COLUMN notify.event_channel_setting."to" IS 'Comma-separated, normalized recipients for this channel: lowercased/trimmed email addresses for EMAIL rows, E.164 phone numbers for SMS rows. Required once active = TRUE.';
+
+COMMENT ON COLUMN notify.event_channel_setting.cc IS 'Comma-separated, normalized, lowercased/trimmed CC email addresses. EMAIL only; NULL on SMS rows.';
+
+COMMENT ON COLUMN notify.event_channel_setting.bcc IS 'Comma-separated, normalized, lowercased/trimmed BCC email addresses. EMAIL only; NULL on SMS rows.';
+
 COMMENT ON COLUMN notify.event_channel_setting.created_at IS 'Timestamp with timezone when the channel setting was created.';
 
 COMMENT ON COLUMN notify.event_channel_setting.created_by IS 'Identifier of the user or process that created this record.';
@@ -184,68 +211,7 @@ COMMENT ON COLUMN notify.event_channel_setting.updated_by IS 'Identifier of the 
 COMMENT ON COLUMN notify.event_channel_setting.is_deleted IS 'Soft delete flag. Deleted rows release their from number back to the picker.';
 
 -- ---------------------------------------------------------------------------
--- 3. Recipients (both tabs)
--- ---------------------------------------------------------------------------
--- Same two-column representation as notify.recipient_safelist (V45): what the user typed, plus
--- the canonical form used for comparison and uniqueness.
-CREATE TABLE
-  notify.event_recipient (
-    id UUID NOT NULL DEFAULT gen_random_uuid (),
-    event_channel_setting_id UUID NOT NULL,
-    recipient VARCHAR(320) NOT NULL,
-    recipient_normalized VARCHAR(320) NOT NULL,
-    label VARCHAR(200),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
-    created_by VARCHAR(200),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
-    updated_by VARCHAR(200),
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT pk_event_recipient PRIMARY KEY (id),
-    CONSTRAINT fk_event_recipient_setting FOREIGN KEY (event_channel_setting_id) REFERENCES notify.event_channel_setting (id) ON DELETE CASCADE,
-    CONSTRAINT chk_event_recipient_recipient CHECK (length(btrim(recipient)) > 0),
-    CONSTRAINT chk_event_recipient_normalized CHECK (
-      recipient_normalized = btrim(recipient_normalized)
-      AND length(recipient_normalized) > 0
-    )
-  );
-
--- No duplicate live recipients on a channel. Partial so a removed recipient can be re-added.
-CREATE UNIQUE INDEX uq_event_recipient_active ON notify.event_recipient (event_channel_setting_id, recipient_normalized)
-WHERE
-  is_deleted = FALSE;
-
-CREATE INDEX idx_event_recipient_setting ON notify.event_recipient (event_channel_setting_id)
-WHERE
-  is_deleted = FALSE;
-
-CREATE TRIGGER trg_event_recipient_updated_at BEFORE
-UPDATE ON notify.event_recipient FOR EACH ROW
-EXECUTE FUNCTION notify.set_updated_at ();
-
-COMMENT ON TABLE notify.event_recipient IS 'Recipients configured on an event channel. Manually entered for now; one row per recipient per channel.';
-
-COMMENT ON COLUMN notify.event_recipient.id IS 'Unique identifier for the recipient entry.';
-
-COMMENT ON COLUMN notify.event_recipient.event_channel_setting_id IS 'Event channel setting this recipient belongs to. Cascade deleted with it; the channel is implied by the parent row.';
-
-COMMENT ON COLUMN notify.event_recipient.recipient IS 'Recipient exactly as entered by the user (email address or phone number). Displayed in the UI.';
-
-COMMENT ON COLUMN notify.event_recipient.recipient_normalized IS 'Canonical form used for comparison and de-duplication: lowercased/trimmed for EMAIL, E.164 for SMS. Matches the convention used by notify.recipient_safelist.';
-
-COMMENT ON COLUMN notify.event_recipient.label IS 'Optional free-text label describing the recipient (e.g. "On-call pager"). Nullable.';
-
-COMMENT ON COLUMN notify.event_recipient.created_at IS 'Timestamp with timezone when the recipient was added.';
-
-COMMENT ON COLUMN notify.event_recipient.created_by IS 'Identifier of the user or process that added this recipient.';
-
-COMMENT ON COLUMN notify.event_recipient.updated_at IS 'Timestamp with timezone when the recipient was last updated. Maintained by trg_event_recipient_updated_at.';
-
-COMMENT ON COLUMN notify.event_recipient.updated_by IS 'Identifier of the user or process that last updated this recipient.';
-
-COMMENT ON COLUMN notify.event_recipient.is_deleted IS 'Soft delete flag. Excluded from the active unique index and from dispatch when true.';
-
--- ---------------------------------------------------------------------------
--- 4. Guard: releasing a number back to the pool
+-- 3. Guard: releasing a number back to the pool
 -- ---------------------------------------------------------------------------
 -- An sso.notify_admin can release a number back to the pool (tenant_id / allocated_at to NULL)
 -- or retire it (is_deleted). Because a tenant holds one number that all of its SMS events share,

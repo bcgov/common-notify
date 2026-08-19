@@ -3,7 +3,6 @@ import {
   Column,
   PrimaryGeneratedColumn,
   ManyToOne,
-  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -12,7 +11,6 @@ import {
 } from 'typeorm'
 import type { Relation } from 'typeorm'
 import { NotifyEvent } from './event.entity'
-import { EventRecipient } from './event-recipient.entity'
 import { ProvisionedPhoneNumber } from './provisioned-phone-number.entity'
 import { Template } from '../../templates/entities/template.entity'
 import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
@@ -79,10 +77,23 @@ export class EventChannelSetting {
   fromPhoneNumber: ProvisionedPhoneNumber | null
 
   /**
-   * Recipients configured on this channel
+   * Comma-separated, normalized recipients for this channel: lowercased/trimmed emails for
+   * EMAIL rows, E.164 phone numbers for SMS rows. Required once active is true.
    */
-  @OneToMany(() => EventRecipient, (recipient) => recipient.channelSetting)
-  recipients: EventRecipient[]
+  @Column({ name: 'to', type: 'varchar', length: 10000, nullable: true })
+  to: string | null
+
+  /**
+   * Comma-separated, normalized CC email addresses. EMAIL only; NULL on SMS rows.
+   */
+  @Column({ type: 'varchar', length: 10000, nullable: true })
+  cc: string | null
+
+  /**
+   * Comma-separated, normalized BCC email addresses. EMAIL only; NULL on SMS rows.
+   */
+  @Column({ type: 'varchar', length: 10000, nullable: true })
+  bcc: string | null
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
