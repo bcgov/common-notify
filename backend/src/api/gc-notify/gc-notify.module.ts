@@ -14,6 +14,7 @@ import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guar
 import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { SafelistModule } from '../safelist/safelist.module'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>
@@ -33,6 +34,7 @@ export class GcNotifyModule {
         FeatureFlagModule,
         TemplatesModule,
         NotificationModule,
+        SafelistModule,
         TypeOrmModule.forFeature([NotifyConfiguration]),
         forwardRef(() => QueueModule),
       ],

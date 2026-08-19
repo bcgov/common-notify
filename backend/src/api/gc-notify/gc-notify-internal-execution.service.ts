@@ -9,6 +9,7 @@ import type { TemplateResponseDto } from '../templates/schemas/template-response
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { SafelistService } from '../safelist/safelist.service'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
@@ -107,6 +108,7 @@ export class GcNotifyInternalExecutionService {
     private readonly templatesService: TemplatesService,
     private readonly notificationService: NotificationService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
+    private readonly safelistService: SafelistService,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
@@ -276,6 +278,45 @@ export class GcNotifyInternalExecutionService {
   }
 
   /**
+   * Reject a send that would reach a recipient this tenant has not safelisted, in the GC Notify
+   * error shape. Mirrors the @Queueable guardrail so the compatibility routes cannot be used to
+   * step around it. Does nothing when the safelist is not enforced in this environment.
+   */
+  private async enforceSafelist(
+    tenantId: string,
+    notifyRequest: Record<string, unknown>,
+  ): Promise<void> {
+    const email = (notifyRequest as { email?: { recipients?: { to?: string[] } } }).email
+    const sms = (notifyRequest as { sms?: { recipients?: { to?: string[] } } }).sms
+    const candidates = [
+      ...(email?.recipients?.to ?? []).map((address) => ({
+        address,
+        channel: NotificationChannel.EMAIL,
+      })),
+      ...(sms?.recipients?.to ?? []).map((address) => ({
+        address,
+        channel: NotificationChannel.SMS,
+      })),
+    ]
+
+    const blocked = await this.safelistService.findBlocked(tenantId, candidates)
+    if (blocked.length === 0) return
+
+    // Count only — recipient values are not logged.
+    this.logger.warn(
+      `Rejected GC Notify send: ${blocked.length} recipient(s) not safelisted (tenant=${tenantId})`,
+    )
+    throw new BadRequestException({
+      errors: [
+        {
+          error: 'ValidationError',
+          message: `Recipient(s) not on this tenant's safelist: ${blocked.join(', ')}. This environment only sends to safelisted recipients.`,
+        },
+      ],
+    })
+  }
+
+  /**
    * Mirrors the create-then-enqueue pattern from @Queueable: synchronously create
    * a durable notification_request record (PENDING), then enqueue the ingestion
    * job asynchronously so the response isn't blocked on queue availability.
@@ -286,6 +327,10 @@ export class GcNotifyInternalExecutionService {
     scheduledFor: string | undefined,
     requestRoute: string | undefined,
   ): Promise<{ id: string; createdAt: Date }> {
+    // Non-production guardrail, enforced at this single choke point so any future send method
+    // routed through here is covered too. No-op in PROD, where the safelist is not enforced.
+    await this.enforceSafelist(tenantId, notifyRequest)
+
     const notificationRecord = await this.notificationService.create({
       tenantId,
       status: NotificationStatus.PENDING,

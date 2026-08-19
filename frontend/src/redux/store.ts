@@ -15,6 +15,7 @@ import adminTenantsReducer from './slices/adminTenants.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
 import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
 import tenantSettingsReducer from './slices/tenantSettings.slice'
+import safelistReducer from './slices/safelist.slice'
 import emailSettingsReducer from './slices/emailSettings.slice'
 import smsSettingsReducer from './slices/smsSettings.slice'
 
@@ -36,6 +37,7 @@ export const store = configureStore({
     apiKeys: apiKeysReducer,
     apiKeyUsage: apiKeyUsageReducer,
     tenantSettings: tenantSettingsReducer,
+    safelist: safelistReducer,
     emailSettings: emailSettingsReducer,
     smsSettings: smsSettingsReducer,
   },
