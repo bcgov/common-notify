@@ -73,6 +73,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
       const updated = await updateEventEmailSettings(eventId, {
         active: values.active,
         senderEmail: values.senderEmail || null,
+        templateId: values.templateId,
+        to: values.to,
+        cc: values.cc,
+        bcc: values.bcc,
       })
       setEvent(updated)
       showSuccessToast('Email settings saved')
@@ -129,6 +133,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             values={{
               active: event.emailSettings?.active ?? false,
               senderEmail: event.emailSettings?.senderEmail ?? '',
+              templateId: event.emailSettings?.templateId ?? null,
+              to: event.emailSettings?.to ?? [],
+              cc: event.emailSettings?.cc ?? [],
+              bcc: event.emailSettings?.bcc ?? [],
             }}
             onSave={handleSaveEmailSettings}
             isDisabled={!canEdit}

@@ -10,6 +10,7 @@ import {
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
+import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 
@@ -33,6 +34,14 @@ const RECIPIENT_ITEMS = [
 export type EmailSettingsValues = {
   active: boolean
   senderEmail: string
+  templateId: string | null
+  to: string[]
+  cc: string[]
+  bcc: string[]
+}
+
+function sameAddresses(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((address, index) => address === b[index])
 }
 
 type EventsEmailTabProps = {
@@ -40,7 +49,7 @@ type EventsEmailTabProps = {
   /** Saves the email channel settings. Must not reject. */
   onSave: (values: EmailSettingsValues) => Promise<void>
   isDisabled?: boolean
-  /** Tenant's default_sender_email (local part only), shown as a placeholder when set. */
+  /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
   defaultSenderEmail?: string | null
 }
 
@@ -53,15 +62,27 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
   const [channelActive, setChannelActive] = useState(values.active)
-  const [senderEmail, setSenderEmail] = useState(values.senderEmail)
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
+  // When the event has no saved sender email yet, start the field on the tenant default
+  // instead of leaving it blank, so applying settings without editing it still saves a value.
+  const [senderEmail, setSenderEmail] = useState(
+    values.senderEmail ||
+      (defaultSenderEmail ? `${defaultSenderEmail}@${SENDER_EMAIL_DOMAIN}` : ''),
+  )
+  const [recipients, setRecipients] = useState<RecipientAddresses>({
+    to: values.to,
+    cc: values.cc,
+    bcc: values.bcc,
+  })
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>(
+    values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
+  )
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>()
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
+    values.templateId ?? undefined,
+  )
 
-  // Template selection isn't persisted yet (the save payload has no templateId field), so this
-  // only populates the dropdown and preview. Failures are not surfaced since the form is still
-  // usable without it.
+  // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
     let active = true
 
@@ -78,12 +99,27 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     }
   }, [])
 
+  // The tenant default loads asynchronously and can arrive after this tab has already mounted;
+  // backfill it once it does, but only while the field is still untouched and unsaved.
+  useEffect(() => {
+    if (!values.senderEmail && !senderEmail && defaultSenderEmail) {
+      setSenderEmail(`${defaultSenderEmail}@${SENDER_EMAIL_DOMAIN}`)
+    }
+  }, [defaultSenderEmail, senderEmail, values.senderEmail])
+
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const trimmedSenderEmail = senderEmail.trim()
+  const recipientsChanged =
+    !sameAddresses(recipients.to, values.to) ||
+    !sameAddresses(recipients.cc, values.cc) ||
+    !sameAddresses(recipients.bcc, values.bcc)
   const settingsChanged =
-    channelActive !== values.active || trimmedSenderEmail !== values.senderEmail
+    channelActive !== values.active ||
+    trimmedSenderEmail !== values.senderEmail ||
+    (selectedTemplateId ?? null) !== values.templateId ||
+    recipientsChanged
   const isFormDisabled = isDisabled || saving
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
@@ -99,7 +135,14 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
     setSaving(true)
     try {
-      await onSave({ active: channelActive, senderEmail: trimmedSenderEmail })
+      await onSave({
+        active: channelActive,
+        senderEmail: trimmedSenderEmail,
+        templateId: selectedTemplateId ?? null,
+        to: recipients.to,
+        cc: recipients.cc,
+        bcc: recipients.bcc,
+      })
     } finally {
       setSaving(false)
     }
@@ -145,14 +188,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         description="The default sender email is based on your tenant but can be changed. It must be linked to a registered IDIR account or an approved email address."
         size="small"
         isDisabled={areFieldsDisabled}
-        isRequired
-        errorMessage="Sender email address cannot be empty."
-        // Workaround to get placeholder to work with BCDS TextField
-        {...(defaultSenderEmail
-          ? ({ placeholder: `${defaultSenderEmail}@${SENDER_EMAIL_DOMAIN}` } as {
-              placeholder: string
-            })
-          : {})}
       />
 
       <Select
@@ -168,7 +203,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       />
 
       {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
-        <EventsAdditionalRecipients isDisabled={areFieldsDisabled} />
+        <EventsAdditionalRecipients
+          values={recipients}
+          onChange={setRecipients}
+          isDisabled={areFieldsDisabled}
+        />
       )}
 
       <Select
