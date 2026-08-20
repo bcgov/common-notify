@@ -15,6 +15,7 @@ import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { normalizeRecipient } from '../safelist/safelist.util'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -218,6 +219,10 @@ export class EventsService {
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
     const senderEmail = updateDto.senderEmail?.trim() || null
+    const templateId = updateDto.templateId ?? null
+    const to = this.normalizeEmailList(updateDto.to)
+    const cc = this.normalizeEmailList(updateDto.cc)
+    const bcc = this.normalizeEmailList(updateDto.bcc)
 
     // uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
     // (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
@@ -232,16 +237,19 @@ export class EventsService {
       })
 
     // Mirrors chk_event_channel_setting_active_complete so an incomplete channel fails with a
-    // usable message rather than a constraint violation. The template is not selectable yet,
-    // so activation is blocked on it for now.
-    if (updateDto.active && (!senderEmail || !setting.templateId)) {
+    // usable message rather than a constraint violation.
+    if (updateDto.active && (!senderEmail || !to || !templateId)) {
       throw new BadRequestException(
-        'The email channel cannot be activated until a sender email address and a template are set',
+        'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
       )
     }
 
     setting.active = updateDto.active
     setting.senderEmail = senderEmail
+    setting.templateId = templateId
+    setting.to = to
+    setting.cc = cc
+    setting.bcc = bcc
     setting.isDeleted = false
     setting.updatedBy = userId
 
@@ -309,7 +317,14 @@ export class EventsService {
       channelCodes: activeChannelCodes,
       status: activeChannelCodes.length > 0 ? EventStatus.ACTIVE : EventStatus.DRAFT,
       emailSettings: emailSetting
-        ? { active: emailSetting.active, senderEmail: emailSetting.senderEmail }
+        ? {
+            active: emailSetting.active,
+            senderEmail: emailSetting.senderEmail,
+            templateId: emailSetting.templateId,
+            to: this.splitEmailList(emailSetting.to),
+            cc: this.splitEmailList(emailSetting.cc),
+            bcc: this.splitEmailList(emailSetting.bcc),
+          }
         : null,
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
@@ -323,5 +338,27 @@ export class EventsService {
     return (event.channelSettings ?? []).find(
       (setting) => setting.channelCode === NotificationChannel.EMAIL && !setting.isDeleted,
     )
+  }
+
+  /**
+   * Normalizes a list of recipient addresses into the comma-separated form stored in
+   * to/cc/bcc, dropping blanks. Returns null when nothing is left, matching
+   * chk_event_channel_setting_to/cc/bcc (never an empty string).
+   */
+  private normalizeEmailList(addresses?: string[]): string | null {
+    if (!addresses?.length) return null
+
+    const normalized = addresses
+      .map((address) => normalizeRecipient(NotificationChannel.EMAIL, address))
+      .filter((address): address is string => !!address)
+
+    return normalized.length > 0 ? normalized.join(',') : null
+  }
+
+  /**
+   * Splits a stored comma-separated to/cc/bcc value back into a list for the API response.
+   */
+  private splitEmailList(value: string | null): string[] {
+    return value ? value.split(',') : []
   }
 }

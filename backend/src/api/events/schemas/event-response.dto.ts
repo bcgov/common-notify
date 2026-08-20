@@ -15,6 +15,30 @@ export class EventEmailSettingsDto {
    * @example "no-reply@gov.bc.ca"
    */
   senderEmail: string | null
+
+  /**
+   * Template used to render this channel. Null until the tab has a template saved.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  templateId: string | null
+
+  /**
+   * Primary recipients for this channel. Empty until the tab has recipients saved.
+   * @example ["alice@example.com"]
+   */
+  to: string[]
+
+  /**
+   * CC recipients for this channel.
+   * @example ["bob@example.com"]
+   */
+  cc: string[]
+
+  /**
+   * BCC recipients for this channel.
+   * @example ["carol@example.com"]
+   */
+  bcc: string[]
 }
 
 /**
