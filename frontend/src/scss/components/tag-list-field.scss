@@ -1,0 +1,40 @@
+// Wraps the tags and the input so they read as a single field.
+.tag-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+
+  &:focus-within {
+    border-color: var(--surface-color-border-active);
+  }
+}
+
+.tag-list-field--disabled {
+  background: var(--surface-color-forms-disabled);
+}
+
+.tag-list-field__input {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+  resize: vertical;
+
+  &::placeholder {
+    color: var(--typography-color-placeholder);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:disabled {
+    color: var(--typography-color-placeholder);
+    cursor: not-allowed;
+  }
+}
