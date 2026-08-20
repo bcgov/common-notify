@@ -28,6 +28,7 @@ import type { DerivedEventFilters } from './events.service'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
+import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
@@ -188,6 +189,28 @@ export class EventsFrontendController {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.eventsService.updateEmailChannelSetting(tenant.id, eventId, updateDto, user)
+  }
+
+  /**
+   * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
+   *
+   * Bypasses the null/empty validation of updateEmailChannelSetting so a partially filled-in
+   * form can be saved; the channel is always stored inactive.
+   */
+  @Version('1')
+  @Post(':eventId/channels/email/draft')
+  @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({ summary: "Save an event's email channel settings as a draft" })
+  @ApiOkResponse({ type: EventResponseDto })
+  async updateEmailChannelDraft(
+    @Req() req: express.Request,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() updateDto: UpdateEmailChannelDraftDto,
+  ): Promise<EventResponseDto> {
+    const tenant = this.getTenant(req)
+    const user = JwtUserExtractor.extractUser(req)
+    return this.eventsService.updateEmailChannelDraft(tenant.id, eventId, updateDto, user)
   }
 
   private getTenant(req: Request | express.Request): Tenant {

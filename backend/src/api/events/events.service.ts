@@ -11,6 +11,7 @@ import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
+import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
@@ -224,18 +225,6 @@ export class EventsService {
     const cc = this.normalizeEmailList(updateDto.cc)
     const bcc = this.normalizeEmailList(updateDto.bcc)
 
-    // uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
-    // (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
-    const setting =
-      (event.channelSettings ?? []).find(
-        (existing) => existing.channelCode === NotificationChannel.EMAIL,
-      ) ??
-      this.channelSettingRepository.create({
-        eventId: event.id,
-        channelCode: NotificationChannel.EMAIL,
-        createdBy: userId,
-      })
-
     // Mirrors chk_event_channel_setting_active_complete so an incomplete channel fails with a
     // usable message rather than a constraint violation.
     if (updateDto.active && (!senderEmail || !to || !templateId)) {
@@ -244,6 +233,7 @@ export class EventsService {
       )
     }
 
+    const setting = this.findOrCreateEmailSetting(event, userId)
     setting.active = updateDto.active
     setting.senderEmail = senderEmail
     setting.templateId = templateId
@@ -257,6 +247,60 @@ export class EventsService {
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * Save an event's EMAIL channel settings as a draft (Save draft on the Email Notification tab)
+   *
+   * Unlike updateEmailChannelSetting, null/empty sender email, template and recipients are
+   * accepted since the channel is forced inactive - chk_event_channel_setting_active_complete
+   * only constrains rows where active = TRUE.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto Partial email channel settings
+   * @param userId User saving the draft (for audit trail)
+   */
+  async updateEmailChannelDraft(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateEmailChannelDraftDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+
+    const setting = this.findOrCreateEmailSetting(event, userId)
+    setting.active = false
+    setting.senderEmail = updateDto.senderEmail?.trim() || null
+    setting.templateId = updateDto.templateId ?? null
+    setting.to = this.normalizeEmailList(updateDto.to)
+    setting.cc = this.normalizeEmailList(updateDto.cc)
+    setting.bcc = this.normalizeEmailList(updateDto.bcc)
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * The event's live EMAIL channel setting, or a new unsaved one to populate.
+   *
+   * uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
+   * (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
+   */
+  private findOrCreateEmailSetting(event: NotifyEvent, userId: string): EventChannelSetting {
+    return (
+      (event.channelSettings ?? []).find(
+        (existing) => existing.channelCode === NotificationChannel.EMAIL,
+      ) ??
+      this.channelSettingRepository.create({
+        eventId: event.id,
+        channelCode: NotificationChannel.EMAIL,
+        createdBy: userId,
+      })
+    )
   }
 
   /**
