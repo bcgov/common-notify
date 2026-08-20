@@ -413,7 +413,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         <Button
           type="button"
           variant="secondary"
-          isDisabled={isDisabled || saving || savingDraft || hasValidationError}
+          isDisabled={isFormDisabled || !settingsChanged || hasValidationError}
           onPress={handleSaveDraft}
         >
           {savingDraft ? 'Saving…' : 'Save draft'}

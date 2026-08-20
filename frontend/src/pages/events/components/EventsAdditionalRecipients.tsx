@@ -58,11 +58,9 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   const [fields, setFields] = useState(() => buildInitialFields(values))
 
   function updateField(id: RecipientFieldId, changes: Partial<RecipientField>) {
-    setFields((current) => {
-      const next = { ...current, [id]: { ...current[id], ...changes } }
-      onChange(exportAddresses(next))
-      return next
-    })
+    const next = { ...fields, [id]: { ...fields[id], ...changes } }
+    setFields(next)
+    onChange(exportAddresses(next))
   }
 
   return (
