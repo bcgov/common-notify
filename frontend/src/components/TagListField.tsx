@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FC } from 'react'
-import { TagGroup, TagList } from '@bcgov/design-system-react-components'
+import { TagGroup, TagList, TextArea } from '@bcgov/design-system-react-components'
 import '@/scss/components/tag-list-field.scss'
 
 /** Appends values to a list, dropping blanks and ones already entered */
@@ -17,6 +17,9 @@ export interface TagListFieldProps {
   'aria-label': string
   placeholder?: string
   isDisabled?: boolean
+  /** Validation is the caller's responsibility; this only controls how the field is displayed. */
+  isInvalid?: boolean
+  errorMessage?: string
 }
 
 /**
@@ -32,6 +35,8 @@ const TagListField: FC<TagListFieldProps> = ({
   'aria-label': ariaLabel,
   placeholder,
   isDisabled = false,
+  isInvalid = false,
+  errorMessage,
 }) => {
   // What is currently typed, before a space turns it into a tag.
   const [draft, setDraft] = useState('')
@@ -54,7 +59,11 @@ const TagListField: FC<TagListFieldProps> = ({
   }
 
   return (
-    <div className={`tag-list-field ${isDisabled ? 'tag-list-field--disabled' : ''}`}>
+    <div
+      className={`tag-list-field ${isDisabled ? 'tag-list-field--disabled' : ''} ${
+        isInvalid ? 'tag-list-field--invalid' : ''
+      }`}
+    >
       {values.length > 0 && (
         <TagGroup
           aria-label={ariaLabel}
@@ -72,17 +81,21 @@ const TagListField: FC<TagListFieldProps> = ({
         </TagGroup>
       )}
 
-      {/* bcds TextArea cannot take a placeholder, so the input is a plain textarea styled to
-          sit inside the bordered container above. */}
-      <textarea
-        className="tag-list-field__input"
+      {/* Not passing `className`: the DS spreads props over its own
+          `bcds-react-aria-TextArea` class, so a className here would strip it. The
+          `.tag-list-field` styles target the DS's own class names instead to blend
+          this into the bordered container above. */}
+      <TextArea
         aria-label={ariaLabel}
-        placeholder={placeholder}
-        rows={2}
         value={draft}
-        onChange={(changeEvent) => handleDraftChange(changeEvent.target.value)}
+        onChange={handleDraftChange}
         onBlur={handleBlur}
-        disabled={isDisabled}
+        isDisabled={isDisabled}
+        isInvalid={isInvalid}
+        errorMessage={errorMessage}
+        // The DS TextArea omits `placeholder` and `rows` from its types, but
+        // react-aria's useTextField still forwards them to the input.
+        {...({ placeholder, rows: 2 } as { placeholder?: string; rows?: number })}
       />
     </div>
   )

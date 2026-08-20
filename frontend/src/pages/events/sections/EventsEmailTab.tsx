@@ -40,14 +40,31 @@ export type EmailSettingsValues = {
   bcc: string[]
 }
 
+export type EmailDraftValues = {
+  senderEmail: string | null
+  templateId: string | null
+  to: string[]
+  cc: string[]
+  bcc: string[]
+}
+
 function sameAddresses(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((address, index) => address === b[index])
 }
 
+const EMAIL_PATTERN =
+  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
+
+function isValidEmail(value: string): boolean {
+  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
+}
+
 type EventsEmailTabProps = {
   values: EmailSettingsValues
-  /** Saves the email channel settings. Must not reject. */
+  /** Saves the email channel settings. */
   onSave: (values: EmailSettingsValues) => Promise<void>
+  /** Saves the current form state as an inactive draft, null values accepted, bad values not accepted. */
+  onSaveDraft: (values: EmailDraftValues) => Promise<void>
   isDisabled?: boolean
   /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
   defaultSenderEmail?: string | null
@@ -56,6 +73,7 @@ type EventsEmailTabProps = {
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
   values,
   onSave,
+  onSaveDraft,
   isDisabled = false,
   defaultSenderEmail,
 }) => {
@@ -77,6 +95,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
   )
   const [saving, setSaving] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
@@ -111,6 +130,20 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const trimmedSenderEmail = senderEmail.trim()
+  const senderEmailError =
+    trimmedSenderEmail !== '' && !isValidEmail(trimmedSenderEmail)
+      ? 'Enter a valid sender email address.'
+      : ''
+  const invalidRecipients: RecipientAddresses = {
+    to: recipients.to.filter((address) => !isValidEmail(address)),
+    cc: recipients.cc.filter((address) => !isValidEmail(address)),
+    bcc: recipients.bcc.filter((address) => !isValidEmail(address)),
+  }
+  const hasValidationError =
+    Boolean(senderEmailError) ||
+    invalidRecipients.to.length > 0 ||
+    invalidRecipients.cc.length > 0 ||
+    invalidRecipients.bcc.length > 0
   const recipientsChanged =
     !sameAddresses(recipients.to, values.to) ||
     !sameAddresses(recipients.cc, values.cc) ||
@@ -120,11 +153,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     trimmedSenderEmail !== values.senderEmail ||
     (selectedTemplateId ?? null) !== values.templateId ||
     recipientsChanged
-  const isFormDisabled = isDisabled || saving
+  const isFormDisabled = isDisabled || saving || savingDraft
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
-  const isApplyDisabled = isFormDisabled || !settingsChanged
+  const isApplyDisabled = isFormDisabled || !settingsChanged || hasValidationError
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -145,6 +178,25 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (hasValidationError) {
+      return
+    }
+
+    setSavingDraft(true)
+    try {
+      await onSaveDraft({
+        senderEmail: trimmedSenderEmail || null,
+        templateId: selectedTemplateId ?? null,
+        to: recipients.to,
+        cc: recipients.cc,
+        bcc: recipients.bcc,
+      })
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -189,7 +241,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         size="small"
         isDisabled={areFieldsDisabled}
         isRequired
-        errorMessage="Sender email address cannot be empty."
+        isInvalid={senderEmailError ? true : undefined}
+        errorMessage={senderEmailError || 'Sender email address cannot be empty.'}
       />
 
       <Select
@@ -208,6 +261,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         <EventsAdditionalRecipients
           values={recipients}
           onChange={setRecipients}
+          invalidAddresses={invalidRecipients}
           isDisabled={areFieldsDisabled}
         />
       )}
@@ -265,6 +319,14 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       <div className="events__actions">
         <Button variant="secondary" isDisabled>
           Preview
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          isDisabled={isDisabled || saving || savingDraft || hasValidationError}
+          onPress={handleSaveDraft}
+        >
+          {savingDraft ? 'Saving…' : 'Save draft'}
         </Button>
         <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
           {saving ? 'Saving…' : 'Apply settings'}

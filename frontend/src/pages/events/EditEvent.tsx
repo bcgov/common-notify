@@ -5,9 +5,14 @@ import Breadcrumb from '@/components/Breadcrumb'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
-import type { EmailSettingsValues } from './sections/EventsEmailTab'
+import type { EmailSettingsValues, EmailDraftValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
-import { getEventById, updateEvent, updateEventEmailSettings } from '@/api/events.api'
+import {
+  getEventById,
+  updateEvent,
+  updateEventEmailSettings,
+  updateEventEmailDraft,
+} from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -85,6 +90,16 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     }
   }
 
+  async function handleSaveEmailDraft(values: EmailDraftValues) {
+    try {
+      const updated = await updateEventEmailDraft(eventId, values)
+      setEvent(updated)
+      showSuccessToast('Draft saved')
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to save draft')
+    }
+  }
+
   return (
     <div className="events">
       <Breadcrumb
@@ -139,6 +154,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
               bcc: event.emailSettings?.bcc ?? [],
             }}
             onSave={handleSaveEmailSettings}
+            onSaveDraft={handleSaveEmailDraft}
             isDisabled={!canEdit}
             defaultSenderEmail={defaultSenderEmail}
           />

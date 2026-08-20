@@ -40,6 +40,8 @@ type EventsAdditionalRecipientsProps = {
   values: RecipientAddresses
   /** Called with the addresses that should be saved whenever a field or its checkbox changes. */
   onChange: (values: RecipientAddresses) => void
+  /** Malformed addresses per field, as determined by the parent; empty/absent means valid. */
+  invalidAddresses?: RecipientAddresses
   isDisabled?: boolean
 }
 
@@ -50,6 +52,7 @@ type EventsAdditionalRecipientsProps = {
 const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   values,
   onChange,
+  invalidAddresses,
   isDisabled = false,
 }) => {
   const [fields, setFields] = useState(() => buildInitialFields(values))
@@ -68,6 +71,7 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
 
       {RECIPIENT_FIELDS.map(({ id, label }) => {
         const field = fields[id]
+        const invalid = invalidAddresses?.[id] ?? []
 
         return (
           <div className="events__recipient-group" key={id}>
@@ -86,6 +90,12 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
                 aria-label={`${label} email addresses`}
                 placeholder="Enter email addresses"
                 isDisabled={isDisabled}
+                isInvalid={invalid.length > 0}
+                errorMessage={
+                  invalid.length > 0
+                    ? `Enter valid email addresses. Invalid: ${invalid.join(', ')}`
+                    : undefined
+                }
               />
             )}
           </div>

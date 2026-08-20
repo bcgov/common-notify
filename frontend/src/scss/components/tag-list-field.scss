@@ -11,30 +11,26 @@
   &:focus-within {
     border-color: var(--surface-color-border-active);
   }
+
+  // The DS TextArea brings its own bordered container; strip it (including its own
+  // invalid-state border) so the input blends into this container's border instead
+  // of nesting one inside the other.
+  .bcds-react-aria-TextArea--Container,
+  .bcds-react-aria-TextArea[data-invalid] > .bcds-react-aria-TextArea--Container {
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+
+  .bcds-react-aria-TextArea--Input {
+    resize: vertical;
+  }
 }
 
 .tag-list-field--disabled {
   background: var(--surface-color-forms-disabled);
 }
 
-.tag-list-field__input {
-  font: var(--typography-regular-body);
-  color: var(--typography-color-primary);
-  background: transparent;
-  border: none;
-  padding: 0;
-  resize: vertical;
-
-  &::placeholder {
-    color: var(--typography-color-placeholder);
-  }
-
-  &:focus {
-    outline: none;
-  }
-
-  &:disabled {
-    color: var(--typography-color-placeholder);
-    cursor: not-allowed;
-  }
+.tag-list-field--invalid {
+  border-color: var(--support-border-color-danger);
 }
