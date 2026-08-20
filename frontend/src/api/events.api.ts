@@ -235,6 +235,7 @@ export async function updateEventEmailSettings(
 }
 
 export interface EventEmailDraftSettings {
+  active: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]
@@ -246,7 +247,9 @@ export interface EventEmailDraftSettings {
  * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
  *
  * Bypasses the required-field validation of updateEventEmailSettings, so a partially filled-in
- * form can be saved. The channel is always stored inactive.
+ * form can be saved, including with `active: true` - the backend allows a draft to be active
+ * ahead of the data being complete. The event still shows as a draft until the settings are
+ * applied via updateEventEmailSettings.
  *
  * @param eventId Event ID
  * @param settings Partial email channel settings

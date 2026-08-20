@@ -41,6 +41,7 @@ export type EmailSettingsValues = {
 }
 
 export type EmailDraftValues = {
+  active: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]
@@ -63,7 +64,7 @@ type EventsEmailTabProps = {
   values: EmailSettingsValues
   /** Saves the email channel settings. */
   onSave: (values: EmailSettingsValues) => Promise<void>
-  /** Saves the current form state as an inactive draft, null values accepted, bad values not accepted. */
+  /** Saves the current form state as a draft, null values accepted, bad values not accepted. The active toggle is always honored, even ahead of the rest of the data being complete. */
   onSaveDraft: (values: EmailDraftValues) => Promise<void>
   isDisabled?: boolean
   /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
@@ -189,6 +190,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     setSavingDraft(true)
     try {
       await onSaveDraft({
+        active: channelActive,
         senderEmail: trimmedSenderEmail || null,
         templateId: selectedTemplateId ?? null,
         to: recipients.to,

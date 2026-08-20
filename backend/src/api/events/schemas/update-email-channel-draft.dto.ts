@@ -1,12 +1,31 @@
-import { IsArray, IsEmail, IsOptional, IsUUID, MaxLength, ValidateIf } from 'class-validator'
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsUUID,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator'
 
 /**
  * DTO for saving an event's EMAIL channel settings as a draft ("Save draft").
  *
- * Every field is optional and nullable so a partially filled-in tab can be saved. The service
- * always forces `active` to false for a draft, so `active` is not accepted here.
+ * Every field except `active` is optional and nullable so a partially filled-in tab can be
+ * saved. `active` is always honored directly - chk_event_channel_setting_active_complete
+ * exempts draft rows from its completeness check, so the channel can be saved as active ahead
+ * of the data being complete. The row is always marked as a draft (`is_draft = true`).
  */
 export class UpdateEmailChannelDraftDto {
+  /**
+   * Whether the event should send on the email channel. Unlike updateEmailChannelSetting, this
+   * is accepted even while the channel is incomplete - chk_event_channel_setting_active_complete
+   * exempts draft rows from that requirement.
+   * @example false
+   */
+  @IsBoolean()
+  active: boolean
+
   /**
    * From address for email sends. Omit or set null to leave unset.
    * @example "no-reply@gov.bc.ca"

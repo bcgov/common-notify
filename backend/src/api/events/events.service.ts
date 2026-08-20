@@ -107,14 +107,17 @@ export class EventsService {
     }
 
     // Both statuses selected is the same as no status filter, so only a single-status
-    // selection narrows the result.
+    // selection narrows the result. Mirrors toResponseDto: ACTIVE requires a channel that's
+    // active and applied (not sitting on unapplied draft edits); DRAFT is everything else.
     const statuses = derived.statuses ?? []
     if (statuses.length === 1) {
-      const subQuery = this.channelSettingSubQuery('statusFilter').andWhere(
-        'statusFilter.active = true',
+      const activeAppliedSubQuery = this.channelSettingSubQuery('statusFilterActive')
+        .andWhere('statusFilterActive.active = true')
+        .andWhere('statusFilterActive.isDraft = false')
+      const existsActiveApplied = `EXISTS (${activeAppliedSubQuery.getQuery()})`
+      queryBuilder.andWhere(
+        statuses[0] === EventStatus.ACTIVE ? existsActiveApplied : `NOT ${existsActiveApplied}`,
       )
-      const exists = `EXISTS (${subQuery.getQuery()})`
-      queryBuilder.andWhere(statuses[0] === EventStatus.ACTIVE ? exists : `NOT ${exists}`)
     }
 
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, eventListQueryConfig)
@@ -235,6 +238,11 @@ export class EventsService {
 
     const setting = this.findOrCreateEmailSetting(event, userId)
     setting.active = updateDto.active
+    // Only an actual activation clears the draft flag - using Apply settings to merely
+    // switch the channel off is not "applying" it, so a pending draft survives.
+    if (updateDto.active) {
+      setting.isDraft = false
+    }
     setting.senderEmail = senderEmail
     setting.templateId = templateId
     setting.to = to
@@ -253,8 +261,10 @@ export class EventsService {
    * Save an event's EMAIL channel settings as a draft (Save draft on the Email Notification tab)
    *
    * Unlike updateEmailChannelSetting, null/empty sender email, template and recipients are
-   * accepted since the channel is forced inactive - chk_event_channel_setting_active_complete
-   * only constrains rows where active = TRUE.
+   * accepted since chk_event_channel_setting_active_complete exempts is_draft = TRUE rows from
+   * its completeness check. `active` is always honored directly from the toggle - a draft can
+   * be saved as active ahead of the data being complete. Only Apply settings (which always
+   * clears is_draft when turning the channel on) requires completeness.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -268,14 +278,20 @@ export class EventsService {
     userId: string = 'system',
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
+    const senderEmail = updateDto.senderEmail?.trim() || null
+    const templateId = updateDto.templateId ?? null
+    const to = this.normalizeEmailList(updateDto.to)
+    const cc = this.normalizeEmailList(updateDto.cc)
+    const bcc = this.normalizeEmailList(updateDto.bcc)
 
     const setting = this.findOrCreateEmailSetting(event, userId)
-    setting.active = false
-    setting.senderEmail = updateDto.senderEmail?.trim() || null
-    setting.templateId = updateDto.templateId ?? null
-    setting.to = this.normalizeEmailList(updateDto.to)
-    setting.cc = this.normalizeEmailList(updateDto.cc)
-    setting.bcc = this.normalizeEmailList(updateDto.bcc)
+    setting.active = updateDto.active
+    setting.isDraft = true
+    setting.senderEmail = senderEmail
+    setting.templateId = templateId
+    setting.to = to
+    setting.cc = cc
+    setting.bcc = bcc
     setting.isDeleted = false
     setting.updatedBy = userId
 
@@ -349,8 +365,11 @@ export class EventsService {
    */
   private toResponseDto(event: NotifyEvent): EventResponseDto {
     const settings = (event.channelSettings ?? []).filter((setting) => !setting.isDeleted)
+    // A channel that's active but still marked as a draft has unapplied edits - possibly
+    // incomplete ones, since Save draft can persist active = true ahead of the data being
+    // complete - so it doesn't count as a real send channel until it's been applied.
     const activeChannelCodes = settings
-      .filter((setting) => setting.active)
+      .filter((setting) => setting.active && !setting.isDraft)
       .map((setting) => setting.channelCode)
     const emailSetting = this.findEmailSetting(event)
 

@@ -65,13 +65,14 @@ export class EventResponseDto {
 
   /**
    * Channels the event actively sends on, from its channel settings.
-   * Excludes channels that are configured but switched off.
+   * Excludes channels that are switched off, and channels with unapplied "Save draft" edits.
    * @example ["EMAIL", "SMS"]
    */
   channelCodes: string[]
 
   /**
-   * ACTIVE once any channel is switched on, DRAFT until then
+   * ACTIVE once a channel is switched on and applied, DRAFT until then - including when a
+   * switched-on channel has unapplied "Save draft" edits pending
    * @example "DRAFT"
    */
   status: EventStatus

@@ -195,7 +195,9 @@ export class EventsFrontendController {
    * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
    *
    * Bypasses the null/empty validation of updateEmailChannelSetting so a partially filled-in
-   * form can be saved; the channel is always stored inactive.
+   * form can be saved. `active` is always honored directly - the channel can be saved as
+   * active ahead of the data being complete, since chk_event_channel_setting_active_complete
+   * exempts draft rows.
    */
   @Version('1')
   @Post(':eventId/channels/email/draft')
