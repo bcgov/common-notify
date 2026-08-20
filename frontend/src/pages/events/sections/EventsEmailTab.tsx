@@ -188,6 +188,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         description="The default sender email is based on your tenant but can be changed. It must be linked to a registered IDIR account or an approved email address."
         size="small"
         isDisabled={areFieldsDisabled}
+        isRequired
+        errorMessage="Sender email address cannot be empty."
       />
 
       <Select
