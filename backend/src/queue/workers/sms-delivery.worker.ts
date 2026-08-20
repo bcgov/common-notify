@@ -1,4 +1,4 @@
-import { HttpException, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
@@ -10,6 +10,7 @@ import { InlineRenderingService } from '../../services/rendering/inline-renderin
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
 import { StructuredLoggerService } from '../../common/logger'
+import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 
 /**
  * SMS Delivery Worker
@@ -27,6 +28,7 @@ import { StructuredLoggerService } from '../../common/logger'
  */
 export class SmsDeliveryWorker {
   private readonly logger = new Logger(SmsDeliveryWorker.name)
+  private static readonly phoneNumberService = new PhoneNumberService()
 
   private static isPermanentValidationError(error: unknown): error is HttpException {
     return error instanceof HttpException && error.getStatus() === 400
@@ -92,6 +94,15 @@ export class SmsDeliveryWorker {
           payload.recipients.to.length === 0
         ) {
           throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
+        }
+
+        const invalidRecipientIndex = payload.recipients.to.findIndex(
+          (recipient) => !SmsDeliveryWorker.phoneNumberService.isValid(recipient),
+        )
+        if (invalidRecipientIndex !== -1) {
+          throw new BadRequestException(
+            `Invalid SMS payload: recipient phone number at index ${invalidRecipientIndex} is not valid E.164`,
+          )
         }
 
         if ((job.attemptsMade ?? 0) > 0) {

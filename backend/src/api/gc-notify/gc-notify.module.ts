@@ -15,6 +15,8 @@ import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guar
 import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
@@ -50,6 +52,8 @@ export class GcNotifyModule {
         ApiKeyGuard,
         GcNotifyRoutingService,
         GcNotifyInternalExecutionService,
+        GcNotifyBulkValidationService,
+        PhoneNumberService,
         AttachmentValidationService,
         AttachmentProcessingService,
       ],
