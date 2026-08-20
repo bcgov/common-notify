@@ -399,12 +399,15 @@ export class EventsService {
    */
   private toResponseDto(event: NotifyEvent): EventResponseDto {
     const settings = (event.channelSettings ?? []).filter((setting) => !setting.isDeleted)
-    // A channel that's active but still marked as a draft has unapplied edits - possibly
-    // incomplete ones, since Save draft can persist active = true ahead of the data being
-    // complete - so it doesn't count as a real send channel until it's been applied.
+    // channelCodes drives the Channel badge and only reflects the on/off toggle - a channel
+    // still shows once switched on even if its settings are an unapplied draft.
     const activeChannelCodes = settings
-      .filter((setting) => setting.active && !setting.isDraft)
+      .filter((setting) => setting.active)
       .map((setting) => setting.channelCode)
+    // Status is stricter: a channel that's active but still marked as a draft has unapplied
+    // edits - possibly incomplete ones, since Save draft can persist active = true ahead of the
+    // data being complete - so it doesn't count as a real send channel until it's been applied.
+    const hasAppliedActiveChannel = settings.some((setting) => setting.active && !setting.isDraft)
     const emailSetting = this.findEmailSetting(event)
 
     return {
@@ -412,7 +415,7 @@ export class EventsService {
       name: event.name,
       description: event.description ?? '',
       channelCodes: activeChannelCodes,
-      status: activeChannelCodes.length > 0 ? EventStatus.ACTIVE : EventStatus.DRAFT,
+      status: hasAppliedActiveChannel ? EventStatus.ACTIVE : EventStatus.DRAFT,
       emailSettings: emailSetting
         ? {
             active: emailSetting.active,

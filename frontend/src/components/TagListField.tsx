@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import type { FC } from 'react'
-import { TagGroup, TagList, TextArea } from '@bcgov/design-system-react-components'
+import {
+  SvgExclamationIcon,
+  TagGroup,
+  TagList,
+  TextArea,
+} from '@bcgov/design-system-react-components'
 import '@/scss/components/tag-list-field.scss'
 
 /** Appends values to a list, dropping blanks and ones already entered */
@@ -59,45 +64,57 @@ const TagListField: FC<TagListFieldProps> = ({
   }
 
   return (
-    <div
-      className={`tag-list-field ${isDisabled ? 'tag-list-field--disabled' : ''} ${
-        isInvalid ? 'tag-list-field--invalid' : ''
-      }`}
-    >
-      {values.length > 0 && (
-        <TagGroup
-          aria-label={ariaLabel}
-          onRemove={(keys) => onChange(values.filter((value) => !keys.has(value)))}
-        >
-          <TagList
-            items={values.map((value) => ({
-              id: value,
-              textValue: value,
-              size: 'xsmall',
-              tagStyle: 'circular',
-              ...(isDisabled && { isDisabled: true }),
-            }))}
-          />
-        </TagGroup>
-      )}
+    <>
+      <div
+        className={`tag-list-field ${isDisabled ? 'tag-list-field--disabled' : ''} ${
+          isInvalid ? 'tag-list-field--invalid' : ''
+        }`}
+      >
+        {values.length > 0 && (
+          <TagGroup
+            aria-label={ariaLabel}
+            onRemove={(keys) => onChange(values.filter((value) => !keys.has(value)))}
+          >
+            <TagList
+              items={values.map((value) => ({
+                id: value,
+                textValue: value,
+                size: 'xsmall',
+                tagStyle: 'circular',
+                ...(isDisabled && { isDisabled: true }),
+              }))}
+            />
+          </TagGroup>
+        )}
 
-      {/* Not passing `className`: the DS spreads props over its own
-          `bcds-react-aria-TextArea` class, so a className here would strip it. The
-          `.tag-list-field` styles target the DS's own class names instead to blend
-          this into the bordered container above. */}
-      <TextArea
-        aria-label={ariaLabel}
-        value={draft}
-        onChange={handleDraftChange}
-        onBlur={handleBlur}
-        isDisabled={isDisabled}
-        isInvalid={isInvalid}
-        errorMessage={errorMessage}
-        // The DS TextArea omits `placeholder` and `rows` from its types, but
-        // react-aria's useTextField still forwards them to the input.
-        {...({ placeholder, rows: 2 } as { placeholder?: string; rows?: number })}
-      />
-    </div>
+        {/* Not passing `className`: the DS spreads props over its own
+            `bcds-react-aria-TextArea` class, so a className here would strip it. The
+            `.tag-list-field` styles target the DS's own class names instead to blend
+            this into the bordered container above. */}
+        <TextArea
+          aria-label={ariaLabel}
+          value={draft}
+          onChange={handleDraftChange}
+          onBlur={handleBlur}
+          isDisabled={isDisabled}
+          isInvalid={isInvalid}
+          errorMessage={errorMessage}
+          // The DS TextArea omits `placeholder` and `rows` from its types, but
+          // react-aria's useTextField still forwards them to the input.
+          {...({ placeholder, rows: 2 } as { placeholder?: string; rows?: number })}
+        />
+      </div>
+
+      {/* The DS renders its own error line inside the bordered container above (hidden via
+          CSS below); this is the visible copy, placed outside it. Marked aria-hidden since
+          the hidden DS copy already wires the accessible description via aria-describedby. */}
+      {isInvalid && errorMessage && (
+        <div className="tag-list-field__error" aria-hidden="true">
+          <SvgExclamationIcon />
+          {errorMessage}
+        </div>
+      )}
+    </>
   )
 }
 

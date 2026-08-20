@@ -498,7 +498,7 @@ describe('EventsService', () => {
       expect(result.status).toBe(EventStatus.DRAFT)
     })
 
-    it('returns DRAFT for an active channel that still has unapplied draft edits', async () => {
+    it('returns DRAFT for an active channel that still has unapplied draft edits, but still includes it in channelCodes', async () => {
       mockEventRepository.findOne.mockResolvedValueOnce(
         buildEvent([
           {
@@ -513,7 +513,7 @@ describe('EventsService', () => {
 
       const result = await service.getEvent(tenantId, eventId)
 
-      expect(result.channelCodes).toEqual([])
+      expect(result.channelCodes).toEqual([NotificationChannel.EMAIL])
       expect(result.status).toBe(EventStatus.DRAFT)
     })
   })

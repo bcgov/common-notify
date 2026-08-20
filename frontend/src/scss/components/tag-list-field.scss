@@ -25,6 +25,12 @@
   .bcds-react-aria-TextArea--Input {
     resize: vertical;
   }
+
+  // Hidden in favor of the visible .tag-list-field__error rendered below this container;
+  // kept in the DOM so the DS still wires up its aria-describedby link to the input.
+  .bcds-react-aria-TextArea--Error {
+    display: none;
+  }
 }
 
 .tag-list-field--disabled {
@@ -33,4 +39,19 @@
 
 .tag-list-field--invalid {
   border-color: var(--support-border-color-danger);
+}
+
+// Mirrors the DS's own .bcds-react-aria-TextArea--Error styling, rendered outside the
+// bordered container instead of inside it.
+.tag-list-field__error {
+  display: flex;
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-danger);
+
+  svg {
+    padding-right: var(--layout-padding-xsmall);
+    color: var(--icons-color-danger);
+    width: var(--icons-size-medium);
+    height: var(--icons-size-medium);
+  }
 }
