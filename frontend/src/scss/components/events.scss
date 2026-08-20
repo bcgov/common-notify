@@ -20,6 +20,14 @@
   flex-direction: column;
   gap: 24px;
   padding-top: 24px;
+  // 284px when the sidebar is collapsed (93px wide); reduced by the sidebar's
+  // expanded-vs-collapsed width delta (296px - 93px = 203px) so the content
+  // stays in the same spot on screen when the sidebar opens.
+  padding-left: 81px;
+  transition: padding-left 0.3s ease;
+}
+
+.sidebar--collapsed + .layout-content .events {
   padding-left: 284px;
 }
 
