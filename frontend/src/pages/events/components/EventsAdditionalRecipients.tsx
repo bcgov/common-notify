@@ -5,6 +5,7 @@ import TagListField from '@/components/TagListField'
 
 export type RecipientFieldId = 'to' | 'cc' | 'bcc'
 export type RecipientAddresses = Record<RecipientFieldId, string[]>
+export type RecipientVariant = 'email' | 'sms'
 
 const RECIPIENT_FIELDS: { id: RecipientFieldId; label: string }[] = [
   { id: 'to', label: 'To' },
@@ -43,10 +44,12 @@ type EventsAdditionalRecipientsProps = {
   /** Malformed addresses per field, as determined by the parent; empty/absent means valid. */
   invalidAddresses?: RecipientAddresses
   isDisabled?: boolean
+  /** 'email' shows To/CC/BCC behind checkboxes; 'sms' shows only a single always-visible To field. */
+  variant?: RecipientVariant
 }
 
 /**
- * Manually entered recipients for the email channel, shown once "Additional recipient(s)"
+ * Manually entered recipients for the email/SMS channels, shown once "Additional recipient(s)"
  * is selected in the Recipient(s) field.
  */
 const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
@@ -54,6 +57,7 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   onChange,
   invalidAddresses,
   isDisabled = false,
+  variant = 'email',
 }) => {
   const [fields, setFields] = useState(() => buildInitialFields(values))
 
@@ -61,6 +65,28 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
     const next = { ...fields, [id]: { ...fields[id], ...changes } }
     setFields(next)
     onChange(exportAddresses(next))
+  }
+
+  if (variant === 'sms') {
+    const invalid = invalidAddresses?.to ?? []
+
+    return (
+      <div className="events__additional-recipients" role="group" aria-label="Additional recipients">
+        <span className="events__field-label">Additional recipient(s) (required)</span>
+
+        <TagListField
+          values={fields.to.addresses}
+          onChange={(addresses) => updateField('to', { enabled: true, addresses })}
+          aria-label="Phone numbers"
+          placeholder="Enter phone number(s)"
+          isDisabled={isDisabled}
+          isInvalid={invalid.length > 0}
+          errorMessage={
+            invalid.length > 0 ? `Enter valid phone numbers. Invalid: ${invalid.join(', ')}` : undefined
+          }
+        />
+      </div>
+    )
   }
 
   return (
