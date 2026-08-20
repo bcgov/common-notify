@@ -5,13 +5,14 @@ import Breadcrumb from '@/components/Breadcrumb'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
-import type { EmailSettingsValues, EmailDraftValues } from './sections/EventsEmailTab'
+import type { EmailApplyValues, EmailDraftValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
 import {
   getEventById,
   updateEvent,
   updateEventEmailSettings,
   updateEventEmailDraft,
+  updateEventEmailActive,
 } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -73,10 +74,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     }
   }
 
-  async function handleSaveEmailSettings(values: EmailSettingsValues) {
+  async function handleSaveEmailSettings(values: EmailApplyValues) {
     try {
       const updated = await updateEventEmailSettings(eventId, {
-        active: values.active,
         senderEmail: values.senderEmail || null,
         templateId: values.templateId,
         to: values.to,
@@ -97,6 +97,18 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
       showSuccessToast('Draft saved')
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : 'Failed to save draft')
+    }
+  }
+
+  // Rethrows on failure so the switch can revert itself back to its previous state.
+  async function handleToggleEmailActive(active: boolean) {
+    try {
+      const updated = await updateEventEmailActive(eventId, active)
+      setEvent(updated)
+      showSuccessToast(active ? 'Email channel activated' : 'Email channel deactivated')
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to update channel')
+      throw error
     }
   }
 
@@ -127,7 +139,6 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
           <ToggleButton id="settings">Event Settings</ToggleButton>
           <ToggleButton id="email">Email Notification</ToggleButton>
           <ToggleButton id="sms">SMS Notification</ToggleButton>
-          <ToggleButton id="third-party">Third-party Notification</ToggleButton>
         </ToggleButtonGroup>
       </div>
 
@@ -155,6 +166,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             }}
             onSave={handleSaveEmailSettings}
             onSaveDraft={handleSaveEmailDraft}
+            onActiveChange={handleToggleEmailActive}
             isDisabled={!canEdit}
             defaultSenderEmail={defaultSenderEmail}
           />

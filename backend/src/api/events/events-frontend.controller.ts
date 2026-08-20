@@ -29,6 +29,7 @@ import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
 import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
+import { UpdateEmailChannelActiveDto } from './schemas/update-email-channel-active.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
@@ -213,6 +214,26 @@ export class EventsFrontendController {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
     return this.eventsService.updateEmailChannelDraft(tenant.id, eventId, updateDto, user)
+  }
+
+  /**
+   * Immediately toggle an event's EMAIL channel on/off (the "Channel active" switch), separate
+   * from the rest of the Email Notification tab's settings.
+   */
+  @Version('1')
+  @Post(':eventId/channels/email/active')
+  @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({ summary: "Toggle an event's email channel active state" })
+  @ApiOkResponse({ type: EventResponseDto })
+  async updateEmailChannelActive(
+    @Req() req: express.Request,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() updateDto: UpdateEmailChannelActiveDto,
+  ): Promise<EventResponseDto> {
+    const tenant = this.getTenant(req)
+    const user = JwtUserExtractor.extractUser(req)
+    return this.eventsService.updateEmailChannelActive(tenant.id, eventId, updateDto, user)
   }
 
   private getTenant(req: Request | express.Request): Tenant {

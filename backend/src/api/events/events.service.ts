@@ -12,6 +12,7 @@ import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
 import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
+import { UpdateEmailChannelActiveDto } from './schemas/update-email-channel-active.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
@@ -208,7 +209,9 @@ export class EventsService {
    * Update an event's EMAIL channel settings (Email Notification tab)
    *
    * Creates the channel setting row the first time the tab is saved, so an event only gains an
-   * EMAIL row once the user configures one.
+   * EMAIL row once the user configures one. Does not touch `active` - the toggle owns that
+   * field directly via updateEmailChannelActive. Always clears `isDraft`, since applying
+   * settings finalizes them.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -228,21 +231,18 @@ export class EventsService {
     const cc = this.normalizeEmailList(updateDto.cc)
     const bcc = this.normalizeEmailList(updateDto.bcc)
 
-    // Mirrors chk_event_channel_setting_active_complete so an incomplete channel fails with a
-    // usable message rather than a constraint violation.
-    if (updateDto.active && (!senderEmail || !to || !templateId)) {
+    const setting = this.findOrCreateEmailSetting(event, userId)
+
+    // Mirrors chk_event_channel_setting_active_complete: an already-active channel must stay
+    // complete, since applying settings always clears isDraft (the exemption that lets an
+    // incomplete channel stay active as a draft).
+    if (setting.active && (!senderEmail || !to || !templateId)) {
       throw new BadRequestException(
         'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
       )
     }
 
-    const setting = this.findOrCreateEmailSetting(event, userId)
-    setting.active = updateDto.active
-    // Only an actual activation clears the draft flag - using Apply settings to merely
-    // switch the channel off is not "applying" it, so a pending draft survives.
-    if (updateDto.active) {
-      setting.isDraft = false
-    }
+    setting.isDraft = false
     setting.senderEmail = senderEmail
     setting.templateId = templateId
     setting.to = to
@@ -262,9 +262,8 @@ export class EventsService {
    *
    * Unlike updateEmailChannelSetting, null/empty sender email, template and recipients are
    * accepted since chk_event_channel_setting_active_complete exempts is_draft = TRUE rows from
-   * its completeness check. `active` is always honored directly from the toggle - a draft can
-   * be saved as active ahead of the data being complete. Only Apply settings (which always
-   * clears is_draft when turning the channel on) requires completeness.
+   * its completeness check. Does not touch `active` - the toggle owns that field directly via
+   * updateEmailChannelActive.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -285,13 +284,48 @@ export class EventsService {
     const bcc = this.normalizeEmailList(updateDto.bcc)
 
     const setting = this.findOrCreateEmailSetting(event, userId)
-    setting.active = updateDto.active
     setting.isDraft = true
     setting.senderEmail = senderEmail
     setting.templateId = templateId
     setting.to = to
     setting.cc = cc
     setting.bcc = bcc
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * Immediately toggle an event's EMAIL channel on/off (the "Channel active" switch), separate
+   * from the rest of the tab's settings.
+   *
+   * If turning the channel on while it isn't fully configured yet, the row is saved as a draft
+   * so chk_event_channel_setting_active_complete is still satisfied - the tab's other fields are
+   * disabled until the channel is active, so the toggle must be able to turn it on ahead of that
+   * data existing. Otherwise `isDraft` is left untouched, since only Apply settings clears it.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto The new active value
+   * @param userId User toggling the channel (for audit trail)
+   */
+  async updateEmailChannelActive(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateEmailChannelActiveDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+    const setting = this.findOrCreateEmailSetting(event, userId)
+    const isComplete = !!setting.senderEmail && !!setting.to && !!setting.templateId
+
+    setting.active = updateDto.active
+    if (updateDto.active && !isComplete) {
+      setting.isDraft = true
+    }
     setting.isDeleted = false
     setting.updatedBy = userId
 

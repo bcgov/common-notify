@@ -40,8 +40,11 @@ export type EmailSettingsValues = {
   bcc: string[]
 }
 
+// The Apply/Save draft payloads exclude `active` - the "Channel active" toggle saves itself
+// immediately via onActiveChange, separate from the rest of the tab's settings.
+export type EmailApplyValues = Omit<EmailSettingsValues, 'active'>
+
 export type EmailDraftValues = {
-  active: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]
@@ -63,9 +66,11 @@ function isValidEmail(value: string): boolean {
 type EventsEmailTabProps = {
   values: EmailSettingsValues
   /** Saves the email channel settings. */
-  onSave: (values: EmailSettingsValues) => Promise<void>
-  /** Saves the current form state as a draft, null values accepted, bad values not accepted. The active toggle is always honored, even ahead of the rest of the data being complete. */
+  onSave: (values: EmailApplyValues) => Promise<void>
+  /** Saves the current form state as a draft, null values accepted, bad values not accepted. */
   onSaveDraft: (values: EmailDraftValues) => Promise<void>
+  /** Immediately persists the "Channel active" toggle, ahead of the rest of the tab's settings. */
+  onActiveChange: (active: boolean) => Promise<void>
   isDisabled?: boolean
   /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
   defaultSenderEmail?: string | null
@@ -75,6 +80,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   values,
   onSave,
   onSaveDraft,
+  onActiveChange,
   isDisabled = false,
   defaultSenderEmail,
 }) => {
@@ -97,6 +103,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   )
   const [saving, setSaving] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
+  const [togglingActive, setTogglingActive] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
@@ -150,15 +157,27 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     !sameAddresses(recipients.cc, values.cc) ||
     !sameAddresses(recipients.bcc, values.bcc)
   const settingsChanged =
-    channelActive !== values.active ||
     trimmedSenderEmail !== values.senderEmail ||
     (selectedTemplateId ?? null) !== values.templateId ||
     recipientsChanged
-  const isFormDisabled = isDisabled || saving || savingDraft
+  const isFormDisabled = isDisabled || saving || savingDraft || togglingActive
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
   const isApplyDisabled = isFormDisabled || !settingsChanged || hasValidationError
+
+  async function handleActiveChange(next: boolean) {
+    const previous = channelActive
+    setChannelActive(next)
+    setTogglingActive(true)
+    try {
+      await onActiveChange(next)
+    } catch {
+      setChannelActive(previous)
+    } finally {
+      setTogglingActive(false)
+    }
+  }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -170,7 +189,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     setSaving(true)
     try {
       await onSave({
-        active: channelActive,
         senderEmail: trimmedSenderEmail,
         templateId: selectedTemplateId ?? null,
         to: recipients.to,
@@ -190,7 +208,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     setSavingDraft(true)
     try {
       await onSaveDraft({
-        active: channelActive,
         senderEmail: trimmedSenderEmail || null,
         templateId: selectedTemplateId ?? null,
         to: recipients.to,
@@ -209,7 +226,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       <Switch
         labelPosition="left"
         isSelected={channelActive}
-        onChange={setChannelActive}
+        onChange={handleActiveChange}
         isDisabled={isFormDisabled}
       >
         Channel active

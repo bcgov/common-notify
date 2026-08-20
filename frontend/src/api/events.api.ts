@@ -186,10 +186,14 @@ export async function updateEvent(
   }
 }
 
+export type EventEmailSettingsUpdate = Omit<EventEmailSettings, 'active'>
+
 /**
  * Update an event's email channel settings (Email Notification tab)
  *
- * Replaces the stored settings, so the tab must send every field it owns.
+ * Replaces the stored settings, so the tab must send every field it owns. Does not include
+ * `active` - the "Channel active" toggle is saved immediately and separately via
+ * updateEventEmailActive.
  *
  * @param eventId Event ID
  * @param settings Email channel settings
@@ -198,7 +202,7 @@ export async function updateEvent(
  */
 export async function updateEventEmailSettings(
   eventId: string,
-  settings: EventEmailSettings,
+  settings: EventEmailSettingsUpdate,
 ): Promise<EventResponse> {
   try {
     const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email`)
@@ -235,7 +239,6 @@ export async function updateEventEmailSettings(
 }
 
 export interface EventEmailDraftSettings {
-  active: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]
@@ -247,9 +250,9 @@ export interface EventEmailDraftSettings {
  * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
  *
  * Bypasses the required-field validation of updateEventEmailSettings, so a partially filled-in
- * form can be saved, including with `active: true` - the backend allows a draft to be active
- * ahead of the data being complete. The event still shows as a draft until the settings are
- * applied via updateEventEmailSettings.
+ * form can be saved. Does not include `active` - the "Channel active" toggle is saved
+ * immediately and separately via updateEventEmailActive. The event still shows as a draft until
+ * the settings are applied via updateEventEmailSettings.
  *
  * @param eventId Event ID
  * @param settings Partial email channel settings
@@ -281,6 +284,46 @@ export async function updateEventEmailDraft(
 
     throw new Error(
       `Failed to save draft: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
+/**
+ * Immediately toggle an event's email channel on/off (the "Channel active" switch on the Email
+ * Notification tab), independent of the rest of the tab's settings.
+ *
+ * @param eventId Event ID
+ * @param active The new active value
+ * @returns Updated event, reflecting the new active state
+ * @throws Error if the toggle fails
+ */
+export async function updateEventEmailActive(
+  eventId: string,
+  active: boolean,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/events/${eventId}/channels/email/active`,
+    )
+    return await post<EventResponse>({ ...params, data: { active } })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to update channel active state: ${
         responseData.message || (error instanceof Error ? error.message : 'Unknown error')
       }`,
     )

@@ -58,9 +58,6 @@ const CreateEvent: FC = () => {
           <ToggleButton id="sms" isDisabled>
             SMS Notification
           </ToggleButton>
-          <ToggleButton id="third-party" isDisabled>
-            Third-party Notification
-          </ToggleButton>
         </ToggleButtonGroup>
       </div>
 

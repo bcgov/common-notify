@@ -73,7 +73,7 @@ describe('EventsService', () => {
       const result = await service.updateEmailChannelSetting(
         tenantId,
         eventId,
-        { active: false, senderEmail: 'a@gov.bc.ca' },
+        { senderEmail: 'a@gov.bc.ca' },
         'user-guid',
       )
 
@@ -84,8 +84,8 @@ describe('EventsService', () => {
       })
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          active: false,
           senderEmail: 'a@gov.bc.ca',
+          isDraft: false,
           updatedBy: 'user-guid',
         }),
       )
@@ -116,7 +116,7 @@ describe('EventsService', () => {
       await service.updateEmailChannelSetting(
         tenantId,
         eventId,
-        { active: false, senderEmail: 'new@gov.bc.ca' },
+        { senderEmail: 'new@gov.bc.ca' },
         'user-guid',
       )
 
@@ -133,7 +133,6 @@ describe('EventsService', () => {
       mockChannelSettingRepository.create.mockReturnValue({} as EventChannelSetting)
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
-        active: false,
         senderEmail: null,
       })
 
@@ -142,11 +141,12 @@ describe('EventsService', () => {
       )
     })
 
-    it('rejects activating the channel while it has no template', async () => {
+    it('rejects incomplete settings while the channel is currently active, with no template', async () => {
       mockEventRepository.findOne.mockResolvedValueOnce(
         buildEvent([
           {
             channelCode: NotificationChannel.EMAIL,
+            active: true,
             senderEmail: 'a@gov.bc.ca',
             templateId: null,
             isDeleted: false,
@@ -156,18 +156,18 @@ describe('EventsService', () => {
 
       await expect(
         service.updateEmailChannelSetting(tenantId, eventId, {
-          active: true,
           senderEmail: 'a@gov.bc.ca',
         }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
 
-    it('rejects activating the channel with no sender email', async () => {
+    it('rejects incomplete settings while the channel is currently active, with no sender email', async () => {
       mockEventRepository.findOne.mockResolvedValueOnce(
         buildEvent([
           {
             channelCode: NotificationChannel.EMAIL,
+            active: true,
             senderEmail: null,
             templateId: 'template-uuid-1',
             isDeleted: false,
@@ -176,16 +176,17 @@ describe('EventsService', () => {
       )
 
       await expect(
-        service.updateEmailChannelSetting(tenantId, eventId, { active: true, senderEmail: null }),
+        service.updateEmailChannelSetting(tenantId, eventId, { senderEmail: null }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
 
-    it('rejects activating the channel with no "to" recipients', async () => {
+    it('rejects incomplete settings while the channel is currently active, with no "to" recipients', async () => {
       mockEventRepository.findOne.mockResolvedValueOnce(
         buildEvent([
           {
             channelCode: NotificationChannel.EMAIL,
+            active: true,
             senderEmail: 'a@gov.bc.ca',
             templateId: 'template-uuid-1',
             isDeleted: false,
@@ -195,29 +196,49 @@ describe('EventsService', () => {
 
       await expect(
         service.updateEmailChannelSetting(tenantId, eventId, {
-          active: true,
           senderEmail: 'a@gov.bc.ca',
         }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
 
-    it('activates the channel once it has a sender email and a template', async () => {
+    it('allows incomplete settings while the channel is currently inactive', async () => {
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(
+          buildEvent([
+            {
+              channelCode: NotificationChannel.EMAIL,
+              active: false,
+              senderEmail: null,
+              templateId: null,
+              isDeleted: false,
+            },
+          ]),
+        )
+        .mockResolvedValueOnce(buildEvent())
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        senderEmail: 'a@gov.bc.ca',
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ senderEmail: 'a@gov.bc.ca' }),
+      )
+    })
+
+    it('saves complete settings while the channel is currently active', async () => {
       const existing = {
         channelCode: NotificationChannel.EMAIL,
-        active: false,
+        active: true,
         senderEmail: 'a@gov.bc.ca',
         templateId: null,
         isDeleted: false,
       } as EventChannelSetting
       mockEventRepository.findOne
         .mockResolvedValueOnce(buildEvent([existing]))
-        .mockResolvedValueOnce(
-          buildEvent([{ ...existing, active: true, templateId: 'template-uuid-1' }]),
-        )
+        .mockResolvedValueOnce(buildEvent([{ ...existing, templateId: 'template-uuid-1' }]))
 
       const result = await service.updateEmailChannelSetting(tenantId, eventId, {
-        active: true,
         senderEmail: 'a@gov.bc.ca',
         templateId: 'template-uuid-1',
         to: ['recipient@gov.bc.ca'],
@@ -225,7 +246,6 @@ describe('EventsService', () => {
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          active: true,
           templateId: 'template-uuid-1',
           to: 'recipient@gov.bc.ca',
         }),
@@ -234,7 +254,7 @@ describe('EventsService', () => {
       expect(result.channelCodes).toEqual([NotificationChannel.EMAIL])
     })
 
-    it('clears isDraft when activating a channel that was saved as a draft', async () => {
+    it('always clears isDraft, since applying settings finalizes them', async () => {
       const existing = {
         channelCode: NotificationChannel.EMAIL,
         active: false,
@@ -245,40 +265,16 @@ describe('EventsService', () => {
       } as EventChannelSetting
       mockEventRepository.findOne
         .mockResolvedValueOnce(buildEvent([existing]))
-        .mockResolvedValueOnce(buildEvent([{ ...existing, active: true, isDraft: false }]))
+        .mockResolvedValueOnce(buildEvent([{ ...existing, isDraft: false }]))
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
-        active: true,
         senderEmail: 'a@gov.bc.ca',
         templateId: 'template-uuid-1',
         to: ['recipient@gov.bc.ca'],
       })
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ active: true, isDraft: false }),
-      )
-    })
-
-    it('leaves isDraft untouched when merely deactivating a channel', async () => {
-      const existing = {
-        channelCode: NotificationChannel.EMAIL,
-        active: true,
-        isDraft: true,
-        senderEmail: 'a@gov.bc.ca',
-        templateId: 'template-uuid-1',
-        isDeleted: false,
-      } as EventChannelSetting
-      mockEventRepository.findOne
-        .mockResolvedValueOnce(buildEvent([existing]))
-        .mockResolvedValueOnce(buildEvent([{ ...existing, active: false }]))
-
-      await service.updateEmailChannelSetting(tenantId, eventId, {
-        active: false,
-        senderEmail: 'a@gov.bc.ca',
-      })
-
-      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ active: false, isDraft: true }),
+        expect.objectContaining({ isDraft: false }),
       )
     })
 
@@ -296,7 +292,6 @@ describe('EventsService', () => {
         .mockResolvedValueOnce(buildEvent([deleted]))
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
-        active: false,
         senderEmail: 'a@gov.bc.ca',
       })
 
@@ -310,13 +305,29 @@ describe('EventsService', () => {
       mockEventRepository.findOne.mockResolvedValueOnce(null)
 
       await expect(
-        service.updateEmailChannelSetting(tenantId, eventId, { active: false, senderEmail: null }),
+        service.updateEmailChannelSetting(tenantId, eventId, { senderEmail: null }),
       ).rejects.toThrow(NotFoundException)
     })
   })
 
   describe('updateEmailChannelDraft', () => {
-    it('honors active on an existing channel even when the draft data is incomplete', async () => {
+    it('creates the EMAIL channel setting as a draft the first time the tab is saved', async () => {
+      const created = { eventId, channelCode: NotificationChannel.EMAIL } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(
+          buildEvent([{ ...created, isDraft: true, senderEmail: 'a@gov.bc.ca' }]),
+        )
+      mockChannelSettingRepository.create.mockReturnValue(created)
+
+      await service.updateEmailChannelDraft(tenantId, eventId, { senderEmail: 'a@gov.bc.ca' })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isDraft: true, senderEmail: 'a@gov.bc.ca' }),
+      )
+    })
+
+    it('saves incomplete draft data without requiring completeness', async () => {
       const existing = {
         id: 'setting-uuid-1',
         channelCode: NotificationChannel.EMAIL,
@@ -327,33 +338,18 @@ describe('EventsService', () => {
       } as EventChannelSetting
       mockEventRepository.findOne
         .mockResolvedValueOnce(buildEvent([existing]))
-        .mockResolvedValueOnce(buildEvent([{ ...existing, active: true, isDraft: true }]))
+        .mockResolvedValueOnce(buildEvent([{ ...existing, isDraft: true }]))
 
       await service.updateEmailChannelDraft(tenantId, eventId, {
-        active: true,
         to: ['recipient@gov.bc.ca'],
       })
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ active: true, isDraft: true, senderEmail: null }),
+        expect.objectContaining({ isDraft: true, to: 'recipient@gov.bc.ca', senderEmail: null }),
       )
     })
 
-    it('activates a brand-new channel when the draft is toggled on, even with no other data', async () => {
-      const created = { channelCode: NotificationChannel.EMAIL } as EventChannelSetting
-      mockEventRepository.findOne
-        .mockResolvedValueOnce(buildEvent())
-        .mockResolvedValueOnce(buildEvent([{ ...created, active: true, isDraft: true }]))
-      mockChannelSettingRepository.create.mockReturnValue(created)
-
-      await service.updateEmailChannelDraft(tenantId, eventId, { active: true })
-
-      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ active: true, isDraft: true }),
-      )
-    })
-
-    it('deactivates immediately when the draft is toggled off', async () => {
+    it('leaves active untouched, since the toggle owns it independently', async () => {
       const existing = {
         id: 'setting-uuid-1',
         channelCode: NotificationChannel.EMAIL,
@@ -365,17 +361,96 @@ describe('EventsService', () => {
       } as EventChannelSetting
       mockEventRepository.findOne
         .mockResolvedValueOnce(buildEvent([existing]))
-        .mockResolvedValueOnce(buildEvent([{ ...existing, active: false, isDraft: true }]))
+        .mockResolvedValueOnce(
+          buildEvent([{ ...existing, isDraft: true, templateId: 'template-uuid-2' }]),
+        )
 
       await service.updateEmailChannelDraft(tenantId, eventId, {
+        templateId: 'template-uuid-2',
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ active: true, isDraft: true, templateId: 'template-uuid-2' }),
+      )
+    })
+
+    it('throws when the event does not belong to the tenant', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateEmailChannelDraft(tenantId, eventId, { senderEmail: null }),
+      ).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  describe('updateEmailChannelActive', () => {
+    it('creates the EMAIL channel setting and marks it a draft when turned on before it is complete', async () => {
+      const created = { eventId, channelCode: NotificationChannel.EMAIL } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent([{ ...created, active: true, isDraft: true }]))
+      mockChannelSettingRepository.create.mockReturnValue(created)
+
+      await service.updateEmailChannelActive(tenantId, eventId, { active: true }, 'user-guid')
+
+      expect(mockChannelSettingRepository.create).toHaveBeenCalledWith({
+        eventId,
+        channelCode: NotificationChannel.EMAIL,
+        createdBy: 'user-guid',
+      })
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ active: true, isDraft: true }),
+      )
+    })
+
+    it('turns the channel on without forcing a draft when the stored data is already complete', async () => {
+      const existing = {
+        id: 'setting-uuid-1',
+        channelCode: NotificationChannel.EMAIL,
         active: false,
+        isDraft: false,
         senderEmail: 'a@gov.bc.ca',
         templateId: 'template-uuid-1',
-      })
+        to: 'recipient@gov.bc.ca',
+        isDeleted: false,
+      } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent([existing]))
+        .mockResolvedValueOnce(buildEvent([{ ...existing, active: true }]))
+
+      await service.updateEmailChannelActive(tenantId, eventId, { active: true })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ active: true, isDraft: false }),
+      )
+    })
+
+    it('turns the channel off without touching isDraft', async () => {
+      const existing = {
+        id: 'setting-uuid-1',
+        channelCode: NotificationChannel.EMAIL,
+        active: true,
+        isDraft: true,
+        senderEmail: 'a@gov.bc.ca',
+        isDeleted: false,
+      } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent([existing]))
+        .mockResolvedValueOnce(buildEvent([{ ...existing, active: false }]))
+
+      await service.updateEmailChannelActive(tenantId, eventId, { active: false })
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ active: false, isDraft: true }),
       )
+    })
+
+    it('throws when the event does not belong to the tenant', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateEmailChannelActive(tenantId, eventId, { active: true }),
+      ).rejects.toThrow(NotFoundException)
     })
   })
 
