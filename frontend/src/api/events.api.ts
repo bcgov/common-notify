@@ -10,6 +10,10 @@ export enum EventStatus {
 export interface EventEmailSettings {
   active: boolean
   senderEmail: string | null
+  templateId: string | null
+  to: string[]
+  cc: string[]
+  bcc: string[]
 }
 
 export interface EventResponse {
