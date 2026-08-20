@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
+  AlertDialog,
   Button,
+  Modal,
   Select,
   Switch,
   TextField,
@@ -13,6 +15,7 @@ import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
@@ -104,6 +107,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [saving, setSaving] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [togglingActive, setTogglingActive] = useState(false)
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
@@ -172,11 +176,33 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     setTogglingActive(true)
     try {
       await onActiveChange(next)
-    } catch {
+      showSuccessToast(
+        next
+          ? 'Email channel reactivated: This channel is now active and can send notifications. Your settings have been restored, and you can make changes at any time.'
+          : 'Email channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
+      )
+    } catch (error) {
       setChannelActive(previous)
+      showErrorToast(
+        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+      )
     } finally {
       setTogglingActive(false)
     }
+  }
+
+  // Turning the channel on saves immediately; turning it off asks for confirmation first.
+  function handleSwitchChange(next: boolean) {
+    if (next) {
+      void handleActiveChange(true)
+    } else {
+      setConfirmDeactivateOpen(true)
+    }
+  }
+
+  async function handleConfirmDeactivate() {
+    setConfirmDeactivateOpen(false)
+    await handleActiveChange(false)
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -195,6 +221,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         cc: recipients.cc,
         bcc: recipients.bcc,
       })
+      showSuccessToast('Settings applied: Your email notification settings have been saved.')
+    } catch (error) {
+      showErrorToast(
+        `Unable to apply settings: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+      )
     } finally {
       setSaving(false)
     }
@@ -214,6 +245,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         cc: recipients.cc,
         bcc: recipients.bcc,
       })
+      showSuccessToast('Draft saved: Your changes have been saved. Continue editing anytime.')
+    } catch (error) {
+      showErrorToast(
+        `Unable to save draft: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+      )
     } finally {
       setSavingDraft(false)
     }
@@ -226,11 +262,46 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       <Switch
         labelPosition="left"
         isSelected={channelActive}
-        onChange={handleActiveChange}
+        onChange={handleSwitchChange}
         isDisabled={isFormDisabled}
       >
         Channel active
       </Switch>
+
+      <Modal
+        isOpen={confirmDeactivateOpen}
+        isDismissable={!togglingActive}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeactivateOpen(false)
+        }}
+      >
+        <AlertDialog
+          variant="confirmation"
+          title="Deactivate this channel?"
+          buttons={
+            <>
+              <Button
+                variant="secondary"
+                danger
+                onPress={handleConfirmDeactivate}
+                isDisabled={togglingActive}
+              >
+                Deactivate
+              </Button>
+              <Button
+                variant="primary"
+                onPress={() => setConfirmDeactivateOpen(false)}
+                isDisabled={togglingActive}
+              >
+                Cancel
+              </Button>
+            </>
+          }
+        >
+          This will stop notifications from being sent through this channel. Your settings will be
+          saved and can be reactivated at any time.
+        </AlertDialog>
+      </Modal>
 
       <TextField
         label={

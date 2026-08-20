@@ -74,42 +74,27 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     }
   }
 
+  // Errors and success messages are surfaced by EventsEmailTab itself via InlineAlert, so these
+  // just persist and re-sync state - failures propagate up to the tab's own try/catch.
   async function handleSaveEmailSettings(values: EmailApplyValues) {
-    try {
-      const updated = await updateEventEmailSettings(eventId, {
-        senderEmail: values.senderEmail || null,
-        templateId: values.templateId,
-        to: values.to,
-        cc: values.cc,
-        bcc: values.bcc,
-      })
-      setEvent(updated)
-      showSuccessToast('Email settings saved')
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : 'Failed to save email settings')
-    }
+    const updated = await updateEventEmailSettings(eventId, {
+      senderEmail: values.senderEmail || null,
+      templateId: values.templateId,
+      to: values.to,
+      cc: values.cc,
+      bcc: values.bcc,
+    })
+    setEvent(updated)
   }
 
   async function handleSaveEmailDraft(values: EmailDraftValues) {
-    try {
-      const updated = await updateEventEmailDraft(eventId, values)
-      setEvent(updated)
-      showSuccessToast('Draft saved')
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : 'Failed to save draft')
-    }
+    const updated = await updateEventEmailDraft(eventId, values)
+    setEvent(updated)
   }
 
-  // Rethrows on failure so the switch can revert itself back to its previous state.
   async function handleToggleEmailActive(active: boolean) {
-    try {
-      const updated = await updateEventEmailActive(eventId, active)
-      setEvent(updated)
-      showSuccessToast(active ? 'Email channel activated' : 'Email channel deactivated')
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : 'Failed to update channel')
-      throw error
-    }
+    const updated = await updateEventEmailActive(eventId, active)
+    setEvent(updated)
   }
 
   return (
