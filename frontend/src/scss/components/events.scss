@@ -59,6 +59,12 @@
   .bcds-react-aria-Button {
     align-self: flex-start;
   }
+
+  .bcds-react-aria-TextField--Label,
+  .bcds-react-aria-TextArea--Label,
+  .bcds-react-aria-Select--Label {
+    font-weight: 700;
+  }
 }
 
 .events__actions {
@@ -105,6 +111,7 @@
 
 .events__field-label {
   font: var(--typography-regular-small-body);
+  font-weight: 700;
   color: var(--typography-color-primary);
 }
 
@@ -150,6 +157,25 @@
   font: var(--typography-regular-body);
   color: var(--typography-color-primary);
   white-space: pre-wrap;
+}
+
+// Grows the read-only preview TextArea to fit its content instead of scrolling,
+// while still letting the user resize it by hand. Same pattern as
+// template-preview__raw in templates.scss.
+.events__template-preview--auto-size {
+  .bcds-react-aria-TextArea--Input {
+    field-sizing: content;
+    resize: vertical;
+    min-height: 6rem;
+  }
+
+  // Keep a white field: the DS greys read-only inputs, but this one reads as
+  // content rather than a disabled control. Match the DS `[data-readonly]`
+  // selector so this override wins on specificity.
+  .bcds-react-aria-TextArea[data-readonly] > .bcds-react-aria-TextArea--Container,
+  .bcds-react-aria-TextArea[data-readonly] .bcds-react-aria-TextArea--Input {
+    background: var(--surface-color-forms-default, #fff);
+  }
 }
 
 .events__section-heading {

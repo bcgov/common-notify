@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { Button, Select, Switch, TextField } from '@bcgov/design-system-react-components'
+import { Button, Select, Switch, TextArea, TextField } from '@bcgov/design-system-react-components'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
@@ -86,19 +86,9 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({ isDisabled = false }) => {
       />
 
       {selectedTemplate && (
-        <div className="events__template-preview">
+        <div className="events__template-preview events__template-preview--auto-size">
           <span className="events__template-preview-label">Template Preview</span>
-          <div className="events__template-preview-box">
-            {selectedTemplate.subject && (
-              <p className="events__template-preview-subject">
-                <strong>Subject line:</strong> {selectedTemplate.subject}
-              </p>
-            )}
-            <p className="events__template-preview-body-label">
-              <strong>Body text:</strong>
-            </p>
-            <p className="events__template-preview-content">{selectedTemplate.body}</p>
-          </div>
+          <TextArea aria-label="Template preview" value={selectedTemplate.body} isReadOnly />
         </div>
       )}
 
