@@ -233,3 +233,53 @@ export async function updateEventEmailSettings(
     )
   }
 }
+
+export interface EventEmailDraftSettings {
+  senderEmail: string | null
+  templateId: string | null
+  to: string[]
+  cc: string[]
+  bcc: string[]
+}
+
+/**
+ * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
+ *
+ * Bypasses the required-field validation of updateEventEmailSettings, so a partially filled-in
+ * form can be saved. The channel is always stored inactive.
+ *
+ * @param eventId Event ID
+ * @param settings Partial email channel settings
+ * @returns Updated event, including the saved draft settings
+ * @throws Error if the save fails
+ */
+export async function updateEventEmailDraft(
+  eventId: string,
+  settings: EventEmailDraftSettings,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/events/${eventId}/channels/email/draft`,
+    )
+    return await post<EventResponse>({ ...params, data: settings })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to save draft: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
