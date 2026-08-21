@@ -7,5 +7,5 @@ export const Route = createFileRoute('/events/$eventId')({
 
 function EditEventPage() {
   const params = Route.useParams()
-  return <EditEvent eventId={params.eventId} />
+  return <EditEvent key={params.eventId} eventId={params.eventId} />
 }

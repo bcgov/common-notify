@@ -46,11 +46,11 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
   }, [dispatch])
 
   // The page owns the single event fetch, so the title, breadcrumb and every tab read
-  // from one request and switching tabs re-fetches nothing.
+  // from one request and switching tabs re-fetches nothing. The route keys this component by
+  // eventId, so a fresh mount (and fresh useState(null)) is what resets event/loadError between
+  // events - this effect only needs to fetch.
   useEffect(() => {
     let active = true
-    setEvent(null)
-    setLoadError(null)
 
     getEventById(eventId)
       .then((loaded) => {
