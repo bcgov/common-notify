@@ -73,7 +73,7 @@ describe('EventsService', () => {
       const result = await service.updateEmailChannelSetting(
         tenantId,
         eventId,
-        { senderEmail: 'a@gov.bc.ca' },
+        { senderEmail: 'a@gov.bc.ca', templateId: null },
         'user-guid',
       )
 
@@ -116,7 +116,7 @@ describe('EventsService', () => {
       await service.updateEmailChannelSetting(
         tenantId,
         eventId,
-        { senderEmail: 'new@gov.bc.ca' },
+        { senderEmail: 'new@gov.bc.ca', templateId: null },
         'user-guid',
       )
 
@@ -134,6 +134,7 @@ describe('EventsService', () => {
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
         senderEmail: null,
+        templateId: null,
       })
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
@@ -157,6 +158,7 @@ describe('EventsService', () => {
       await expect(
         service.updateEmailChannelSetting(tenantId, eventId, {
           senderEmail: 'a@gov.bc.ca',
+          templateId: null,
         }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
@@ -176,7 +178,10 @@ describe('EventsService', () => {
       )
 
       await expect(
-        service.updateEmailChannelSetting(tenantId, eventId, { senderEmail: null }),
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          senderEmail: null,
+          templateId: 'template-uuid-1',
+        }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
@@ -197,6 +202,7 @@ describe('EventsService', () => {
       await expect(
         service.updateEmailChannelSetting(tenantId, eventId, {
           senderEmail: 'a@gov.bc.ca',
+          templateId: 'template-uuid-1',
         }),
       ).rejects.toThrow(BadRequestException)
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
@@ -219,6 +225,7 @@ describe('EventsService', () => {
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
         senderEmail: 'a@gov.bc.ca',
+        templateId: null,
       })
 
       expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
@@ -293,6 +300,7 @@ describe('EventsService', () => {
 
       await service.updateEmailChannelSetting(tenantId, eventId, {
         senderEmail: 'a@gov.bc.ca',
+        templateId: null,
       })
 
       expect(mockChannelSettingRepository.create).not.toHaveBeenCalled()
@@ -305,7 +313,10 @@ describe('EventsService', () => {
       mockEventRepository.findOne.mockResolvedValueOnce(null)
 
       await expect(
-        service.updateEmailChannelSetting(tenantId, eventId, { senderEmail: null }),
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          senderEmail: null,
+          templateId: null,
+        }),
       ).rejects.toThrow(NotFoundException)
     })
   })
