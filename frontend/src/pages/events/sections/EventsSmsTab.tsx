@@ -50,15 +50,41 @@ function sameAddresses(a: string[], b: string[]): boolean {
 const DEFAULT_PHONE_REGION = 'CA'
 const FORMATTING_CHARACTERS = /[\s\-().]/g
 
-function isValidPhone(value: string): boolean {
+// Returns the E.164 form, or null if `value` isn't a resolvable phone number.
+function normalizePhone(value: string): string | null {
   const cleaned = value.replace(FORMATTING_CHARACTERS, '')
 
   try {
     const phoneNumber = parsePhoneNumberFromString(cleaned, DEFAULT_PHONE_REGION)
-    return !!phoneNumber && !phoneNumber.ext && phoneNumber.isValid()
+    return phoneNumber && !phoneNumber.ext && phoneNumber.isValid() ? phoneNumber.number : null
   } catch {
-    return false
+    return null
   }
+}
+
+function isValidPhone(value: string): boolean {
+  return normalizePhone(value) !== null
+}
+
+// Differently formatted entries can normalize to the same E.164 number (e.g. "2505551234" and
+// "250-555-1234"); TagListField only catches exact-string repeats, so flag later entries whose
+// normalized form repeats an earlier one, the same way a malformed number is flagged, instead of
+// letting the form silently drop them.
+function duplicatePhoneNumbers(addresses: string[]): string[] {
+  const seen = new Set<string>()
+  const duplicates: string[] = []
+
+  for (const address of addresses) {
+    const normalized = normalizePhone(address)
+    if (normalized === null) continue
+    if (seen.has(normalized)) {
+      duplicates.push(address)
+    } else {
+      seen.add(normalized)
+    }
+  }
+
+  return duplicates
 }
 
 type EventsSmsTabProps = {
@@ -99,6 +125,14 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
     values.templateId ?? undefined,
   )
 
+  // The backend normalizes recipients (e.g. phone numbers to E.164) on save, and EditEvent
+  // passes the saved result back down as `values`. Re-sync so that's reflected immediately
+  // instead of only after a manual page refresh; no-ops while `values.to` still matches what
+  // was last saved.
+  useEffect(() => {
+    setRecipients((prev) => (sameAddresses(prev.to, values.to) ? prev : { ...prev, to: values.to }))
+  }, [values.to])
+
   // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
     let active = true
@@ -119,8 +153,11 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
+  const duplicateRecipients = duplicatePhoneNumbers(recipients.to)
   const invalidRecipients: RecipientAddresses = {
-    to: recipients.to.filter((address) => !isValidPhone(address)),
+    to: recipients.to.filter(
+      (address) => !isValidPhone(address) || duplicateRecipients.includes(address),
+    ),
     cc: [],
     bcc: [],
   }

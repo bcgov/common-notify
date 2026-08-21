@@ -623,8 +623,9 @@ export class EventsService {
    * PhoneNumberService, dropping blanks and numbers that don't parse. The DTO's
    * IsNormalizablePhoneNumber validator already rejects bad numbers before this runs, so
    * unparseable entries aren't expected here - this mirrors normalizeEmailList's defensive
-   * filtering rather than assuming that. Returns null when nothing is left, matching
-   * chk_event_channel_setting_to (never an empty string).
+   * filtering rather than assuming that. HasUniqueNormalizedPhoneNumbers already rejects
+   * duplicate numbers before this runs too, so no dedup step is needed here. Returns null when
+   * nothing is left, matching chk_event_channel_setting_to (never an empty string).
    */
   private normalizePhoneList(addresses?: string[]): string | null {
     if (!addresses?.length) return null

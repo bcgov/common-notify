@@ -1,5 +1,6 @@
 import { IsArray, IsOptional, IsUUID, ValidateIf } from 'class-validator'
 import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
+import { HasUniqueNormalizedPhoneNumbers } from '../../notify/schemas/validators/unique-normalized-phone-numbers.validator'
 
 /**
  * DTO for saving an event's SMS channel settings as a draft ("Save draft").
@@ -25,5 +26,6 @@ export class UpdateSmsChannelDraftDto {
   @IsOptional()
   @IsArray()
   @IsNormalizablePhoneNumber({ each: true })
+  @HasUniqueNormalizedPhoneNumbers()
   to?: string[]
 }

@@ -82,7 +82,9 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
           isDisabled={isDisabled}
           isInvalid={invalid.length > 0}
           errorMessage={
-            invalid.length > 0 ? `Enter valid phone numbers. Invalid: ${invalid.join(', ')}` : undefined
+            invalid.length > 0
+              ? `Enter valid, unique phone numbers. Invalid or duplicate: ${invalid.join(', ')}`
+              : undefined
           }
         />
       </div>
