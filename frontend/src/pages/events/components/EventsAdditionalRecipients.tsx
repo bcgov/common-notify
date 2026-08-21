@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Checkbox } from '@bcgov/design-system-react-components'
 import TagListField from '@/components/TagListField'
@@ -26,6 +26,10 @@ function buildInitialFields(values: RecipientAddresses): Record<RecipientFieldId
     }),
     {} as Record<RecipientFieldId, RecipientField>,
   )
+}
+
+function sameAddresses(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((address, index) => address === b[index])
 }
 
 /** Addresses to report to the parent: only for fields the user has checked on. */
@@ -60,6 +64,29 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   variant = 'email',
 }) => {
   const [fields, setFields] = useState(() => buildInitialFields(values))
+
+  // The parent re-seeds `values` once a save resolves (e.g. with backend-normalized phone
+  // numbers), but `fields` is otherwise local state - resync addresses so that's reflected
+  // without waiting for this component to remount. No-ops while unchanged, so it doesn't fight
+  // the user's own edits (which flow out via onChange and back in as an already-equal `values`).
+  useEffect(() => {
+    setFields((prev) => {
+      let changed = false
+      const next = RECIPIENT_FIELDS.reduce(
+        (acc, { id }) => {
+          if (sameAddresses(prev[id].addresses, values[id])) {
+            acc[id] = prev[id]
+          } else {
+            changed = true
+            acc[id] = { ...prev[id], addresses: values[id] }
+          }
+          return acc
+        },
+        {} as Record<RecipientFieldId, RecipientField>,
+      )
+      return changed ? next : prev
+    })
+  }, [values])
 
   function updateField(id: RecipientFieldId, changes: Partial<RecipientField>) {
     const next = { ...fields, [id]: { ...fields[id], ...changes } }
