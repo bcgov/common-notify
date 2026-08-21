@@ -419,6 +419,7 @@ export class EventsService {
       emailSettings: emailSetting
         ? {
             active: emailSetting.active,
+            isDraft: emailSetting.isDraft,
             senderEmail: emailSetting.senderEmail,
             templateId: emailSetting.templateId,
             to: this.splitEmailList(emailSetting.to),

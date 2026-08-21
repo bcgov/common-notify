@@ -36,6 +36,8 @@ const RECIPIENT_ITEMS = [
 
 export type EmailSettingsValues = {
   active: boolean
+  /** True while this channel has unapplied "Save draft" edits - lets Apply settings run even without further changes, since applying clears it. */
+  isDraft: boolean
   senderEmail: string
   templateId: string | null
   to: string[]
@@ -44,8 +46,9 @@ export type EmailSettingsValues = {
 }
 
 // The Apply/Save draft payloads exclude `active` - the "Channel active" toggle saves itself
-// immediately via onActiveChange, separate from the rest of the tab's settings.
-export type EmailApplyValues = Omit<EmailSettingsValues, 'active'>
+// immediately via onActiveChange, separate from the rest of the tab's settings - and `isDraft`,
+// which the backend derives rather than accepts.
+export type EmailApplyValues = Omit<EmailSettingsValues, 'active' | 'isDraft'>
 
 export type EmailDraftValues = {
   senderEmail: string | null
@@ -172,7 +175,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
-  const isApplyDisabled = isFormDisabled || !settingsChanged || recipientsHaveError
+  // A draft channel's settings haven't been applied yet, so Apply settings stays enabled even
+  // without further edits - clicking it (once valid) both applies the current values and clears
+  // isDraft.
+  const isApplyDisabled =
+    isFormDisabled || (!settingsChanged && !values.isDraft) || recipientsHaveError
 
   async function handleActiveChange(next: boolean) {
     const previous = channelActive

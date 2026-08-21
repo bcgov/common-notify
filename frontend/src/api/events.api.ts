@@ -9,6 +9,8 @@ export enum EventStatus {
 
 export interface EventEmailSettings {
   active: boolean
+  /** True while this channel has unapplied "Save draft" edits - cleared once Apply settings succeeds. */
+  isDraft: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]

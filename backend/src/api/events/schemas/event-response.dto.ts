@@ -11,6 +11,13 @@ export class EventEmailSettingsDto {
   active: boolean
 
   /**
+   * True while this channel's settings have unapplied "Save draft" edits - cleared when
+   * Apply settings succeeds.
+   * @example false
+   */
+  isDraft: boolean
+
+  /**
    * From address for email sends. Null while the tab is still a draft.
    * @example "no-reply@gov.bc.ca"
    */

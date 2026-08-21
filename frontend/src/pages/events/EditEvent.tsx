@@ -143,6 +143,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
           <EventsEmailTab
             values={{
               active: event.emailSettings?.active ?? false,
+              isDraft: event.emailSettings?.isDraft ?? false,
               senderEmail: event.emailSettings?.senderEmail ?? '',
               templateId: event.emailSettings?.templateId ?? null,
               to: event.emailSettings?.to ?? [],
