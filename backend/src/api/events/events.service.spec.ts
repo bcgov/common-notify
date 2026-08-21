@@ -58,18 +58,16 @@ describe('EventsService', () => {
   describe('updateEmailChannelSetting', () => {
     it('creates the EMAIL channel setting the first time the tab is saved', async () => {
       const created = { eventId, channelCode: NotificationChannel.EMAIL } as EventChannelSetting
-      mockEventRepository.findOne
-        .mockResolvedValueOnce(buildEvent())
-        .mockResolvedValueOnce(
-          buildEvent([
-            {
-              channelCode: NotificationChannel.EMAIL,
-              active: false,
-              senderEmail: 'a@gov.bc.ca',
-              templateId: null,
-            },
-          ]),
-        )
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent()).mockResolvedValueOnce(
+        buildEvent([
+          {
+            channelCode: NotificationChannel.EMAIL,
+            active: false,
+            senderEmail: 'a@gov.bc.ca',
+            templateId: null,
+          },
+        ]),
+      )
       mockChannelSettingRepository.create.mockReturnValue(created)
 
       const result = await service.updateEmailChannelSetting(

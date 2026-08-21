@@ -98,7 +98,11 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
     const invalid = invalidAddresses?.to ?? []
 
     return (
-      <div className="events__additional-recipients" role="group" aria-label="Additional recipients">
+      <div
+        className="events__additional-recipients"
+        role="group"
+        aria-label="Additional recipients"
+      >
         <span className="events__field-label">Additional recipient(s) (required)</span>
 
         <TagListField
