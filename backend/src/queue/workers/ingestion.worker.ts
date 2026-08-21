@@ -113,7 +113,7 @@ export class IngestionWorker {
         if (!request || typeof request !== 'object') {
           throw new Error('Invalid request: request payload is missing or invalid')
         }
-        let processedRequest = request
+        let processedRequest
 
         // Mail merge email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
