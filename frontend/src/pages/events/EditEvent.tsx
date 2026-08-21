@@ -176,6 +176,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             onSaveDraft={handleSaveEmailDraft}
             onActiveChange={handleToggleEmailActive}
             isDisabled={!canEdit}
+            isConfigured={event.emailSettings !== null}
             defaultSenderEmail={defaultSenderEmail}
           />
         ) : selectedTab === 'sms' ? (
@@ -190,6 +191,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             onSaveDraft={handleSaveSmsDraft}
             onActiveChange={handleToggleSmsActive}
             isDisabled={!canEdit}
+            isConfigured={event.smsSettings !== null}
           />
         ) : (
           <p className="events__help">Not yet implemented</p>

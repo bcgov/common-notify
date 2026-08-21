@@ -96,6 +96,8 @@ type EventsSmsTabProps = {
   /** Immediately persists the "Channel active" toggle, ahead of the rest of the tab's settings. */
   onActiveChange: (active: boolean) => Promise<void>
   isDisabled?: boolean
+  /** False until this channel has been saved for the first time (event.smsSettings is still null). */
+  isConfigured: boolean
 }
 
 const EventsSmsTab: FC<EventsSmsTabProps> = ({
@@ -104,6 +106,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   onSaveDraft,
   onActiveChange,
   isDisabled = false,
+  isConfigured,
 }) => {
   // Seeded once at mount, the same way EventsEmailTab does it: the page passes the saved
   // settings back in via `values`, which is what the change check below compares against.
@@ -168,6 +171,10 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
+  // Before the channel has ever been saved, there's nothing to configure yet - keep the fields
+  // hidden entirely until it's switched on for the first time. Once settings exist, deactivating
+  // goes back to showing them disabled rather than hiding them again.
+  const showFields = isConfigured || channelActive
   const isApplyDisabled = isFormDisabled || !settingsChanged || hasValidationError
 
   async function handleActiveChange(next: boolean) {
@@ -265,6 +272,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
       <Modal
         isOpen={confirmDeactivateOpen}
         isDismissable={!togglingActive}
+        aria-label="Deactivate this channel?"
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
         }}
@@ -297,70 +305,74 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
         </AlertDialog>
       </Modal>
 
-      <TextField
-        label="Sender phone number"
-        value=""
-        description={SENDER_PHONE_HELP}
-        size="small"
-        isDisabled
-      />
+      {showFields && (
+        <>
+          <TextField
+            label="Sender phone number"
+            value=""
+            description={SENDER_PHONE_HELP}
+            size="small"
+            isDisabled
+          />
 
-      <Select
-        label="Template"
-        placeholder="Select a template..."
-        items={templateItems}
-        value={selectedTemplateId}
-        onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
-        size="small"
-        isDisabled={areFieldsDisabled}
-        isRequired
-      />
+          <Select
+            label="Template"
+            placeholder="Select a template..."
+            items={templateItems}
+            value={selectedTemplateId}
+            onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
+            size="small"
+            isDisabled={areFieldsDisabled}
+            isRequired
+          />
 
-      {selectedTemplate && (
-        <div className="events__template-preview events__template-preview--auto-size">
-          <span className="events__template-preview-label">Template Preview</span>
-          <TextArea aria-label="Template preview" value={selectedTemplate.body} isReadOnly />
-        </div>
+          {selectedTemplate && (
+            <div className="events__template-preview events__template-preview--auto-size">
+              <span className="events__template-preview-label">Template Preview</span>
+              <TextArea aria-label="Template preview" value={selectedTemplate.body} isReadOnly />
+            </div>
+          )}
+
+          <Select
+            label="Recipient(s)"
+            placeholder="Select a recipient..."
+            selectionMode="multiple"
+            items={RECIPIENT_ITEMS}
+            value={selectedRecipients}
+            onChange={(keys) => setSelectedRecipients(keys.map(String))}
+            size="small"
+            isDisabled={areFieldsDisabled}
+            isRequired
+          />
+
+          {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
+            <EventsAdditionalRecipients
+              values={recipients}
+              onChange={setRecipients}
+              invalidAddresses={invalidRecipients}
+              isDisabled={areFieldsDisabled}
+              variant="sms"
+            />
+          )}
+
+          <div className="events__actions">
+            <Button variant="secondary" isDisabled>
+              Preview
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              isDisabled={isFormDisabled || !settingsChanged || hasValidationError}
+              onPress={handleSaveDraft}
+            >
+              {savingDraft ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
+              {saving ? 'Saving…' : 'Apply settings'}
+            </Button>
+          </div>
+        </>
       )}
-
-      <Select
-        label="Recipient(s)"
-        placeholder="Select a recipient..."
-        selectionMode="multiple"
-        items={RECIPIENT_ITEMS}
-        value={selectedRecipients}
-        onChange={(keys) => setSelectedRecipients(keys.map(String))}
-        size="small"
-        isDisabled={areFieldsDisabled}
-        isRequired
-      />
-
-      {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
-        <EventsAdditionalRecipients
-          values={recipients}
-          onChange={setRecipients}
-          invalidAddresses={invalidRecipients}
-          isDisabled={areFieldsDisabled}
-          variant="sms"
-        />
-      )}
-
-      <div className="events__actions">
-        <Button variant="secondary" isDisabled>
-          Preview
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          isDisabled={isFormDisabled || !settingsChanged || hasValidationError}
-          onPress={handleSaveDraft}
-        >
-          {savingDraft ? 'Saving…' : 'Save draft'}
-        </Button>
-        <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
-          {saving ? 'Saving…' : 'Apply settings'}
-        </Button>
-      </div>
     </form>
   )
 }

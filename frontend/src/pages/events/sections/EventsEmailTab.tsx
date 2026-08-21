@@ -78,6 +78,8 @@ type EventsEmailTabProps = {
   /** Immediately persists the "Channel active" toggle, ahead of the rest of the tab's settings. */
   onActiveChange: (active: boolean) => Promise<void>
   isDisabled?: boolean
+  /** False until this channel has been saved for the first time (event.emailSettings is still null). */
+  isConfigured: boolean
   /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
   defaultSenderEmail?: string | null
 }
@@ -88,6 +90,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   onSaveDraft,
   onActiveChange,
   isDisabled = false,
+  isConfigured,
   defaultSenderEmail,
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
@@ -175,6 +178,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
+  // Before the channel has ever been saved, there's nothing to configure yet - keep the fields
+  // hidden entirely until it's switched on for the first time. Once settings exist, deactivating
+  // goes back to showing them disabled rather than hiding them again.
+  const showFields = isConfigured || channelActive
   // A draft channel's settings haven't been applied yet, so Apply settings stays enabled even
   // without further edits - clicking it (once valid) both applies the current values and clears
   // isDraft.
@@ -290,6 +297,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       <Modal
         isOpen={confirmDeactivateOpen}
         isDismissable={!togglingActive}
+        aria-label="Deactivate this channel?"
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
         }}
@@ -322,125 +330,129 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         </AlertDialog>
       </Modal>
 
-      <TextField
-        label={
-          (
-            <>
-              Sender email address{' '}
-              <TooltipTrigger>
-                <Button
-                  aria-label="About the sender email address"
-                  className="events__tooltip-trigger"
-                  isIconButton
-                  size="xsmall"
-                  type="button"
-                  variant="tertiary"
-                >
-                  <SvgInfoIcon />
-                </Button>
+      {showFields && (
+        <>
+          <TextField
+            label={
+              (
+                <>
+                  Sender email address{' '}
+                  <TooltipTrigger>
+                    <Button
+                      aria-label="About the sender email address"
+                      className="events__tooltip-trigger"
+                      isIconButton
+                      size="xsmall"
+                      type="button"
+                      variant="tertiary"
+                    >
+                      <SvgInfoIcon />
+                    </Button>
 
-                <Tooltip placement="right">{SENDER_EMAIL_TOOLTIP}</Tooltip>
-              </TooltipTrigger>
-            </>
-          ) as unknown as string
-        }
-        value={senderEmail}
-        onChange={setSenderEmail}
-        description="The default sender email is based on your tenant but can be changed. It must be linked to a registered IDIR account or an approved email address."
-        size="small"
-        isDisabled={areFieldsDisabled}
-        isRequired
-        isInvalid={displayedSenderEmailError ? true : undefined}
-        errorMessage={displayedSenderEmailError || 'Sender email address cannot be empty.'}
-      />
+                    <Tooltip placement="right">{SENDER_EMAIL_TOOLTIP}</Tooltip>
+                  </TooltipTrigger>
+                </>
+              ) as unknown as string
+            }
+            value={senderEmail}
+            onChange={setSenderEmail}
+            description="The default sender email is based on your tenant but can be changed. It must be linked to a registered IDIR account or an approved email address."
+            size="small"
+            isDisabled={areFieldsDisabled}
+            isRequired
+            isInvalid={displayedSenderEmailError ? true : undefined}
+            errorMessage={displayedSenderEmailError || 'Sender email address cannot be empty.'}
+          />
 
-      <Select
-        label="Recipient(s)"
-        placeholder="Select recipients..."
-        selectionMode="multiple"
-        items={RECIPIENT_ITEMS}
-        value={selectedRecipients}
-        onChange={(keys) => setSelectedRecipients(keys.map(String))}
-        size="small"
-        isDisabled={areFieldsDisabled}
-        isRequired
-      />
+          <Select
+            label="Recipient(s)"
+            placeholder="Select recipients..."
+            selectionMode="multiple"
+            items={RECIPIENT_ITEMS}
+            value={selectedRecipients}
+            onChange={(keys) => setSelectedRecipients(keys.map(String))}
+            size="small"
+            isDisabled={areFieldsDisabled}
+            isRequired
+          />
 
-      {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
-        <EventsAdditionalRecipients
-          values={recipients}
-          onChange={setRecipients}
-          invalidAddresses={invalidRecipients}
-          isDisabled={areFieldsDisabled}
-        />
-      )}
+          {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
+            <EventsAdditionalRecipients
+              values={recipients}
+              onChange={setRecipients}
+              invalidAddresses={invalidRecipients}
+              isDisabled={areFieldsDisabled}
+            />
+          )}
 
-      <Select
-        label="Template"
-        placeholder="Select a template..."
-        items={templateItems}
-        value={selectedTemplateId}
-        onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
-        size="small"
-        isDisabled={areFieldsDisabled}
-        isRequired
-      />
+          <Select
+            label="Template"
+            placeholder="Select a template..."
+            items={templateItems}
+            value={selectedTemplateId}
+            onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
+            size="small"
+            isDisabled={areFieldsDisabled}
+            isRequired
+          />
 
-      {selectedTemplate && (
-        <div className="events__template-preview">
-          <span className="events__template-preview-label">Template Preview</span>
-          <div className="events__template-preview-box">
-            <p className="events__template-preview-subject">
-              <strong>Subject line:</strong> {selectedTemplate.subject}
-            </p>
-            <p className="events__template-preview-body-label">
-              <strong>Body text:</strong>
-            </p>
-            <p className="events__template-preview-content">{selectedTemplate.body}</p>
+          {selectedTemplate && (
+            <div className="events__template-preview">
+              <span className="events__template-preview-label">Template Preview</span>
+              <div className="events__template-preview-box">
+                <p className="events__template-preview-subject">
+                  <strong>Subject line:</strong> {selectedTemplate.subject}
+                </p>
+                <p className="events__template-preview-body-label">
+                  <strong>Body text:</strong>
+                </p>
+                <p className="events__template-preview-content">{selectedTemplate.body}</p>
+              </div>
+            </div>
+          )}
+
+          <Select
+            label="Header"
+            placeholder="Use tenant default"
+            items={NOT_IMPLEMENTED_ITEMS}
+            size="small"
+            isDisabled
+          />
+
+          <Select
+            label="Footer"
+            placeholder="Use tenant default"
+            items={NOT_IMPLEMENTED_ITEMS}
+            size="small"
+            isDisabled
+          />
+
+          <Select
+            label="Attachment service"
+            placeholder="Select an attachment..."
+            items={NOT_IMPLEMENTED_ITEMS}
+            size="small"
+            isDisabled
+          />
+
+          <div className="events__actions">
+            <Button variant="secondary" isDisabled>
+              Preview
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              isDisabled={isFormDisabled || !settingsChanged || recipientsHaveError}
+              onPress={handleSaveDraft}
+            >
+              {savingDraft ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
+              {saving ? 'Saving…' : 'Apply settings'}
+            </Button>
           </div>
-        </div>
+        </>
       )}
-
-      <Select
-        label="Header"
-        placeholder="Use tenant default"
-        items={NOT_IMPLEMENTED_ITEMS}
-        size="small"
-        isDisabled
-      />
-
-      <Select
-        label="Footer"
-        placeholder="Use tenant default"
-        items={NOT_IMPLEMENTED_ITEMS}
-        size="small"
-        isDisabled
-      />
-
-      <Select
-        label="Attachment service"
-        placeholder="Select an attachment..."
-        items={NOT_IMPLEMENTED_ITEMS}
-        size="small"
-        isDisabled
-      />
-
-      <div className="events__actions">
-        <Button variant="secondary" isDisabled>
-          Preview
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          isDisabled={isFormDisabled || !settingsChanged || recipientsHaveError}
-          onPress={handleSaveDraft}
-        >
-          {savingDraft ? 'Saving…' : 'Save draft'}
-        </Button>
-        <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
-          {saving ? 'Saving…' : 'Apply settings'}
-        </Button>
-      </div>
     </form>
   )
 }
