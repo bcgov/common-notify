@@ -2,6 +2,23 @@ import type { AxiosError } from 'axios'
 import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedEventResponse } from '@/interfaces/PaginatedNotificationResponse'
 
+/**
+ * ValidationExceptionFilter always sets `message` to the generic 'Validation failed' but
+ * includes the real per-field detail in `errors` - prefer that when present.
+ */
+function extractErrorMessage(responseData: any, fallback: string): string {
+  if (Array.isArray(responseData?.errors) && responseData.errors.length > 0) {
+    return responseData.errors.join('; ')
+  }
+  if (Array.isArray(responseData?.message)) {
+    return responseData.message.join(', ')
+  }
+  if (typeof responseData?.message === 'string') {
+    return responseData.message
+  }
+  return fallback
+}
+
 export enum EventStatus {
   ACTIVE = 'ACTIVE',
   DRAFT = 'DRAFT',
@@ -18,6 +35,12 @@ export interface EventEmailSettings {
   bcc: string[]
 }
 
+export interface EventSmsSettings {
+  active: boolean
+  templateId: string | null
+  to: string[]
+}
+
 export interface EventResponse {
   id: string
   name: string
@@ -27,6 +50,8 @@ export interface EventResponse {
   status: EventStatus
   /** Email channel settings, null until the Email Notification tab is first saved. */
   emailSettings: EventEmailSettings | null
+  /** SMS channel settings, null until the SMS Notification tab is first saved. */
+  smsSettings: EventSmsSettings | null
   createdAt: string
   updatedAt: string
 }
@@ -216,14 +241,10 @@ export async function updateEventEmailSettings(
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
     }
-    // The backend rejects activating a channel that is not fully configured; its message
-    // names the missing piece, so surface it as-is.
-    if (axiosError.response?.status === STATUS_CODES.BadRequest && responseData.message) {
-      throw new Error(
-        Array.isArray(responseData.message)
-          ? responseData.message.join(', ')
-          : responseData.message,
-      )
+    // The backend rejects activating a channel that is not fully configured, or an invalid
+    // recipient value; either way, its message names the specific problem, so surface it as-is.
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
     }
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to update this event')
@@ -266,9 +287,7 @@ export async function updateEventEmailDraft(
   settings: EventEmailDraftSettings,
 ): Promise<EventResponse> {
   try {
-    const params = generateApiParameters(
-      `/api/v1/frontend/events/${eventId}/channels/email/draft`,
-    )
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email/draft`)
     return await post<EventResponse>({ ...params, data: settings })
   } catch (error) {
     const axiosError = error as AxiosError
@@ -276,6 +295,9 @@ export async function updateEventEmailDraft(
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
     }
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to update this event')
@@ -306,9 +328,143 @@ export async function updateEventEmailActive(
   active: boolean,
 ): Promise<EventResponse> {
   try {
-    const params = generateApiParameters(
-      `/api/v1/frontend/events/${eventId}/channels/email/active`,
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email/active`)
+    return await post<EventResponse>({ ...params, data: { active } })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to update channel active state: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
     )
+  }
+}
+
+export type EventSmsSettingsUpdate = Omit<EventSmsSettings, 'active'>
+
+/**
+ * Update an event's SMS channel settings (SMS Notification tab)
+ *
+ * Replaces the stored settings, so the tab must send every field it owns. Does not include
+ * `active` - the "Channel active" toggle is saved immediately and separately via
+ * updateEventSmsActive.
+ *
+ * @param eventId Event ID
+ * @param settings SMS channel settings
+ * @returns Updated event, including the saved SMS settings
+ * @throws Error if update fails
+ */
+export async function updateEventSmsSettings(
+  eventId: string,
+  settings: EventSmsSettingsUpdate,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms`)
+    return await post<EventResponse>({ ...params, data: settings })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    // The backend rejects activating a channel that is not fully configured, or an invalid
+    // recipient value; either way, its message names the specific problem, so surface it as-is.
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to update SMS settings: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
+export interface EventSmsDraftSettings {
+  templateId: string | null
+  to: string[]
+}
+
+/**
+ * Save an event's SMS channel settings as a draft (Save draft on the SMS Notification tab)
+ *
+ * Bypasses the required-field validation of updateEventSmsSettings, so a partially filled-in
+ * form can be saved. Does not include `active` - the "Channel active" toggle is saved
+ * immediately and separately via updateEventSmsActive. The event still shows as a draft until
+ * the settings are applied via updateEventSmsSettings.
+ *
+ * @param eventId Event ID
+ * @param settings Partial SMS channel settings
+ * @returns Updated event, including the saved draft settings
+ * @throws Error if the save fails
+ */
+export async function updateEventSmsDraft(
+  eventId: string,
+  settings: EventSmsDraftSettings,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms/draft`)
+    return await post<EventResponse>({ ...params, data: settings })
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Event not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to update this event')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to update this event')
+    }
+
+    throw new Error(
+      `Failed to save draft: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
+/**
+ * Immediately toggle an event's SMS channel on/off (the "Channel active" switch on the SMS
+ * Notification tab), independent of the rest of the tab's settings.
+ *
+ * @param eventId Event ID
+ * @param active The new active value
+ * @returns Updated event, reflecting the new active state
+ * @throws Error if the toggle fails
+ */
+export async function updateEventSmsActive(
+  eventId: string,
+  active: boolean,
+): Promise<EventResponse> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms/active`)
     return await post<EventResponse>({ ...params, data: { active } })
   } catch (error) {
     const axiosError = error as AxiosError

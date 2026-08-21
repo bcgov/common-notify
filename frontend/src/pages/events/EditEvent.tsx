@@ -7,12 +7,16 @@ import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
 import type { EmailApplyValues, EmailDraftValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
+import type { SmsApplyValues, SmsDraftValues } from './sections/EventsSmsTab'
 import {
   getEventById,
   updateEvent,
   updateEventEmailSettings,
   updateEventEmailDraft,
   updateEventEmailActive,
+  updateEventSmsSettings,
+  updateEventSmsDraft,
+  updateEventSmsActive,
 } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -97,6 +101,24 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     setEvent(updated)
   }
 
+  async function handleSaveSmsSettings(values: SmsApplyValues) {
+    const updated = await updateEventSmsSettings(eventId, {
+      templateId: values.templateId,
+      to: values.to,
+    })
+    setEvent(updated)
+  }
+
+  async function handleSaveSmsDraft(values: SmsDraftValues) {
+    const updated = await updateEventSmsDraft(eventId, values)
+    setEvent(updated)
+  }
+
+  async function handleToggleSmsActive(active: boolean) {
+    const updated = await updateEventSmsActive(eventId, active)
+    setEvent(updated)
+  }
+
   return (
     <div className="events">
       <Breadcrumb
@@ -157,7 +179,18 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             defaultSenderEmail={defaultSenderEmail}
           />
         ) : selectedTab === 'sms' ? (
-          <EventsSmsTab />
+          // The SMS channel starts disabled until the tab has been saved with it switched on.
+          <EventsSmsTab
+            values={{
+              active: event.smsSettings?.active ?? false,
+              templateId: event.smsSettings?.templateId ?? null,
+              to: event.smsSettings?.to ?? [],
+            }}
+            onSave={handleSaveSmsSettings}
+            onSaveDraft={handleSaveSmsDraft}
+            onActiveChange={handleToggleSmsActive}
+            isDisabled={!canEdit}
+          />
         ) : (
           <p className="events__help">Not yet implemented</p>
         )}
