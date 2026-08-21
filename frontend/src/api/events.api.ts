@@ -213,7 +213,7 @@ export async function updateEvent(
   }
 }
 
-export type EventEmailSettingsUpdate = Omit<EventEmailSettings, 'active'>
+export type EventEmailSettingsUpdate = Omit<EventEmailSettings, 'active' | 'isDraft'>
 
 /**
  * Update an event's email channel settings (Email Notification tab)
