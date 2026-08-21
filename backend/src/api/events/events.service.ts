@@ -13,11 +13,15 @@ import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
 import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
 import { UpdateEmailChannelActiveDto } from './schemas/update-email-channel-active.dto'
+import { UpdateSmsChannelSettingDto } from './schemas/update-sms-channel-setting.dto'
+import { UpdateSmsChannelDraftDto } from './schemas/update-sms-channel-draft.dto'
+import { UpdateSmsChannelActiveDto } from './schemas/update-sms-channel-active.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { normalizeRecipient } from '../safelist/safelist.util'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -64,6 +68,7 @@ export class EventsService {
     private readonly eventRepository: Repository<NotifyEvent>,
     @InjectRepository(EventChannelSetting)
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
+    private readonly phoneNumberService: PhoneNumberService,
   ) {}
 
   /**
@@ -354,6 +359,146 @@ export class EventsService {
   }
 
   /**
+   * Update an event's SMS channel settings (SMS Notification tab)
+   *
+   * Creates the channel setting row the first time the tab is saved, so an event only gains an
+   * SMS row once the user configures one. Does not touch `active` - the toggle owns that field
+   * directly via updateSmsChannelActive. Always clears `isDraft`, since applying settings
+   * finalizes them.
+   *
+   * `fromPhoneNumberId` is not settable yet (the pool claim flow is a follow-up), so it stays
+   * permanently null - meaning an active, non-draft SMS channel is not yet reachable, the same
+   * way an EMAIL channel can't be applied without a sender email.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto SMS channel settings, replacing what is stored
+   * @param userId User updating the settings (for audit trail)
+   */
+  async updateSmsChannelSetting(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateSmsChannelSettingDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+    const templateId = updateDto.templateId ?? null
+    const to = this.normalizePhoneList(updateDto.to)
+
+    const setting = this.findOrCreateSmsSetting(event, userId)
+
+    // Mirrors chk_event_channel_setting_active_complete: an already-active channel must stay
+    // complete, since applying settings always clears isDraft (the exemption that lets an
+    // incomplete channel stay active as a draft).
+    if (setting.active && (!to || !templateId || !setting.fromPhoneNumberId)) {
+      throw new BadRequestException(
+        'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
+      )
+    }
+
+    setting.isDraft = false
+    setting.templateId = templateId
+    setting.to = to
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    // Re-read so the derived channelCodes and status reflect the row that was just written.
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * Save an event's SMS channel settings as a draft (Save draft on the SMS Notification tab)
+   *
+   * Unlike updateSmsChannelSetting, null/empty template and recipients are accepted since
+   * chk_event_channel_setting_active_complete exempts is_draft = TRUE rows from its completeness
+   * check. Does not touch `active` - the toggle owns that field directly via
+   * updateSmsChannelActive.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto Partial SMS channel settings
+   * @param userId User saving the draft (for audit trail)
+   */
+  async updateSmsChannelDraft(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateSmsChannelDraftDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+    const templateId = updateDto.templateId ?? null
+    const to = this.normalizePhoneList(updateDto.to)
+
+    const setting = this.findOrCreateSmsSetting(event, userId)
+    setting.isDraft = true
+    setting.templateId = templateId
+    setting.to = to
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * Immediately toggle an event's SMS channel on/off (the "Channel active" switch), separate
+   * from the rest of the tab's settings.
+   *
+   * If turning the channel on while it isn't fully configured yet, the row is saved as a draft
+   * so chk_event_channel_setting_active_complete is still satisfied - the tab's other fields are
+   * disabled until the channel is active, so the toggle must be able to turn it on ahead of that
+   * data existing. Otherwise `isDraft` is left untouched, since only Apply settings clears it.
+   *
+   * @param tenantId The tenant ID
+   * @param eventId The event ID
+   * @param updateDto The new active value
+   * @param userId User toggling the channel (for audit trail)
+   */
+  async updateSmsChannelActive(
+    tenantId: string,
+    eventId: string,
+    updateDto: UpdateSmsChannelActiveDto,
+    userId: string = 'system',
+  ): Promise<EventResponseDto> {
+    const event = await this.findEvent(tenantId, eventId)
+    const setting = this.findOrCreateSmsSetting(event, userId)
+    const isComplete = !!setting.to && !!setting.templateId && !!setting.fromPhoneNumberId
+
+    setting.active = updateDto.active
+    if (updateDto.active && !isComplete) {
+      setting.isDraft = true
+    }
+    setting.isDeleted = false
+    setting.updatedBy = userId
+
+    await this.channelSettingRepository.save(setting)
+
+    return this.getEvent(tenantId, eventId)
+  }
+
+  /**
+   * The event's live SMS channel setting, or a new unsaved one to populate.
+   *
+   * uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
+   * (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
+   */
+  private findOrCreateSmsSetting(event: NotifyEvent, userId: string): EventChannelSetting {
+    return (
+      (event.channelSettings ?? []).find(
+        (existing) => existing.channelCode === NotificationChannel.SMS,
+      ) ??
+      this.channelSettingRepository.create({
+        eventId: event.id,
+        channelCode: NotificationChannel.SMS,
+        createdBy: userId,
+      })
+    )
+  }
+
+  /**
    * Load an event with its channel settings, or throw
    */
   private async findEvent(tenantId: string, eventId: string): Promise<NotifyEvent> {
@@ -409,6 +554,7 @@ export class EventsService {
     // data being complete - so it doesn't count as a real send channel until it's been applied.
     const hasAppliedActiveChannel = settings.some((setting) => setting.active && !setting.isDraft)
     const emailSetting = this.findEmailSetting(event)
+    const smsSetting = this.findSmsSetting(event)
 
     return {
       id: event.id,
@@ -422,9 +568,16 @@ export class EventsService {
             isDraft: emailSetting.isDraft,
             senderEmail: emailSetting.senderEmail,
             templateId: emailSetting.templateId,
-            to: this.splitEmailList(emailSetting.to),
-            cc: this.splitEmailList(emailSetting.cc),
-            bcc: this.splitEmailList(emailSetting.bcc),
+            to: this.splitRecipientList(emailSetting.to),
+            cc: this.splitRecipientList(emailSetting.cc),
+            bcc: this.splitRecipientList(emailSetting.bcc),
+          }
+        : null,
+      smsSettings: smsSetting
+        ? {
+            active: smsSetting.active,
+            templateId: smsSetting.templateId,
+            to: this.splitRecipientList(smsSetting.to),
           }
         : null,
       createdAt: event.createdAt,
@@ -438,6 +591,15 @@ export class EventsService {
   private findEmailSetting(event: NotifyEvent): EventChannelSetting | undefined {
     return (event.channelSettings ?? []).find(
       (setting) => setting.channelCode === NotificationChannel.EMAIL && !setting.isDeleted,
+    )
+  }
+
+  /**
+   * The event's live SMS channel setting, if it has one
+   */
+  private findSmsSetting(event: NotifyEvent): EventChannelSetting | undefined {
+    return (event.channelSettings ?? []).find(
+      (setting) => setting.channelCode === NotificationChannel.SMS && !setting.isDeleted,
     )
   }
 
@@ -457,9 +619,27 @@ export class EventsService {
   }
 
   /**
+   * Normalizes a list of recipient phone numbers to E.164 (default region CA) via
+   * PhoneNumberService, dropping blanks and numbers that don't parse. The DTO's
+   * IsNormalizablePhoneNumber validator already rejects bad numbers before this runs, so
+   * unparseable entries aren't expected here - this mirrors normalizeEmailList's defensive
+   * filtering rather than assuming that. Returns null when nothing is left, matching
+   * chk_event_channel_setting_to (never an empty string).
+   */
+  private normalizePhoneList(addresses?: string[]): string | null {
+    if (!addresses?.length) return null
+
+    const normalized = addresses
+      .map((address) => this.phoneNumberService.normalize(address))
+      .filter((address): address is string => !!address)
+
+    return normalized.length > 0 ? normalized.join(',') : null
+  }
+
+  /**
    * Splits a stored comma-separated to/cc/bcc value back into a list for the API response.
    */
-  private splitEmailList(value: string | null): string[] {
+  private splitRecipientList(value: string | null): string[] {
     return value ? value.split(',') : []
   }
 }

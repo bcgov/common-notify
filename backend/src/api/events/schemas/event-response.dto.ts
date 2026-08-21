@@ -49,6 +49,29 @@ export class EventEmailSettingsDto {
 }
 
 /**
+ * The event's SMS channel settings, backing the SMS Notification tab
+ */
+export class EventSmsSettingsDto {
+  /**
+   * Whether the event sends on the SMS channel
+   * @example false
+   */
+  active: boolean
+
+  /**
+   * Template used to render this channel. Null until the tab has a template saved.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  templateId: string | null
+
+  /**
+   * Primary recipients for this channel. Empty until the tab has recipients saved.
+   * @example ["+12505551234"]
+   */
+  to: string[]
+}
+
+/**
  * DTO for event responses from the API
  */
 export class EventResponseDto {
@@ -89,6 +112,11 @@ export class EventResponseDto {
    * EMAIL channel settings, or null until the Email Notification tab is first saved
    */
   emailSettings: EventEmailSettingsDto | null
+
+  /**
+   * SMS channel settings, or null until the SMS Notification tab is first saved
+   */
+  smsSettings: EventSmsSettingsDto | null
 
   /**
    * Timestamp when the event was created

@@ -5,6 +5,7 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
@@ -19,7 +20,7 @@ import { EventsService } from './events.service'
     FeatureFlagModule,
   ],
   controllers: [EventsFrontendController],
-  providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard],
+  providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard, PhoneNumberService],
   exports: [EventsService],
 })
 export class EventsModule {}

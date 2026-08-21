@@ -7,6 +7,7 @@ import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 
 describe('EventsService', () => {
   let service: EventsService
@@ -41,6 +42,7 @@ describe('EventsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
+        PhoneNumberService,
         { provide: getRepositoryToken(NotifyEvent), useValue: mockEventRepository },
         {
           provide: getRepositoryToken(EventChannelSetting),
