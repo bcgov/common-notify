@@ -112,6 +112,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
+  // Validation errors only surface after a Save draft / Apply settings attempt, not on every keystroke.
+  const [validationAttempted, setValidationAttempted] = useState(false)
 
   // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
@@ -151,11 +153,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     cc: recipients.cc.filter((address) => !isValidEmail(address)),
     bcc: recipients.bcc.filter((address) => !isValidEmail(address)),
   }
-  const hasValidationError =
-    Boolean(senderEmailError) ||
+  const recipientsHaveError =
     invalidRecipients.to.length > 0 ||
     invalidRecipients.cc.length > 0 ||
     invalidRecipients.bcc.length > 0
+  const hasValidationError = Boolean(senderEmailError) || recipientsHaveError
+  // Recipients validate live; the sender email error only surfaces once a save attempt has run it.
+  const displayedSenderEmailError = validationAttempted ? senderEmailError : ''
   const recipientsChanged =
     !sameAddresses(recipients.to, values.to) ||
     !sameAddresses(recipients.cc, values.cc) ||
@@ -168,7 +172,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
-  const isApplyDisabled = isFormDisabled || !settingsChanged || hasValidationError
+  const isApplyDisabled = isFormDisabled || !settingsChanged || recipientsHaveError
 
   async function handleActiveChange(next: boolean) {
     const previous = channelActive
@@ -212,6 +216,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       return
     }
 
+    if (hasValidationError) {
+      setValidationAttempted(true)
+      return
+    }
+
     setSaving(true)
     try {
       await onSave({
@@ -221,6 +230,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         cc: recipients.cc,
         bcc: recipients.bcc,
       })
+      setValidationAttempted(false)
       showSuccessToast('Settings applied: Your email notification settings have been saved.')
     } catch (error) {
       showErrorToast(
@@ -233,6 +243,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
   async function handleSaveDraft() {
     if (hasValidationError) {
+      setValidationAttempted(true)
       return
     }
 
@@ -245,6 +256,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         cc: recipients.cc,
         bcc: recipients.bcc,
       })
+      setValidationAttempted(false)
       showSuccessToast('Draft saved: Your changes have been saved. Continue editing anytime.')
     } catch (error) {
       showErrorToast(
@@ -331,8 +343,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         size="small"
         isDisabled={areFieldsDisabled}
         isRequired
-        isInvalid={senderEmailError ? true : undefined}
-        errorMessage={senderEmailError || 'Sender email address cannot be empty.'}
+        isInvalid={displayedSenderEmailError ? true : undefined}
+        errorMessage={displayedSenderEmailError || 'Sender email address cannot be empty.'}
       />
 
       <Select
@@ -413,7 +425,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         <Button
           type="button"
           variant="secondary"
-          isDisabled={isFormDisabled || !settingsChanged || hasValidationError}
+          isDisabled={isFormDisabled || !settingsChanged || recipientsHaveError}
           onPress={handleSaveDraft}
         >
           {savingDraft ? 'Saving…' : 'Save draft'}
