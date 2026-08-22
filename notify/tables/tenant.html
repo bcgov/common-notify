@@ -156,6 +156,11 @@
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
                                             <tr>
+                                                <td title="recipient_safelist.tenant_id references tenant.id via fk_recipient_safelist_tenant"><a href='recipient_safelist.html'>recipient_safelist</a><span class='relatedKey'>.tenant_id</span></td>
+                                                <td class="constraint detail">fk_recipient_safelist_tenant</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
+                                            <tr>
                                                 <td title="tenant_settings.tenant_id references tenant.id via fk_tenant_settings_tenant"><a href='tenant_settings.html'>tenant_settings</a><span class='relatedKey'>.tenant_id</span></td>
                                                 <td class="constraint detail">fk_tenant_settings_tenant</td>
                                                 <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
@@ -419,39 +424,42 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="626,5,851,181">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,724,564,1087">
-<area shape="rect" id="node7" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,844,240,961">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="652,199,825,375">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="608,392,869,568">
-<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="651,585,826,761">
-<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="618,1031,859,1295">
-<area shape="rect" id="node8" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="637,1348,841,1495">
-<area shape="rect" id="node9" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="635,779,843,1013">
-<area shape="rect" id="node10" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="913,972,1168,1207">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="635,5,861,181">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,805,564,1168">
+<area shape="rect" id="node8" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,925,240,1043">
+<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="661,199,835,375">
+<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="617,392,879,568">
+<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="661,585,835,761">
+<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="627,1031,869,1295">
+<area shape="rect" id="node7" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="639,1348,857,1553">
+<area shape="rect" id="node9" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="608,1571,888,1717">
+<area shape="rect" id="node10" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="644,779,852,1013">
+<area shape="rect" id="node11" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="932,972,1187,1207">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="626,453,851,629">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,441,564,804">
-<area shape="rect" id="node14" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,561,240,679">
-<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="969,565,1151,653">
-<area shape="rect" id="node4" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="946,355,1174,443">
-<area shape="rect" id="node5" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="931,249,1189,337">
-<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="618,43,859,131">
-<area shape="rect" id="node12" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="287,5,561,93">
-<area shape="rect" id="node7" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="964,460,1156,548">
-<area shape="rect" id="node8" href="attachment.html" target="_top" title="attachment" alt="" coords="652,647,825,823">
-<area shape="rect" id="node9" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="608,840,869,1016">
-<area shape="rect" id="node10" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="651,1033,826,1209">
-<area shape="rect" id="node11" href="feature_flag_code.html" target="_top" title="feature_flag_code" alt="" coords="314,1065,534,1153">
-<area shape="rect" id="node13" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="913,37,1207,125">
-<area shape="rect" id="node15" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="637,253,841,400">
-<area shape="rect" id="node16" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="635,148,843,236">
-<area shape="rect" id="node17" href="webhook_type.html" target="_top" title="webhook_type" alt="" coords="327,145,521,233">
-<area shape="rect" id="node18" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="933,144,1187,232">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="639,947,865,1123">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,540,564,903">
+<area shape="rect" id="node16" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,660,240,777">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="995,755,1178,843">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="608,841,896,929">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="973,860,1201,948">
+<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="957,649,1216,737">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="631,185,873,273">
+<area shape="rect" id="node13" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="287,147,561,235">
+<area shape="rect" id="node8" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="991,965,1183,1053">
+<area shape="rect" id="node9" href="attachment.html" target="_top" title="attachment" alt="" coords="665,291,839,467">
+<area shape="rect" id="node10" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="621,484,883,660">
+<area shape="rect" id="node11" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="665,1176,839,1352">
+<area shape="rect" id="node12" href="feature_flag_code.html" target="_top" title="feature_flag_code" alt="" coords="314,1208,534,1296">
+<area shape="rect" id="node14" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="940,184,1233,272">
+<area shape="rect" id="node15" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="978,1071,1195,1276">
+<area shape="rect" id="node17" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="612,677,892,824">
+<area shape="rect" id="node18" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="648,8,856,96">
+<area shape="rect" id="node19" href="webhook_type.html" target="_top" title="webhook_type" alt="" coords="327,5,521,93">
+<area shape="rect" id="node20" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="959,79,1214,167">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>

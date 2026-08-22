@@ -184,6 +184,15 @@
                                         <td></td>
                                     </tr>
                                     <tr>
+                                        <td><a href="routines/audit_history_preserving_actor__694fd7ef.html">audit_history_preserving_actor()</a></td>
+                                        <td>FUNCTION</td>
+                                        <td>plpgsql</td>
+                                        <td>false</td>
+                                        <td>trigger</td>
+                                        <td>INVOKER</td>
+                                        <td><p>History trigger for tables whose created_by/updated_by are set by the application. Records a full row snapshot after INSERT/UPDATE without modifying the row, attributing the history entry to the row&rsquo;s own audit user. Contrast notify.audit_history(), which overwrites those columns from app.current_user or the database role.</p></td>
+                                    </tr>
+                                    <tr>
                                         <td><a href="routines/uuid_ns_url___18e5b3ba.html">uuid_ns_url()</a></td>
                                         <td>FUNCTION</td>
                                         <td>c</td>

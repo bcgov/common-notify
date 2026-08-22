@@ -262,6 +262,176 @@
                                     </td>
                                     <td><p>Soft delete flag. When true, the settings row is considered inactive and excluded from normal queries.</p></td>
                                 </tr>
+                                <tr>
+                                    <td><span id="default_sender_email">default_sender_email</span></td>
+                                    <td>varchar</td>
+                                    <td>64</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Local part (before @gov.bc.ca) of the tenant-wide default sending/from email address. Max 64 chars; letters, digits, ., -, _.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="email_notifications_enabled">email_notifications_enabled</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>true</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When false, the tenant cannot send email notifications.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="reply_to_email">reply_to_email</span></td>
+                                    <td>varchar</td>
+                                    <td>64</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Optional local part (before @gov.bc.ca) of the default reply-to address. Can be overridden per event.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="use_custom_email_header">use_custom_email_header</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>false</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When true, custom_email_header_title is used instead of the tenant default header title.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="custom_email_header_title">custom_email_header_title</span></td>
+                                    <td>varchar</td>
+                                    <td>60</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Custom email header title (max 60 chars). Used only when use_custom_email_header is true.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="email_attachments_enabled">email_attachments_enabled</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>true</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When true, files may be included as attachments in outgoing emails for this tenant.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="sms_notifications_enabled">sms_notifications_enabled</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>true</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When false, the tenant cannot send SMS notifications.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="include_tenant_name_in_sms">include_tenant_name_in_sms</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>true</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When true, SMS messages are prefixed with the tenant name.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="international_sms_enabled">international_sms_enabled</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>false</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When true, the tenant may send SMS to international numbers.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="safelist_max_entries">safelist_max_entries</span></td>
+                                    <td>int4</td>
+                                    <td>10</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Optional per-tenant override of the maximum number of recipient safelist entries. NULL means use the global notify.configuration key &lsquo;safelist_max_entries&rsquo;.</p></td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -316,6 +486,50 @@
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
+                            <i class="fa fa-sitemap"></i>
+                            <h3 class="box-title">Check Constraints</h3>
+                            <div class="box-tools pull-right">
+                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="box-body">
+                            <table
+                                    id="check_table"
+                                    class="table table-bordered table-striped dataTable"
+                                    role="grid"
+                                    data-paging="true"
+                                    data-page-length="10"
+                                    data-length-change="false">
+                                <thead align='left'>
+                                <tr>
+                                    <th>Constraint Name</th>
+                                    <th>Constraint</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>chk_tenant_settings_default_sender_email</td>
+                                    <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_tenant_settings_safelist_max</td>
+                                    <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_tenant_settings_custom_header</td>
+                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_tenant_settings_reply_to_email</td>
+                                    <td>((reply_to_email IS NULL) OR ((reply_to_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="box box-primary">
+                        <div class="box-header with-border">
                             <i class="fa fa-code-fork"></i>
                             <h3 id="Relationships" class="box-title">Relationships</h3>
                             <div class="box-tools pull-right">
@@ -333,23 +547,24 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="191,5,503,309">
+<area shape="rect" id="node1" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="191,5,609,603">
 <area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,37,147,213">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant_settings.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="513,5,738,93">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,353,425,529">
-<area shape="rect" id="node7" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,415,240,503">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="539,111,712,199">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="495,216,756,304">
-<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="538,321,713,409">
-<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="505,463,746,551">
-<area shape="rect" id="node8" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="469,673,781,977">
-<area shape="rect" id="node9" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="521,568,729,656">
-<area shape="rect" id="node10" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="825,463,1080,551">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="566,5,791,93">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,387,425,563">
+<area shape="rect" id="node8" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,448,240,536">
+<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="592,111,765,199">
+<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="548,216,809,304">
+<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="591,321,766,409">
+<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="558,463,799,551">
+<area shape="rect" id="node7" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="571,673,787,761">
+<area shape="rect" id="node9" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="469,779,888,1376">
+<area shape="rect" id="node10" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="575,568,783,656">
+<area shape="rect" id="node11" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="932,463,1187,551">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant_settings.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>

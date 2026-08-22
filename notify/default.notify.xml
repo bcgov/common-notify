@@ -338,6 +338,7 @@
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
             <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
+            <child column="channel_code" foreignKey="fk_recipient_safelist_channel" implied="false" onDeleteCascade="false" schema="notify" table="recipient_safelist"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
             <child column="channel_code" foreignKey="fk_template_version_channel" implied="false" onDeleteCascade="false" schema="notify" table="template_version"/>
          </column>
@@ -537,6 +538,62 @@
          <index name="notify_user_email_key" unique="true">
             <column ascending="true" name="email"/>
          </index>
+         <index name="uq_notify_user_external_id" unique="true">
+            <column ascending="true" name="external_id"/>
+         </index>
+      </table>
+      <table name="recipient_safelist" remarks="Per-tenant list of recipients that may be sent to in non-production environments, where the recipient_safelist feature flag is enabled. Equivalent to GC Notify service_safelist. Ignored in PROD, where the flag is off." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the safelist entry." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant this safelist entry belongs to. Cascade deleted with the tenant." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_recipient_safelist_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel the entry applies to (EMAIL or SMS). An email address safelisted for EMAIL does not permit SMS sends." size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_recipient_safelist_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="recipient" nullable="false" remarks="Recipient exactly as entered by the administrator (email address or phone number). Displayed in the UI." size="320" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="recipient_normalized" nullable="false" remarks="Canonical form used for comparison by the send path: lowercased/trimmed for EMAIL, E.164 for SMS." size="320" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="label" nullable="true" remarks="Optional free-text label describing the entry (e.g. &quot;QA mailbox&quot;). Nullable." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="Timestamp with timezone when the entry was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="created_by" nullable="true" remarks="Identifier of the user or process that added this entry." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="Timestamp with timezone when the entry was last updated. Maintained by the audit trigger." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this entry." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="10" name="is_deleted" nullable="false" remarks="Soft delete flag. Excluded from the active unique index and from send-path lookups when true." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_recipient_safelist" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_recipient_safelist_tenant" unique="false">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="uq_recipient_safelist_active" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="recipient_normalized"/>
+         </index>
+         <checkConstraint constraint="((channel_code)::text = ANY ((ARRAY['EMAIL'::character varying, 'SMS'::character varying])::text[]))" name="chk_recipient_safelist_channel"/>
+         <checkConstraint constraint="(((recipient_normalized)::text = btrim((recipient_normalized)::text)) AND (length((recipient_normalized)::text) &gt; 0))" name="chk_recipient_safelist_normalized"/>
+         <checkConstraint constraint="(length(btrim((recipient)::text)) &gt; 0)" name="chk_recipient_safelist_recipient"/>
+      </table>
+      <table name="recipient_safelist_history" remarks="Immutable audit log of changes to recipient_safelist. Each row is a full snapshot after INSERT/UPDATE, populated by the notify.audit_history() trigger. Removals are soft deletes and are therefore recorded as UPDATE rows." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="Unique identifier for this history record." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="recipient_safelist.id that was changed." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="Type of operation: I=INSERT, U=UPDATE." size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="User who performed the operation (from app.current_user or the database user)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="Server timestamp when the operation occurred." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="Complete JSON snapshot of the row after the operation." size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="recipient_safelist_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_rs_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_rs_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
+         </index>
+         <index name="idx_rs_history_user" unique="false">
+            <column ascending="true" name="operation_user"/>
+         </index>
       </table>
       <table name="template" remarks="Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Template ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
@@ -657,6 +714,7 @@
             <child column="tenant_id" foreignKey="client_tenant_mapping_tenant_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="client_tenant_mapping"/>
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="tenant_id" foreignKey="fk_recipient_safelist_tenant" implied="false" onDeleteCascade="true" schema="notify" table="recipient_safelist"/>
             <child column="tenant_id" foreignKey="fk_tenant_settings_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_settings"/>
             <child column="tenant_id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
             <child column="tenant_id" foreignKey="webhook_delivery_log_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_delivery_log"/>
@@ -700,6 +758,16 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="updated_at" nullable="false" remarks="Timestamp with timezone when the settings record was last updated. Automatically maintained by trg_tenant_settings_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="false" digits="0" id="7" name="is_deleted" nullable="false" remarks="Soft delete flag. When true, the settings row is considered inactive and excluded from normal queries." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="default_sender_email" nullable="true" remarks="Local part (before @gov.bc.ca) of the tenant-wide default sending/from email address. Max 64 chars; letters, digits, ., -, _." size="64" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="9" name="email_notifications_enabled" nullable="false" remarks="When false, the tenant cannot send email notifications." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="10" name="reply_to_email" nullable="true" remarks="Optional local part (before @gov.bc.ca) of the default reply-to address. Can be overridden per event." size="64" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="11" name="use_custom_email_header" nullable="false" remarks="When true, custom_email_header_title is used instead of the tenant default header title." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="custom_email_header_title" nullable="true" remarks="Custom email header title (max 60 chars). Used only when use_custom_email_header is true." size="60" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="13" name="email_attachments_enabled" nullable="false" remarks="When true, files may be included as attachments in outgoing emails for this tenant." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="14" name="sms_notifications_enabled" nullable="false" remarks="When false, the tenant cannot send SMS notifications." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="15" name="include_tenant_name_in_sms" nullable="false" remarks="When true, SMS messages are prefixed with the tenant name." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="16" name="international_sms_enabled" nullable="false" remarks="When true, the tenant may send SMS to international numbers." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="17" name="safelist_max_entries" nullable="true" remarks="Optional per-tenant override of the maximum number of recipient safelist entries. NULL means use the global notify.configuration key 'safelist_max_entries'." size="10" type="int4" typeCode="4"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="pk_tenant_settings" unique="true">
             <column ascending="true" name="id"/>
@@ -710,6 +778,10 @@
          <index name="uq_tenant_settings_tenant" unique="true">
             <column ascending="true" name="tenant_id"/>
          </index>
+         <checkConstraint constraint="((use_custom_email_header = false) OR (custom_email_header_title IS NOT NULL))" name="chk_tenant_settings_custom_header"/>
+         <checkConstraint constraint="((default_sender_email IS NULL) OR ((default_sender_email)::text ~ '^[A-Za-z0-9._-]{1,64}$'::text))" name="chk_tenant_settings_default_sender_email"/>
+         <checkConstraint constraint="((reply_to_email IS NULL) OR ((reply_to_email)::text ~ '^[A-Za-z0-9._-]{1,64}$'::text))" name="chk_tenant_settings_reply_to_email"/>
+         <checkConstraint constraint="((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))" name="chk_tenant_settings_safelist_max"/>
       </table>
       <table name="tenant_status_code" remarks="Code table for tenant status values. Defines all valid statuses for tenants." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="Status code (e.g., active, disabled). Primary key." size="20" type="varchar" typeCode="12">
@@ -888,6 +960,28 @@ BEGIN
   ) USING NEW;
 
   RETURN NEW;
+END;]]></definition>
+         <parameters>
+            <parameter mode="IN"/>
+         </parameters>
+      </routine>
+      <routine dataAccess="MODIFIES" deterministic="false" name="audit_history_preserving_actor()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
+         <comment><![CDATA[History trigger for tables whose created_by/updated_by are set by the application. Records a full row snapshot after INSERT/UPDATE without modifying the row, attributing the history entry to the row's own audit user. Contrast notify.audit_history(), which overwrites those columns from app.current_user or the database role.]]></comment>
+         <definition language="plpgsql"><![CDATA[DECLARE
+  v_history_table TEXT;
+  v_pk_column TEXT;
+BEGIN
+  v_history_table := TG_ARGV[0];
+  v_pk_column := TG_ARGV[1];
+
+  EXECUTE format(
+    'INSERT INTO notify.%I (target_row_id, operation_type, operation_user,
+     operation_executed_at, data_after_operation) VALUES ($1.%I, %L, $2, now(), to_jsonb($1))',
+    v_history_table, v_pk_column, SUBSTRING(TG_OP, 1, 1)
+  ) USING NEW, COALESCE(NEW.updated_by, NEW.created_by, current_user);
+
+  -- AFTER trigger: the return value is ignored and the row is already written as supplied.
+  RETURN NULL;
 END;]]></definition>
          <parameters>
             <parameter mode="IN"/>

@@ -18,6 +18,7 @@ tenant_settings
 api_key_limit
 api_key_limit_alert
 feature_flag
+recipient_safelist
 user_identity
 api_key_usage
 notification_request_detail
@@ -29,3 +30,4 @@ flyway_schema_history
 mime_type_code
 notification_event_type_code
 notification_request_history
+recipient_safelist_history

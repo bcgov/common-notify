@@ -1,3 +1,4 @@
+recipient_safelist_history
 notification_request_history
 notification_event_type_code
 mime_type_code
@@ -9,6 +10,7 @@ template_version
 notification_request_detail
 api_key_usage
 user_identity
+recipient_safelist
 feature_flag
 api_key_limit_alert
 api_key_limit

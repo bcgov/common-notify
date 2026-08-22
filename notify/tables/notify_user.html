@@ -178,7 +178,7 @@
                                     <td><p>Email address of the user. Must be unique across all Notify users.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="external_id">external_id</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="external_id">external_id</span></td>
                                     <td>varchar</td>
                                     <td>200</td>
                                     <td title='nullable'>√</td>
@@ -389,6 +389,12 @@
                                     <td>Must be unique</td>
                                     <td><span title='Ascending'>Asc</span></td>
                                     <td>email</td>
+                                </tr>
+                                <tr>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_notify_user_external_id</td>
+                                    <td>Must be unique</td>
+                                    <td><span title='Ascending'>Asc</span></td>
+                                    <td>external_id</td>
                                 </tr>
                                 </tbody>
                             </table>
