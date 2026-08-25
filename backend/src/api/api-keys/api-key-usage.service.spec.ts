@@ -71,3 +71,82 @@ describe('ApiKeyUsageService.recordUsage', () => {
     expect(result.every(({ periodStart }) => periodStart instanceof Date)).toBe(true)
   })
 })
+
+describe('ApiKeyUsageService.assertWithinLimits', () => {
+  const apiKeyLimitRepository = { find: vi.fn() }
+  const configurationRepository = { findOne: vi.fn() }
+  const usageQueryBuilder = {
+    select: vi.fn().mockReturnThis(),
+    addSelect: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    andWhere: vi.fn().mockReturnThis(),
+    groupBy: vi.fn().mockReturnThis(),
+    addGroupBy: vi.fn().mockReturnThis(),
+    getRawMany: vi.fn(),
+  }
+  const apiKeyUsageRepository = {
+    createQueryBuilder: vi.fn(() => usageQueryBuilder),
+  }
+
+  const service = new ApiKeyUsageService(
+    {} as Repository<ApiKeyConsumer>,
+    apiKeyLimitRepository as unknown as Repository<ApiKeyLimit>,
+    {} as Repository<ApiKeyLimitAlert>,
+    apiKeyUsageRepository as unknown as Repository<ApiKeyUsage>,
+    configurationRepository as unknown as Repository<NotifyConfiguration>,
+  )
+
+  /** Tenant has a 100/day SMS limit with `usedToday` already spent. */
+  const withDailyUsage = (usedToday: number) => {
+    apiKeyLimitRepository.find.mockResolvedValue([
+      { channelCode: 'SMS', dailyLimit: 100, annualLimit: 100_000 },
+    ])
+    usageQueryBuilder.getRawMany.mockResolvedValue([
+      { channelCode: 'SMS', periodTypeCode: UsagePeriodType.DAY, total: String(usedToday) },
+      { channelCode: 'SMS', periodTypeCode: UsagePeriodType.YEAR, total: String(usedToday) },
+    ])
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    configurationRepository.findOne.mockResolvedValue(null)
+  })
+
+  it('rejects a multi-segment SMS that does not fit in the remaining allowance', async () => {
+    // 99 of 100 used: one message left, but this SMS costs three.
+    withDailyUsage(99)
+
+    await expect(
+      service.assertWithinLimits('consumer-1', [
+        {
+          channel: 'SMS',
+          count: 3,
+          countExplanation: '1 recipient(s) x 3 segments, because the message is too long',
+        },
+      ]),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 429,
+        message: expect.stringContaining('1 recipient(s) x 3 segments'),
+      },
+    })
+  })
+
+  it('accepts a multi-segment SMS that exactly fills the remaining allowance', async () => {
+    withDailyUsage(97)
+
+    await expect(
+      service.assertWithinLimits('consumer-1', [{ channel: 'SMS', count: 3 }]),
+    ).resolves.toBeUndefined()
+  })
+
+  it('reports the segment-inflated request count in the error, not the recipient count', async () => {
+    withDailyUsage(99)
+
+    await expect(
+      service.assertWithinLimits('consumer-1', [{ channel: 'SMS', count: 3 }]),
+    ).rejects.toMatchObject({
+      response: { message: expect.stringContaining('requested 3') },
+    })
+  })
+})

@@ -22,6 +22,7 @@ function RootLayout() {
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const cstarIsLoading = useAppSelector((state) => state.cstar.isLoading)
+  const cstarHasLoaded = useAppSelector((state) => state.cstar.hasLoaded)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
 
   // Track which user we've already fetched tenants for to avoid duplicate fetches
@@ -79,8 +80,13 @@ function RootLayout() {
       return
     }
 
-    // Only check once CSTAR has finished loading
-    if (cstarIsLoading) {
+    // Only check once CSTAR has actually returned.
+    // `cstarIsLoading` is not enough on its own: the effect above dispatches the
+    // tenant fetch in this same commit, so this effect still sees the pre-dispatch
+    // snapshot (isLoading === false, tenants === []). On a first login there is no
+    // tenant in localStorage either, so the check below would fire before CSTAR had
+    // been asked and strand the user on /not-authorized.
+    if (!cstarHasLoaded || cstarIsLoading) {
       return
     }
 
@@ -106,7 +112,7 @@ function RootLayout() {
         navigate({ to: '/not-authorized' })
       }
     }
-  }, [user?.id, cstarTenants, cstarIsLoading, selectedTenant, navigate])
+  }, [user?.id, cstarTenants, cstarIsLoading, cstarHasLoaded, selectedTenant, navigate])
 
   return (
     <Layout>

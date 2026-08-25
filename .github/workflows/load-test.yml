@@ -1,8 +1,8 @@
 name: Load Test
 
 # Ingress load-test SUITE against the DEV environment.
-#   - Manually: Actions → "Load Test" → Run workflow (tune RPS / ramp / burst).
-#   - Automatically: called by merge.yml after the DEV deploy completes.
+#   - Manual only: Actions → "Load Test" → Run workflow (tune RPS / ramp / burst).
+#     It is intentionally NOT run automatically on the DEV deploy.
 #
 # All tests run in ONE job so the DEV backend is switched to the `log` email sink
 # + load-test auto-bind exactly once, then ALWAYS restored. Running them as separate
@@ -23,17 +23,6 @@ on:
         type: string
       burst_size:
         description: Notifications to enqueue for the queue-drain test
-        default: "1000"
-        type: string
-  workflow_call:
-    inputs:
-      target_rps:
-        default: "50"
-        type: string
-      ramp_seconds:
-        default: "60"
-        type: string
-      burst_size:
         default: "1000"
         type: string
 

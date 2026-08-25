@@ -8,9 +8,7 @@ on:
       - "docs/**"
       - ".devcontainer/**"
       - "LICENSE"
-      - ".github/**"
       - ".github/graphics/**"
-      - "!.github/workflows/**"
   workflow_dispatch:
     inputs:
       tag:
@@ -162,16 +160,6 @@ jobs:
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: dev
-
-  # Load-test the freshly deployed DEV environment. Runs alongside the TEST/PROD
-  # promotion (does not gate it). Also runnable manually via the Load Test workflow.
-  load-test-dev:
-    name: Load Test (DEV)
-    needs: [deploy-dev]
-    permissions:
-      contents: read # required so the reusable load-test job can checkout
-    uses: ./.github/workflows/load-test.yml
-    secrets: inherit
 
   gateway-config-test:
     name: Apply TEST Gateway Config

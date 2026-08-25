@@ -1,4 +1,9 @@
-import { ArgumentsHost, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  ArgumentsHost,
+  BadRequestException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import { describe, it, expect, vi } from 'vitest'
 import { GcNotifyExceptionFilter } from './gc-notify-exception.filter'
 
@@ -55,5 +60,20 @@ describe('GcNotifyExceptionFilter', () => {
       result: 'error',
       message: 'Notification not found in database',
     })
+  })
+
+  it('uses the standard GC Notify envelope for atomic bulk-validation 422 errors', () => {
+    const json = vi.fn()
+    const host = buildHost(json)
+    const errors = [
+      {
+        error: 'ValidationError',
+        message: 'Row 2: "12345" is not a valid E.164 phone number',
+      },
+    ]
+
+    filter.catch(new UnprocessableEntityException({ errors }), host)
+
+    expect(json).toHaveBeenCalledWith({ status_code: 422, errors })
   })
 })

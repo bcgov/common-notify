@@ -54,7 +54,7 @@ describe('GcNotifyPassthroughController', () => {
   describe('sendSms', () => {
     it('always calls GcNotifyApiClient.sendSms and forwards the auth header', async () => {
       const body: CreateSmsNotificationRequest = {
-        phone_number: '+15555550100',
+        phone_number: '+491512345678901',
         template_id: 'tpl-2',
       }
       const expected = { id: 'notif-2' }
@@ -68,8 +68,15 @@ describe('GcNotifyPassthroughController', () => {
   })
 
   describe('sendBulk', () => {
-    it('always calls GcNotifyApiClient.sendBulk and forwards the auth header', async () => {
-      const body = { name: 'batch', template_id: 'tpl-1', rows: [] } as PostBulkRequest
+    it('forwards malformed rows unchanged without local validation', async () => {
+      const body = {
+        name: 'batch',
+        template_id: 'tpl-1',
+        rows: [
+          ['phone number', 'name'],
+          ['12345', 'Alice'],
+        ],
+      } as PostBulkRequest
       const expected = { id: 'job-1' }
       mockGcNotifyApiClient.sendBulk.mockResolvedValue(expected)
 
