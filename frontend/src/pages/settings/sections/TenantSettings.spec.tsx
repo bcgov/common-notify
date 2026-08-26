@@ -18,6 +18,12 @@ vi.mock('@/redux/thunks/settings.thunks', () => ({
   updateTenantSettings: vi.fn((payload) => ({ type: 'tenantSettings/update', payload })),
 }))
 
+// The API key block owns its own fetch, slice and dialogs and is covered by
+// ApiKeyField.spec.tsx. Stubbing it keeps this spec about the settings form.
+vi.mock('./ApiKeyField', () => ({
+  default: () => <div data-testid="api-key-field" />,
+}))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),

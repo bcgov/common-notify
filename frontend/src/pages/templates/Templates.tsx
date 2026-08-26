@@ -126,10 +126,10 @@ const Templates: FC = () => {
   }
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Notification Templates" />
 
-      <div className="templates-page__search">
+      <div className="page__toolbar">
         <SearchField
           value={searchInput}
           onChange={setSearchInput}

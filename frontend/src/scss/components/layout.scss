@@ -15,9 +15,10 @@
   background-color: $secondary-color;
   color: $white;
 
-  // Widen the BCDS header's inner container (default max-width is 1100px)
+  // Release the BCDS header's inner container (default max-width is 1100px) so the
+  // header tracks the body, which no longer caps its width either.
   .bcds-header > .bcds-header--container {
-    max-width: 1376px;
+    max-width: none;
   }
 }
 
@@ -110,27 +111,25 @@
 .layout-body {
   display: flex;
   flex: 1;
-  justify-content: center;
 }
 
 .layout-body-inner {
   display: flex;
   width: 100%;
-  max-width: 1400px;
 }
 
-.layout-sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  border-right: 1px solid $border-default;
-  padding: $spacing-lg $spacing-md;
-  background-color: $white;
-  margin-bottom: 20px;
-}
+// The sidebar styles itself (see sidebar.scss); there is deliberately no
+// `.layout-sidebar` rule here, as nothing renders that class.
 
 .layout-content {
   flex-grow: 1;
-  padding: $spacing-xl $spacing-md;
+  // Let this column shrink below the width of its content. Without it a table
+  // wider than the viewport sets a min-content floor on the flex line, and the
+  // row makes room by squeezing the sidebar. The table overflows this column
+  // instead, which is what the design expects.
+  min-width: 0;
+  // No side gutters: pages run to the window edge, as in the design.
+  padding: $spacing-xl 0;
 }
 
 .layout-footer {

@@ -1,14 +1,5 @@
 @import '../variables.scss';
 
-// Notification Templates list page: 73px between the search bar and the table
-.templates-page__search {
-  margin-bottom: 73px;
-
-  .search-field {
-    margin: 0;
-  }
-}
-
 .desc-above {
   .bcds-react-aria-TextField--container {
     order: 1;
@@ -19,41 +10,8 @@
   }
 }
 
-.template-form-page {
-  padding: 0 0 2rem;
-}
-
-.template-form-page__content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin: 0 auto;
-  width: 100%;
-  max-width: 572px;
-}
-
-.template-form-page__header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 24px;
-  width: 100%;
-}
-
-.template-form-page__header > .d-flex,
-.template-form-page__header > .d-flex > h1 {
-  margin-bottom: 0 !important;
-}
-
-.template-form-page__header > .d-flex > h1 {
-  font-family: 'BC Sans', sans-serif;
-  font-style: normal;
-  font-weight: 700;
-  font-size: 32px;
-  line-height: 54px;
-  letter-spacing: 0;
-  color: #1e1e1e;
-}
+// The page frame (heading, gutters, centred column) comes from `.page .page--narrow`
+// in page.scss; everything below is specific to the template form.
 
 .template-form {
   display: flex;
@@ -213,32 +171,19 @@
   margin-top: 0.25rem;
 }
 
-.template-form__syntax-tooltip-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+// These info buttons sit on the radio's own line, so they run a size below the design
+// system's xsmall icon button. Scoped from the parent rather than passed as a className:
+// the Button spreads caller props over its own className, so one would replace its
+// design-system classes — variant styling and all — instead of adding to them.
+.template-form__syntax-option .bcds-react-aria-Button.xsmall.icon {
   min-width: 20px;
   width: 20px;
   height: 20px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--icons-color-primary, #2d2d2d);
-}
 
-.template-form__syntax-tooltip-trigger svg {
-  width: 16px;
-  height: 16px;
-}
-
-.template-form__syntax-tooltip-trigger[data-hovered],
-.template-form__syntax-tooltip-trigger[data-pressed],
-.template-form__syntax-tooltip-trigger[data-selected],
-.template-form__syntax-tooltip-trigger[data-disabled] {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .template-form__section--syntax-type .bcds-react-aria-RadioGroup--description {

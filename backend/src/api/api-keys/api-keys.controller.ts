@@ -1,23 +1,45 @@
 import {
   Controller,
   Post,
-  Body,
   Req,
   Version,
   UnauthorizedException,
+  NotFoundException,
   HttpCode,
   HttpStatus,
   Logger,
 } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiExcludeController } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
-import { UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
-import { BindApiKeyDto } from './schemas/bind-api-key.dto'
-import { JwtOrLoadtestBindGuard } from '../../common/guards/jwt-or-loadtest-bind.guard'
 
-@ApiTags('api-keys')
+/**
+ * Load-test-only API key binding.
+ *
+ * This endpoint used to be how every tenant onboarded: request a key in the API
+ * Services Portal, then POST here from Postman with a user JWT and a CSTAR tenant id to
+ * tie the two together. That path is **gone**. Keys are now issued from the Notify UI
+ * (ApiKeysFrontendController), which mints the credential and binds it in one step
+ * without anyone hand-assembling a request.
+ *
+ * What remains is the one caller that cannot use the UI: the k6 load test in
+ * .github/workflows/load-test.yml, which runs in an ephemeral PR environment with no
+ * user to authenticate as. It self-binds a pre-provisioned key to a throwaway tenant.
+ *
+ * Three things keep this from becoming a back door into tenant onboarding:
+ *   - it only responds when `LOADTEST_AUTOBIND_ENABLED` is set,
+ *   - that flag is forced off in any `-test` or `-prod` namespace (see configuration.ts),
+ *   - and the service refuses to run there regardless, as defence in depth.
+ *
+ * It binds only to the fixed load-test tenant. There is no way to name a real tenant, so
+ * it cannot be used to onboard one — which is the point. Keys already bound through the
+ * old flow keep working untouched; tenant resolution still finds them by credential
+ * identifier. See docs/api-key-self-service.md for the migration path.
+ *
+ * Hidden from the public API docs: it is infrastructure, not something to integrate with.
+ */
+@ApiExcludeController()
 @Controller('service/api-key')
 export class ApiKeysController {
   private readonly logger = new Logger(ApiKeysController.name)
@@ -27,38 +49,18 @@ export class ApiKeysController {
     private readonly configService: ConfigService,
   ) {}
 
-  /**
-   * Bind an API key to a CSTAR tenant.
-   *
-   * This endpoint must be called through the API gateway so that Kong's key-auth
-   * plugin validates the API key and forwards the x-credential-identifier header.
-   * The caller must also supply a valid user JWT in the Authorization header so
-   * the backend can verify CSTAR tenant membership.
-   *
-   * Request requirements:
-   *   - X-API-KEY header: the API key being bound (consumed/validated by Kong)
-   *   - Authorization: Bearer <jwt>: the user's SSO JWT (validated by backend)
-   *   - Body: { cstarTenantId: "<guid>" }
-   *
-   * Kong forwards x-credential-identifier and x-consumer-id headers after validating
-   * the API key. These are used as the stable binding keys — never the raw key value.
-   */
   @Version('1')
   @Post('bind')
-  @UseGuards(JwtOrLoadtestBindGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bind an API key to a CSTAR tenant' })
-  @ApiResponse({ status: 200, description: 'API key successfully bound to tenant' })
-  @ApiResponse({ status: 401, description: 'API key not authenticated by gateway or invalid JWT' })
-  @ApiResponse({ status: 403, description: 'User is not a member of the specified CSTAR tenant' })
-  @ApiResponse({ status: 404, description: 'No Notify tenant configured for the CSTAR tenant ID' })
-  @ApiResponse({ status: 409, description: 'API key is already bound to a different tenant' })
-  async bindApiKey(
-    @Body() dto: BindApiKeyDto,
-    @Req() request: Request,
-  ): Promise<{ message: string }> {
-    // x-credential-identifier is set by Kong's key-auth plugin.
-    // If missing, the request did not come through the gateway with a valid key.
+  async autoBindForLoadTest(@Req() request: Request): Promise<{ message: string }> {
+    // Behave as though the route does not exist anywhere it is not enabled, rather than
+    // advertising a disabled endpoint to anyone probing for it.
+    if (!this.configService.get<boolean>('loadtest.autobindEnabled')) {
+      throw new NotFoundException('Cannot POST /api/v1/service/api-key/bind')
+    }
+
+    // Set by Kong's key-auth plugin. Absent means the request did not come through the
+    // gateway with a valid key.
     const credentialIdentifier = request.headers['x-credential-identifier'] as string
     if (!credentialIdentifier) {
       throw new UnauthorizedException(
@@ -67,30 +69,10 @@ export class ApiKeysController {
     }
 
     const consumerId = (request.headers['x-consumer-id'] as string) || ''
-    const jwtUser = (request as any).user as { idir_user_guid?: string } | undefined
-    const idirUserGuid = jwtUser?.idir_user_guid
 
-    // Load-test-only path (PR dev): no user JWT, self-bind to a throwaway tenant.
-    if (this.configService.get<boolean>('loadtest.autobindEnabled') && !idirUserGuid) {
-      this.logger.warn(`[LOADTEST] Auto-binding credential ${credentialIdentifier} (no JWT)`)
-      await this.apiKeysService.autoBindApiKeyForLoadTest(credentialIdentifier, consumerId)
-      return { message: 'API key auto-bound to load-test tenant' }
-    }
+    this.logger.warn(`[LOADTEST] Auto-binding credential ${credentialIdentifier}`)
+    await this.apiKeysService.autoBindApiKeyForLoadTest(credentialIdentifier, consumerId)
 
-    if (!idirUserGuid) {
-      throw new UnauthorizedException('JWT is missing required idir_user_guid claim')
-    }
-
-    const authHeader = request.headers.authorization as string
-
-    await this.apiKeysService.bindApiKey({
-      credentialIdentifier,
-      consumerId,
-      cstarTenantId: dto.cstarTenantId,
-      idirUserGuid,
-      authHeader,
-    })
-
-    return { message: 'API key successfully bound to tenant' }
+    return { message: 'API key auto-bound to load-test tenant' }
   }
 }

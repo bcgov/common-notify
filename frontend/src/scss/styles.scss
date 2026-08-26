@@ -13,6 +13,7 @@
 @import './components/data-table.scss';
 @import './components/status-badge.scss';
 @import './components/breadcrumb.scss';
+@import './components/page.scss';
 @import './components/settings.scss';
 @import './components/dashboard.scss';
 
@@ -111,14 +112,4 @@ body {
 
 .pagination-controls__page-button.btn-outline-secondary {
   color: $dark-text;
-}
-
-.page-heading {
-  margin: 0;
-  font-family: $font-family-sans-serif;
-  font-weight: 700;
-  font-size: 24px;
-  line-height: 1.5;
-  color: $dark-text;
-  margin-bottom: 16px;
 }

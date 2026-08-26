@@ -2,6 +2,10 @@
 
 .sidebar {
   width: 296px;
+  // Never let the flex row steal width from the nav. Without this the sidebar
+  // is the only shrinkable item beside `.layout-content`, so a page with a wide
+  // table squeezes the nav narrower and shifts every page's content with it.
+  flex-shrink: 0;
   padding: 24px;
   margin-right: 64px;
   transition: width 0.3s ease;
@@ -173,29 +177,6 @@
 
     .sidebar__label {
       margin-left: 0;
-    }
-
-    .sidebar__role-tooltip-trigger {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-      color: $dark-text;
-
-      &:hover,
-      &:focus {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        outline: none;
-      }
-      &:focus-visible {
-        outline: 2px solid $border-active;
-        outline-offset: 2px;
-      }
     }
   }
 

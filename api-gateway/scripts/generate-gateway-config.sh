@@ -11,6 +11,7 @@ set -e
 #   ./generate-gateway-config.sh pr <release-name>              # Generate PR routes only
 #   ./generate-gateway-config.sh all                            # Generate Product + all services (dev+test+prod)
 #   ./generate-gateway-config.sh pr-with-permanent <release>    # Generate PR + permanent services (dev+test+prod+PR)
+#   ./generate-gateway-config.sh aps-test-instance              # Generate the APS test-instance sandbox gateway
 
 COMMAND=$1
 RELEASE_NAME=$2
@@ -73,6 +74,34 @@ generate_env_config() {
   echo "  ✓ Generated: gw-routes-${env}.yaml"
 }
 
+# Function to generate the APS test-instance sandbox gateway.
+#
+# Separate from generate_env_config because it uses a different template and is not part
+# of any deploy pipeline: it targets APS's own test deployment, where the Credential
+# Issuer API lives, rather than the production instance that hosts gw-fe8c5.
+generate_aps_test_instance_config() {
+  local ENV_FILE="${SCRIPT_DIR}/config/aps-test-instance.env"
+  local TEMPLATE_FILE="${SCRIPT_DIR}/templates/aps-test-instance.yaml"
+  local OUTPUT_FILE="${SCRIPT_DIR}/generated/gw-aps-test-instance.yaml"
+
+  set -a
+  source "$ENV_FILE"
+  set +a
+
+  mkdir -p "${SCRIPT_DIR}/generated"
+  envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+
+  echo "  ✓ Generated: gw-aps-test-instance.yaml"
+  echo ""
+  echo "  Apply with:"
+  echo "    gwa apply --input ${OUTPUT_FILE} \\"
+  echo "      --host api-gov-bc-ca.test.api.gov.bc.ca --gateway ${GATEWAY_ID}"
+  echo ""
+  echo "  Use --host per command rather than 'gwa config set host': that setting is"
+  echo "  written to ~/.gwa-config.yaml and would silently redirect later production"
+  echo "  publishes to the test instance."
+}
+
 # Function to generate Product config
 generate_product_config() {
   local ENV_FILE="${SCRIPT_DIR}/config/product.env"
@@ -112,6 +141,12 @@ case "$COMMAND" in
   prod)
     echo "Generating PROD configuration..."
     generate_env_config "prod"
+    echo "✅ Done!"
+    ;;
+
+  aps-test-instance)
+    echo "Generating APS test-instance sandbox gateway..."
+    generate_aps_test_instance_config
     echo "✅ Done!"
     ;;
 
@@ -191,6 +226,7 @@ case "$COMMAND" in
     echo "  $0 pr <release-name>              # Generate PR routes only"
     echo "  $0 all                            # Generate Product + all services"
     echo "  $0 pr-with-permanent <release>    # Generate PR + permanent services"
+    echo "  $0 aps-test-instance              # Generate the APS test-instance sandbox gateway"
     exit 1
     ;;
 esac

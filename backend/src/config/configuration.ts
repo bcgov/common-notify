@@ -67,6 +67,26 @@ export default () => {
       adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
     },
 
+    // APS Directory API (API Programme Services) — Credential Issuer.
+    // Lets Notify issue and regenerate gateway consumer credentials on behalf of a
+    // tenant instead of the tenant requesting a key through the API Services Portal.
+    // Requires an APS service account with the CredentialIssuer.Generate scope on the
+    // gateway. When clientId/clientSecret are absent the issuer falls back to the local
+    // Kong Admin API (dev only) — see credential-issuer.module.ts.
+    aps: {
+      baseUrl: process.env.APS_API_BASE_URL,
+      gatewayId: process.env.APS_GATEWAY_ID,
+      environmentAppId: process.env.APS_ENVIRONMENT_APP_ID,
+      tokenUrl: process.env.APS_TOKEN_URL,
+      clientId: process.env.APS_CLIENT_ID,
+      clientSecret: process.env.APS_CLIENT_SECRET,
+      // Optional. Left unset, Keycloak issues the service account's default scopes,
+      // which already carry CredentialIssuer.Generate. Set it only if the realm
+      // requires the scope to be requested explicitly.
+      scope: process.env.APS_TOKEN_SCOPE,
+      timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
+    },
+
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
     // Used to fetch user roles for role-based access control
     cstar: {

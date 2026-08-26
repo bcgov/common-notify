@@ -74,30 +74,6 @@
   font-weight: 400;
 }
 
-.settings__info-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  color: $text-secondary;
-
-  &:hover,
-  &:focus {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    outline: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid $border-active;
-    outline-offset: 2px;
-  }
-}
-
 .settings__tooltip {
   max-width: 30rem;
 }
@@ -136,4 +112,150 @@
     width: 0.85em;
     height: 0.85em;
   }
+}
+
+// ---------------------------------------------------------------------------
+// API key
+//
+// Lives inside the tenant settings form, grouped with the API rate limit. The
+// value itself is only ever rendered inside the reveal dialog.
+// ---------------------------------------------------------------------------
+
+.api-key__created {
+  margin: 0;
+  color: $dark-text;
+}
+
+.api-key__table {
+  // The field's own 8px gap keeps "Created on" tight under the label; the blocks below
+  // it sit on a 24px rhythm instead, so each adds the difference itself.
+  margin-top: $spacing-md;
+  border-collapse: collapse;
+  width: fit-content;
+  min-width: 24rem;
+  font-size: $font-size-sm;
+
+  th,
+  td {
+    text-align: left;
+    padding: 8px 16px;
+  }
+
+  thead th {
+    background: #f1f8fe;
+    color: $dark-text;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    background: #fbfbfb;
+    color: $dark-text;
+    // A note can be a long vault path; wrap rather than stretch the table.
+    word-break: break-word;
+  }
+}
+
+// Wraps the generate/regenerate button. The margin cannot go on the Button itself: the
+// design system spreads caller props over its own className, so a className prop would
+// wipe out the variant styling and the form's align-self rule with it.
+.api-key__action {
+  margin-top: $spacing-md;
+}
+
+// Sit below the generate/regenerate button, one per line.
+.api-key__links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-lg;
+  margin: $spacing-md 0 0;
+}
+
+.api-key__warning {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: #fef1d8;
+  border: 1px solid #f8bb47;
+  border-radius: 4px;
+}
+
+.api-key__warning-icon {
+  flex-shrink: 0;
+  width: 1.1em;
+  height: 1.1em;
+  margin-top: 2px;
+  color: #f8bb47;
+}
+
+.api-key__warning-title {
+  margin: 0;
+  font-weight: 700;
+  color: $dark-text;
+}
+
+.api-key__warning-body {
+  margin: 4px 0 0;
+  color: $dark-text;
+}
+
+.api-key__reveal {
+  display: flex;
+  flex-direction: column;
+  // Matches GenericModal's own gap-3 on its submit branch, so the two dialog styles
+  // line up. The children below deliberately zero their margins and rely on this.
+  gap: 16px;
+}
+
+.api-key__reveal-heading {
+  margin: 0;
+  font-size: 1.125rem;
+  color: $dark-text;
+}
+
+.api-key__value {
+  margin: 0;
+  padding: 12px 16px;
+  background: #fbfbfb;
+  border: 1px solid $border-medium;
+  border-radius: 4px;
+  // The key is long and must stay selectable so a blocked clipboard is not a dead end.
+  word-break: break-all;
+  user-select: all;
+}
+
+.api-key__copy-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.api-key__copied {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #2e8540;
+  font-size: $font-size-sm;
+
+  svg {
+    width: 1em;
+    height: 1em;
+  }
+}
+
+.api-key__notes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+// A key bound before self-service issuing: still valid, but not managed from here.
+.api-key__row--legacy td {
+  color: $text-secondary;
+  font-style: italic;
 }

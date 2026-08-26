@@ -21,7 +21,8 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
-import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 
 const navItems = [
   {
@@ -138,8 +139,10 @@ const Sidebar: FC = () => {
         })}
         {isAdmin && (
           <div className="sidebar__menu-group">
+            {/* sidebar__item styles these rows end to end so a button matches the Links
+                beside it. Passing className replaces the design system's own classes, so
+                there is deliberately no variant here — it would have no effect. */}
             <Button
-              variant="link"
               className="sidebar__item"
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
@@ -196,7 +199,7 @@ const Sidebar: FC = () => {
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
         {/*
-          <Button variant="link" className="sidebar__item">
+          <Button className="sidebar__item">
             <span className="sidebar__icon" aria-hidden="true">
               <HelpOutlineOutlinedIcon />
             </span>
@@ -230,7 +233,6 @@ const Sidebar: FC = () => {
                     <TooltipTrigger>
                       <Button
                         aria-label={`About the ${CSTAR_ROLE_DISPLAY[primaryRole].label} role`}
-                        className="sidebar__role-tooltip-trigger"
                         isIconButton
                         size="xsmall"
                         type="button"
@@ -251,7 +253,6 @@ const Sidebar: FC = () => {
           {/* Logout / Login */}
           {user ? (
             <Button
-              variant="link"
               className="sidebar__item"
               onPress={handleLogout}
               aria-label={collapsed ? 'Logout' : undefined}
@@ -262,7 +263,7 @@ const Sidebar: FC = () => {
               <span className="sidebar__label">Logout</span>
             </Button>
           ) : (
-            <Button variant="link" className="sidebar__item" onPress={handleLogin}>
+            <Button className="sidebar__item" onPress={handleLogin}>
               <span className="sidebar__icon" aria-hidden="true">
                 <LoginOutlinedIcon />
               </span>

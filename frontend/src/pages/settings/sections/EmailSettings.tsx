@@ -6,8 +6,8 @@ import {
   Switch,
   TextField,
   Tooltip,
-  TooltipTrigger,
 } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -123,7 +123,6 @@ const EmailSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About email notifications"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -180,7 +179,6 @@ const EmailSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About allowing email attachments"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -208,7 +206,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the daily limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -232,7 +229,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the annual limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"

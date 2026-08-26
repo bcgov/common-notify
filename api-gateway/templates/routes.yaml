@@ -830,10 +830,14 @@ routes:
   # API KEY MANAGEMENT ROUTES
   # ============================================================================
   # /api/v1/service/api-key/bind
-  # Binds an API key to a CSTAR tenant.
-  # Requires: X-API-KEY header (validated by Kong) AND Authorization: Bearer <jwt>
-  # Kong validates the API key and forwards x-credential-identifier to the backend.
-  # The backend uses the JWT to verify CSTAR tenant membership before storing the mapping.
+  # LOAD TEST ONLY. Tenants get keys from the Notify UI now (/api/v1/frontend/api-keys),
+  # which issues and binds in one step — the old "request a key in the Portal, then bind
+  # it from Postman" path has been removed from the backend.
+  # What is left serves the k6 load test, which runs in an ephemeral PR environment with
+  # no user to authenticate as. The backend 404s this route unless LOADTEST_AUTOBIND_ENABLED
+  # is set, and that flag is forced off in -test and -prod namespaces, so it binds only to
+  # a throwaway tenant and cannot be used to onboard a real one.
+  # The route stays published because the load test calls it through the gateway.
   - name: ${ROUTE_PREFIX}api-key-bind
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
@@ -842,6 +846,45 @@ routes:
       - ${PATH_PREFIX}/api/v1/service/api-key/bind
     methods:
       - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/api-keys (frontend variant - list and issue)
+  # Self-service API key management. Called by the Notify web app with a frontend user
+  # JWT (never a service API key): the backend asks the APS Credential Issuer API for a
+  # gateway credential and binds it to the caller's tenant in one step, which replaces
+  # requesting a key in the API Services Portal and binding it by hand afterwards.
+  - name: ${ROUTE_PREFIX}api-keys-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/api-keys
+    methods:
+      - GET
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/api-keys/{clientId} (PATCH notes) and /{clientId}/regenerate (POST)
+  # Separate route because PATCH is not a method on the collection path above, same
+  # reason the safelist entry route is split out from the safelist collection route.
+  # No DELETE: revoking a key is done on the API Services Portal, not in Notify.
+  - name: ${ROUTE_PREFIX}api-keys-entry-frontend
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ~${PATH_PREFIX}/api/v1/frontend/api-keys/[^/]+
+    methods:
+      - POST
+      - PATCH
     strip_path: true
     https_redirect_status_code: 426
     path_handling: v0
@@ -1559,6 +1602,20 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}templates-frontend-preview-body
+    config: *jwtConfig
+
+  # API Keys Frontend (list, issue) - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-keys-frontend
+    config: *jwtConfig
+
+  # API Keys Frontend (regenerate, revoke) - Frontend Token
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-keys-entry-frontend
     config: *jwtConfig
 
   # API Key Usage Frontend - Frontend Token

@@ -138,6 +138,31 @@ backend:
     accessKeySecretKey: AccessKeyID
     #-- key in existingSecret for secret access key
     secretKeySecretKey: AccessSecretKey
+  #-- APS Directory API (Credential Issuer) — lets Notify issue gateway API keys for a
+  #-- tenant instead of the tenant requesting one in the API Services Portal.
+  #--
+  #-- The values themselves are NOT here. Like CSTAR_API_URL, NOTIFY_CLIENT_ID and the
+  #-- Keycloak issuers, they are per-environment backend configuration and live in the
+  #-- app-api-secrets secret in each namespace, so pointing a namespace at a different
+  #-- APS instance is an `oc patch` and a restart rather than a chart change:
+  #--
+  #--   APS_API_BASE_URL        Directory API base path
+  #--   APS_TOKEN_URL           OAuth2 token endpoint — MUST be the same APS instance
+  #--                           as APS_API_BASE_URL, or every call 401s
+  #--   APS_GATEWAY_ID          gateway that owns the product environments
+  #--   APS_ENVIRONMENT_APP_ID  [].environments[].appId, NOT the product-level appId
+  #--                           beside it and NOT the gateway id
+  #--   APS_CLIENT_ID           service account, specific to the APS instance
+  #--   APS_CLIENT_SECRET
+  #--
+  #-- All six are optional. A namespace with none of them set starts normally and
+  #-- rejects issue requests with a 503 naming what is missing.
+  #--
+  #-- See docs/api-key-self-service.md for the values per instance and how to obtain
+  #-- them. Only the backend talks to APS; there is nothing to configure on the frontend.
+  aps:
+    #-- secret holding the APS configuration and service account credentials
+    existingSecret: app-api-secrets
 
 frontend:
   # -- enable or disable a component deployment.

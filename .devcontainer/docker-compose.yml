@@ -150,6 +150,16 @@ services:
       S3_SECRET_KEY: minioadmin123
       S3_FORCE_PATH_STYLE: "true"
       GATEWAY_OAUTH2_TOKEN_URL: http://kong:8000/oauth2/token
+      # APS Credential Issuer. Defaults point at the local mock in oauth2-mock-server.js,
+      # which is backed by the Kong in this stack — so self-service API keys work out of
+      # the box and the real ApsCredentialIssuerClient is the code under test.
+      # Any of these set in .env wins, for pointing at a real APS instance instead.
+      APS_API_BASE_URL: ${APS_API_BASE_URL:-http://oauth2-mock:3002/ds/api/v3}
+      APS_TOKEN_URL: ${APS_TOKEN_URL:-http://oauth2-mock:3002/}
+      APS_CLIENT_ID: ${APS_CLIENT_ID:-sa-notify-service}
+      APS_CLIENT_SECRET: ${APS_CLIENT_SECRET:-notify-service-secret-12345678901234}
+      APS_GATEWAY_ID: ${APS_GATEWAY_ID:-gw-local}
+      APS_ENVIRONMENT_APP_ID: ${APS_ENVIRONMENT_APP_ID:-LOCAL001}
     image: *node-image
     ports: ["3001:3000"]
     healthcheck:
@@ -265,6 +275,11 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3002
+      # The APS Credential Issuer mock provisions into this Kong. Kept in step with the
+      # backend's APS_* defaults above so both agree on gateway and environment ids.
+      KONG_ADMIN_URL: http://kong:8001
+      APS_GATEWAY_ID: ${APS_GATEWAY_ID:-gw-local}
+      APS_ENVIRONMENT_APP_ID: ${APS_ENVIRONMENT_APP_ID:-LOCAL001}
     ports: ["3002:3002"]
     volumes:
       - ./oauth2-mock-server.js:/app/server.js

@@ -23,6 +23,17 @@ const config = {
     '',
   CSTAR_TENANT_SETUP_URL:
     window.VITE_CSTAR_TENANT_SETUP_URL || import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || '',
+  // Background reading for the API key tooltip.
+  API_KEY_DOCS_URL:
+    window.VITE_API_KEY_DOCS_URL ||
+    import.meta.env.VITE_API_KEY_DOCS_URL ||
+    'https://api.gov.bc.ca/devportal/api-directory',
+  // Revoking a key is done on the API Services Portal Consumers page, not in Notify —
+  // it is the only place that stops the gateway honouring the key.
+  API_KEY_REVOKE_URL:
+    window.VITE_API_KEY_REVOKE_URL ||
+    import.meta.env.VITE_API_KEY_REVOKE_URL ||
+    'https://api.gov.bc.ca/manager/consumers',
 }
 
 export default config
