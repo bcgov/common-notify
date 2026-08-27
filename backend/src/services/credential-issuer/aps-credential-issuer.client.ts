@@ -114,6 +114,9 @@ export class ApsCredentialIssuerClient implements CredentialIssuer {
         ...(request.applicationDescription ? { description: request.applicationDescription } : {}),
       },
       ...(request.labels ? { labels: request.labels } : {}),
+      // Omitted entirely when empty: `controls` validity depends on the environment
+      // flow, and sending an empty object invites the gateway to validate it.
+      ...(request.aclGroups?.length ? { controls: { aclGroups: request.aclGroups } } : {}),
     }
 
     const credential = await this.send<GatewayConsumerCredential>(

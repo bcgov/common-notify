@@ -32,6 +32,26 @@ export function readGatewayCredentialHeaders(
   }
 }
 
+/**
+ * Every header the gateway injected, for logging.
+ *
+ * Deliberately reads the raw headers rather than the parsed shape above: the point is to
+ * see what the gateway *actually* sent, including anything we do not yet consume —
+ * `x-consumer-groups` in particular, which is where a tenant identifier would arrive if
+ * the environment is on a `kong-api-key-acl` flow.
+ *
+ * Nothing here is secret. Kong sets these after it has already validated the key, and
+ * none of them is the key itself.
+ */
+export function describeGatewayHeaders(headers: Record<string, unknown>): string {
+  const injected = Object.keys(headers)
+    .filter((name) => /^x-(consumer|credential|authenticated|anonymous)/i.test(name))
+    .sort()
+    .map((name) => `${name}=${String(headers[name])}`)
+
+  return injected.length ? injected.join(' ') : '(none)'
+}
+
 /** True when the gateway gave us nothing to identify the credential with. */
 export function hasNoCredentialHeaders(headers: GatewayCredentialHeaders): boolean {
   return !headers.credentialIdentifier && !headers.consumerUsername && !headers.consumerCustomId
@@ -58,8 +78,13 @@ export async function resolveApiKeyConsumer(
   repository: Repository<ApiKeyConsumer>,
   headers: GatewayCredentialHeaders,
   logger: Logger,
+  rawHeaders?: Record<string, unknown>,
 ): Promise<ApiKeyConsumer | null> {
   const { credentialIdentifier, consumerUsername, consumerCustomId, consumerId } = headers
+
+  if (rawHeaders) {
+    logger.debug(`Gateway headers: ${describeGatewayHeaders(rawHeaders)}`)
+  }
 
   if (credentialIdentifier) {
     const byCredential = await repository.findOne({
@@ -89,6 +114,16 @@ export async function resolveApiKeyConsumer(
   })
   if (!byClientId) {
     return null
+  }
+
+  // Logged at info, not debug: this fires once per key, and it is the request that
+  // proves which headers the gateway actually sends. Deployed environments run at info,
+  // so without this the evidence would only exist on a developer's laptop.
+  if (rawHeaders) {
+    logger.log(
+      `First authenticated request for API key ${byClientId.clientId}. ` +
+        `Gateway headers: ${describeGatewayHeaders(rawHeaders)}`,
+    )
   }
 
   await backfillCredentialIdentifier(

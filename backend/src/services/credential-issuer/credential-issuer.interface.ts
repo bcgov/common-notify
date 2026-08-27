@@ -43,6 +43,19 @@ export interface IssueCredentialRequest {
   applicationDescription?: string
   /** Labels attached to the consumer, used to filter the Consumers page. */
   labels?: Record<string, string>
+  /**
+   * Extra ACL groups for the consumer, beyond the environment appId the gateway applies
+   * itself.
+   *
+   * Kong's ACL plugin forwards every group to the upstream as a comma-joined
+   * `X-Consumer-Groups` header — verified against a real Kong — which makes this the one
+   * supported way to get tenant identity into a request header. APS's own spec example
+   * puts a tenant identifier here, so it is an intended use rather than a trick.
+   *
+   * Only takes effect on a `kong-api-key-acl` environment; on `kong-api-key-only` there
+   * is no ACL plugin and the groups are simply ignored.
+   */
+  aclGroups?: string[]
 }
 
 /**

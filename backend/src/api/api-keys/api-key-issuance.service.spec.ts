@@ -80,8 +80,12 @@ describe('ApiKeyIssuanceService', () => {
       const result = await issue()
 
       expect(credentialIssuer.issue).toHaveBeenCalledWith({
-        // Discriminated — see buildApplicationName for why a repeated name is fatal.
-        applicationName: expect.stringMatching(/^notify-tenant-a-[0-9a-f]{6}$/),
+        // Carries the CSTAR guid so the Consumers page is searchable by it, and a
+        // discriminator because a repeated name is permanently unusable.
+        applicationName: expect.stringMatching(/^notify-tenant-a-cstar-guid-[0-9a-f]{6}$/),
+        // Kong forwards ACL groups as X-Consumer-Groups — the one supported way to get
+        // the tenant into a request header.
+        aclGroups: ['cstar-guid'],
         applicationDescription: 'Notify API key for tenant Tenant A',
         labels: {
           'issued-by': 'notify',
@@ -115,9 +119,11 @@ describe('ApiKeyIssuanceService', () => {
         idirUserGuid: 'idir-guid',
       })
 
-      const { labels } = credentialIssuer.issue.mock.calls[0][0]
-      expect(labels).not.toHaveProperty('cstar-tenant-id')
-      expect(labels['notify-tenant']).toBe('tenant-a')
+      const call = credentialIssuer.issue.mock.calls[0][0]
+      expect(call.labels).not.toHaveProperty('cstar-tenant-id')
+      expect(call.labels['notify-tenant']).toBe('tenant-a')
+      // No guid means no group to send; an empty ACL group would be meaningless.
+      expect(call).not.toHaveProperty('aclGroups')
     })
 
     it('seeds the same default limits a bound key gets', async () => {
@@ -194,7 +200,9 @@ describe('ApiKeyIssuanceService', () => {
 
       expect(credentialIssuer.issue).toHaveBeenCalledWith(
         expect.objectContaining({
-          applicationName: expect.stringMatching(/^notify-air-quality-alert-[0-9a-f]{6}$/),
+          applicationName: expect.stringMatching(
+            /^notify-air-quality-alert-cstar-guid-[0-9a-f]{6}$/,
+          ),
         }),
       )
     })

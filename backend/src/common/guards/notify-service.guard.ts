@@ -75,6 +75,7 @@ export class NotifyServiceGuard implements CanActivate {
         this.apiKeyConsumerRepository,
         credentialHeaders,
         this.logger,
+        request.headers,
       )
     } catch (error) {
       this.logger.error(

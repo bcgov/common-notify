@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { In, IsNull, Repository } from 'typeorm'
 import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
 import {
+  describeGatewayHeaders,
   hasNoCredentialHeaders,
   readGatewayCredentialHeaders,
   resolveApiKeyConsumer,
@@ -36,6 +37,29 @@ describe('readGatewayCredentialHeaders', () => {
   })
 })
 
+describe('describeGatewayHeaders', () => {
+  it('reports every injected header, including ones we do not consume', () => {
+    // x-consumer-groups is the point: it is where a tenant id would arrive on a
+    // kong-api-key-acl environment, and nothing reads it yet.
+    const described = describeGatewayHeaders({
+      'x-credential-identifier': 'cred-1',
+      'x-consumer-username': 'ENV123-APP456',
+      'x-consumer-groups': 'ENV123, e936010f-bb93-4430-87d9',
+      authorization: 'Bearer should-not-appear',
+      'x-api-key': 'should-not-appear',
+    })
+
+    expect(described).toMatch(/x-consumer-groups=ENV123, e936010f/)
+    expect(described).toMatch(/x-consumer-username=ENV123-APP456/)
+    // The key itself and the bearer token are not gateway-injected identity.
+    expect(described).not.toMatch(/should-not-appear/)
+  })
+
+  it('says so plainly when the gateway injected nothing', () => {
+    expect(describeGatewayHeaders({ host: 'x' })).toBe('(none)')
+  })
+})
+
 describe('hasNoCredentialHeaders', () => {
   it('is true when the gateway identified nothing', () => {
     expect(hasNoCredentialHeaders({})).toBe(true)
@@ -61,11 +85,19 @@ describe('resolveApiKeyConsumer', () => {
       findOne: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue(undefined),
     }
-    logger = { debug: vi.fn(), warn: vi.fn() } as unknown as Logger
+    logger = { debug: vi.fn(), warn: vi.fn(), log: vi.fn() } as unknown as Logger
   })
 
-  const resolve = (headers: Parameters<typeof resolveApiKeyConsumer>[1]) =>
-    resolveApiKeyConsumer(repository as unknown as Repository<ApiKeyConsumer>, headers, logger)
+  const resolve = (
+    headers: Parameters<typeof resolveApiKeyConsumer>[1],
+    rawHeaders?: Record<string, unknown>,
+  ) =>
+    resolveApiKeyConsumer(
+      repository as unknown as Repository<ApiKeyConsumer>,
+      headers,
+      logger,
+      rawHeaders,
+    )
 
   it('resolves on the credential identifier without touching the fallback', async () => {
     const binding = { id: 'binding-1', credentialIdentifier: 'cred-1' }
@@ -112,6 +144,22 @@ describe('resolveApiKeyConsumer', () => {
         where: expect.objectContaining({ credentialIdentifier: IsNull() }),
       }),
     )
+  })
+
+  it('logs the gateway headers at info on a key\u2019s first use', async () => {
+    // Deployed environments run at info, so a debug line would leave the evidence
+    // only on a developer's laptop. This fires once per key.
+    const binding = { id: 'binding-1', clientId: 'ENV123-APP456', credentialIdentifier: null }
+    repository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(binding)
+
+    await resolve(
+      { credentialIdentifier: 'cred-1', consumerUsername: 'ENV123-APP456' },
+      { 'x-consumer-username': 'ENV123-APP456', 'x-consumer-groups': 'ENV123, cstar-guid' },
+    )
+
+    const logged = (logger.log as unknown as ReturnType<typeof vi.fn>).mock.calls.flat().join(' ')
+    expect(logged).toMatch(/First authenticated request/)
+    expect(logged).toMatch(/x-consumer-groups=ENV123, cstar-guid/)
   })
 
   it('backfills the credential identifier so later requests take the fast path', async () => {

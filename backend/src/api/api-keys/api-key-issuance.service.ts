@@ -91,6 +91,12 @@ export class ApiKeyIssuanceService {
     const credential = await this.credentialIssuer.issue({
       applicationName,
       applicationDescription: `Notify API key for tenant ${tenant.name}`,
+      // Kong forwards ACL groups to the upstream as X-Consumer-Groups, so this is what
+      // puts the tenant's CSTAR id into a request header — the one supported way to
+      // identify a tenant without a database lookup. APS's own spec example does the
+      // same thing. Ignored on a kong-api-key-only environment (no ACL plugin), so it
+      // is harmless to send today and ready when the environment moves to -acl.
+      ...(tenant.externalId ? { aclGroups: [tenant.externalId] } : {}),
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
@@ -300,8 +306,16 @@ export class ApiKeyIssuanceService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
 
-    const discriminator = randomBytes(3).toString('hex')
-    return `${`notify-${slug}`.slice(0, 53)}-${discriminator}`
+    // The CSTAR guid rather than Notify's row id, so the Consumers page is searchable by
+    // the identifier other systems share. The slug rides along because a bare guid is
+    // unreadable when scanning a page of consumers.
+    //
+    // The random suffix stays even with the guid present. APS refuses a second
+    // credential for the same Application in the same Environment and cannot delete
+    // Applications, so any name that repeats is permanently unusable — a re-issue after
+    // a binding row was cleaned up by hand would 409 forever.
+    const parts = ['notify', slug.slice(0, 24), tenant.externalId, randomBytes(3).toString('hex')]
+    return parts.filter(Boolean).join('-')
   }
 
   /**

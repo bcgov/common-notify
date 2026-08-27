@@ -105,7 +105,7 @@ const TenantSettings: FC = () => {
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-      <div className="settings__field">
+      <div className="settings__field settings__field--email">
         <span className="settings__label">
           <span id="default-sending-email-label">Default sending email address</span>
           <TooltipTrigger>

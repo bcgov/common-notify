@@ -82,12 +82,48 @@
   max-width: 38rem;
 }
 
+// Fixed @gov.bc.ca domain, rendered through the design system's iconRight slot.
+//
+// The DS renders `<div --container><input --Input><span suffix></div>`: the container
+// carries the border, is `display:flex` with a `gap`, and has `padding: <small> 12px`.
+// Left alone, that padding and gap hold the suffix away from the border and stop it
+// filling the height, so it reads as a pill floating inside the field rather than part
+// of it.
+//
+// So the container's own padding moves onto the children: the input keeps the left
+// inset, the suffix goes flush to the right edge and stretches full height, and a
+// divider plus fill make it read as an attached segment.
+//
+// Specificity-coupled to design-system internals (CLAUDE.md §6.4) — recheck on upgrade.
+// There is no public prop for this; `iconRight` is the only hook and it exposes no
+// container.
+.settings__field--email {
+  .bcds-react-aria-TextField {
+    max-width: 26rem;
+  }
+
+  .bcds-react-aria-TextField--container {
+    gap: 0;
+    padding: 0 0 0 12px;
+  }
+}
+
 .settings__field-suffix {
   flex-shrink: 0;
   white-space: nowrap;
   color: $text-secondary;
   user-select: none;
   pointer-events: none;
+
+  // Fill the field vertically — the container centres its children by default.
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-left: 1px solid $border-default;
+  background: #f1f1f1;
+  // Match the container's radius so the fill does not square off the rounded corner.
+  border-radius: 0 var(--layout-border-radius-medium) var(--layout-border-radius-medium) 0;
 }
 
 .settings__help {
