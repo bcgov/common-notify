@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { randomBytes } from 'crypto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKeyConsumer, ApiKeyIssuedVia } from './entities/api-key-consumer.entity'
@@ -21,14 +22,23 @@ import {
 /**
  * How many keys Notify will issue for one tenant.
  *
- * One, for now. A tenant that needs to rotate uses regenerate, which keeps the same
- * clientId and so keeps limits, usage history and alert configuration intact. Multiple
- * concurrent keys are a plausible future step — the endpoints are already shaped as a
- * collection so raising this number is the only change that would be needed — but
- * nothing today needs them, and every extra key is a permanent Application and Consumer
- * on a gateway shared across the ministry.
+ * One. A tenant needing a fresh value uses regenerate, which keeps the same clientId and
+ * so keeps limits, usage history and alert configuration intact.
+ *
+ * This is also enforced by a partial unique index (migration V55), because the check
+ * below cannot be: two concurrent requests both read a count of zero and both issue.
+ * That matters more than usual here — every extra key is an Application and Consumer on
+ * a shared gateway that no API can delete.
+ *
+ * Raising it therefore takes three changes, not one: this constant, dropping
+ * `uq_api_key_consumer_one_self_service_per_tenant`, and confirming the endpoints still
+ * behave when listForTenant returns several manageable keys (the UI currently assumes
+ * one).
  */
 export const MAX_KEYS_PER_TENANT = 1
+
+/** Postgres unique-violation SQLSTATE. */
+const PG_UNIQUE_VIOLATION = '23505'
 
 @Injectable()
 export class ApiKeyIssuanceService {
@@ -84,7 +94,15 @@ export class ApiKeyIssuanceService {
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
-        'notify-tenant-id': tenant.id,
+        // The CSTAR tenant id, not Notify's internal primary key. These labels exist to
+        // be read on the Portal Consumers page by someone cross-referencing a consumer
+        // against another system, and CSTAR is the identifier those systems share —
+        // Notify's row id means nothing outside our own database.
+        //
+        // Omitted rather than sent empty when a tenant has no CSTAR id (the column is
+        // nullable, and the load-test tenant is one such), since a label whose value is
+        // blank is worse than an absent one.
+        ...(tenant.externalId ? { 'cstar-tenant-id': tenant.externalId } : {}),
       },
     })
 
@@ -101,20 +119,42 @@ export class ApiKeyIssuanceService {
     }
 
     const now = new Date()
-    const binding = await this.apiKeyConsumerRepository.save(
-      this.apiKeyConsumerRepository.create({
-        credentialIdentifier: credential.credentialIdentifier ?? null,
-        clientId: credential.clientId,
-        applicationAppId: this.deriveApplicationAppId(credential.clientId),
-        notes: notes?.trim() || null,
-        tenantId: tenant.id,
-        boundByIdirGuid: idirUserGuid,
-        issuedVia: ApiKeyIssuedVia.SELF_SERVICE,
-        issuedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      }),
-    )
+    let binding: ApiKeyConsumer
+    try {
+      binding = await this.apiKeyConsumerRepository.save(
+        this.apiKeyConsumerRepository.create({
+          credentialIdentifier: credential.credentialIdentifier ?? null,
+          clientId: credential.clientId,
+          applicationAppId: this.deriveApplicationAppId(credential.clientId),
+          notes: notes?.trim() || null,
+          tenantId: tenant.id,
+          boundByIdirGuid: idirUserGuid,
+          issuedVia: ApiKeyIssuedVia.SELF_SERVICE,
+          issuedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
+    } catch (error) {
+      // Lost a race with a concurrent issue for the same tenant. The count check above
+      // passed for both callers; the partial unique index from V55 is what actually
+      // holds the limit.
+      //
+      // The credential has already been created at the gateway and cannot be deleted
+      // through the API, so it is logged loudly with its clientId: someone has to remove
+      // it from the Portal Consumers page by hand.
+      if ((error as { code?: string })?.code === PG_UNIQUE_VIOLATION) {
+        this.logger.error(
+          `Concurrent issue for tenant ${tenant.id} lost the race after the gateway had ` +
+            `already created ${credential.clientId}. That consumer is now orphaned and must ` +
+            'be revoked manually on the API Services Portal Consumers page.',
+        )
+        throw new ConflictException(
+          'This tenant already has an API key. Regenerate it to get a new value.',
+        )
+      }
+      throw error
+    }
 
     // Same per-channel limits and alert thresholds a bound key gets.
     await this.apiKeysService.ensureDefaults(binding.id)
@@ -246,6 +286,13 @@ export class ApiKeyIssuanceService {
    *
    * Prefixed with `notify-` and the tenant slug so a Notify-issued key is identifiable
    * at a glance on a gateway shared across the whole ministry.
+   *
+   * The random suffix is not decoration. APS refuses a second credential for the same
+   * Application in the same Environment, and Applications cannot be deleted through the
+   * API — so any name that repeats is permanently unusable. Without a discriminator,
+   * re-issuing after a binding row is removed from the database (entirely plausible
+   * during this rollout) would 409 forever, and raising MAX_KEYS_PER_TENANT above 1
+   * would never work at all.
    */
   private buildApplicationName(tenant: Tenant): string {
     const slug = tenant.slug
@@ -253,7 +300,8 @@ export class ApiKeyIssuanceService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
 
-    return `notify-${slug}`.slice(0, 60)
+    const discriminator = randomBytes(3).toString('hex')
+    return `${`notify-${slug}`.slice(0, 53)}-${discriminator}`
   }
 
   /**

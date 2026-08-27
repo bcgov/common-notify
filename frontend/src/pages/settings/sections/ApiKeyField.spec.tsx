@@ -26,6 +26,13 @@ vi.mock('@/redux/thunks/apiKeys.thunks', () => ({
   updateApiKeyNotes: vi.fn((payload) => ({ type: 'apiKeys/updateNotes', payload })),
 }))
 
+vi.mock('@/config', () => ({
+  default: {
+    API_KEY_DOCS_URL: 'https://example.test/docs',
+    API_KEY_REVOKE_URL: 'https://example.test/revoke',
+  },
+}))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),
@@ -272,7 +279,9 @@ describe('ApiKeyField', () => {
       expect(screen.getByLabelText('API key notes')).toHaveValue('OpenShift secret')
     })
 
-    it('closes even when saving the note fails, since the key already exists', async () => {
+    it('stays open when saving the note fails, so the text is not lost', async () => {
+      // This dialog is the only place a note can be written. Closing on failure would
+      // discard it with no way back short of regenerating a working key.
       await openReveal([EXISTING_KEY])
       dispatchMock.mockReturnValue({ unwrap: () => Promise.reject('Save failed') })
 
@@ -280,7 +289,8 @@ describe('ApiKeyField', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
       await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith('Save failed'))
-      expect(screen.queryByText('the-only-copy')).not.toBeInTheDocument()
+      expect(screen.getByText('the-only-copy')).toBeInTheDocument()
+      expect(screen.getByLabelText('API key notes')).toHaveValue('new note')
     })
   })
 
@@ -343,6 +353,22 @@ describe('ApiKeyField', () => {
     renderField({ error: 'Failed to load API keys' })
 
     expect(screen.getByText('Failed to load API keys')).toBeInTheDocument()
+  })
+
+  it('omits the help links entirely when their URLs are not configured', async () => {
+    vi.resetModules()
+    vi.doMock('@/config', () => ({ default: { API_KEY_DOCS_URL: '', API_KEY_REVOKE_URL: '' } }))
+    const { default: Unconfigured } = await import('./ApiKeyField')
+
+    state = {
+      apiKeys: { keys: [EXISTING_KEY], saving: false, loading: false },
+      user: { current: { cstarRoles: [CstarRole.NOTIFY_OPERATIONS_ADMIN] } },
+    }
+    render(<Unconfigured />)
+
+    // A link to nowhere is worse than no link.
+    expect(screen.queryByRole('link', { name: /Revoke API key/ })).not.toBeInTheDocument()
+    vi.doUnmock('@/config')
   })
 
   it('links out to the API gateway for revoking, which Notify does not do', () => {

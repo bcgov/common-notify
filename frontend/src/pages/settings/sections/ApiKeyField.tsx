@@ -123,23 +123,26 @@ const ApiKeyField: FC = () => {
     const trimmed = notes.trim()
     const unchanged = trimmed === (revealed?.notes ?? '')
 
-    // Close first: the key has already been issued and copied, so a failure to save a
-    // note must not trap the user in the dialog.
-    setRevealed(null)
-
-    if (!clientId || unchanged) return
+    if (!clientId || unchanged) {
+      setRevealed(null)
+      return
+    }
 
     try {
       await dispatch(updateApiKeyNotes({ clientId, notes: trimmed || null })).unwrap()
     } catch (notesError) {
+      // Stay open. This dialog is the only place a note can be written, so closing on a
+      // failed save would discard what the user typed with no way to re-enter it short
+      // of regenerating a working key.
       showErrorToast(
         typeof notesError === 'string'
           ? notesError
-          : 'The API key was created, but the notes could not be saved',
+          : 'The API key was created, but the notes could not be saved. Try again.',
       )
       return
     }
 
+    setRevealed(null)
     showSuccessToast('API key notes saved')
   }
 
@@ -240,27 +243,35 @@ const ApiKeyField: FC = () => {
 
       {/* Below the button, stacked, per the design: these are references, not the
           primary action. */}
-      <p className="api-key__links">
-        <Link
-          className="settings__external-link"
-          href={config.API_KEY_DOCS_URL}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Learn more about API keys
-          <SvgUpRightFromSquareIcon />
-        </Link>
-        {/* Revoking is done on the API gateway's own site, never in Notify. */}
-        <Link
-          className="settings__external-link"
-          href={config.API_KEY_REVOKE_URL}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Revoke API key
-          <SvgUpRightFromSquareIcon />
-        </Link>
-      </p>
+      {/* Rendered only when configured. An unset URL means the destination has not been
+          confirmed, and a link to nowhere is worse than no link. */}
+      {(config.API_KEY_DOCS_URL || config.API_KEY_REVOKE_URL) && (
+        <p className="api-key__links">
+          {config.API_KEY_DOCS_URL && (
+            <Link
+              className="settings__external-link"
+              href={config.API_KEY_DOCS_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn more about API keys
+              <SvgUpRightFromSquareIcon />
+            </Link>
+          )}
+          {/* Revoking is done on the API gateway's own site, never in Notify. */}
+          {config.API_KEY_REVOKE_URL && (
+            <Link
+              className="settings__external-link"
+              href={config.API_KEY_REVOKE_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Revoke API key
+              <SvgUpRightFromSquareIcon />
+            </Link>
+          )}
+        </p>
+      )}
 
       <GenericModal
         isOpen={isConfirmingRegenerate}

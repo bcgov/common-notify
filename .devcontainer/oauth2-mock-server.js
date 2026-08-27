@@ -347,6 +347,16 @@ async function kong(method, path, body) {
  * docs/api-key-self-service.md can be walked through locally.
  */
 app.get('/ds/api/v3/gateways/:gatewayId/products', (req, res) => {
+  // Scoped like the issue route below. Without this the mock is more permissive than the
+  // real API in exactly the dimension that has already cost time twice: a wrong
+  // APS_GATEWAY_ID would look fine here and fail only later, against real APS.
+  if (req.params.gatewayId !== GATEWAY_ID) {
+    return res.status(403).json({
+      code: 'permission_denied',
+      message: `Missing required scope: ${req.params.gatewayId}:Namespace.Manage`,
+    })
+  }
+
   res.json([
     {
       name: 'Notify API',

@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { In, Repository } from 'typeorm'
+import { In, IsNull, Repository } from 'typeorm'
 import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
 import {
   hasNoCredentialHeaders,
@@ -94,9 +94,24 @@ describe('resolveApiKeyConsumer', () => {
 
     expect(result).toBe(binding)
     expect(repository.findOne).toHaveBeenLastCalledWith({
-      where: { clientId: In(['ENV123-APP456']) },
+      where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
       relations: ['tenant'],
     })
+  })
+
+  it('only accepts a clientId for a binding that has never been used', async () => {
+    // clientId is displayed in the UI and on the Portal Consumers page, so it is a much
+    // weaker secret than Kong's credential UUID. Once a binding is activated this path
+    // must be closed for it.
+    repository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+
+    await resolve({ consumerUsername: 'ENV123-APP456' })
+
+    expect(repository.findOne).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ credentialIdentifier: IsNull() }),
+      }),
+    )
   })
 
   it('backfills the credential identifier so later requests take the fast path', async () => {
@@ -140,7 +155,7 @@ describe('resolveApiKeyConsumer', () => {
     await resolve({ consumerUsername: 'ENV123-APP456', consumerCustomId: 'ENV123-APP456' })
 
     expect(repository.findOne).toHaveBeenLastCalledWith({
-      where: { clientId: In(['ENV123-APP456']) },
+      where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
       relations: ['tenant'],
     })
   })

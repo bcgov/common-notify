@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common'
-import { In, Repository } from 'typeorm'
+import { In, IsNull, Repository } from 'typeorm'
 import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
 
 /** The gateway-injected headers that identify the caller's credential. */
@@ -76,8 +76,15 @@ export async function resolveApiKeyConsumer(
     return null
   }
 
+  // Restricted to bindings that have never been used. That is the only case this
+  // fallback exists for, and narrowing it matters: clientId is low-entropy and openly
+  // displayed — in the Notify UI and on the Portal Consumers page — whereas Kong's
+  // credential id is an unguessable UUID. Kong overwrites these headers, so forging one
+  // requires already being inside the cluster network, but leaving a guessable
+  // identifier accepted for the life of every key is a needlessly wide door. Once the
+  // credential id is backfilled below, this path closes for that binding permanently.
   const byClientId = await repository.findOne({
-    where: { clientId: In(clientIds) },
+    where: { clientId: In(clientIds), credentialIdentifier: IsNull() },
     relations: ['tenant'],
   })
   if (!byClientId) {

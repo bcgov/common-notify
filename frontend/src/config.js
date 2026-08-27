@@ -23,13 +23,15 @@ const config = {
     '',
   CSTAR_TENANT_SETUP_URL:
     window.VITE_CSTAR_TENANT_SETUP_URL || import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || '',
-  // Background reading for the API key tooltip.
+  // API key help links, shown beside the API key field in Tenant Settings. Both point at
+  // the APS platform techdocs. Set to '' to hide a link rather than pointing it somewhere
+  // provisional — ApiKeyField omits any link whose URL is empty.
   API_KEY_DOCS_URL:
     window.VITE_API_KEY_DOCS_URL ||
     import.meta.env.VITE_API_KEY_DOCS_URL ||
-    'https://api.gov.bc.ca/devportal/api-directory',
-  // Revoking a key is done on the API Services Portal Consumers page, not in Notify —
-  // it is the only place that stops the gateway honouring the key.
+    'https://developer.gov.bc.ca/docs/default/component/aps-infra-platform-docs/concepts/protect-api/#kong-api-key',
+  // Revoking is done on the API gateway, never in Notify — it is the only place that
+  // stops the gateway honouring the key.
   API_KEY_REVOKE_URL:
     window.VITE_API_KEY_REVOKE_URL ||
     import.meta.env.VITE_API_KEY_REVOKE_URL ||

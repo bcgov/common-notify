@@ -80,12 +80,14 @@ describe('ApiKeyIssuanceService', () => {
       const result = await issue()
 
       expect(credentialIssuer.issue).toHaveBeenCalledWith({
-        applicationName: 'notify-tenant-a',
+        // Discriminated — see buildApplicationName for why a repeated name is fatal.
+        applicationName: expect.stringMatching(/^notify-tenant-a-[0-9a-f]{6}$/),
         applicationDescription: 'Notify API key for tenant Tenant A',
         labels: {
           'issued-by': 'notify',
           'notify-tenant': 'tenant-a',
-          'notify-tenant-id': 'tenant-uuid',
+          // The CSTAR guid, not the Notify row id — see the service for why.
+          'cstar-tenant-id': 'cstar-guid',
         },
       })
 
@@ -105,6 +107,17 @@ describe('ApiKeyIssuanceService', () => {
       expect(result.apiKey).toBe('the-only-copy')
       expect(result.clientId).toBe('ENV123-APP456')
       expect(result.activated).toBe(false)
+    })
+
+    it('omits the CSTAR label rather than sending it empty when the tenant has none', async () => {
+      await service.issueForTenant({
+        tenant: { ...TENANT, externalId: null } as unknown as Tenant,
+        idirUserGuid: 'idir-guid',
+      })
+
+      const { labels } = credentialIssuer.issue.mock.calls[0][0]
+      expect(labels).not.toHaveProperty('cstar-tenant-id')
+      expect(labels['notify-tenant']).toBe('tenant-a')
     })
 
     it('seeds the same default limits a bound key gets', async () => {
@@ -180,8 +193,41 @@ describe('ApiKeyIssuanceService', () => {
       })
 
       expect(credentialIssuer.issue).toHaveBeenCalledWith(
-        expect.objectContaining({ applicationName: 'notify-air-quality-alert' }),
+        expect.objectContaining({
+          applicationName: expect.stringMatching(/^notify-air-quality-alert-[0-9a-f]{6}$/),
+        }),
       )
+    })
+
+    it('never reuses an application name', async () => {
+      // APS refuses a second credential for the same Application in an Environment and
+      // cannot delete Applications, so a repeated name is permanently unusable — which
+      // would bite on any re-issue after a binding row was cleaned up by hand.
+      await issue()
+      await issue()
+
+      const [first, second] = credentialIssuer.issue.mock.calls.map((c) => c[0].applicationName)
+      expect(first).not.toBe(second)
+    })
+
+    it('reports a lost concurrency race as a conflict, and logs the orphaned consumer', async () => {
+      // The count check cannot hold under concurrency; the partial unique index from V55
+      // does. The credential already exists at the gateway by this point and no API can
+      // remove it, so the clientId has to reach the logs.
+      const uniqueViolation = Object.assign(new Error('duplicate key'), { code: '23505' })
+      repository.save.mockRejectedValueOnce(uniqueViolation)
+      const logError = vi
+        .spyOn((service as any).logger, 'error')
+        .mockImplementation(() => undefined)
+
+      await expect(issue()).rejects.toThrow(ConflictException)
+      expect(logError.mock.calls.flat().join(' ')).toMatch(/ENV123-APP456/)
+    })
+
+    it('does not disguise an unrelated database failure as a conflict', async () => {
+      repository.save.mockRejectedValueOnce(new Error('connection reset'))
+
+      await expect(issue()).rejects.toThrow(/connection reset/)
     })
   })
 
