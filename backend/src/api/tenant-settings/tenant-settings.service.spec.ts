@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { BadRequestException } from '@nestjs/common'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { vi } from 'vitest'
 import { TenantSettingsService } from './tenant-settings.service'
 import { TenantSettings } from './entities/tenant-settings.entity'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 
 describe('TenantSettingsService', () => {
   let service: TenantSettingsService
@@ -33,6 +35,11 @@ describe('TenantSettingsService', () => {
     create: vi.fn(),
     save: vi.fn(),
   }
+  const mockEmailLogoService = {
+    findByIdIfApproved: vi.fn().mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+    }),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,6 +48,10 @@ describe('TenantSettingsService', () => {
         {
           provide: getRepositoryToken(TenantSettings),
           useValue: mockRepository,
+        },
+        {
+          provide: EmailLogoService,
+          useValue: mockEmailLogoService,
         },
       ],
     }).compile()
@@ -157,6 +168,7 @@ describe('TenantSettingsService', () => {
 
   describe('upsertEmailSettings', () => {
     const emailDto = {
+      emailLogoId: '11111111-1111-4111-8111-111111111111',
       emailNotificationsEnabled: false,
       replyToEmail: 'noreply',
       emailAttachmentsEnabled: false,
@@ -188,6 +200,7 @@ describe('TenantSettingsService', () => {
       const result = await service.upsertEmailSettings('tenant-uuid-1', emailDto, 'updater-guid')
 
       expect(existingSettings.emailNotificationsEnabled).toBe(false)
+      expect(existingSettings.emailLogoId).toBe(emailDto.emailLogoId)
       expect(existingSettings.replyToEmail).toBe('noreply')
       expect(existingSettings.emailAttachmentsEnabled).toBe(false)
       expect(existingSettings.updatedBy).toBe('updater-guid')
@@ -207,6 +220,29 @@ describe('TenantSettingsService', () => {
       expect(existingSettings.replyToEmail).toBeNull()
       expect(mockRepository.save).toHaveBeenCalledWith(existingSettings)
       expect(result).toEqual(savedSettings)
+    })
+
+    it('should clear emailLogoId without an approval lookup', async () => {
+      const existingSettings = { ...mockTenantSettings, emailLogoId: emailDto.emailLogoId }
+      const dto = { ...emailDto, emailLogoId: null }
+      mockRepository.findOne.mockResolvedValue(existingSettings)
+      mockRepository.save.mockResolvedValue(existingSettings)
+
+      await service.upsertEmailSettings('tenant-uuid-1', dto, 'updater-guid')
+
+      expect(existingSettings.emailLogoId).toBeNull()
+      expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
+    })
+
+    it('should reject an emailLogoId that is not approved', async () => {
+      mockEmailLogoService.findByIdIfApproved.mockResolvedValueOnce(null)
+
+      await expect(
+        service.upsertEmailSettings('tenant-uuid-1', emailDto, 'updater-guid'),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockRepository.findOne).not.toHaveBeenCalled()
+      expect(mockRepository.save).not.toHaveBeenCalled()
     })
 
     it('should leave the tenant tab fields untouched', async () => {

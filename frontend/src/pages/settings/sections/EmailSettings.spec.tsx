@@ -68,6 +68,7 @@ vi.mock('@bcgov/design-system-react-components', () => ({
 }))
 
 const SAVED_EMAIL = {
+  emailLogoId: 'logo-1',
   emailNotificationsEnabled: true,
   replyToEmail: 'noreply',
   emailAttachmentsEnabled: true,
@@ -180,6 +181,7 @@ describe('EmailSettings section', () => {
 
     await waitFor(() => {
       expect(updateEmailSettings).toHaveBeenCalledWith({
+        emailLogoId: 'logo-1',
         emailNotificationsEnabled: false,
         emailAttachmentsEnabled: true,
         replyToEmail: 'support',

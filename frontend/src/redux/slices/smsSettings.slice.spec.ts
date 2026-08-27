@@ -24,6 +24,7 @@ describe('smsSettingsSlice', () => {
     tenantId: 'tenant-1',
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
+    emailLogoId: null,
     smsNotificationsEnabled: false,
     includeTenantNameInSms: false,
     internationalSmsEnabled: true,

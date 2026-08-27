@@ -13,6 +13,7 @@ describe('tenantSettingsSlice', () => {
   const loadedState = {
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
+    emailLogoId: null,
     saving: false,
   }
 

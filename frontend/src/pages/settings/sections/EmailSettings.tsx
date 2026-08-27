@@ -35,8 +35,14 @@ interface EmailSwitches {
 const EmailSettings: FC = () => {
   const dispatch = useAppDispatch()
   const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
-  const { emailNotificationsEnabled, replyToEmail, emailAttachmentsEnabled, saving, error } =
-    useAppSelector((state) => state.emailSettings)
+  const {
+    emailLogoId,
+    emailNotificationsEnabled,
+    replyToEmail,
+    emailAttachmentsEnabled,
+    saving,
+    error,
+  } = useAppSelector((state) => state.emailSettings)
   const emailLimits = usage?.channels.find(
     (channel) => channel.channel === NotificationChannel.EMAIL,
   )
@@ -93,7 +99,7 @@ const EmailSettings: FC = () => {
 
     try {
       const updatedSettings = await dispatch(
-        updateEmailSettings({ ...switches, replyToEmail: normalizedReplyTo }),
+        updateEmailSettings({ ...switches, emailLogoId, replyToEmail: normalizedReplyTo }),
       ).unwrap()
       // Re-sync to exactly what was persisted; the slice moves the baseline.
       setSwitches({

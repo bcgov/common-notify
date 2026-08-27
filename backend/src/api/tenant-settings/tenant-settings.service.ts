@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 import { TenantSettings } from './entities/tenant-settings.entity'
 import { UpdateEmailSettingsDto } from './schemas/update-email-settings.dto'
 import { UpdateSmsSettingsDto } from './schemas/update-sms-settings.dto'
@@ -13,6 +14,7 @@ export class TenantSettingsService {
   constructor(
     @InjectRepository(TenantSettings)
     private tenantSettingsRepository: Repository<TenantSettings>,
+    private readonly emailLogoService: EmailLogoService,
   ) {}
 
   async findByTenantId(tenantId: string): Promise<TenantSettings | null> {
@@ -59,9 +61,19 @@ export class TenantSettingsService {
     updatedBy?: string,
   ): Promise<TenantSettings> {
     try {
+      if (dto.emailLogoId !== null) {
+        const approvedLogo = await this.emailLogoService.findByIdIfApproved(dto.emailLogoId)
+        if (!approvedLogo) {
+          throw new BadRequestException(
+            'emailLogoId must reference an approved, non-deleted email logo',
+          )
+        }
+      }
+
       const existing = await this.findByTenantId(tenantId)
 
       if (existing) {
+        existing.emailLogoId = dto.emailLogoId
         existing.emailNotificationsEnabled = dto.emailNotificationsEnabled
         existing.replyToEmail = dto.replyToEmail
         existing.emailAttachmentsEnabled = dto.emailAttachmentsEnabled
@@ -74,6 +86,7 @@ export class TenantSettingsService {
 
       const settings = this.tenantSettingsRepository.create({
         tenantId,
+        emailLogoId: dto.emailLogoId,
         emailNotificationsEnabled: dto.emailNotificationsEnabled,
         replyToEmail: dto.replyToEmail,
         emailAttachmentsEnabled: dto.emailAttachmentsEnabled,

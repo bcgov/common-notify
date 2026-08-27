@@ -6,6 +6,7 @@ import type { TenantSettings } from '@/interfaces/tenant-settings.interface'
 describe('emailSettingsSlice', () => {
   // Mirrors the tenant_settings column defaults.
   const initialState = {
+    emailLogoId: null,
     emailNotificationsEnabled: true,
     replyToEmail: null,
     emailAttachmentsEnabled: true,
@@ -13,6 +14,7 @@ describe('emailSettingsSlice', () => {
   }
 
   const loadedState = {
+    emailLogoId: 'logo-1',
     emailNotificationsEnabled: false,
     replyToEmail: 'noreply',
     emailAttachmentsEnabled: false,
@@ -24,6 +26,7 @@ describe('emailSettingsSlice', () => {
     tenantId: 'tenant-1',
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
+    emailLogoId: 'logo-1',
     emailNotificationsEnabled: false,
     replyToEmail: 'noreply',
     emailAttachmentsEnabled: false,
@@ -51,6 +54,7 @@ describe('emailSettingsSlice', () => {
       )
 
       expect(state.emailNotificationsEnabled).toBe(true)
+      expect(state.emailLogoId).toBeNull()
       expect(state.replyToEmail).toBeNull()
       expect(state.emailAttachmentsEnabled).toBe(true)
       expect(state.error).toBeUndefined()
@@ -63,6 +67,7 @@ describe('emailSettingsSlice', () => {
       )
 
       expect(state.emailNotificationsEnabled).toBe(false)
+      expect(state.emailLogoId).toBe('logo-1')
       expect(state.replyToEmail).toBe('noreply')
       expect(state.emailAttachmentsEnabled).toBe(false)
     })
@@ -71,6 +76,7 @@ describe('emailSettingsSlice', () => {
       const state = emailSettingsReducer(loadedState, fetchSettings.fulfilled(null, '', undefined))
 
       expect(state.emailNotificationsEnabled).toBe(true)
+      expect(state.emailLogoId).toBeNull()
       expect(state.replyToEmail).toBeNull()
       expect(state.emailAttachmentsEnabled).toBe(true)
     })
@@ -88,6 +94,7 @@ describe('emailSettingsSlice', () => {
 
   describe('updateEmailSettings thunk', () => {
     const payload = {
+      emailLogoId: 'logo-1',
       emailNotificationsEnabled: false,
       replyToEmail: 'noreply',
       emailAttachmentsEnabled: false,
@@ -107,6 +114,7 @@ describe('emailSettingsSlice', () => {
       )
 
       expect(state.emailNotificationsEnabled).toBe(false)
+      expect(state.emailLogoId).toBe('logo-1')
       expect(state.replyToEmail).toBe('noreply')
       expect(state.emailAttachmentsEnabled).toBe(false)
       expect(state.saving).toBe(false)

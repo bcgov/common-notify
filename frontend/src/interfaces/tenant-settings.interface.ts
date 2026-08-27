@@ -13,6 +13,7 @@ export interface SmsSettingsValues {
 
 /** The Email tab fields, which are also the PATCH payload for the email settings route. */
 export interface EmailSettingsValues {
+  emailLogoId: string | null
   emailNotificationsEnabled: boolean
   replyToEmail: string | null
   emailAttachmentsEnabled: boolean
