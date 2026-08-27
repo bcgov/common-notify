@@ -5,7 +5,10 @@
   flex-direction: column;
   gap: 24px;
   padding-top: 24px;
-  padding-left: 284px;
+  // Settings keeps its own layout rather than using `.page`, so it does not pick up
+  // $page-gutter. 348px = the previous 284px plus the 64px the sidebar used to
+  // contribute as margin-right, which keeps this page exactly where it was.
+  padding-left: 348px;
 }
 
 .settings__title {

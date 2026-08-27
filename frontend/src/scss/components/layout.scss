@@ -3,15 +3,22 @@
 .layout-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  // Fixed to the viewport, not min-height: the sidebar and the content column are
+  // independent scroll regions, and that only works if the shell itself never grows.
+  // With min-height the flex row took the height of the tallest child, so a long page
+  // stretched the sidebar with it and pushed its footer far below the fold.
+  height: 100vh;
+  overflow: hidden;
 }
 
 .layout-header {
   @include flex-between;
+  // The two scrolling regions below own all the leftover height.
+  flex-shrink: 0;
   gap: $spacing-md;
   padding-top: $spacing-md;
-  padding-left: $spacing-md;
-  padding-right: $spacing-md;
+  padding-left: $layout-gutter;
+  padding-right: $layout-gutter;
   background-color: $secondary-color;
   color: $white;
 
@@ -19,6 +26,15 @@
   // header tracks the body, which no longer caps its width either.
   .bcds-header > .bcds-header--container {
     max-width: none;
+  }
+
+  // The DS header carries its own `padding: 0 var(--layout-padding-medium)`, which would
+  // stack on top of the $layout-gutter above and push the title past the page content it
+  // is meant to line up with. Zeroed here so the gutter is applied exactly once.
+  // Scoped from this parent class rather than by redefining .bcds-header globally.
+  .bcds-header {
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 
@@ -111,11 +127,15 @@
 .layout-body {
   display: flex;
   flex: 1;
+  // Without min-height: 0 a flex child refuses to shrink below its content, so the
+  // overflow rules further down never engage and the page scrolls as a whole instead.
+  min-height: 0;
 }
 
 .layout-body-inner {
   display: flex;
   width: 100%;
+  min-height: 0;
 }
 
 // The sidebar styles itself (see sidebar.scss); there is deliberately no
@@ -128,19 +148,11 @@
   // row makes room by squeezing the sidebar. The table overflows this column
   // instead, which is what the design expects.
   min-width: 0;
-  // No side gutters: pages run to the window edge, as in the design.
-  padding: $spacing-xl 0;
-}
-
-.layout-footer {
-  margin-top: auto;
-  position: relative;
-
-  .footer-version {
-    position: absolute;
-    bottom: $spacing-sm;
-    right: $spacing-md;
-    font-size: $font-size-sm;
-    color: $text-secondary;
-  }
+  // Scrolls on its own, independently of the nav beside it.
+  min-height: 0;
+  overflow-y: auto;
+  // No side gutters here: the 64px inset on each side belongs to `.page`
+  // ($page-gutter), so it applies once and pages cannot double it up.
+  // 56px separates the header from the page content below it.
+  padding: 56px 0 $spacing-xl;
 }

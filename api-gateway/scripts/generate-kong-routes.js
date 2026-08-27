@@ -34,6 +34,10 @@ const requiredVars = [
   'GATEWAY_SERVICE_NAME',
   'BACKEND_HOST',
   'ROUTE_PREFIX',
+  // Unset, routes.yaml keeps a literal ${CONFIG_TAG} in `tags: [...]`, which is not a
+  // valid plain scalar inside a YAML flow sequence — so the failure surfaces as an
+  // opaque parse error rather than a missing variable.
+  'CONFIG_TAG',
   'GATEWAY_HOSTNAME',
   'KEYCLOAK_ISSUER',
   'FRONTEND_KEYCLOAK_ISSUER',

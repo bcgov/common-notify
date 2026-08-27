@@ -10,7 +10,7 @@
  * it. Pages should not add their own top/left margins on top of this.
  */
 
-$page-gutter: 24px; // Side inset from the sidebar / window edge
+$page-gutter: $layout-gutter; // Side inset from the sidebar / window edge
 $page-block-gap: 24px; // Space between the blocks stacked inside a page
 $page-toolbar-gap: 73px; // Search/toolbar row to the table beneath it
 $page-narrow-width: 572px; // Single-column form pages (template create/edit)
