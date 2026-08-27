@@ -85,6 +85,14 @@ export default () => {
       // requires the scope to be requested explicitly.
       scope: process.env.APS_TOKEN_SCOPE,
       timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
+      // Group every issued credential joins, in addition to the tenant's CSTAR id.
+      // The gateway's acl plugin allows this one group, which is what lets a single
+      // static allow-list authorize an unbounded set of tenants: the tenant's own
+      // group rides along in X-Consumer-Groups without ever needing to be enumerated.
+      //
+      // MUST match ACL_GROUP in api-gateway/config/*.env. A mismatch is a 403 on every
+      // request, so change both together.
+      aclGroup: process.env.APS_ACL_GROUP || 'notify-api',
     },
 
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth

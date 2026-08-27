@@ -1,0 +1,41 @@
+# Product and Dataset for the APS test-instance sandbox gateway.
+#
+# The routes themselves are NOT here: they are generated from templates/routes.yaml, the
+# same source the real environments use, so the sandbox cannot drift into testing a route
+# set that does not exist anywhere else. This file supplies only the piece routes.yaml has
+# no notion of — the Product Environment, which APS requires before it will issue a
+# credential, and which must reference the service by the name routes.yaml gave it.
+---
+kind: DraftDataset
+name: ${SERVICE_SUBDOMAIN}-dataset
+title: ${PRODUCT_TITLE}
+organization: ${ORGANIZATION}
+organizationUnit: ${ORGANIZATION_UNIT}
+notes: |
+  Sandbox gateway for validating BC Notify's self-service API key issuing against the
+  APS Credential Issuer API. Not a deployment target and not intended for consumers.
+tags: [notify, sandbox]
+license_title: Access Only
+security_class: PUBLIC
+record_publish_date: '2026-01-01'
+---
+kind: Product
+name: ${PRODUCT_TITLE}
+dataset: ${SERVICE_SUBDOMAIN}-dataset
+environments:
+  - name: ${ENVIRONMENT}
+    # Inactive on purpose: per the APS docs a Product Environment does not need to be
+    # active in the API Directory to issue credentials, and publishing a sandbox to the
+    # public directory would be misleading.
+    active: false
+    approval: false
+    # kong-api-key-acl, not kong-api-key-only: the ACL flow is what makes Kong attach
+    # consumers to their groups and forward them as X-Consumer-Groups, which is how the
+    # tenant's CSTAR id reaches the backend without a database lookup. The -only flow
+    # authenticates identically but injects no groups.
+    #
+    # Deviates from the production Notify
+    # environments; client-credentials returns clientId/clientSecret instead of an apiKey
+    # and the backend rejects it with a 400.
+    flow: kong-api-key-acl
+    services: [${GATEWAY_SERVICE_NAME}]

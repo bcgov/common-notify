@@ -44,6 +44,11 @@ const PG_UNIQUE_VIOLATION = '23505'
 export class ApiKeyIssuanceService {
   private readonly logger = new Logger(ApiKeyIssuanceService.name)
 
+  /** Shared ACL group every issued credential joins. See configuration.ts. */
+  private get aclGroup(): string {
+    return this.configService.get<string>('aps.aclGroup') || 'notify-api'
+  }
+
   constructor(
     @InjectRepository(ApiKeyConsumer)
     private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
@@ -95,8 +100,13 @@ export class ApiKeyIssuanceService {
       // puts the tenant's CSTAR id into a request header — the one supported way to
       // identify a tenant without a database lookup. APS's own spec example does the
       // same thing. Ignored on a kong-api-key-only environment (no ACL plugin), so it
-      // is harmless to send today and ready when the environment moves to -acl.
-      ...(tenant.externalId ? { aclGroups: [tenant.externalId] } : {}),
+      // is harmless to send there and active once the environment moves to -acl.
+      //
+      // The shared group is what the gateway's acl plugin actually allows. The tenant's
+      // own group is never in that allow-list — it does not need to be, because Kong
+      // reports every group the consumer belongs to, not just the one that matched.
+      // That is what keeps the allow-list static while tenants stay dynamic.
+      aclGroups: [this.aclGroup, tenant.externalId].filter(Boolean) as string[],
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,

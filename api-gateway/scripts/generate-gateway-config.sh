@@ -11,10 +11,13 @@ set -e
 #   ./generate-gateway-config.sh pr <release-name>              # Generate PR routes only
 #   ./generate-gateway-config.sh all                            # Generate Product + all services (dev+test+prod)
 #   ./generate-gateway-config.sh pr-with-permanent <release>    # Generate PR + permanent services (dev+test+prod+PR)
-#   ./generate-gateway-config.sh aps-test-instance              # Generate the APS test-instance sandbox gateway
+#   ./generate-gateway-config.sh aps-test-instance [<release>]  # Generate the APS test-instance sandbox gateway
 
 COMMAND=$1
 RELEASE_NAME=$2
+# Kept separate: generate_aps_test_instance_config exports RELEASE_NAME for envsubst, so
+# reading the argument back from it later would see the exported value, not the input.
+RELEASE_NAME_ARG=$2
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -76,22 +79,63 @@ generate_env_config() {
 
 # Function to generate the APS test-instance sandbox gateway.
 #
-# Separate from generate_env_config because it uses a different template and is not part
-# of any deploy pipeline: it targets APS's own test deployment, where the Credential
-# Issuer API lives, rather than the production instance that hosts gw-fe8c5.
+# Separate from generate_env_config because it targets APS's own test deployment — where
+# the Credential Issuer API lives — rather than the production instance that hosts
+# gw-fe8c5, and because it needs a Product Environment appended that routes.yaml has no
+# notion of.
+#
+# The routes come from templates/routes.yaml, the same source every real environment
+# uses. Reusing it rather than keeping a hand-written subset means the sandbox always
+# exercises the routes that actually exist.
 generate_aps_test_instance_config() {
+  local release=$1
   local ENV_FILE="${SCRIPT_DIR}/config/aps-test-instance.env"
-  local TEMPLATE_FILE="${SCRIPT_DIR}/templates/aps-test-instance.yaml"
+  local ROUTES_TEMPLATE="${SCRIPT_DIR}/templates/routes.yaml"
+  local PRODUCT_TEMPLATE="${SCRIPT_DIR}/templates/aps-test-instance-product.yaml"
   local OUTPUT_FILE="${SCRIPT_DIR}/generated/gw-aps-test-instance.yaml"
+
+  # Per-release naming, mirroring how pr.env isolates a PR on the production gateway:
+  # each release publishes its own service and its own /pr-<n> path prefix, so a key
+  # sent at that prefix reaches the backend that actually holds its binding.
+  # A bare invocation targets the permanent dev release and takes no prefix.
+  if [ -z "$release" ]; then
+    release="common-notify-dev"
+  fi
+  export RELEASE_NAME="$release"
+
+  local pr_number
+  pr_number=$(echo "$release" | sed -n 's/^common-notify-\([0-9][0-9]*\)$/\1/p')
+  if [ -n "$pr_number" ]; then
+    export RELEASE_SUFFIX="pr-${pr_number}"
+    export RELEASE_PATH_PREFIX="/pr-${pr_number}"
+  else
+    export RELEASE_SUFFIX="dev"
+    export RELEASE_PATH_PREFIX=""
+  fi
 
   set -a
   source "$ENV_FILE"
   set +a
 
   mkdir -p "${SCRIPT_DIR}/generated"
-  envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+  envsubst < "$ROUTES_TEMPLATE" > "$OUTPUT_FILE"
+  envsubst < "$PRODUCT_TEMPLATE" >> "$OUTPUT_FILE"
 
-  echo "  ✓ Generated: gw-aps-test-instance.yaml"
+  # Same anchor expansion the other configs get: routes.yaml uses YAML anchors, and no
+  # downstream consumer should have to support them.
+  python3 "${SCRIPT_DIR}/scripts/expand-yaml-anchors.py" "$OUTPUT_FILE"
+
+  # routes.yaml's strip_path: true discards the whole matched path, so every route would
+  # proxy "/" to the backend. Sandbox-only, so the production configs generated from the
+  # same template are left byte-identical. See fix-upstream-path.py.
+  python3 "${SCRIPT_DIR}/scripts/fix-upstream-path.py" "$OUTPUT_FILE" "$PATH_PREFIX"
+
+  # routes.yaml carries no acl plugin, so Kong injects no X-Consumer-Groups and the
+  # tenant is unidentifiable from headers alone. Sandbox-only for the same reason as
+  # above. See inject-acl-plugins.py.
+  python3 "${SCRIPT_DIR}/scripts/inject-acl-plugins.py" "$OUTPUT_FILE" "$ACL_GROUP"
+
+  echo "  ✓ Generated: gw-aps-test-instance.yaml (release ${RELEASE_NAME})"
   echo ""
   echo "  Apply with:"
   echo "    gwa apply --input ${OUTPUT_FILE} \\"
@@ -146,7 +190,7 @@ case "$COMMAND" in
 
   aps-test-instance)
     echo "Generating APS test-instance sandbox gateway..."
-    generate_aps_test_instance_config
+    generate_aps_test_instance_config "$RELEASE_NAME_ARG"
     echo "✅ Done!"
     ;;
 
@@ -226,7 +270,7 @@ case "$COMMAND" in
     echo "  $0 pr <release-name>              # Generate PR routes only"
     echo "  $0 all                            # Generate Product + all services"
     echo "  $0 pr-with-permanent <release>    # Generate PR + permanent services"
-    echo "  $0 aps-test-instance              # Generate the APS test-instance sandbox gateway"
+    echo "  $0 aps-test-instance [<release>]  # Generate the APS test-instance sandbox gateway"
     exit 1
     ;;
 esac
