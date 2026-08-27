@@ -67,6 +67,28 @@ spec:
                 name: {{.Release.Name}}-backend
             - secretRef:
                 name: app-api-secrets
+            # Per-release overrides, layered last so its keys win. envFrom entries are
+            # applied in order and a later duplicate key replaces an earlier one, so this
+            # secret only needs the handful of keys being changed — everything else falls
+            # through to app-api-secrets above.
+            #
+            # Exists so a single PR environment can be repointed (at a different APS
+            # instance, say) without a chart change, a redeploy, or disturbing the other
+            # releases that share the namespace secret. Not created by this chart: Helm
+            # would reconcile it back on the next upgrade and silently discard manual
+            # edits. Create it by hand and delete it when finished:
+            #
+            #   oc create secret generic {{ .Release.Name }}-overrides --from-literal=KEY=value
+            #   oc delete secret {{ .Release.Name }}-overrides
+            #
+            # pr-close.yml removes it automatically when a PR is closed. Optional, so a
+            # release without one deploys exactly as before.
+            #
+            # Worth knowing in a long-lived environment: an override here is invisible in
+            # git. Prefer values.yaml or app-api-secrets for anything meant to persist.
+            - secretRef:
+                name: {{ .Release.Name }}-overrides
+                optional: true
           env:
             - name: LOG_LEVEL
               value: info
@@ -173,57 +195,6 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: CSTAR_API_URL
-            # APS Directory API (Credential Issuer) — self-service API key issuing.
-            #
-            # All six come from app-api-secrets, matching CSTAR_API_URL and the Keycloak
-            # issuers above: per-environment backend configuration lives in that secret,
-            # not in values.yaml, so a namespace can be repointed with `oc patch` and a
-            # restart instead of a chart change and a redeploy.
-            #
-            # Every key is optional, so a namespace that has not been configured still
-            # starts — issuing returns a 503 naming what is missing rather than the pod
-            # failing to schedule.
-            #
-            # APS_API_BASE_URL and APS_TOKEN_URL must name the SAME APS instance. A token
-            # is only valid to the instance that issued it, so a mismatched pair gives a
-            # 401 that reads like a missing permission; the backend warns at startup if
-            # it sees one. See docs/api-key-self-service.md.
-            - name: APS_API_BASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_API_BASE_URL
-                  optional: true
-            - name: APS_TOKEN_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_TOKEN_URL
-                  optional: true
-            - name: APS_GATEWAY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_GATEWAY_ID
-                  optional: true
-            - name: APS_ENVIRONMENT_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_ENVIRONMENT_APP_ID
-                  optional: true
-            - name: APS_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_CLIENT_ID
-                  optional: true
-            - name: APS_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.backend.aps.existingSecret | quote }}
-                  key: APS_CLIENT_SECRET
-                  optional: true
           ports:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
