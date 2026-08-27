@@ -11,6 +11,7 @@ describe('TenantSettingsService', () => {
     id: 'settings-uuid-1',
     tenantId: 'tenant-uuid-1',
     alertEmail: 'alerts@example.com',
+    emailLogoId: null,
     defaultSenderEmail: 'noreply',
     emailNotificationsEnabled: true,
     replyToEmail: null,

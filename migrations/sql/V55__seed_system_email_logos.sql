@@ -3,13 +3,13 @@ INSERT INTO
 VALUES
   (
     'BC Gov Logo Primary',
-    'bc-gov-logo-primary.png',
+    'logos/bc-gov-logo-primary.png',
     'SYSTEM',
     'APPROVED'
   ),
   (
     'BC Gov Logo Alternate',
-    'bc-gov-logo-alt.png',
+    'logos/bc-gov-logo-alt.png',
     'SYSTEM',
     'APPROVED'
   );

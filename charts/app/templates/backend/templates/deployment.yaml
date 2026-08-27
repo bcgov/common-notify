@@ -47,6 +47,12 @@ spec:
               value: "10"
             - name: FLYWAY_GROUP
               value: "true"
+          command: ["/bin/sh", "-c"]
+          args:
+            - /flyway/flyway info migrate repair && cp -R /flyway/assets/email-logos/. /email-logo-seed-assets/
+          volumeMounts:
+            - name: email-logo-seed-assets
+              mountPath: /email-logo-seed-assets
           resources:
             requests:
               cpu: 50m
@@ -99,6 +105,8 @@ spec:
               value: {{ .Values.backend.s3.endpoint | quote }}
             - name: S3_BUCKET
               value: {{ if contains "-dev" .Release.Namespace }}{{ .Values.backend.s3.buckets.dev | quote }}{{ else if contains "-test" .Release.Namespace }}{{ .Values.backend.s3.buckets.test | quote }}{{ else if contains "-prod" .Release.Namespace }}{{ .Values.backend.s3.buckets.prod | quote }}{{ else }}{{ .Values.backend.s3.buckets.dev | quote }}{{ end }}
+            - name: EMAIL_LOGO_SEED_ASSET_DIRECTORY
+              value: /app/email-logo-seed-assets
             - name: S3_REGION
               value: {{ .Values.backend.s3.region | quote }}
             - name: S3_FORCE_PATH_STYLE
@@ -214,6 +222,13 @@ spec:
             limits:
               cpu: 4
               memory: 8Gi
+          volumeMounts:
+            - name: email-logo-seed-assets
+              mountPath: /app/email-logo-seed-assets
+              readOnly: true
+      volumes:
+        - name: email-logo-seed-assets
+          emptyDir: {}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
