@@ -68,6 +68,7 @@ export async function bootstrap() {
   // changing just the hostname would.
   app.setGlobalPrefix('api', {
     exclude: [
+      { path: 'logos/(.*)', method: RequestMethod.ALL },
       { path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL },
       { path: 'gcnotify-passthrough/v2/(.*)', method: RequestMethod.ALL },
     ],

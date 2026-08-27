@@ -107,6 +107,21 @@ spec:
               value: {{ if contains "-dev" .Release.Namespace }}{{ .Values.backend.s3.buckets.dev | quote }}{{ else if contains "-test" .Release.Namespace }}{{ .Values.backend.s3.buckets.test | quote }}{{ else if contains "-prod" .Release.Namespace }}{{ .Values.backend.s3.buckets.prod | quote }}{{ else }}{{ .Values.backend.s3.buckets.dev | quote }}{{ end }}
             - name: EMAIL_LOGO_SEED_ASSET_DIRECTORY
               value: /app/email-logo-seed-assets
+            - name: PUBLIC_API_GATEWAY_BASE_URL
+              {{- if .Values.frontend.secrets.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
+                  key: api-gateway-notify-url
+              {{- else }}
+              value: {{ .Values.frontend.secrets.apiGatewayNotifyUrl | quote }}
+              {{- end }}
+            - name: PUBLIC_API_GATEWAY_PATH_PREFIX
+              {{- if regexMatch "^common-notify-[0-9]+$" .Release.Name }}
+              value: "/pr-{{ trimPrefix "common-notify-" .Release.Name }}"
+              {{- else }}
+              value: ""
+              {{- end }}
             - name: S3_REGION
               value: {{ .Values.backend.s3.region | quote }}
             - name: S3_FORCE_PATH_STYLE

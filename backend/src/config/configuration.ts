@@ -121,6 +121,9 @@ export default () => {
       seedAssetDirectory:
         process.env.EMAIL_LOGO_SEED_ASSET_DIRECTORY ||
         path.resolve(process.cwd(), '../migrations/assets/email-logos'),
+      publicBaseUrl:
+        process.env.PUBLIC_API_GATEWAY_BASE_URL || process.env.VITE_API_GATEWAY_NOTIFY_URL,
+      publicPathPrefix: process.env.PUBLIC_API_GATEWAY_PATH_PREFIX || '',
     },
 
     // ClamAV
