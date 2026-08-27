@@ -133,7 +133,7 @@ generate_aps_test_instance_config() {
   # routes.yaml carries no acl plugin, so Kong injects no X-Consumer-Groups and the
   # tenant is unidentifiable from headers alone. Sandbox-only for the same reason as
   # above. See inject-acl-plugins.py.
-  python3 "${SCRIPT_DIR}/scripts/inject-acl-plugins.py" "$OUTPUT_FILE" "$ACL_GROUP"
+  python3 "${SCRIPT_DIR}/scripts/inject-acl-plugins.py" "$OUTPUT_FILE" "$ACL_GROUP" "$ACL_MODE"
 
   echo "  ✓ Generated: gw-aps-test-instance.yaml (release ${RELEASE_NAME})"
   echo ""
