@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config'
-import { readFile } from 'fs/promises'
+import { readFile, readdir } from 'fs/promises'
 import * as path from 'path'
 import { vi } from 'vitest'
 import { ClamavService } from '../../services/clamav.service'
@@ -33,7 +33,7 @@ describe('EmailLogoBootstrapService', () => {
     vi.clearAllMocks()
   })
 
-  it('uploads both checked-in PNGs under the seeded database keys', async () => {
+  it('uploads every configured checked-in PNG under its seeded database key', async () => {
     vi.mocked(storage.head).mockResolvedValue(null)
     vi.mocked(storage.upload).mockImplementation(async (input) => ({
       storageKey: input.storageKey,
@@ -43,7 +43,15 @@ describe('EmailLogoBootstrapService', () => {
 
     await new EmailLogoBootstrapService(config, storage, clamavService).onModuleInit()
 
-    expect(storage.upload).toHaveBeenCalledTimes(2)
+    const checkedInFilenames = (await readdir(assetDirectory))
+      .filter((filename) => filename.endsWith('.png'))
+      .sort()
+    const configuredFilenames = SYSTEM_EMAIL_LOGO_KEYS.map((storageKey) =>
+      path.posix.basename(storageKey),
+    ).sort()
+
+    expect(configuredFilenames).toEqual(checkedInFilenames)
+    expect(storage.upload).toHaveBeenCalledTimes(SYSTEM_EMAIL_LOGO_KEYS.length)
     for (const storageKey of SYSTEM_EMAIL_LOGO_KEYS) {
       const filename = path.posix.basename(storageKey)
       const expectedContent = await readFile(path.join(assetDirectory, filename))
