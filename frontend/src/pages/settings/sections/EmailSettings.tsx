@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
+  Radio,
+  RadioGroup,
   SvgInfoIcon,
   Switch,
   TextField,
@@ -11,7 +13,7 @@ import {
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
-import { updateEmailSettings } from '@/redux/thunks/settings.thunks'
+import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
@@ -27,6 +29,8 @@ const normalizeReplyTo = (value: string): string | null => value.trim() || null
 
 const isValidReplyTo = (value: string): boolean => REPLY_TO_PATTERN.test(value)
 
+const NO_LOGO_VALUE = 'none'
+
 interface EmailSwitches {
   emailNotificationsEnabled: boolean
   emailAttachmentsEnabled: boolean
@@ -40,6 +44,9 @@ const EmailSettings: FC = () => {
     emailNotificationsEnabled,
     replyToEmail,
     emailAttachmentsEnabled,
+    approvedLogos,
+    approvedLogosLoading,
+    approvedLogosError,
     saving,
     error,
   } = useAppSelector((state) => state.emailSettings)
@@ -55,11 +62,13 @@ const EmailSettings: FC = () => {
     emailAttachmentsEnabled,
   })
   const [replyToInput, setReplyToInput] = useState(replyToEmail ?? '')
+  const [selectedEmailLogoId, setSelectedEmailLogoId] = useState<string | null>(emailLogoId)
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
 
   // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
   useEffect(() => {
     dispatch(fetchApiKeyUsage())
+    dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
 
   const normalizedReplyTo = normalizeReplyTo(replyToInput)
@@ -73,6 +82,7 @@ const EmailSettings: FC = () => {
   const settingsChanged =
     switches.emailNotificationsEnabled !== emailNotificationsEnabled ||
     switches.emailAttachmentsEnabled !== emailAttachmentsEnabled ||
+    selectedEmailLogoId !== emailLogoId ||
     normalizedReplyTo !== replyToEmail
   const isSaveDisabled = !canEdit || !settingsChanged || saving || Boolean(validationError)
   const isFieldDisabled = saving || !canEdit
@@ -99,7 +109,11 @@ const EmailSettings: FC = () => {
 
     try {
       const updatedSettings = await dispatch(
-        updateEmailSettings({ ...switches, emailLogoId, replyToEmail: normalizedReplyTo }),
+        updateEmailSettings({
+          ...switches,
+          emailLogoId: selectedEmailLogoId,
+          replyToEmail: normalizedReplyTo,
+        }),
       ).unwrap()
       // Re-sync to exactly what was persisted; the slice moves the baseline.
       setSwitches({
@@ -107,6 +121,7 @@ const EmailSettings: FC = () => {
         emailAttachmentsEnabled: updatedSettings.emailAttachmentsEnabled,
       })
       setReplyToInput(updatedSettings.replyToEmail ?? '')
+      setSelectedEmailLogoId(updatedSettings.emailLogoId)
       setShouldShowValidation(false)
       showSuccessToast('Email settings updated successfully')
     } catch (updateError) {
@@ -121,6 +136,46 @@ const EmailSettings: FC = () => {
       <h2 className="settings__section-heading">Email Settings</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
+
+      <div className="settings__field">
+        <RadioGroup
+          className="settings__logo-picker"
+          label="Email logo"
+          description="Choose a logo for outgoing emails, or select no logo."
+          value={selectedEmailLogoId ?? NO_LOGO_VALUE}
+          onChange={(value) => setSelectedEmailLogoId(value === NO_LOGO_VALUE ? null : value)}
+          isDisabled={isFieldDisabled || approvedLogosLoading}
+        >
+          <div className="settings__logo-grid">
+            <div className="settings__logo-option">
+              <Radio value={NO_LOGO_VALUE}>
+                <span className="settings__logo-none">No logo</span>
+              </Radio>
+            </div>
+            {approvedLogos.map((logo) => (
+              <div className="settings__logo-option" key={logo.id}>
+                <Radio value={logo.id}>
+                  <span className="settings__logo-content">
+                    <img
+                      alt=""
+                      className="settings__logo-thumbnail"
+                      loading="lazy"
+                      src={logo.imageUrl}
+                    />
+                    <span>{logo.name ?? 'Unnamed logo'}</span>
+                  </span>
+                </Radio>
+              </div>
+            ))}
+          </div>
+        </RadioGroup>
+        {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
+        {approvedLogosError && (
+          <p className="settings__field-error" role="alert">
+            {approvedLogosError}
+          </p>
+        )}
+      </div>
 
       <div className="settings__field">
         <div className="settings__switch-row">

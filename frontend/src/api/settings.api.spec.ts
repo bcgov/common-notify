@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSettings, updateSmsSettings, updateTenantSettings } from './settings.api'
+import {
+  getApprovedEmailLogos,
+  getSettings,
+  updateSmsSettings,
+  updateTenantSettings,
+} from './settings.api'
 import { generateApiParameters, get, patch } from '@/common/api'
 
 vi.mock('@/common/api', () => ({
@@ -37,6 +42,20 @@ describe('settings.api', () => {
     await expect(getSettings()).resolves.toBeNull()
   })
 
+  it('loads approved email logos from the tenant settings route', async () => {
+    const logos = [
+      {
+        id: 'logo-1',
+        name: 'Primary',
+        imageUrl: 'https://gateway.example.test/logos/logo-1/image',
+      },
+    ]
+    vi.mocked(get).mockResolvedValue(logos)
+
+    await expect(getApprovedEmailLogos()).resolves.toBe(logos)
+    expect(get).toHaveBeenCalledWith(expect.objectContaining({ url: `${BASE_URL}/email-logos` }))
+  })
+
   it('sends the tenant payload as the PATCH body on the per-tab route', async () => {
     vi.mocked(patch).mockResolvedValue({})
     const data = { alertEmail: 'alerts@example.com', defaultSenderEmail: 'noreply' }
@@ -71,6 +90,7 @@ describe('settings.api', () => {
    */
   it.each([
     ['getSettings', () => getSettings()],
+    ['getApprovedEmailLogos', () => getApprovedEmailLogos()],
     [
       'updateTenantSettings',
       () => updateTenantSettings({ alertEmail: null, defaultSenderEmail: 'noreply' }),

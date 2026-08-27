@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import emailSettingsReducer from './emailSettings.slice'
-import { fetchSettings, updateEmailSettings } from '../thunks/settings.thunks'
+import {
+  fetchApprovedEmailLogos,
+  fetchSettings,
+  updateEmailSettings,
+} from '../thunks/settings.thunks'
 import type { TenantSettings } from '@/interfaces/tenant-settings.interface'
 
 describe('emailSettingsSlice', () => {
@@ -10,6 +14,8 @@ describe('emailSettingsSlice', () => {
     emailNotificationsEnabled: true,
     replyToEmail: null,
     emailAttachmentsEnabled: true,
+    approvedLogos: [],
+    approvedLogosLoading: false,
     saving: false,
   }
 
@@ -18,6 +24,8 @@ describe('emailSettingsSlice', () => {
     emailNotificationsEnabled: false,
     replyToEmail: 'noreply',
     emailAttachmentsEnabled: false,
+    approvedLogos: [],
+    approvedLogosLoading: false,
     saving: false,
   }
 
@@ -129,6 +137,42 @@ describe('emailSettingsSlice', () => {
 
       expect(state.saving).toBe(false)
       expect(state.error).toBe(error)
+    })
+  })
+
+  describe('fetchApprovedEmailLogos thunk', () => {
+    const logos = [
+      {
+        id: 'logo-1',
+        name: 'Primary',
+        imageUrl: 'https://gateway.example.test/logos/logo-1/image',
+      },
+    ]
+
+    it('tracks loading and stores the approved logos', () => {
+      const loadingState = emailSettingsReducer(
+        initialState,
+        fetchApprovedEmailLogos.pending('', undefined, {}),
+      )
+      const loadedLogosState = emailSettingsReducer(
+        loadingState,
+        fetchApprovedEmailLogos.fulfilled(logos, '', undefined),
+      )
+
+      expect(loadingState.approvedLogosLoading).toBe(true)
+      expect(loadedLogosState.approvedLogosLoading).toBe(false)
+      expect(loadedLogosState.approvedLogos).toEqual(logos)
+    })
+
+    it('clears the list and exposes a readable load error', () => {
+      const state = emailSettingsReducer(
+        { ...initialState, approvedLogos: logos, approvedLogosLoading: true },
+        fetchApprovedEmailLogos.rejected(new Error(), '', undefined, 'Logo service unavailable'),
+      )
+
+      expect(state.approvedLogos).toEqual([])
+      expect(state.approvedLogosLoading).toBe(false)
+      expect(state.approvedLogosError).toBe('Logo service unavailable')
     })
   })
 })

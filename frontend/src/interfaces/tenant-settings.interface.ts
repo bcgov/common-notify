@@ -19,6 +19,12 @@ export interface EmailSettingsValues {
   emailAttachmentsEnabled: boolean
 }
 
+export interface ApprovedEmailLogo {
+  id: string
+  name: string | null
+  imageUrl: string
+}
+
 /** The whole tenant_settings row, as returned by GET /api/v1/frontend/tenant-settings. */
 export interface TenantSettings
   extends TenantSettingsValues, SmsSettingsValues, EmailSettingsValues {
