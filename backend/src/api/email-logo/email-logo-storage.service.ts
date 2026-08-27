@@ -11,9 +11,7 @@ import {
 
 @Injectable()
 export class EmailLogoStorageService implements EmailLogoStorage {
-  constructor(
-    @Inject(ATTACHMENT_STORAGE) private readonly attachmentStorage: AttachmentStorage,
-  ) {}
+  constructor(@Inject(ATTACHMENT_STORAGE) private readonly attachmentStorage: AttachmentStorage) {}
 
   upload(input: EmailLogoUploadInput): Promise<EmailLogoUploadResult> {
     return this.attachmentStorage.upload({
