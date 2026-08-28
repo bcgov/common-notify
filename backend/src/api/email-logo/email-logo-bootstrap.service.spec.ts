@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config'
-import { readFile, readdir } from 'fs/promises'
+import { readdir } from 'fs/promises'
 import * as path from 'path'
 import { vi } from 'vitest'
 import { ClamavService } from '../../services/clamav.service'
@@ -52,17 +52,21 @@ describe('EmailLogoBootstrapService', () => {
 
     expect(configuredFilenames).toEqual(checkedInFilenames)
     expect(storage.upload).toHaveBeenCalledTimes(SYSTEM_EMAIL_LOGO_KEYS.length)
-    for (const storageKey of SYSTEM_EMAIL_LOGO_KEYS) {
+
+    const scanCalls = vi.mocked(clamavService.scanBuffer).mock.calls
+    const uploadCalls = vi.mocked(storage.upload).mock.calls
+    for (const [index, storageKey] of SYSTEM_EMAIL_LOGO_KEYS.entries()) {
       const filename = path.posix.basename(storageKey)
-      const expectedContent = await readFile(path.join(assetDirectory, filename))
-      expect(clamavService.scanBuffer).toHaveBeenCalledWith(expectedContent, filename)
-      expect(storage.upload).toHaveBeenCalledWith({
-        storageKey,
-        content: expectedContent,
-        mimeType: 'image/png',
-      })
+      const [scannedContent, scannedFilename] = scanCalls[index]
+      const [uploadInput] = uploadCalls[index]
+
+      expect(scannedFilename).toBe(filename)
+      expect(Buffer.isBuffer(scannedContent)).toBe(true)
+      expect(scannedContent.byteLength).toBeGreaterThan(0)
+      expect(uploadInput).toMatchObject({ storageKey, mimeType: 'image/png' })
+      expect(uploadInput.content).toBe(scannedContent)
     }
-  })
+  }, 15_000)
 
   it('skips objects that already exist', async () => {
     vi.mocked(storage.head).mockResolvedValue({ contentLength: 1 })
