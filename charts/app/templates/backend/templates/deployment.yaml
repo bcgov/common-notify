@@ -114,7 +114,7 @@ spec:
                   name: {{ .Values.frontend.secrets.name | default (printf "%s-frontend-config" .Release.Name) }}
                   key: api-gateway-notify-url
               {{- else }}
-              value: {{ .Values.frontend.secrets.apiGatewayNotifyUrl | quote }}
+              value: {{ .Values.frontend.apiGatewayNotifyUrl | quote }}
               {{- end }}
             - name: PUBLIC_API_GATEWAY_PATH_PREFIX
               {{- if regexMatch "^common-notify-[0-9]+$" .Release.Name }}
