@@ -15,7 +15,6 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import TemplatePreviewModal from './TemplatePreviewModal'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
-import Breadcrumb from '@/components/Breadcrumb'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
 
@@ -193,157 +192,153 @@ const TemplateCreate: FC = () => {
   }
 
   return (
-    <div className="template-form-page">
-      <div className="template-form-page__content">
-        <div className="template-form-page__header">
-          <Breadcrumb
-            items={[
-              { label: 'Home', to: '/dashboard' },
-              { label: 'Templates', to: '/templates' },
-              { label: 'Create reusable template' },
-            ]}
-          />
-          <PageHeading title="Create reusable template" />
-        </div>
-        <form className="template-form" noValidate onSubmit={handleSave}>
-          <div className="template-form__questions">
-            <div className="template-form__section template-form__section--title">
+    <div className="page page--narrow template-form-page">
+      <PageHeading
+        title="Create reusable template"
+        breadcrumbs={[
+          { label: 'Home', to: '/dashboard' },
+          { label: 'Templates', to: '/templates' },
+          { label: 'Create reusable template' },
+        ]}
+      />
+      <form className="template-form" noValidate onSubmit={handleSave}>
+        <div className="template-form__questions">
+          <div className="template-form__section template-form__section--title">
+            <TextField
+              label="Template title"
+              description="This will be the name of your template. Use a name that will help you easily find it later."
+              value={formData.name}
+              onChange={handleFieldChange('name')}
+              {...({ placeholder: 'Type a template title' } as any)}
+              className="bcds-react-aria-TextField template-form__field"
+              size="small"
+              isRequired
+              isInvalid={!!formErrors.name}
+              errorMessage={formErrors.name}
+            />
+          </div>
+
+          <div className="template-form__section template-form__section--template-type">
+            <RadioGroup
+              className="template-form__radio-group"
+              label={(<RequiredLabel text="Template type" />) as unknown as string}
+              value={formData.channelCode}
+              onChange={(value) => {
+                setFormData((prev) => ({ ...prev, channelCode: value }))
+                setFormErrors((prev) => ({ ...prev, channelCode: '' }))
+              }}
+              aria-required="true"
+              isInvalid={!!formErrors.channelCode}
+              errorMessage={formErrors.channelCode}
+            >
+              <Radio key="email" value={NotificationChannel.EMAIL}>
+                Email
+              </Radio>
+              <Radio key="sms" value={NotificationChannel.SMS}>
+                SMS
+              </Radio>
+            </RadioGroup>
+          </div>
+
+          {formData.channelCode === NotificationChannel.EMAIL && (
+            <div className="template-form__section template-form__section--subject">
               <TextField
-                label="Template title"
-                description="This will be the name of your template. Use a name that will help you easily find it later."
-                value={formData.name}
-                onChange={handleFieldChange('name')}
-                {...({ placeholder: 'Type a template title' } as any)}
-                className="bcds-react-aria-TextField template-form__field"
+                label="Subject line of the email"
+                description="Use a subject line that clearly describes the email content."
+                value={formData.subject}
+                onChange={handleFieldChange('subject')}
+                className="bcds-react-aria-TextField template-form__field template-form__field--full"
                 size="small"
                 isRequired
-                isInvalid={!!formErrors.name}
-                errorMessage={formErrors.name}
+                isInvalid={!!formErrors.subject}
+                errorMessage={formErrors.subject}
               />
             </div>
+          )}
 
-            <div className="template-form__section template-form__section--template-type">
-              <RadioGroup
-                className="template-form__radio-group"
-                label={(<RequiredLabel text="Template type" />) as unknown as string}
-                value={formData.channelCode}
-                onChange={(value) => {
-                  setFormData((prev) => ({ ...prev, channelCode: value }))
-                  setFormErrors((prev) => ({ ...prev, channelCode: '' }))
-                }}
-                aria-required="true"
-                isInvalid={!!formErrors.channelCode}
-                errorMessage={formErrors.channelCode}
-              >
-                <Radio key="email" value={NotificationChannel.EMAIL}>
-                  Email
-                </Radio>
-                <Radio key="sms" value={NotificationChannel.SMS}>
-                  SMS
-                </Radio>
-              </RadioGroup>
-            </div>
-
-            {formData.channelCode === NotificationChannel.EMAIL && (
-              <div className="template-form__section template-form__section--subject">
-                <TextField
-                  label="Subject line of the email"
-                  description="Use a subject line that clearly describes the email content."
-                  value={formData.subject}
-                  onChange={handleFieldChange('subject')}
-                  className="bcds-react-aria-TextField template-form__field template-form__field--full"
-                  size="small"
-                  isRequired
-                  isInvalid={!!formErrors.subject}
-                  errorMessage={formErrors.subject}
-                />
-              </div>
-            )}
-
-            <div className="template-form__section template-form__section--syntax-type error-after-label">
-              <RadioGroup
-                className="template-form__radio-group"
-                label={(<RequiredLabel text="Syntax type" />) as unknown as string}
-                description="Choose the syntax used for dynamic variables and placeholders in this template."
-                value={formData.engineCode}
-                onChange={(value) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    engineCode: value,
-                  }))
-                  setFormErrors((prev) => ({
-                    ...prev,
-                    engineCode: '',
-                  }))
-                }}
-                aria-required="true"
-                isInvalid={!!formErrors.engineCode}
-                errorMessage={formErrors.engineCode}
-              >
-                {SYNTAX_TOOLTIPS.map((option) => (
-                  <div className="template-form__syntax-option" key={option.value}>
-                    <Radio value={option.value}>{option.label}</Radio>
-                    <TooltipTrigger>
-                      <Button
-                        aria-label={option.tooltipLabel}
-                        className="template-form__syntax-tooltip-trigger"
-                        isIconButton
-                        size="xsmall"
-                        type="button"
-                        variant="tertiary"
-                      >
-                        <SvgInfoIcon />
-                      </Button>
-                      <Tooltip placement="left">{option.tooltipText}</Tooltip>
-                    </TooltipTrigger>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className="template-form__section template-form__section--body">
-              <label
-                htmlFor="body"
-                className="bcds-react-aria-TextField--Label template-form__body-label"
-              >
-                <RequiredLabel text="Template body" />
-              </label>
-              <textarea
-                ref={bodyTextareaRef}
-                aria-label="Template body (required)"
-                id="body"
-                placeholder={templateBodyPlaceholder}
-                className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
-                value={formData.body}
-                onChange={(e) => handleFieldChange('body')(e.target.value)}
-              />
-              {formErrors.body && (
-                <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
-              )}
-              {formData.channelCode === NotificationChannel.SMS && (
-                <SmsSegmentEstimate body={formData.body} />
-              )}
-            </div>
-          </div>
-
-          <div className="template-form__actions">
-            <Button type="button" variant="secondary" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onPress={() => setPreviewOpen(true)}
-              isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+          <div className="template-form__section template-form__section--syntax-type error-after-label">
+            <RadioGroup
+              className="template-form__radio-group"
+              label={(<RequiredLabel text="Syntax type" />) as unknown as string}
+              description="Choose the syntax used for dynamic variables and placeholders in this template."
+              value={formData.engineCode}
+              onChange={(value) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  engineCode: value,
+                }))
+                setFormErrors((prev) => ({
+                  ...prev,
+                  engineCode: '',
+                }))
+              }}
+              aria-required="true"
+              isInvalid={!!formErrors.engineCode}
+              errorMessage={formErrors.engineCode}
             >
-              Preview
-            </Button>
-            <Button type="submit" isDisabled={isSaveDisabled}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+              {SYNTAX_TOOLTIPS.map((option) => (
+                <div className="template-form__syntax-option" key={option.value}>
+                  <Radio value={option.value}>{option.label}</Radio>
+                  <TooltipTrigger>
+                    <Button
+                      aria-label={option.tooltipLabel}
+                      className="template-form__syntax-tooltip-trigger"
+                      isIconButton
+                      size="xsmall"
+                      type="button"
+                      variant="tertiary"
+                    >
+                      <SvgInfoIcon />
+                    </Button>
+                    <Tooltip placement="left">{option.tooltipText}</Tooltip>
+                  </TooltipTrigger>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
-        </form>
-      </div>
+
+          <div className="template-form__section template-form__section--body">
+            <label
+              htmlFor="body"
+              className="bcds-react-aria-TextField--Label template-form__body-label"
+            >
+              <RequiredLabel text="Template body" />
+            </label>
+            <textarea
+              ref={bodyTextareaRef}
+              aria-label="Template body (required)"
+              id="body"
+              placeholder={templateBodyPlaceholder}
+              className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
+              value={formData.body}
+              onChange={(e) => handleFieldChange('body')(e.target.value)}
+            />
+            {formErrors.body && (
+              <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
+            )}
+            {formData.channelCode === NotificationChannel.SMS && (
+              <SmsSegmentEstimate body={formData.body} />
+            )}
+          </div>
+        </div>
+
+        <div className="template-form__actions">
+          <Button type="button" variant="secondary" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onPress={() => setPreviewOpen(true)}
+            isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+          >
+            Preview
+          </Button>
+          <Button type="submit" isDisabled={isSaveDisabled}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </form>
 
       <TemplatePreviewModal
         isOpen={previewOpen}

@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
 import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
@@ -56,6 +57,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BulkNotificationsIndexRoute = BulkNotificationsIndexRouteImport.update({
+  id: '/bulk-notifications/',
+  path: '/bulk-notifications/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   id: '/template-edit/$templateId',
   path: '/template-edit/$templateId',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/bulk-notifications/': typeof BulkNotificationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/bulk-notifications': typeof BulkNotificationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/admin/usage': typeof AdminUsageRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/bulk-notifications/': typeof BulkNotificationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/bulk-notifications/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/bulk-notifications'
   id:
     | '__root__'
     | '/'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/bulk-notifications/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -172,6 +184,7 @@ export interface RootRouteChildren {
   AdminUsageRoute: typeof AdminUsageRoute
   RequestStatusNotificationRequestIdRoute: typeof RequestStatusNotificationRequestIdRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
+  BulkNotificationsIndexRoute: typeof BulkNotificationsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bulk-notifications/': {
+      id: '/bulk-notifications/'
+      path: '/bulk-notifications'
+      fullPath: '/bulk-notifications/'
+      preLoaderRoute: typeof BulkNotificationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/template-edit/$templateId': {
       id: '/template-edit/$templateId'
       path: '/template-edit/$templateId'
@@ -269,6 +289,7 @@ const rootRouteChildren: RootRouteChildren = {
   RequestStatusNotificationRequestIdRoute:
     RequestStatusNotificationRequestIdRoute,
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
+  BulkNotificationsIndexRoute: BulkNotificationsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
