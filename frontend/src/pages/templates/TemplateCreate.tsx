@@ -20,6 +20,7 @@ import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
 
 const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
+const TEMPLATE_BODY_MAX_LENGTH = 10_000
 const DEFAULT_TEMPLATE_BODY_PLACEHOLDER = 'Type the template body here'
 const SYNTAX_TYPE_BODY_PLACEHOLDERS: Record<TemplateEngine, string> = {
   [TemplateEngine.MJML]: `<mjml>
@@ -136,6 +137,10 @@ const TemplateCreate: FC = () => {
     setFormErrors((prev) => ({ ...prev, [field]: '' }))
   }
 
+  const handleBodyChange = (value: string) => {
+    handleFieldChange('body')(value.slice(0, TEMPLATE_BODY_MAX_LENGTH))
+  }
+
   const validate = (): boolean => {
     const errors = {
       name: '',
@@ -213,6 +218,7 @@ const TemplateCreate: FC = () => {
                 description="This will be the name of your template. Use a name that will help you easily find it later."
                 value={formData.name}
                 onChange={handleFieldChange('name')}
+                maxLength={255}
                 {...({ placeholder: 'Type a template title' } as any)}
                 className="bcds-react-aria-TextField template-form__field"
                 size="small"
@@ -251,6 +257,7 @@ const TemplateCreate: FC = () => {
                   description="Use a subject line that clearly describes the email content."
                   value={formData.subject}
                   onChange={handleFieldChange('subject')}
+                  maxLength={500}
                   className="bcds-react-aria-TextField template-form__field template-form__field--full"
                   size="small"
                   isRequired
@@ -315,7 +322,7 @@ const TemplateCreate: FC = () => {
                 placeholder={templateBodyPlaceholder}
                 className={`form-control template-form__textarea${formErrors.body ? ' is-invalid' : ''}`}
                 value={formData.body}
-                onChange={(e) => handleFieldChange('body')(e.target.value)}
+                onChange={(e) => handleBodyChange(e.target.value)}
               />
               {formErrors.body && (
                 <span className="bcds-react-aria-TextField--Error">{formErrors.body}</span>
