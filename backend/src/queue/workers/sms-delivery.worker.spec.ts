@@ -272,6 +272,62 @@ describe('SmsDeliveryWorker', () => {
       )
     })
 
+    it('should permanently fail a malformed recipient before calling the SMS provider', async () => {
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-invalid-recipient',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234', '250-555-1234'] },
+            content: { body: 'Test body', bodyType: 'html' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+        discard: vi.fn(),
+      }
+
+      const expectedError =
+        'Invalid SMS payload: recipient phone number at index 1 is not valid E.164'
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+        expectedError,
+      )
+
+      expect(mockSmsAdapter.send).not.toHaveBeenCalled()
+      expect(mockTemplatesRepository.findById).not.toHaveBeenCalled()
+      expect(job.discard).toHaveBeenCalledTimes(1)
+      expect(job.attemptsMade).toBe(0)
+      expect(mockRequestDetailService.resetForRetry).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledTimes(1)
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-invalid-recipient',
+        'tenant-123',
+        {
+          status: NotificationStatus.FAILED,
+          updatedBy: 'system',
+          errorReason: expectedError,
+        },
+      )
+      expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
+        'notify-invalid-recipient',
+        expectedError,
+      )
+    })
+
     it('should throw error when SMS body is missing', async () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
@@ -356,7 +412,6 @@ describe('SmsDeliveryWorker', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'template-sms-uuid' }),
         { code: '123456' },
-        undefined,
       )
       expect(mockSmsAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -415,7 +470,6 @@ describe('SmsDeliveryWorker', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'template-sms-uuid' }),
         { code: 'channel', shared: 'global' },
-        undefined,
       )
     })
 

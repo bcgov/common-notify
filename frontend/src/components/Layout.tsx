@@ -29,22 +29,19 @@ const Layout: FC<Props> = ({ children }) => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const showTenantModal = useAppSelector((state) => state.tenant.showTenantModal)
   const rolesLoading = useAppSelector((state) => state.user.rolesLoading)
+  const rolesTenantId = useAppSelector((state) => state.user.rolesTenantId)
   const rolesError = useAppSelector((state) => state.user.rolesError)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
   const userCurrent = useAppSelector((state) => state.user.current)
   const { canEdit } = useCstarRoles()
 
-  // Track which tenants we've already fetched roles for in this session
-  const rolesFetchedRef = useRef<Set<string>>(new Set())
+  // Tenant whose roles request is currently in flight, so the effect below doesn't
+  // dispatch twice before the pending state lands in this component's props.
+  const rolesRequestRef = useRef<string | null>(null)
 
-  // When tenant selection changes, fetch roles for that tenant (once per session)
+  // When tenant selection changes, fetch roles for that tenant
   useEffect(() => {
     if (!selectedTenant?.id) {
-      return
-    }
-
-    // Only fetch if we haven't already fetched roles for this tenant in this session
-    if (rolesFetchedRef.current.has(selectedTenant.id)) {
       return
     }
 
@@ -53,9 +50,14 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
-    rolesFetchedRef.current.add(selectedTenant.id)
+    // Already have (or are fetching) roles for this tenant
+    if (rolesTenantId === selectedTenant.id || rolesRequestRef.current === selectedTenant.id) {
+      return
+    }
+
+    rolesRequestRef.current = selectedTenant.id
     dispatch(fetchCstarRoles({ tenantId: selectedTenant.id }))
-  }, [selectedTenant?.id, userCurrent, dispatch])
+  }, [selectedTenant?.id, userCurrent, rolesTenantId, dispatch])
 
   useEffect(() => {
     // Enforce tenant-level authorization after roles fetch completes.
@@ -64,7 +66,10 @@ const Layout: FC<Props> = ({ children }) => {
       return
     }
 
-    if (!rolesFetchedRef.current.has(selectedTenant.id) || rolesLoading) {
+    // Only judge access once the lookup for *this* tenant has settled. Gating on
+    // "a fetch was dispatched" instead would run this check against the previous
+    // tenant's roles (or none at all) while the request is still in flight.
+    if (rolesLoading || rolesTenantId !== selectedTenant.id) {
       return
     }
 
@@ -96,6 +101,7 @@ const Layout: FC<Props> = ({ children }) => {
   }, [
     selectedTenant?.id,
     rolesLoading,
+    rolesTenantId,
     rolesError,
     cstarRoles,
     canEdit,
@@ -103,9 +109,10 @@ const Layout: FC<Props> = ({ children }) => {
     navigate,
   ])
 
-  // Block rendering while we're fetching roles for the selected tenant
-  // This ensures authorization checks have the correct roles loaded
-  if (selectedTenant && rolesLoading) {
+  // Block rendering until roles for the selected tenant have settled, so pages never
+  // render against another tenant's roles. A failed lookup also sets `rolesTenantId`,
+  // so this can't spin forever — the effect above sends those users to /not-authorized.
+  if (selectedTenant && userCurrent && rolesTenantId !== selectedTenant.id) {
     return <LoadingSpinner isVisible />
   }
 

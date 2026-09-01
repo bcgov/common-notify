@@ -1,4 +1,4 @@
-import { HttpException, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload } from '../queue.types'
@@ -10,6 +10,7 @@ import { InlineRenderingService } from '../../services/rendering/inline-renderin
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
 import { StructuredLoggerService } from '../../common/logger'
+import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 
 /**
  * SMS Delivery Worker
@@ -27,16 +28,7 @@ import { StructuredLoggerService } from '../../common/logger'
  */
 export class SmsDeliveryWorker {
   private readonly logger = new Logger(SmsDeliveryWorker.name)
-
-  private static normalizeTemplateBodyType(
-    bodyType: 'text' | 'markdown' | 'html' | undefined,
-  ): 'markdown' | undefined {
-    if (bodyType === 'markdown' || bodyType === 'text') {
-      return 'markdown'
-    }
-
-    return undefined
-  }
+  private static readonly phoneNumberService = new PhoneNumberService()
 
   private static isPermanentValidationError(error: unknown): error is HttpException {
     return error instanceof HttpException && error.getStatus() === 400
@@ -104,6 +96,15 @@ export class SmsDeliveryWorker {
           throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
         }
 
+        const invalidRecipientIndex = payload.recipients.to.findIndex(
+          (recipient) => !SmsDeliveryWorker.phoneNumberService.isValid(recipient),
+        )
+        if (invalidRecipientIndex !== -1) {
+          throw new BadRequestException(
+            `Invalid SMS payload: recipient phone number at index ${invalidRecipientIndex} is not valid E.164`,
+          )
+        }
+
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
         }
@@ -129,13 +130,12 @@ export class SmsDeliveryWorker {
 
             // Merge template content into SMS payload if channel matches
             if (template.channelCode === 'SMS') {
-              // Render the template with personalisation data from request.params
-              // Normalize legacy body types before entering the markdown-only render path.
-              const rendered = await templatesService.renderTemplateContent(
-                template,
-                { ...request?.params, ...payload.params },
-                SmsDeliveryWorker.normalizeTemplateBodyType(payload.content?.bodyType),
-              )
+              // Render the template with personalisation data from request.params.
+              // SMS always renders as plain text, so no bodyType override applies here.
+              const rendered = await templatesService.renderTemplateContent(template, {
+                ...request?.params,
+                ...payload.params,
+              })
 
               resolvedPayload = {
                 ...payload,

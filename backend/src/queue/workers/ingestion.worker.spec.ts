@@ -186,6 +186,53 @@ describe('IngestionWorker', () => {
       )
     })
 
+    it('normalizes an SMS recipient once before persistence and delivery fan-out', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockRequestDetailService,
+        mockConfigService,
+        mockClamavService,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-normalized-sms',
+          tenantId: 'tenant-456',
+          request: {
+            sms: {
+              recipients: { to: ['250-555-1234'] },
+              content: { body: 'SMS test' },
+            },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+      expect(mockRequestDetailService.createPending).toHaveBeenCalledWith(
+        'notify-normalized-sms',
+        expect.objectContaining({
+          sms: expect.objectContaining({
+            recipients: { to: ['+12505551234'] },
+          }),
+        }),
+        'tenant-456',
+      )
+      expect(mockSmsQueue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request: expect.objectContaining({
+            sms: expect.objectContaining({ recipients: { to: ['+12505551234'] } }),
+          }),
+          payload: expect.objectContaining({ recipients: { to: ['+12505551234'] } }),
+        }),
+        expect.any(Object),
+      )
+    })
+
     it('should process both email and SMS delivery jobs when both channels are requested', async () => {
       await IngestionWorker.initialize(
         mockIngestionQueue as Bull.Queue<IngestionJobPayload>,

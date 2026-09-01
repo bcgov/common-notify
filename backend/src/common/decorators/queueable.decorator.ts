@@ -20,6 +20,9 @@ import type {
   RecordedUsageResult,
 } from '../../api/api-keys/api-key-usage.service'
 import type { LimitAlertNotificationService } from '../../api/notify/services/limit-alert-notification.service'
+import type { SafelistCandidate, SafelistService } from '../../api/safelist/safelist.service'
+import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
+import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -36,7 +39,35 @@ export interface QueueableContext {
   notificationPubSubService?: NotificationPubSubService
   apiKeyUsageService?: ApiKeyUsageService
   limitAlertNotificationService?: LimitAlertNotificationService
+  safelistService?: SafelistService
+  notificationRequestDetailService?: NotificationRequestDetailService
+  smsSegmentService?: SmsSegmentService
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+/**
+ * Billable segments a single SMS recipient of this request will cost.
+ *
+ * A message over the single-segment budget is concatenated and every segment is billed as its
+ * own message by the carrier, so usage is attributed in segments. Falls back to 1 when the
+ * service is unavailable or the body cannot be resolved — never blocks a send.
+ */
+async function resolveSmsSegments(
+  ctx: QueueableContext,
+  tenantId: string,
+  payload: ProcessedNotifySimpleRequest,
+): Promise<number> {
+  if (!ctx.smsSegmentService) return 1
+  try {
+    return Math.max(1, await ctx.smsSegmentService.countSegmentsPerRecipient(tenantId, payload))
+  } catch (error) {
+    new Logger('Queueable[sms-segments]').warn(
+      `Failed to count SMS segments, billing as a single segment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+    return 1
+  }
 }
 
 /**
@@ -113,6 +144,65 @@ async function enforceLimits(
   await ctx.apiKeyUsageService.assertWithinLimits(apiKeyConsumerId, entries)
 }
 /**
+ * Every external contact point a request would reach: email to/cc/bcc and SMS to.
+ *
+ * cc and bcc are included deliberately. A blocked address hidden in bcc reaches a real person
+ * exactly as a `to` does, so leaving them out would make the guardrail one header away from
+ * being bypassed. msgApp is excluded: it delivers inside the application, not to a contact point.
+ */
+function collectSafelistCandidates(
+  payload: NotifySimpleRequest | ProcessedNotifySimpleRequest,
+): SafelistCandidate[] {
+  const candidates: SafelistCandidate[] = []
+  const email = payload.email?.recipients
+  for (const address of [...(email?.to ?? []), ...(email?.cc ?? []), ...(email?.bcc ?? [])]) {
+    candidates.push({ address, channel: NotificationChannel.EMAIL })
+  }
+  for (const address of payload.sms?.recipients?.to ?? []) {
+    candidates.push({ address, channel: NotificationChannel.SMS })
+  }
+  return candidates
+}
+
+/** The 400 raised when a send would reach a recipient the tenant has not safelisted. */
+function safelistRejection(blocked: string[]): BadRequestException {
+  return new BadRequestException({
+    message: 'Request validation failed',
+    errors: [
+      `Recipient(s) not on this tenant's safelist: ${blocked.join(', ')}. This environment only ` +
+        'sends to safelisted recipients.  You can safelist recipients by adding them under Settings.',
+    ],
+  })
+}
+
+/**
+ * Reject a send that would reach any non-safelisted recipient. A no-op when the safelist is not
+ * enforced in this environment (always the case in PROD) or the service is not wired in.
+ *
+ * Any blocked recipient fails the whole request rather than being quietly stripped: dropping one
+ * address from a multi-recipient send would change what the caller asked for without telling them.
+ */
+async function enforceSafelist(
+  ctx: QueueableContext,
+  tenantId: string,
+  payload: NotifySimpleRequest | ProcessedNotifySimpleRequest,
+): Promise<void> {
+  if (!ctx.safelistService) return
+
+  const blocked = await ctx.safelistService.findBlocked(
+    tenantId,
+    collectSafelistCandidates(payload),
+  )
+  if (blocked.length > 0) {
+    // Count only — recipient values are not logged.
+    new Logger('Queueable[safelist]').warn(
+      `Rejected send: ${blocked.length} recipient(s) not safelisted (tenant=${tenantId})`,
+    )
+    throw safelistRejection(blocked)
+  }
+}
+
+/**
  * Map a NotificationChannel to the NotifySimpleRequest property key used to wrap a bare
  * single-channel route body.
  */
@@ -170,7 +260,31 @@ async function handleEmailMerge(
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }
 
-  const recipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
+  const allRecipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
+
+  // Non-production guardrail. A merge is a list of independent sends, so non-safelisted rows are
+  // dropped from the fan-out and recorded individually as `blocked` instead of failing the whole
+  // request — unless every recipient is blocked, in which case there is nothing left to send.
+  const blockedAddresses = ctx.safelistService
+    ? await ctx.safelistService.findBlocked(
+        tenantId,
+        allRecipients.map(({ address }) => ({ address, channel: NotificationChannel.EMAIL })),
+      )
+    : []
+  const blockedSet = new Set(blockedAddresses)
+  const recipients = allRecipients.filter(({ address }) => !blockedSet.has(address))
+
+  // Guarded on blockedSet so an otherwise-empty merge still fails validateMailMergeRules'
+  // own way rather than being reported as a safelist rejection.
+  if (recipients.length === 0 && blockedSet.size > 0) {
+    throw safelistRejection(blockedAddresses)
+  }
+  if (blockedSet.size > 0) {
+    // Count only — recipient values are not logged.
+    logger.warn(
+      `Mail merge: ${blockedSet.size} of ${allRecipients.length} recipient(s) not safelisted (tenant=${tenantId})`,
+    )
+  }
 
   // Enforce daily/annual EMAIL limits BEFORE accepting the merge request (throws HTTP 429).
   await enforceLimits(ctx, apiKeyConsumerId, [
@@ -188,6 +302,26 @@ async function handleEmailMerge(
   logger.debug(
     `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
+
+  // Record the dropped recipients so "why didn't this one arrive?" is answerable from the
+  // notification's detail view. Non-fatal: the accepted recipients still go out if this fails.
+  if (blockedSet.size > 0 && ctx.notificationRequestDetailService) {
+    try {
+      await ctx.notificationRequestDetailService.createBlocked(
+        notificationRecord.id,
+        // blockedSet, not blockedAddresses: a merge can list the same address on several rows.
+        [...blockedSet].map((address) => ({ address, channel: NotificationChannel.EMAIL })),
+        'Recipient is not on the tenant safelist',
+        tenantId,
+      )
+    } catch (error) {
+      logger.warn(
+        `Failed to record blocked mail merge recipients for ${notificationRecord.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+  }
 
   // Attribute accepted merge emails against the API key's usage limits (non-fatal).
   const usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
@@ -242,6 +376,10 @@ async function handleEmailMerge(
     message: hasDelayedSend
       ? `Email merge send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
       : `Email merge send accepted with ${recipients.length} recipient(s)`,
+    ...(blockedSet.size > 0 && {
+      blockedRecipientCount: blockedSet.size,
+      blockedMessage: `${blockedSet.size} recipient(s) were not sent to because they are not on this tenant's safelist`,
+    }),
   }
 
   // Fire off queueing asynchronously - don't block the response.
@@ -434,6 +572,27 @@ export function Queueable(
         }
 
         // Primary (to) recipient count per channel — used for both limit enforcement and usage.
+        // SMS is counted in billable segments: a body over the single-segment budget is sent (and
+        // billed by ACS) as several concatenated messages, so one request to one recipient can
+        // consume several of the tenant's SMS allowance.
+        //
+        // INVARIANT: every SMS recipient of a request receives the same body — the SMS channel has
+        // one content block and one params set, and mail merge is email-only (NotifySmsRecipients
+        // has no mergeArray). So the segment count is uniform and recipients x segments is exact.
+        // If per-recipient SMS personalisation is ever added, this must become a per-recipient sum.
+        const smsRecipientCount = processedPayload.sms?.recipients?.to?.length ?? 0
+        const smsSegments =
+          smsRecipientCount > 0
+            ? await resolveSmsSegments(this as QueueableContext, tenantId, processedPayload)
+            : 1
+        if (smsSegments > 1) {
+          logger.debug(
+            `SMS body spans ${smsSegments} segments; billing ${smsRecipientCount} recipient(s) as ${
+              smsRecipientCount * smsSegments
+            } message(s) (tenant=${tenantId})`,
+          )
+        }
+
         const usageEntries = [
           {
             channel: NotificationChannel.EMAIL,
@@ -441,9 +600,20 @@ export function Queueable(
           },
           {
             channel: NotificationChannel.SMS,
-            count: processedPayload.sms?.recipients?.to?.length ?? 0,
+            count: smsRecipientCount * smsSegments,
+            // Explains a 429 when a short-looking request costs several messages.
+            countExplanation:
+              smsSegments > 1
+                ? `${smsRecipientCount} recipient(s) x ${smsSegments} segments, ` +
+                  `because the message is too long to send as one SMS`
+                : undefined,
           },
         ]
+
+        // Non-production guardrail: reject the request outright if it would reach a recipient
+        // this tenant has not safelisted. Runs before anything is persisted, queued or counted
+        // against the API key's limits.
+        await enforceSafelist(this as QueueableContext, tenantId, processedPayload)
 
         // Enforce daily/annual limits BEFORE accepting. Throws HTTP 429 if the request would
         // exceed a limit, rejecting the whole request before any record is created.
