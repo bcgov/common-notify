@@ -7,9 +7,9 @@ import {
   RadioGroup,
   Radio,
   Tooltip,
-  TooltipTrigger,
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import {
   getTemplateById,
   updateTemplate,

@@ -23,7 +23,8 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
-import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 
 const navItems = [
   {

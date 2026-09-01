@@ -7,9 +7,9 @@ import {
   RadioGroup,
   Radio,
   Tooltip,
-  TooltipTrigger,
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
