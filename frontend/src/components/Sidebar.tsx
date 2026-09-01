@@ -12,6 +12,7 @@ import { SsoRole } from '@/enum/sso-role.enum'
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import OutboxOutlinedIcon from '@mui/icons-material/OutboxOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 // import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
@@ -22,7 +23,8 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
-import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 
 const navItems = [
   {
@@ -44,6 +46,11 @@ const navItems = [
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
+  },
+  {
+    label: 'Bulk Notifications',
+    to: '/bulk-notifications',
+    icon: <OutboxOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
@@ -83,6 +90,7 @@ const Sidebar: FC = () => {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
+  const bulkNotificationsEnabled = useFeatureFlag('bulk_notifications', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -128,6 +136,7 @@ const Sidebar: FC = () => {
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Events' && hasTenantRole && eventsEnabled) ||
             (item.label === 'Templates' && hasTenantRole) ||
+            (item.label === 'Bulk Notifications' && hasTenantRole && bulkNotificationsEnabled) ||
             (item.label === 'Usage & Limits' && showUsage) ||
             (item.label === 'Settings' && hasTenantRole)
 

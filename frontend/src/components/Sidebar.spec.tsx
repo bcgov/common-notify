@@ -36,7 +36,7 @@ const mockUser = {
 function makeStore(
   user: typeof mockUser | null = null,
   cstarRoles: string[] = [],
-  eventsEnabled = false,
+  featureFlags: Record<string, boolean> = {},
 ) {
   return configureStore({
     reducer: {
@@ -68,14 +68,16 @@ function makeStore(
         rolesError: null,
       },
       tenant: {
-        selectedTenant: null,
+        selectedTenant: { id: 'tenant-1', name: 'Test Tenant' } as any,
         showTenantModal: false,
       },
       featureFlags: {
-        byCode: { events: eventsEnabled },
+        byCode: featureFlags,
         flagsList: [],
         loading: false,
+        // Synced for this tenant, so the flag hook does not fire a fetch during the test.
         synced: true,
+        tenantId: 'tenant-1',
       },
     },
   })
@@ -84,10 +86,10 @@ function makeStore(
 function renderSidebar(
   user: typeof mockUser | null = null,
   cstarRoles: string[] = [],
-  eventsEnabled = false,
+  featureFlags: Record<string, boolean> = {},
 ) {
   return render(
-    <Provider store={makeStore(user, cstarRoles, eventsEnabled)}>
+    <Provider store={makeStore(user, cstarRoles, featureFlags)}>
       <Sidebar />
     </Provider>,
   )
@@ -135,6 +137,27 @@ describe('Sidebar', () => {
     renderSidebar()
 
     expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the bulk notifications link when the bulk notifications flag is on', () => {
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'], { bulk_notifications: true })
+
+    expect(screen.getByRole('link', { name: /bulk notifications/i })).toHaveAttribute(
+      'href',
+      '/bulk-notifications',
+    )
+  })
+
+  it('hides the bulk notifications link when the bulk notifications flag is off', () => {
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
+
+    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the bulk notifications link from users with no CSTAR role', () => {
+    renderSidebar(null, [], { bulk_notifications: true })
+
+    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

@@ -21,6 +21,7 @@ import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { MailMergeUiLimitsGuard } from '../../common/guards/mail-merge-ui-limits.guard'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
@@ -266,6 +267,36 @@ export class NotifySimpleFrontendController {
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
+  }
+
+  /**
+   * Ad-hoc email send from the UI, used by the mail merge screen: the recipient list and the
+   * per-recipient template values both come from `recipients.mergeArray`.
+   *
+   * The bare email-channel body is wrapped into a NotifySimpleRequest by @Queueable, so this shares
+   * the merge validation, safelist filtering and fan-out with NotifySimpleController.simpleSendEmail.
+   * Open to template editors as well as operations admins — the same pair as `canEdit` on the
+   * frontend, which gates the Send button on the Bulk Notifications screen.
+   *
+   * Guarded by the same BULK_NOTIFICATIONS flag the frontend hides the screen behind, so a tenant
+   * without the feature cannot reach the send by calling the API directly. FeatureFlagGuard is
+   * listed first so a disabled tenant is refused before the row cap is even measured; it reads the
+   * tenant from `request.tenant`, which the controller-level NotifyFrontendRoleGuard has already
+   * set by the time route guards run.
+   */
+  @Version('1')
+  @Post()
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard, MailMergeUiLimitsGuard)
+  @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
+  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
+  sendEmail(
+    @Req() _req: any,
+    @Body() _body: NotifyEmailChannel,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable
+    return undefined as any
   }
 
   @Version('1')
