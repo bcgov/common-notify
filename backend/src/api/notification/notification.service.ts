@@ -324,7 +324,7 @@ export class NotificationService {
       const params: Record<string, unknown> = {}
       for (let i = 1; i < header.length; i++) {
         const key = (header[i] ?? '').trim()
-        if (key) params[key] = row[i] ?? ''
+        if (key) setMergeParam(params, key, row[i] ?? '')
       }
       return { address, params }
     })
@@ -708,5 +708,47 @@ export class NotificationService {
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
 
     return updated
+  }
+}
+
+/** Keys that would reach Object.prototype if written blindly into a nested object. */
+const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
+
+/**
+ * Write one mail-merge cell into the params object, expanding a dotted column name into the nested
+ * shape the renderer expects.
+ *
+ * A column called `alert.id` has to become `{ alert: { id: value } }`: Handlebars reads `{{alert.id}}`
+ * as a path, so a literal `"alert.id"` key would never bind and the placeholder would render empty.
+ * It also satisfies the personalisation check, which looks for the root key `alert`.
+ *
+ * A segment that collides with a non-object value already written (`a` and `a.b` both present) keeps
+ * the first value rather than replacing it with an object - the file is contradictory either way,
+ * and validation reports it before this runs.
+ */
+function setMergeParam(params: Record<string, unknown>, key: string, value: string): void {
+  const segments = key.split('.')
+
+  if (segments.some((segment) => !segment || UNSAFE_PARAM_SEGMENTS.has(segment))) {
+    return
+  }
+
+  let target = params
+  for (let i = 0; i < segments.length - 1; i++) {
+    const segment = segments[i]
+    const existing = target[segment]
+
+    if (existing === undefined) {
+      target[segment] = {}
+    } else if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) {
+      return
+    }
+
+    target = target[segment] as Record<string, unknown>
+  }
+
+  const leaf = segments[segments.length - 1]
+  if (!(leaf in target)) {
+    target[leaf] = value
   }
 }

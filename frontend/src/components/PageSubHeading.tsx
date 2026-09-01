@@ -9,11 +9,7 @@ interface PageSubHeadingProps {
  * Standardized page sub heading component for consistent styling across all pages
  */
 const PageSubHeading: FC<PageSubHeadingProps> = ({ title }) => {
-  return (
-    <div className="d-flex align-items-center justify-content-between mb-4">
-      <h2 className="fw-bold mb-0 fs-5">{title}</h2>
-    </div>
-  )
+  return <h2 className="page__section-heading">{title}</h2>
 }
 
 export default PageSubHeading

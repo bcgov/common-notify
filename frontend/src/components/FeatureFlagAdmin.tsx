@@ -105,10 +105,10 @@ const FeatureFlagAdmin: FC = () => {
   ]
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Feature Flag Administration" />
 
-      <div className="mb-3">
+      <div className="page__section-body">
         <Button variant="primary" onClick={() => setShowCreateForm(true)}>
           Create New Feature Flag
         </Button>
