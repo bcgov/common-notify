@@ -6,6 +6,7 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import tenantReducer from '@/redux/slices/tenant.slice'
 import userReducer from '@/redux/slices/user.slice'
+import featureFlagsReducer from '@/redux/slices/featureFlags.slice'
 import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import type * as BulkNotificationsApi from '@/api/bulkNotifications.api'
@@ -208,9 +209,12 @@ const emailTemplate = {
   updatedAt: '2026-08-01T00:00:00.000Z',
 }
 
-function makeStore(cstarRoles: string[] = ['NOTIFY_OPERATIONS_ADMIN']) {
+function makeStore(
+  cstarRoles: string[] = ['NOTIFY_OPERATIONS_ADMIN'],
+  featureFlags: Record<string, boolean> = {},
+) {
   return configureStore({
-    reducer: { tenant: tenantReducer, user: userReducer },
+    reducer: { tenant: tenantReducer, user: userReducer, featureFlags: featureFlagsReducer },
     preloadedState: {
       tenant: {
         selectedTenant: { id: 'tenant-1', name: 'Test Tenant' } as any,
@@ -224,13 +228,21 @@ function makeStore(cstarRoles: string[] = ['NOTIFY_OPERATIONS_ADMIN']) {
         error: null,
         rolesError: null,
       },
+      featureFlags: {
+        byCode: featureFlags,
+        flagsList: [],
+        loading: false,
+        // Synced for this tenant, so the flag hook does not fire a fetch during the test.
+        synced: true,
+        tenantId: 'tenant-1',
+      },
     },
   })
 }
 
-function renderPage(cstarRoles?: string[]) {
+function renderPage(cstarRoles?: string[], featureFlags?: Record<string, boolean>) {
   return render(
-    <Provider store={makeStore(cstarRoles)}>
+    <Provider store={makeStore(cstarRoles, featureFlags)}>
       <BulkNotifications />
     </Provider>,
   )
@@ -293,11 +305,17 @@ describe('BulkNotifications', () => {
     )
   })
 
-  it('offers email and shows SMS as unavailable, since the send pipeline is email-only', async () => {
+  it('shows SMS but keeps it unselectable while the tenant has the flag off', async () => {
     renderPage()
 
     expect(await screen.findByRole('radio', { name: 'Email notification' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: 'SMS notification' })).toBeDisabled()
+  })
+
+  it('lets the tenant pick SMS once the flag is on', async () => {
+    renderPage(undefined, { sms_notifications: true })
+
+    expect(await screen.findByRole('radio', { name: 'SMS notification' })).toBeEnabled()
   })
 
   it('asks for a channel before it offers a template', async () => {

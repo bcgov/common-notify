@@ -19,6 +19,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { useCsvUpload } from '@/hooks/useCsvUpload'
 import {
   buildSampleCsv,
@@ -34,7 +35,7 @@ import SendResultPanel from './sections/SendResultPanel'
 import type { SendResult } from './sections/SendResultPanel'
 import '@/scss/components/bulk-notifications.scss'
 
-/** Channels the screen offers. SMS is offered but not selectable - see the radio group below. */
+/** Channels the screen offers. SMS is gated on the tenant's feature flag - see the radio group below. */
 type Channel = 'email' | 'sms'
 
 const BulkNotifications: FC = () => {
@@ -42,6 +43,7 @@ const BulkNotifications: FC = () => {
   // Template editors send as well as operations admins, matching the roles on the
   // frontend notifysimple endpoint. `canEdit` is exactly that pair.
   const { canEdit: canSend } = useCstarRoles()
+  const smsEnabled = useFeatureFlag('sms_notifications', selectedTenant?.id)
 
   const [channel, setChannel] = useState<Channel | null>(null)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
@@ -219,10 +221,9 @@ const BulkNotifications: FC = () => {
         }}
       >
         <Radio value="email">Email notification</Radio>
-        {/* Offered but not selectable: the send pipeline is email-only - `mergeArray` exists on the
-            email channel alone - so the option shows the roadmap without offering a control that
-            cannot work. */}
-        <Radio value="sms" isDisabled>
+        {/* Shown either way so the channel list stays the same everywhere, but only selectable for a
+            tenant with SMS switched on - the flag is what licensing is gated behind. */}
+        <Radio value="sms" isDisabled={!smsEnabled}>
           SMS notification
         </Radio>
       </RadioGroup>
