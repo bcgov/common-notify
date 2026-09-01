@@ -22,29 +22,29 @@ export const NotificationTemplatesSection: FC = () => {
   }, [dispatch, selectedTenant])
 
   return (
-    <section className="mb-4">
+    <section className="page__section">
       <PageSubHeading title="Notification Templates" />
-      <Button
-        variant="primary"
-        onPress={() => navigate({ to: '/template-create' })}
-        isDisabled={!canEdit}
-      >
-        Create New Template
-      </Button>
-      <ul className="list-unstyled mt-3 d-flex flex-column gap-2">
-        {templates.slice(0, 2).map((template) => (
-          <li key={template.id}>
-            <Link
-              to="/template-edit/$templateId"
-              params={{ templateId: String(template.id) }}
-              style={{ color: 'black' }}
-            >
-              {template.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-2">
+      <div className="page__section-body">
+        <Button
+          variant="primary"
+          onPress={() => navigate({ to: '/template-create' })}
+          isDisabled={!canEdit}
+        >
+          Create New Template
+        </Button>
+        <ul className="list-unstyled m-0 d-flex flex-column gap-2">
+          {templates.slice(0, 2).map((template) => (
+            <li key={template.id}>
+              <Link
+                to="/template-edit/$templateId"
+                params={{ templateId: String(template.id) }}
+                style={{ color: 'black' }}
+              >
+                {template.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
         <Link to="/templates" style={{ color: '#255A90' }}>
           Browse existing templates
         </Link>

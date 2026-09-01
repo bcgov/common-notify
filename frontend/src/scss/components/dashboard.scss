@@ -1,24 +1,5 @@
 @import '../variables.scss';
 
-.dashboard-page__layout {
-  margin-top: 88px;
-  margin-left: 13px;
-}
-
-.dashboard-page__search {
-  margin-bottom: 73px;
-
-  .search-field {
-    margin: 0;
-  }
-}
-
-.dashboard-page__table {
-  .data-table {
-    margin-top: 0;
-  }
-}
-
 /* Keep the table id column width restricted with ellipses */
 .data-table__id-col {
   width: 110px;

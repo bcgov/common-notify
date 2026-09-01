@@ -1,0 +1,154 @@
+@import '../variables.scss';
+
+// The page frame — gutter, heading placement and the spacing between the blocks
+// stacked below it — comes from `.page` in page.scss. All this adds is the width
+// cap on the single-column form.
+.bulk-notifications > * {
+  max-width: 760px;
+}
+
+.bulk-notifications__notice {
+  margin: 0;
+  padding: $spacing-sm $spacing-md;
+  border-left: 4px solid $warning-color;
+  background: $light-bg;
+}
+
+// Template preview: the raw subject and body, so the user can see which placeholders the
+// spreadsheet has to fill in.
+.bulk-notifications__preview {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  width: 100%;
+}
+
+.bulk-notifications__preview-box {
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $white;
+}
+
+.bulk-notifications__preview-subject,
+.bulk-notifications__preview-label {
+  margin: 0 0 $spacing-sm;
+}
+
+.bulk-notifications__preview-body {
+  margin: 0;
+  font-family: inherit;
+  font-size: $font-size-base;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bulk-notifications__field {
+  width: 100%;
+  max-width: 420px;
+}
+
+// One labelled control plus whatever explains it, kept together within a section.
+.bulk-notifications__field-group {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.bulk-notifications__field-label {
+  font-weight: 700;
+  color: $dark-text;
+}
+
+.bulk-notifications__hint {
+  margin: 0;
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+.bulk-notifications__columns {
+  margin: 0;
+  word-break: break-word;
+}
+
+.bulk-notifications__actions {
+  display: flex;
+  gap: $spacing-md;
+}
+
+.bulk-notifications__result {
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-left: 4px solid $success-color;
+  border-radius: 4px;
+  background: $light-bg;
+}
+
+.bulk-notifications__result-title {
+  margin: 0 0 $spacing-sm;
+  font-size: $font-size-lg;
+  font-weight: 700;
+}
+
+.bulk-notifications__result-blocked {
+  margin: 0 0 $spacing-sm;
+  color: $text-secondary;
+}
+
+// Preview modal
+.bulk-notifications-preview {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  min-width: 480px;
+  max-width: 720px;
+  padding: $spacing-md;
+}
+
+.bulk-notifications-preview__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.bulk-notifications-preview__recipient {
+  margin: $spacing-xs 0 0;
+  color: $text-secondary;
+}
+
+.bulk-notifications-preview__nav {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+}
+
+.bulk-notifications-preview__position {
+  font-weight: 700;
+}
+
+.bulk-notifications-preview__jump {
+  max-width: 140px;
+}
+
+.bulk-notifications-preview__output {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.bulk-notifications-preview__error {
+  margin: 0;
+  color: $danger-color;
+}
+
+.bulk-notifications-preview__loading {
+  margin: 0;
+  color: $text-secondary;
+}
+
+.bulk-notifications-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+}

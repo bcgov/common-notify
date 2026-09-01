@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import MarkdownIt from 'markdown-it'
+import { toEmailHtml } from '../../../../../services/rendering/email-body-html'
 import { IEmailTransport, SendEmailOptions, SendEmailResult } from '../../../../interfaces'
 
 interface ChesTokenResponse {
@@ -49,16 +49,8 @@ export class ChesEmailTransport implements IEmailTransport {
   private readonly logger = new Logger(ChesEmailTransport.name)
 
   private tokenCache: { token: string; expiresAt: number } | null = null
-  private readonly markdown: MarkdownIt
 
-  constructor(private readonly configService: ConfigService) {
-    // Initialize markdown-it with HTML disabled so raw tags are not rendered.
-    this.markdown = new MarkdownIt({
-      html: false,
-      linkify: true, // converst urls and links to clickable links
-      typographer: true, // enables smart quotes and other typographic replacements
-    })
-  }
+  constructor(private readonly configService: ConfigService) {}
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
     // Handle both flat (SendEmailOptions) and nested (NotifyEmailChannel) structures
@@ -144,8 +136,8 @@ export class ChesEmailTransport implements IEmailTransport {
     let chesBodyType: 'text' | 'html' = 'html'
 
     if (bodyType === 'markdown') {
-      // Convert markdown to HTML
-      finalBody = this.markdown.render(finalBody)
+      // Shared with the preview endpoints so what is previewed is what is sent.
+      finalBody = toEmailHtml(finalBody, 'markdown')
       chesBodyType = 'html'
     } else if (bodyType === 'text') {
       chesBodyType = 'text'
