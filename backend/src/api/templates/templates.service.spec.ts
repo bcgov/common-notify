@@ -1,6 +1,7 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { BadRequestException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -117,6 +118,11 @@ describe('TemplatesService', () => {
         {
           provide: EmailTemplateLayoutService,
           useValue: mockEmailTemplateLayoutService,
+          // The preview reports the address a send would use, resolved from config.
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) => (key === 'ches.from' ? 'noreply@gov.bc.ca' : undefined),
+          },
         },
       ],
     }).compile()

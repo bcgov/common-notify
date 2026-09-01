@@ -20,7 +20,8 @@ import {
 } from '@/redux/thunks/notificationDetail.thunks'
 import RequestStatusSummary from '@/components/RequestStatusSummary'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
-import Breadcrumb from '@/components/Breadcrumb'
+import PageHeading from '@/components/PageHeading'
+import PageSubHeading from '@/components/PageSubHeading'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -114,21 +115,19 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
   }
 
   return (
-    <div className="request-status-page">
-      <div className="request-status-page__header">
-        <Breadcrumb
-          items={[
-            { label: 'Home', to: '/' },
-            { label: 'Dashboard', to: '/dashboard' },
-            {
-              label: 'Request Status',
-            },
-          ]}
-        />
-        {/** Add event name here when events are added */}
-        <h1 className="request-status-page__title">{notificationRequest?.requestRoute}</h1>
-      </div>
-      <div className="request-status-page__request-id">Request ID: {notificationRequest?.id}</div>
+    <div className="page request-status-page">
+      {/** Add event name to the title here when events are added */}
+      <PageHeading
+        title={notificationRequest?.requestRoute ?? ''}
+        breadcrumbs={[
+          { label: 'Home', to: '/' },
+          { label: 'Dashboard', to: '/dashboard' },
+          {
+            label: 'Request Status',
+          },
+        ]}
+        meta={`Request ID: ${notificationRequest?.id ?? ''}`}
+      />
 
       {notificationRequest && (
         <RequestStatusSummary
@@ -139,9 +138,9 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
         />
       )}
 
-      <h2 className="request-status-page__subtitle">Recipient Delivery Status</h2>
+      <PageSubHeading title="Recipient Delivery Status" />
 
-      <div className="request-status-page__search">
+      <div className="page__toolbar">
         <SearchField
           value={searchInput}
           onChange={setSearchInput}

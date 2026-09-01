@@ -38,8 +38,21 @@ export class CstarApiClient {
   private readonly baseUrl: string
   private static readonly SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]{1,128}$/
 
+  /**
+   * Successful lookups, keyed by the identity they were fetched for. Only successes are
+   * stored, and a Map is used rather than a plain object so a key like `__proto__`
+   * (however unlikely, the key derives from a token claim) cannot pollute a prototype.
+   */
+  private readonly tenantsCache = new Map<string, { expiresAt: number; value: any[] }>()
+  private readonly rolesCache = new Map<string, { expiresAt: number; value: string[] }>()
+  /** Lookups currently in flight, so a burst of requests shares a single CSTAR call. */
+  private readonly tenantsInFlight = new Map<string, Promise<any[]>>()
+  private readonly rolesInFlight = new Map<string, Promise<string[]>>()
+  private readonly cacheTtlMs: number
+
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>('cstar.baseUrl') || ''
+    this.cacheTtlMs = this.configService.get<number>('cstar.userTenantsCacheTtlMs') ?? 15000
   }
 
   private validatePathSegment(value: string, fieldName: string): string {
@@ -60,7 +73,11 @@ export class CstarApiClient {
    * @throws ForbiddenException if user doesn't have access to tenant
    * @throws InternalServerErrorException if CSTAR API error
    */
-  async getUserRoles(tenantId: string, ssoUserId: string, authHeader?: string): Promise<string[]> {
+  private async fetchUserRoles(
+    tenantId: string,
+    ssoUserId: string,
+    authHeader?: string,
+  ): Promise<string[]> {
     if (!this.baseUrl) {
       this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')
@@ -166,7 +183,99 @@ export class CstarApiClient {
    * @throws UnauthorizedException if user not found or credentials invalid
    * @throws InternalServerErrorException if CSTAR API error
    */
+  /**
+   * Reuse a recent result, and let concurrent callers share one in-flight request.
+   *
+   * Both CSTAR lookups sit on the hot path: NotifyFrontendRoleGuard calls getUserTenants
+   * on every tenant-scoped frontend request and getUserRoles on every role-gated one, so
+   * clicking quickly through the nav otherwise fires a burst of identical calls and the
+   * failures surface as "Failed to verify tenant access".
+   *
+   * Failures are never cached: an error must not lock a user out for the whole window,
+   * and a transient CSTAR problem should be retried by the very next request.
+   */
+  private cachedLookup<T>(
+    cache: Map<string, { expiresAt: number; value: T }>,
+    inFlight: Map<string, Promise<T>>,
+    key: string,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    const cached = cache.get(key)
+    if (cached && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.value)
+    }
+
+    const pending = inFlight.get(key)
+    if (pending) {
+      return pending
+    }
+
+    const request = fetcher()
+      .then((value) => {
+        if (this.cacheTtlMs > 0) {
+          this.pruneExpired(cache)
+          cache.set(key, { expiresAt: Date.now() + this.cacheTtlMs, value })
+        }
+        return value
+      })
+      .finally(() => {
+        inFlight.delete(key)
+      })
+
+    inFlight.set(key, request)
+    return request
+  }
+
+  /** Drop expired entries so a cache tracks active users, not every user ever seen. */
+  private pruneExpired<T>(cache: Map<string, { expiresAt: number; value: T }>): void {
+    const now = Date.now()
+    for (const [key, entry] of cache) {
+      if (entry.expiresAt <= now) {
+        cache.delete(key)
+      }
+    }
+  }
+
+  /**
+   * Reject an identifier that is missing or not a string before it is used as a cache key.
+   *
+   * The path-segment regexes below stringify their argument, so `undefined` becomes the
+   * literal "undefined" and passes them. Harmless when every call went to CSTAR; not
+   * harmless once results are cached, because every caller missing the claim would share
+   * one entry.
+   */
+  private requireIdentifier(value: string, field: string): string {
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new BadRequestException(`Invalid ${field}`)
+    }
+    return value
+  }
+
+  /** The tenants a user belongs to, according to CSTAR. */
   async getUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
+    this.requireIdentifier(ssoUserId, 'ssoUserId')
+    return this.cachedLookup(this.tenantsCache, this.tenantsInFlight, ssoUserId, () =>
+      this.fetchUserTenants(ssoUserId, authHeader),
+    )
+  }
+
+  /**
+   * A user's roles within one tenant.
+   *
+   * Keyed by tenant *and* user: a user holds different roles in different tenants, so the
+   * tenant has to be part of the key or switching tenants would read the wrong entry.
+   * ":" cannot appear in either identifier (see the path-segment regexes), so the two
+   * halves cannot run together to forge another pair's key.
+   */
+  async getUserRoles(tenantId: string, ssoUserId: string, authHeader?: string): Promise<string[]> {
+    this.requireIdentifier(tenantId, 'tenantId')
+    this.requireIdentifier(ssoUserId, 'ssoUserId')
+    return this.cachedLookup(this.rolesCache, this.rolesInFlight, `${tenantId}:${ssoUserId}`, () =>
+      this.fetchUserRoles(tenantId, ssoUserId, authHeader),
+    )
+  }
+
+  private async fetchUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
     if (!this.baseUrl) {
       this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')

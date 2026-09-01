@@ -373,6 +373,9 @@ async function handleEmailMerge(
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
+    // Accepted recipients only - safelist-blocked rows are reported separately below, so a caller
+    // can tell "242 queued" from "250 rows uploaded" without parsing the message string.
+    recipientCount: recipients.length,
     message: hasDelayedSend
       ? `Email merge send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
       : `Email merge send accepted with ${recipients.length} recipient(s)`,

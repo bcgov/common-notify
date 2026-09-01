@@ -5,6 +5,7 @@ import { Provider as ReduxProvider } from 'react-redux'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { store } from '@/redux/store'
 import { initializeAuthFromToken } from '@/redux/thunks/auth.thunks'
+import { initGlobalLoading } from '@/redux/utils/globalLoading'
 import UserService from './service/user-service'
 
 // Import bootstrap styles
@@ -22,6 +23,9 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+// Let the axios interceptors drive the app-wide loading overlay (see globalLoading).
+initGlobalLoading(store.dispatch, () => store.getState().loading.requestCount)
 
 const renderApp = () => {
   // Initialize auth from JWT token after Keycloak is initialized

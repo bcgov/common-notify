@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
-import {
-  Button,
-  SvgInfoIcon,
-  Switch,
-  Tooltip,
-  TooltipTrigger,
-} from '@bcgov/design-system-react-components'
+import { Button, SvgInfoIcon, Switch, Tooltip } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'

@@ -139,7 +139,7 @@ const AdminUsage: FC = () => {
   ]
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Tenant Usage & Limits" />
 
       <DataTable

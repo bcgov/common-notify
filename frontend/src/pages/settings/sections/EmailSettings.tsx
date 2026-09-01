@@ -8,8 +8,8 @@ import {
   Switch,
   TextField,
   Tooltip,
-  TooltipTrigger,
 } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
