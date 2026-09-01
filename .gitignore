@@ -433,7 +433,7 @@ api-gateway/generated/
 .claude/
 
 # Claude Code agents markdown file, excluding this for now until I refine it a bit more
-AGENTS.MD
+AGENTS.md
 
 # Mac
 monitoring/grafana-admin-credentials.txt
