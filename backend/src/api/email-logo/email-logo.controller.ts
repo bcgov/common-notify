@@ -15,6 +15,7 @@ export class EmailLogoController {
   @Get(':id/image')
   @Public()
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
   async getImage(@Param('id') id: string, @Res() response: Response): Promise<void> {
     const logo = await this.emailLogoService.findByIdIfApproved(id)
 
