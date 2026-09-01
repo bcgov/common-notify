@@ -118,6 +118,8 @@ describe('TemplatesService', () => {
         {
           provide: EmailTemplateLayoutService,
           useValue: mockEmailTemplateLayoutService,
+        },
+        {
           // The preview reports the address a send would use, resolved from config.
           provide: ConfigService,
           useValue: {

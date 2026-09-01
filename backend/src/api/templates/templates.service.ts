@@ -23,7 +23,6 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
-import { extractTemplatePersonalisationKeys } from '../../services/rendering/template-personalisation-validation'
 import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
 import {
   extractTemplatePersonalisationKeys,
