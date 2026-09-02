@@ -98,7 +98,7 @@
     "brace-expansion@5": "^5.0.8",
     "uuid": "$uuid",
     "@nestjs/swagger": {
-      "js-yaml": "^5.2.2"
+      "js-yaml": "^4.3.0"
     },
     "chevrotain": {
       "lodash": "4.17.23"
