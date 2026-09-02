@@ -4,6 +4,13 @@ import { TooltipTrigger as BcdsTooltipTrigger } from '@bcgov/design-system-react
 /**
  * How long to hover before a tooltip appears.
  *
+ * React Aria's `TooltipTrigger` defaults to **1500ms**, which reads as broken rather
+ * than deliberate: a second and a half of hovering with nothing happening looks like a
+ * dead icon, so people give up before it fires. Worse, React Aria has a global
+ * warmup/cooldown — once any tooltip has appeared, the next shows instantly for a few
+ * seconds — so the same icon appears to work sometimes and not others depending on what
+ * was hovered just before.
+ *
  * 250ms responds to a deliberate hover without flashing tooltips at someone sweeping
  * the pointer across a form.
  */

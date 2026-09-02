@@ -69,6 +69,34 @@ export default () => {
       adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
     },
 
+    // APS Directory API (API Programme Services) — Credential Issuer.
+    // Lets Notify issue and regenerate gateway consumer credentials on behalf of a
+    // tenant instead of the tenant requesting a key through the API Services Portal.
+    // Requires an APS service account with the CredentialIssuer.Generate scope on the
+    // gateway. When clientId/clientSecret are absent the issuer falls back to the local
+    // Kong Admin API (dev only) — see credential-issuer.module.ts.
+    aps: {
+      baseUrl: process.env.APS_API_BASE_URL,
+      gatewayId: process.env.APS_GATEWAY_ID,
+      environmentAppId: process.env.APS_ENVIRONMENT_APP_ID,
+      tokenUrl: process.env.APS_TOKEN_URL,
+      clientId: process.env.APS_CLIENT_ID,
+      clientSecret: process.env.APS_CLIENT_SECRET,
+      // Optional. Left unset, Keycloak issues the service account's default scopes,
+      // which already carry CredentialIssuer.Generate. Set it only if the realm
+      // requires the scope to be requested explicitly.
+      scope: process.env.APS_TOKEN_SCOPE,
+      timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
+      // Group every issued credential joins, in addition to the tenant's CSTAR id.
+      // The gateway's acl plugin allows this one group, which is what lets a single
+      // static allow-list authorize an unbounded set of tenants: the tenant's own
+      // group rides along in X-Consumer-Groups without ever needing to be enumerated.
+      //
+      // MUST match ACL_GROUP in api-gateway/config/*.env. A mismatch is a 403 on every
+      // request, so change both together.
+      aclGroup: process.env.APS_ACL_GROUP || 'notify-api',
+    },
+
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
     // Used to fetch user roles for role-based access control
     cstar: {

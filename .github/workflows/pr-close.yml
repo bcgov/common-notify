@@ -37,6 +37,22 @@ jobs:
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           values_file: charts/crunchy/values.yml
 
+  cleanup_overrides:
+    name: Delete PR Override Secret
+    runs-on: ubuntu-24.04
+    steps:
+      # The per-release override secret is created by hand (see the envFrom comment in
+      # the backend deployment) so Helm cannot reconcile it away mid-PR. That also means
+      # `cleanup: helm` above will not remove it, hence this step.
+      - name: Remove <release>-overrides
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
+          commands: |
+            oc delete secret ${{ github.event.repository.name }}-${{ github.event.number }}-overrides --ignore-not-found
+
   cleanup_gateway:
     name: Delete PR API Gateway Config
     runs-on: ubuntu-24.04

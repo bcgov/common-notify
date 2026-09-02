@@ -333,7 +333,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                   <TooltipTrigger>
                     <Button
                       aria-label={option.tooltipLabel}
-                      className="template-form__syntax-tooltip-trigger"
                       isIconButton
                       size="xsmall"
                       type="button"

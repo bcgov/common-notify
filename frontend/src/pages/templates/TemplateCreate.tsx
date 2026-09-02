@@ -282,7 +282,6 @@ const TemplateCreate: FC = () => {
                   <TooltipTrigger>
                     <Button
                       aria-label={option.tooltipLabel}
-                      className="template-form__syntax-tooltip-trigger"
                       isIconButton
                       size="xsmall"
                       type="button"

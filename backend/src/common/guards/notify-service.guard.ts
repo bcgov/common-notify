@@ -10,6 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
 import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
+import {
+  hasNoCredentialHeaders,
+  readGatewayCredentialHeaders,
+  resolveApiKeyConsumer,
+} from './resolve-api-key-consumer'
 
 /**
  * NotifyServiceGuard
@@ -19,23 +24,20 @@ import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.ent
  * **How it works:**
  * 1. Kong's key-auth plugin validates the API key (sent in X-API-KEY header)
  * 2. Only valid requests reach the backend (Kong blocks invalid keys)
- * 3. Kong passes the per-key credential ID in x-credential-identifier header
- * 4. Backend looks up the api_key_consumer mapping by credential identifier
- * 5. Backend resolves the tenant from the mapping and attaches it to the request
- *
- * **Flow:**
- * Request → Kong key-auth validates X-API-KEY → Kong adds x-credential-identifier header
- *         → Backend reads x-credential-identifier → Looks up api_key_consumer mapping
- *         → Resolves tenant → Attaches tenant context to request
+ * 3. Kong passes the credential's identity along as x-credential-identifier and
+ *    x-consumer-username
+ * 4. Backend resolves the api_key_consumer binding from those headers
+ *    (see resolve-api-key-consumer.ts for why both are needed)
+ * 5. Backend resolves the tenant from the binding and attaches it to the request
  *
  * **Key Design Decision:**
  * We never store or validate raw API key values in the database.
  * Kong is the source of truth for key validity via the key-auth plugin.
- * Tenant resolution uses the stable per-key credential identifier from the mapping
- * table, created by the bind endpoint (POST /api/v1/service/api-key/bind).
+ * Tenant resolution uses the stable identifiers from the mapping table, created
+ * either by the self-service issue endpoint or by POST /api/v1/service/api-key/bind.
  *
  * Error responses:
- * - 401: Kong did not pass x-credential-identifier (request not authenticated by Kong)
+ * - 401: Kong did not identify the credential (request not authenticated by Kong)
  * - 404: No binding found for the credential; key must be bound to a tenant first
  *
  * Usage:
@@ -56,22 +58,25 @@ export class NotifyServiceGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    // Kong's key-auth plugin passes the per-key credential ID in this header.
-    // This header is only present if Kong successfully validated an API key.
-    const credentialIdentifier = request.headers['x-credential-identifier'] as string
-    if (!credentialIdentifier) {
+    // Kong's key-auth plugin injects these only after it has validated an API key.
+    const credentialHeaders = readGatewayCredentialHeaders(request.headers)
+    if (hasNoCredentialHeaders(credentialHeaders)) {
       this.logger.warn(
-        'Request missing x-credential-identifier header. Kong did not authenticate the API key.',
+        'Request carries no gateway credential headers. Kong did not authenticate the API key.',
       )
       throw new UnauthorizedException('API request must be authenticated with a valid API key')
     }
 
+    const credentialIdentifier = credentialHeaders.credentialIdentifier
+
     let mapping: ApiKeyConsumer | null = null
     try {
-      mapping = await this.apiKeyConsumerRepository.findOne({
-        where: { credentialIdentifier },
-        relations: ['tenant'],
-      })
+      mapping = await resolveApiKeyConsumer(
+        this.apiKeyConsumerRepository,
+        credentialHeaders,
+        this.logger,
+        request.headers,
+      )
     } catch (error) {
       this.logger.error(
         `Failed to look up api_key_consumer for credential ${credentialIdentifier}: ${error instanceof Error ? error.message : String(error)}`,
@@ -82,11 +87,11 @@ export class NotifyServiceGuard implements CanActivate {
     if (!mapping) {
       this.logger.warn(
         `No tenant binding found for credential identifier ${credentialIdentifier}. ` +
-          `The API key must be bound to a tenant via POST /api/v1/service/api-key/bind`,
+          `The API key must be issued from the Notify UI, or bound via POST /api/v1/service/api-key/bind`,
       )
       throw new NotFoundException(
         'This API key has not been associated with a tenant. ' +
-          'Please call POST /api/v1/service/api-key/bind to complete setup.',
+          'Request a key from the Notify UI, or call POST /api/v1/service/api-key/bind to complete setup.',
       )
     }
 
@@ -105,7 +110,7 @@ export class NotifyServiceGuard implements CanActivate {
     // The bound API key (api_key_consumer) that authenticated this request.
     // Used downstream to attribute notification usage against the key's limits.
     request.apiKeyConsumerId = mapping.id
-    request.credentialIdentifier = credentialIdentifier
+    request.credentialIdentifier = credentialIdentifier ?? mapping.credentialIdentifier
 
     this.logger.debug(
       `✓ Service-to-service request authorized. Tenant: "${tenant.name}" (${tenant.id})`,
