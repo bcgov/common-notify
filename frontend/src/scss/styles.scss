@@ -37,6 +37,34 @@ body {
   }
 }
 
+// Let a Select's dropdown grow to fit its longest option instead of wrapping.
+//
+// The design system pins the popover to `width: var(--trigger-width)`, so the list is
+// only ever as wide as the *selected* value — pick a short tenant and every longer one
+// in the list wraps onto two lines. Sizing to `max-content` with the trigger width as
+// the floor keeps every option on one line, and the cap stops a long option from
+// running off-screen (React Aria still flips and shifts the popover to fit).
+//
+// This is global rather than scoped to a parent: React Aria portals the popover to
+// document.body and the design system hard-codes its className, so there is no wrapper
+// to scope from and no prop to pass. `[data-trigger='Select']` limits it to Select
+// popovers — menus and dialogs use the same Popover primitive — and it doubles as the
+// specificity needed to beat the design system's own rule, which is injected into
+// <head> at runtime and so wins any tie on source order.
+//
+// Specificity-coupled to design-system internals (CLAUDE.md §6.4) — recheck on upgrade.
+.bcds-react-aria-Select--Popover[data-trigger='Select'] {
+  width: max-content;
+  min-width: var(--trigger-width);
+  max-width: min(32rem, calc(100vw - #{$spacing-xl}));
+
+  .bcds-react-aria-Select--ListBoxItem-Text-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 // .bcds-header--line {
 //   display: none;
 // }

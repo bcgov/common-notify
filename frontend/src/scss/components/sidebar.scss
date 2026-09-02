@@ -111,8 +111,16 @@
       background-color: rgba($primary-color, 0.08);
     }
 
-    &:focus-visible,
+    // Pressed feedback is the background alone. The outline is the keyboard focus
+    // indicator, and :focus-visible already covers that — pairing it with :active also
+    // drew a 2px ring under the pointer for as long as the mouse button was held, which
+    // read as a glitch on every click. `__subitem` below has only ever had the
+    // :focus-visible half; this matches it.
     &:active {
+      background-color: rgba($primary-color, 0.08);
+    }
+
+    &:focus-visible {
       outline: 2px solid $border-active;
       outline-offset: 0;
       background-color: rgba($primary-color, 0.08);

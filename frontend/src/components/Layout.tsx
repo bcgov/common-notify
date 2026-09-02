@@ -131,9 +131,9 @@ const Layout: FC<Props> = ({ children }) => {
     <>
       <LoadingSpinner />
       <ToastContainer
-        position="top-right"
+        position="bottom-right"
         autoClose={5000}
-        hideProgressBar={false}
+        hideProgressBar
         newestOnTop={false}
         closeOnClick
         rtl={false}

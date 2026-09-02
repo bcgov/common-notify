@@ -46,4 +46,21 @@ export class NotificationAcceptanceResponse {
     description: 'Human-readable status message',
   })
   message: string
+
+  @ApiPropertyOptional({
+    description:
+      'Mail merge only: number of recipients accepted for sending, excluding any dropped by the safelist',
+  })
+  recipientCount?: number
+
+  @ApiPropertyOptional({
+    description:
+      'Mail merge only: number of distinct recipients dropped because they are not on the tenant safelist. Omitted when none were dropped.',
+  })
+  blockedRecipientCount?: number
+
+  @ApiPropertyOptional({
+    description: 'Mail merge only: human-readable explanation of the dropped recipients',
+  })
+  blockedMessage?: string
 }
