@@ -67,7 +67,11 @@ export async function bootstrap() {
   // integration a single baseUrl config change (baseUrl + '/gcnotify'), same as
   // changing just the hostname would.
   app.setGlobalPrefix('api', {
-    exclude: [{ path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL }],
+    exclude: [
+      { path: 'logos/(.*)', method: RequestMethod.ALL },
+      { path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL },
+      { path: 'gcnotify-passthrough/v2/(.*)', method: RequestMethod.ALL },
+    ],
   })
   app.enableVersioning({
     type: VersioningType.URI,
