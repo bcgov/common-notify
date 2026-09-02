@@ -39,12 +39,12 @@ info:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
   description: |
-    Multi-tenanted unified notification API which covers everything from  simple single-channel sends 
-    to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides 
+    Multi-tenanted unified notification API which covers everything from  simple single-channel sends
+    to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides
     comprensive defaults through the use of configurable event-types, which free calling applications
-    from the burden of managing recipients, content, channels and subscriptions - however, defaults can 
+    from the burden of managing recipients, content, channels and subscriptions - however, defaults can
     be overridden or augmented by the message payload at any time if required.
-    Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends, 
+    Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends,
     maintenance console and integration with subscription services.
     The GC Notify interface is supported for legacy applications.
     Defaults are configured through an administrative UI.
@@ -59,7 +59,7 @@ tags:
   - name: Notify
     description: Notification send, preview, status, service and callback endpoints.
   - name: GC Notify
-    description: Passthrough API for GC Notify v2.
+    description: GC Notify-compatible native API endpoints.
 
 paths:
   /notifysimple:
@@ -212,7 +212,7 @@ paths:
         Provide channel-specific overrides or augments under email, sms, or msgApp.
         params is a top-level object of template variables applied to all channels.
 
-        Query param preview=true previews resolved channel payloads 
+        Query param preview=true previews resolved channel payloads
         Returns fully resolved channel payloads (email, sms, msgApp)
         after applying defaults, overrides, augments, and params. No message is sent.
 
@@ -2045,8 +2045,8 @@ components:
       in: header
       name: Authorization
       description: |
-        GC Notify API key.  
-        Must be provided as:  
+        GC Notify API key.
+        Must be provided as:
         'Authorization: ApiKey-v1 <your-key>''
 
 `;

@@ -25,10 +25,6 @@ vi.mock('@/redux/utils/toastUtils', () => ({
   showSuccessToast: vi.fn(),
 }))
 
-vi.mock('@/components/PageHeading', () => ({
-  default: ({ title }: { title: string }) => <h1>{title}</h1>,
-}))
-
 vi.mock('./TemplatePreviewModal', () => ({
   default: () => null,
 }))

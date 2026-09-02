@@ -71,6 +71,16 @@ export default () => {
     // Used to fetch user roles for role-based access control
     cstar: {
       baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+      // How long a user's CSTAR tenant list stays reusable. Every tenant-scoped frontend
+      // request verifies membership, so without this a user clicking quickly through the
+      // nav fires a burst of identical calls at CSTAR, and the failures come back as
+      // "Failed to verify tenant access".
+      //
+      // This caches an authorization input, so it is deliberately short: a user removed
+      // from a tenant keeps access for at most this long. Set to 0 to disable caching —
+      // concurrent identical requests are still coalesced into one call, which is what
+      // fixes the burst.
+      userTenantsCacheTtlMs: parseInt(process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000', 10),
     },
 
     // Twilio SMS Service
