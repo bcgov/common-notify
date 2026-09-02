@@ -3,6 +3,8 @@ import type { FC, SubmitEvent } from 'react'
 import {
   AlertDialog,
   Button,
+  Checkbox,
+  CheckboxGroup,
   Modal,
   Select,
   Switch,
@@ -27,12 +29,10 @@ const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 // Header, footer and attachment service are not implemented yet.
 const NOT_IMPLEMENTED_ITEMS = [{ id: 'not-implemented', label: 'Not implemented' }]
 
+// Subscription service and CSTAR group recipients are not implemented yet.
+const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
+const CSTAR_GROUPS_ID = 'cstar-groups'
 const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
-
-// `tagStyle` is forwarded to the tag the Select renders once the option is selected.
-const RECIPIENT_ITEMS = [
-  { id: ADDITIONAL_RECIPIENTS_ID, label: 'Additional recipient(s)', tagStyle: 'circular' as const },
-]
 
 export type EmailSettingsValues = {
   active: boolean
@@ -56,10 +56,6 @@ export type EmailDraftValues = {
   to: string[]
   cc: string[]
   bcc: string[]
-}
-
-function sameAddresses(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((address, index) => address === b[index])
 }
 
 const EMAIL_PATTERN =
@@ -120,6 +116,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   )
   // Validation errors only surface after a Save draft / Apply settings attempt, not on every keystroke.
   const [validationAttempted, setValidationAttempted] = useState(false)
+  // Flipped on by any edit below and only cleared by a successful save - editing a field back to
+  // its saved value still counts as a change.
+  const [settingsChanged, setSettingsChanged] = useState(false)
 
   // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
@@ -164,16 +163,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     invalidRecipients.cc.length > 0 ||
     invalidRecipients.bcc.length > 0
   const hasValidationError = Boolean(senderEmailError) || recipientsHaveError
+  // Only blocks Apply settings - a draft is allowed to have no recipients picked yet.
+  const recipientSelectionError =
+    selectedRecipients.length === 0 ? 'Select at least one recipient.' : ''
   // Recipients validate live; the sender email error only surfaces once a save attempt has run it.
   const displayedSenderEmailError = validationAttempted ? senderEmailError : ''
-  const recipientsChanged =
-    !sameAddresses(recipients.to, values.to) ||
-    !sameAddresses(recipients.cc, values.cc) ||
-    !sameAddresses(recipients.bcc, values.bcc)
-  const settingsChanged =
-    trimmedSenderEmail !== values.senderEmail ||
-    (selectedTemplateId ?? null) !== values.templateId ||
-    recipientsChanged
+  const displayedRecipientSelectionError = validationAttempted ? recipientSelectionError : ''
   const isFormDisabled = isDisabled || saving || savingDraft || togglingActive
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
@@ -230,7 +225,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       return
     }
 
-    if (hasValidationError) {
+    if (hasValidationError || recipientSelectionError) {
       setValidationAttempted(true)
       return
     }
@@ -245,6 +240,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         bcc: recipients.bcc,
       })
       setValidationAttempted(false)
+      setSettingsChanged(false)
       showSuccessToast('Settings applied: Your email notification settings have been saved.')
     } catch (error) {
       showErrorToast(
@@ -271,6 +267,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         bcc: recipients.bcc,
       })
       setValidationAttempted(false)
+      setSettingsChanged(false)
       showSuccessToast('Draft saved: Your changes have been saved. Continue editing anytime.')
     } catch (error) {
       showErrorToast(
@@ -355,7 +352,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               ) as unknown as string
             }
             value={senderEmail}
-            onChange={setSenderEmail}
+            onChange={(value) => {
+              setSenderEmail(value)
+              setSettingsChanged(true)
+            }}
             description="The default sender email is based on your tenant but can be changed. It must be linked to a registered IDIR account or an approved email address."
             size="small"
             isDisabled={areFieldsDisabled}
@@ -364,22 +364,37 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             errorMessage={displayedSenderEmailError || 'Sender email address cannot be empty.'}
           />
 
-          <Select
+          <CheckboxGroup
             label="Recipient(s)"
-            placeholder="Select recipients..."
-            selectionMode="multiple"
-            items={RECIPIENT_ITEMS}
             value={selectedRecipients}
-            onChange={(keys) => setSelectedRecipients(keys.map(String))}
-            size="small"
+            onChange={(value) => {
+              setSelectedRecipients(value)
+              setSettingsChanged(true)
+            }}
             isDisabled={areFieldsDisabled}
             isRequired
-          />
+            // Native validation flags an empty group as soon as it is touched; drive the error
+            // from validationAttempted instead so it only appears after Apply settings.
+            validationBehavior="aria"
+            isInvalid={Boolean(displayedRecipientSelectionError)}
+            errorMessage={displayedRecipientSelectionError}
+          >
+            <Checkbox value={SUBSCRIPTION_SERVICE_ID} isDisabled>
+              Subscription Service
+            </Checkbox>
+            <Checkbox value={CSTAR_GROUPS_ID} isDisabled>
+              CSTAR Group(s)
+            </Checkbox>
+            <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
+          </CheckboxGroup>
 
           {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
             <EventsAdditionalRecipients
               values={recipients}
-              onChange={setRecipients}
+              onChange={(value) => {
+                setRecipients(value)
+                setSettingsChanged(true)
+              }}
               invalidAddresses={invalidRecipients}
               isDisabled={areFieldsDisabled}
             />
@@ -390,7 +405,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             placeholder="Select a template..."
             items={templateItems}
             value={selectedTemplateId}
-            onChange={(key) => setSelectedTemplateId(key == null ? undefined : String(key))}
+            onChange={(key) => {
+              setSelectedTemplateId(key == null ? undefined : String(key))
+              setSettingsChanged(true)
+            }}
             size="small"
             isDisabled={areFieldsDisabled}
             isRequired
