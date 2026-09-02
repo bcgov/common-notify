@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
-import Breadcrumb from '@/components/Breadcrumb'
+import PageHeading from '@/components/PageHeading'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import { createEvent } from '@/api/events.api'
@@ -32,16 +32,15 @@ const CreateEvent: FC = () => {
   }
 
   return (
-    <div className="events">
-      <Breadcrumb
-        items={[
+    <div className="page page--narrow events">
+      <PageHeading
+        title="Create New Event"
+        breadcrumbs={[
           { label: 'Home', to: '/dashboard' },
           { label: 'Event', to: '/events' },
           { label: 'Create New Event' },
         ]}
       />
-
-      <h1 className="events__title">Create New Event</h1>
 
       {/* The notification tabs need an event to attach to, so they stay disabled until the
           event exists and the edit page takes over. */}

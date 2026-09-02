@@ -14,47 +14,29 @@
   vertical-align: middle;
 }
 
-// Create / edit event pages
-.events {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding-top: 24px;
-  // 284px when the sidebar is collapsed (93px wide); reduced by the sidebar's
-  // expanded-vs-collapsed width delta (296px - 93px = 203px) so the content
-  // stays in the same spot on screen when the sidebar opens.
-  padding-left: 81px;
-  transition: padding-left 0.3s ease;
-}
-
-.sidebar--collapsed + .layout-content .events {
-  padding-left: 284px;
-}
-
-.events__title {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: $dark-text;
-}
-
+// Create / edit event pages. The page frame (heading, gutters, centred
+// column) comes from `.page .page--narrow` in page.scss; everything below is
+// specific to the event form.
 .events__tabs {
   .bcds-react-aria-ToggleButtonGroup {
     width: fit-content;
   }
 }
 
+// Spans the centred column from `.page--narrow > *`; the form inside is what
+// carries the narrower field width, so it starts flush with the heading above.
 .events__section {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  width: 418px;
 }
 
 .events__form {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
+  max-width: 418px;
 
   .bcds-react-aria-Button {
     align-self: flex-start;

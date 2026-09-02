@@ -120,7 +120,7 @@ const Events: FC = () => {
   }
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Notification Events" />
 
       <div className="events-page__search">

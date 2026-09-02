@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
-import Breadcrumb from '@/components/Breadcrumb'
+import PageHeading from '@/components/PageHeading'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
@@ -120,16 +120,15 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
   }
 
   return (
-    <div className="events">
-      <Breadcrumb
-        items={[
+    <div className="page page--narrow events">
+      <PageHeading
+        title={event?.name ?? 'Event'}
+        breadcrumbs={[
           { label: 'Home', to: '/dashboard' },
           { label: 'Event', to: '/events' },
           { label: event?.name ?? 'Event' },
         ]}
       />
-
-      <h1 className="events__title">{event?.name ?? 'Event'}</h1>
 
       <div className="events__tabs">
         <ToggleButtonGroup
