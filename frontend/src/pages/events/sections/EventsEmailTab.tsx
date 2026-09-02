@@ -294,7 +294,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       <Modal
         isOpen={confirmDeactivateOpen}
         isDismissable={!togglingActive}
-        aria-label="Deactivate this channel?"
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
         }}
@@ -303,6 +302,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           variant="confirmation"
           isIconHidden
           title="Deactivate this channel?"
+          // AlertDialog renders `title` as a plain div rather than a <Heading slot="title">, so
+          // the underlying Dialog needs an explicit label.
+          aria-label="Deactivate this channel?"
           buttons={
             <>
               <Button
