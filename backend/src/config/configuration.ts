@@ -1,3 +1,5 @@
+import * as path from 'path'
+
 export default () => {
   const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
@@ -123,6 +125,15 @@ export default () => {
       accessKey: process.env.S3_ACCESS_KEY,
       secretKey: process.env.S3_SECRET_KEY,
       forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+    },
+
+    emailLogo: {
+      seedAssetDirectory:
+        process.env.EMAIL_LOGO_SEED_ASSET_DIRECTORY ||
+        path.resolve(process.cwd(), '../migrations/assets/email-logos'),
+      publicBaseUrl:
+        process.env.PUBLIC_API_GATEWAY_BASE_URL || process.env.VITE_API_GATEWAY_NOTIFY_URL,
+      publicPathPrefix: process.env.PUBLIC_API_GATEWAY_PATH_PREFIX || '',
     },
 
     // ClamAV

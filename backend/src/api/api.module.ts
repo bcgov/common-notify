@@ -8,6 +8,7 @@ import { AttachmentModule } from './attachment/attachment.module'
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
 import { EventsModule } from './events/events.module'
 import { SafelistModule } from './safelist/safelist.module'
+import { EmailLogoModule } from './email-logo/email-logo.module'
 
 /**
  * API Module
@@ -34,6 +35,7 @@ import { SafelistModule } from './safelist/safelist.module'
     TenantSettingsModule,
     EventsModule,
     SafelistModule,
+    EmailLogoModule,
   ],
   exports: [
     NotifyModule,
@@ -45,6 +47,7 @@ import { SafelistModule } from './safelist/safelist.module'
     TenantSettingsModule,
     EventsModule,
     SafelistModule,
+    EmailLogoModule,
   ],
 })
 export class ApiModule {}

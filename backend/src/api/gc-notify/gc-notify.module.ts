@@ -2,7 +2,6 @@ import { DynamicModule, Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { GcNotifyApiClient } from './gc-notify-api.client'
 import { GcNotifyController } from './gc-notify.controller'
-import { GcNotifyPassthroughController } from './gc-notify-passthrough.controller'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
@@ -12,7 +11,6 @@ import { QueueModule } from '../../queue/queue.module'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
 import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guard'
-import { ApiKeyGuard } from '../../common/guards/api-key.guard'
 import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
@@ -26,7 +24,7 @@ import { SafelistModule } from '../safelist/safelist.module'
 export type GcNotifyModuleOptions = Record<string, never>
 
 /**
- * GC Notify module - provides GcNotifyApiClient and registers the GC Notify passthrough controller.
+ * GC Notify module - provides GcNotifyApiClient and registers the GC Notify controller.
  */
 @Module({})
 export class GcNotifyModule {
@@ -45,11 +43,10 @@ export class GcNotifyModule {
         SafelistModule,
         forwardRef(() => QueueModule),
       ],
-      controllers: [GcNotifyController, GcNotifyPassthroughController],
+      controllers: [GcNotifyController],
       providers: [
         GcNotifyApiClient,
         GcNotifyServiceGuard,
-        ApiKeyGuard,
         GcNotifyRoutingService,
         GcNotifyInternalExecutionService,
         GcNotifyBulkValidationService,

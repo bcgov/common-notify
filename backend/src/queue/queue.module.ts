@@ -29,6 +29,7 @@ import { WebhookService } from '../api/webhook/webhook.service'
 import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
 import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
 import { ClamavService } from '../services/clamav.service'
+import { ClamavModule } from '../services/clamav.module'
 import { AttachmentModule } from '../api/attachment/attachment.module'
 import { AttachmentService } from '../api/attachment/attachment.service'
 import { StructuredLoggerService } from '../common/logger'
@@ -55,6 +56,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     TemplatesModule,
     WebhookModule,
     AttachmentModule,
+    ClamavModule,
     forwardRef(() => NotifyModule),
   ],
   providers: [
@@ -62,7 +64,6 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     NotificationService,
     NotificationRequestDetailService,
     NotificationPubSubService,
-    ClamavService,
     PhoneNumberService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis

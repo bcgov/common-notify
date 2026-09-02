@@ -28,6 +28,7 @@ import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.e
 import { NotifyEvent } from './api/events/entities/event.entity'
 import { EventChannelSetting } from './api/events/entities/event-channel-setting.entity'
 import { ProvisionedPhoneNumber } from './api/events/entities/provisioned-phone-number.entity'
+import { EmailLogo } from './api/tenant-settings/entities/email-logo.entity'
 import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
@@ -76,6 +77,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         NotifyEvent,
         EventChannelSetting,
         ProvisionedPhoneNumber,
+        EmailLogo,
         RecipientSafelist,
       ],
       synchronize: false, // Use Flyway for migrations
