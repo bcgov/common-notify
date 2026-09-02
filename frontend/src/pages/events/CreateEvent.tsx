@@ -32,7 +32,7 @@ const CreateEvent: FC = () => {
   }
 
   return (
-    <div className="page page--narrow events">
+    <div className="page events">
       <PageHeading
         title="Create New Event"
         breadcrumbs={[

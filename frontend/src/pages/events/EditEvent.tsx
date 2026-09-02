@@ -120,7 +120,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
   }
 
   return (
-    <div className="page page--narrow events">
+    <div className="page events">
       <PageHeading
         title={event?.name ?? 'Event'}
         breadcrumbs={[
