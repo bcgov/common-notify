@@ -114,15 +114,21 @@ export class EventsService {
 
     // Both statuses selected is the same as no status filter, so only a single-status
     // selection narrows the result. Mirrors toResponseDto: ACTIVE requires a channel that's
-    // active and applied (not sitting on unapplied draft edits); DRAFT is everything else.
+    // active and applied and no active channel still sitting on unapplied draft edits;
+    // DRAFT is everything else.
     const statuses = derived.statuses ?? []
     if (statuses.length === 1) {
       const activeAppliedSubQuery = this.channelSettingSubQuery('statusFilterActive')
         .andWhere('statusFilterActive.active = true')
         .andWhere('statusFilterActive.isDraft = false')
-      const existsActiveApplied = `EXISTS (${activeAppliedSubQuery.getQuery()})`
+      const activeDraftSubQuery = this.channelSettingSubQuery('statusFilterDraft')
+        .andWhere('statusFilterDraft.active = true')
+        .andWhere('statusFilterDraft.isDraft = true')
+      const isActive =
+        `EXISTS (${activeAppliedSubQuery.getQuery()})` +
+        ` AND NOT EXISTS (${activeDraftSubQuery.getQuery()})`
       queryBuilder.andWhere(
-        statuses[0] === EventStatus.ACTIVE ? existsActiveApplied : `NOT ${existsActiveApplied}`,
+        statuses[0] === EventStatus.ACTIVE ? `(${isActive})` : `NOT (${isActive})`,
       )
     }
 
@@ -552,7 +558,11 @@ export class EventsService {
     // Status is stricter: a channel that's active but still marked as a draft has unapplied
     // edits - possibly incomplete ones, since Save draft can persist active = true ahead of the
     // data being complete - so it doesn't count as a real send channel until it's been applied.
-    const hasAppliedActiveChannel = settings.some((setting) => setting.active && !setting.isDraft)
+    // Any such channel holds the whole event in DRAFT, so the event is ACTIVE only once every
+    // channel it sends on has been applied.
+    const activeSettings = settings.filter((setting) => setting.active)
+    const allActiveChannelsApplied =
+      activeSettings.length > 0 && activeSettings.every((setting) => !setting.isDraft)
     const emailSetting = this.findEmailSetting(event)
     const smsSetting = this.findSmsSetting(event)
 
@@ -561,7 +571,7 @@ export class EventsService {
       name: event.name,
       description: event.description ?? '',
       channelCodes: activeChannelCodes,
-      status: hasAppliedActiveChannel ? EventStatus.ACTIVE : EventStatus.DRAFT,
+      status: allActiveChannelsApplied ? EventStatus.ACTIVE : EventStatus.DRAFT,
       emailSettings: emailSetting
         ? {
             active: emailSetting.active,

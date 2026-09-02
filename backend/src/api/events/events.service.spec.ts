@@ -527,5 +527,54 @@ describe('EventsService', () => {
       expect(result.channelCodes).toEqual([NotificationChannel.EMAIL])
       expect(result.status).toBe(EventStatus.DRAFT)
     })
+
+    it('returns DRAFT when one active channel is applied but another is still a draft', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(
+        buildEvent([
+          {
+            channelCode: NotificationChannel.EMAIL,
+            active: true,
+            isDraft: false,
+            senderEmail: 'a@gov.bc.ca',
+            isDeleted: false,
+          },
+          {
+            channelCode: NotificationChannel.SMS,
+            active: true,
+            isDraft: true,
+            isDeleted: false,
+          },
+        ]),
+      )
+
+      const result = await service.getEvent(tenantId, eventId)
+
+      expect(result.channelCodes).toEqual([NotificationChannel.EMAIL, NotificationChannel.SMS])
+      expect(result.status).toBe(EventStatus.DRAFT)
+    })
+
+    it('ignores an inactive draft channel when deriving ACTIVE', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(
+        buildEvent([
+          {
+            channelCode: NotificationChannel.EMAIL,
+            active: true,
+            isDraft: false,
+            senderEmail: 'a@gov.bc.ca',
+            isDeleted: false,
+          },
+          {
+            channelCode: NotificationChannel.SMS,
+            active: false,
+            isDraft: true,
+            isDeleted: false,
+          },
+        ]),
+      )
+
+      const result = await service.getEvent(tenantId, eventId)
+
+      expect(result.status).toBe(EventStatus.ACTIVE)
+    })
   })
 })
