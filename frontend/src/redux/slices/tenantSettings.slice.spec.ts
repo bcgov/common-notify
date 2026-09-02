@@ -13,6 +13,7 @@ describe('tenantSettingsSlice', () => {
   const loadedState = {
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
+    emailLogoId: null,
     saving: false,
   }
 
@@ -21,6 +22,10 @@ describe('tenantSettingsSlice', () => {
     tenantId: 'tenant-1',
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
+    emailLogoId: null,
+    emailNotificationsEnabled: true,
+    replyToEmail: null,
+    emailAttachmentsEnabled: true,
     smsNotificationsEnabled: true,
     includeTenantNameInSms: true,
     internationalSmsEnabled: false,

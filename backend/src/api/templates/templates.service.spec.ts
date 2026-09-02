@@ -9,6 +9,7 @@ import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { EmailTemplateLayoutService } from './email-template-layout.service'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -97,6 +98,10 @@ describe('TemplatesService', () => {
     findAll: vi.fn(),
   }
 
+  const mockEmailTemplateLayoutService = {
+    apply: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -109,6 +114,10 @@ describe('TemplatesService', () => {
         {
           provide: TenantsService,
           useValue: mockTenantsService,
+        },
+        {
+          provide: EmailTemplateLayoutService,
+          useValue: mockEmailTemplateLayoutService,
         },
         {
           // The preview reports the address a send would use, resolved from config.

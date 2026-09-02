@@ -184,11 +184,12 @@ export class EmailDeliveryWorker {
             if (template.channelCode === 'EMAIL') {
               // Render the template with personalisation data from request.params
               // Normalize legacy body types before entering the markdown-only render path.
-              const rendered = await templatesService.renderTemplateContent(
+              const renderedTemplate = await templatesService.renderTemplateContent(
                 template,
                 { ...request?.params, ...emailPayload.params },
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
+              const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
 
               emailPayload = {
                 ...emailPayload,
@@ -496,7 +497,11 @@ export class EmailDeliveryWorker {
         let body: string
         let bodyType: 'text' | 'markdown' | 'html' | undefined
         if (template) {
-          const rendered = await templatesService.renderTemplateContent(template, mergedParams)
+          const renderedTemplate = await templatesService.renderTemplateContent(
+            template,
+            mergedParams,
+          )
+          const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
           subject = rendered.subject
           body = rendered.body
           bodyType = rendered.bodyType
