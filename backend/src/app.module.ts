@@ -17,7 +17,7 @@ import { NotificationModule } from './api/notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
 import { GcNotifyModule } from './api/gc-notify/gc-notify.module'
-import { ClamavService } from './services/clamav.service'
+import { ClamavModule } from './services/clamav.module'
 import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
 import { LoggerModule } from './common/logger'
 
@@ -40,9 +40,10 @@ import { LoggerModule } from './common/logger'
     FeatureFlagModule,
     AdaptersModule.forRoot(),
     GcNotifyModule.forRoot(),
+    ClamavModule,
   ],
   controllers: [AppController, MetricsController, HealthController],
-  providers: [AppService, ClamavService],
+  providers: [AppService],
 })
 export class AppModule {
   // let's add a middleware on all routes

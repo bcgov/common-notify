@@ -23,6 +23,7 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
+import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
 import {
   extractTemplatePersonalisationKeys,
   describeTemplatePlaceholders,
@@ -41,8 +42,16 @@ export class TemplatesService {
     private readonly rendererRegistry: ITemplateRendererRegistry,
     private readonly tenantsService: TenantsService,
     private readonly inlineRenderingService: InlineRenderingService,
+    private readonly emailTemplateLayoutService: EmailTemplateLayoutService,
     private readonly configService: ConfigService,
   ) {}
+
+  public applyEmailLayout(
+    template: Template,
+    rendered: RenderedEmailContent,
+  ): Promise<RenderedEmailContent> {
+    return this.emailTemplateLayoutService.apply(template, rendered)
+  }
 
   /**
    * List all active templates for a tenant
@@ -313,7 +322,7 @@ export class TemplatesService {
     template: Template,
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
-  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+  ): Promise<RenderedEmailContent> {
     const normalizedPersonalisation = personalisation ?? {}
 
     this.validateTemplatePersonalisation(template, normalizedPersonalisation)
