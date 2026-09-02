@@ -301,9 +301,17 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       >
         <AlertDialog
           variant="confirmation"
+          isIconHidden
           title="Deactivate this channel?"
           buttons={
             <>
+              <Button
+                variant="tertiary"
+                onPress={() => setConfirmDeactivateOpen(false)}
+                isDisabled={togglingActive}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="secondary"
                 danger
@@ -311,13 +319,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
                 isDisabled={togglingActive}
               >
                 Deactivate
-              </Button>
-              <Button
-                variant="primary"
-                onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={togglingActive}
-              >
-                Cancel
               </Button>
             </>
           }
