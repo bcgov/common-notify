@@ -11,11 +11,7 @@ import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
-import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
-import { UpdateEmailChannelActiveDto } from './schemas/update-email-channel-active.dto'
 import { UpdateSmsChannelSettingDto } from './schemas/update-sms-channel-setting.dto'
-import { UpdateSmsChannelDraftDto } from './schemas/update-sms-channel-draft.dto'
-import { UpdateSmsChannelActiveDto } from './schemas/update-sms-channel-active.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
@@ -113,23 +109,15 @@ export class EventsService {
     }
 
     // Both statuses selected is the same as no status filter, so only a single-status
-    // selection narrows the result. Mirrors toResponseDto: ACTIVE requires a channel that's
-    // active and applied and no active channel still sitting on unapplied draft edits;
-    // DRAFT is everything else.
+    // selection narrows the result. Mirrors toResponseDto: ACTIVE means at least one channel
+    // is switched on, DRAFT is everything else.
     const statuses = derived.statuses ?? []
     if (statuses.length === 1) {
-      const activeAppliedSubQuery = this.channelSettingSubQuery('statusFilterActive')
-        .andWhere('statusFilterActive.active = true')
-        .andWhere('statusFilterActive.isDraft = false')
-      const activeDraftSubQuery = this.channelSettingSubQuery('statusFilterDraft')
-        .andWhere('statusFilterDraft.active = true')
-        .andWhere('statusFilterDraft.isDraft = true')
-      const isActive =
-        `EXISTS (${activeAppliedSubQuery.getQuery()})` +
-        ` AND NOT EXISTS (${activeDraftSubQuery.getQuery()})`
-      queryBuilder.andWhere(
-        statuses[0] === EventStatus.ACTIVE ? `(${isActive})` : `NOT (${isActive})`,
+      const activeSubQuery = this.channelSettingSubQuery('statusFilterActive').andWhere(
+        'statusFilterActive.active = true',
       )
+      const isActive = `EXISTS (${activeSubQuery.getQuery()})`
+      queryBuilder.andWhere(statuses[0] === EventStatus.ACTIVE ? isActive : `NOT ${isActive}`)
     }
 
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, eventListQueryConfig)
@@ -220,9 +208,9 @@ export class EventsService {
    * Update an event's EMAIL channel settings (Email Notification tab)
    *
    * Creates the channel setting row the first time the tab is saved, so an event only gains an
-   * EMAIL row once the user configures one. Does not touch `active` - the toggle owns that
-   * field directly via updateEmailChannelActive. Always clears `isDraft`, since applying
-   * settings finalizes them.
+   * EMAIL row once the user configures one. This is the only path that switches the channel on:
+   * the tab's active toggle is local until the settings are applied, so `active` arrives here
+   * alongside the data it depends on.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -244,16 +232,16 @@ export class EventsService {
 
     const setting = this.findOrCreateEmailSetting(event, userId)
 
-    // Mirrors chk_event_channel_setting_active_complete: an already-active channel must stay
-    // complete, since applying settings always clears isDraft (the exemption that lets an
-    // incomplete channel stay active as a draft).
-    if (setting.active && (!senderEmail || !to || !templateId)) {
+    // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
+    // rather than the stored one: switching the channel on requires the settings being saved
+    // with it to be complete. An inactive channel can be saved half-filled.
+    if (updateDto.active && (!senderEmail || !to || !templateId)) {
       throw new BadRequestException(
         'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
       )
     }
 
-    setting.isDraft = false
+    setting.active = updateDto.active
     setting.senderEmail = senderEmail
     setting.templateId = templateId
     setting.to = to
@@ -269,75 +257,31 @@ export class EventsService {
   }
 
   /**
-   * Save an event's EMAIL channel settings as a draft (Save draft on the Email Notification tab)
+   * Immediately switch an event's EMAIL channel off (the "Channel active" switch turned off),
+   * separate from the rest of the tab's settings. There is no matching "switch on" here:
+   * activating goes through updateEmailChannelSetting, since that is where the settings
+   * activation depends on are supplied.
    *
-   * Unlike updateEmailChannelSetting, null/empty sender email, template and recipients are
-   * accepted since chk_event_channel_setting_active_complete exempts is_draft = TRUE rows from
-   * its completeness check. Does not touch `active` - the toggle owns that field directly via
-   * updateEmailChannelActive.
-   *
-   * @param tenantId The tenant ID
-   * @param eventId The event ID
-   * @param updateDto Partial email channel settings
-   * @param userId User saving the draft (for audit trail)
-   */
-  async updateEmailChannelDraft(
-    tenantId: string,
-    eventId: string,
-    updateDto: UpdateEmailChannelDraftDto,
-    userId: string = 'system',
-  ): Promise<EventResponseDto> {
-    const event = await this.findEvent(tenantId, eventId)
-    const senderEmail = updateDto.senderEmail?.trim() || null
-    const templateId = updateDto.templateId ?? null
-    const to = this.normalizeEmailList(updateDto.to)
-    const cc = this.normalizeEmailList(updateDto.cc)
-    const bcc = this.normalizeEmailList(updateDto.bcc)
-
-    const setting = this.findOrCreateEmailSetting(event, userId)
-    setting.isDraft = true
-    setting.senderEmail = senderEmail
-    setting.templateId = templateId
-    setting.to = to
-    setting.cc = cc
-    setting.bcc = bcc
-    setting.isDeleted = false
-    setting.updatedBy = userId
-
-    await this.channelSettingRepository.save(setting)
-
-    return this.getEvent(tenantId, eventId)
-  }
-
-  /**
-   * Immediately toggle an event's EMAIL channel on/off (the "Channel active" switch), separate
-   * from the rest of the tab's settings.
-   *
-   * If turning the channel on while it isn't fully configured yet, the row is saved as a draft
-   * so chk_event_channel_setting_active_complete is still satisfied - the tab's other fields are
-   * disabled until the channel is active, so the toggle must be able to turn it on ahead of that
-   * data existing. Otherwise `isDraft` is left untouched, since only Apply settings clears it.
+   * Deactivating a channel that was never configured is a no-op rather than an empty inactive
+   * row, so the tab keeps treating it as unconfigured.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
-   * @param updateDto The new active value
-   * @param userId User toggling the channel (for audit trail)
+   * @param userId User switching the channel off (for audit trail)
    */
-  async updateEmailChannelActive(
+  async deactivateEmailChannel(
     tenantId: string,
     eventId: string,
-    updateDto: UpdateEmailChannelActiveDto,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
-    const setting = this.findOrCreateEmailSetting(event, userId)
-    const isComplete = !!setting.senderEmail && !!setting.to && !!setting.templateId
+    const setting = this.findEmailSetting(event)
 
-    setting.active = updateDto.active
-    if (updateDto.active && !isComplete) {
-      setting.isDraft = true
+    if (!setting) {
+      return this.toResponseDto(event)
     }
-    setting.isDeleted = false
+
+    setting.active = false
     setting.updatedBy = userId
 
     await this.channelSettingRepository.save(setting)
@@ -368,13 +312,13 @@ export class EventsService {
    * Update an event's SMS channel settings (SMS Notification tab)
    *
    * Creates the channel setting row the first time the tab is saved, so an event only gains an
-   * SMS row once the user configures one. Does not touch `active` - the toggle owns that field
-   * directly via updateSmsChannelActive. Always clears `isDraft`, since applying settings
-   * finalizes them.
+   * SMS row once the user configures one. This is the only path that switches the channel on:
+   * the tab's active toggle is local until the settings are applied, so `active` arrives here
+   * alongside the data it depends on.
    *
    * `fromPhoneNumberId` is not settable yet (the pool claim flow is a follow-up), so it stays
-   * permanently null - meaning an active, non-draft SMS channel is not yet reachable, the same
-   * way an EMAIL channel can't be applied without a sender email.
+   * permanently null - meaning an active SMS channel is not reachable until that flow lands,
+   * the same way an EMAIL channel can't be activated without a sender email.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -393,16 +337,16 @@ export class EventsService {
 
     const setting = this.findOrCreateSmsSetting(event, userId)
 
-    // Mirrors chk_event_channel_setting_active_complete: an already-active channel must stay
-    // complete, since applying settings always clears isDraft (the exemption that lets an
-    // incomplete channel stay active as a draft).
-    if (setting.active && (!to || !templateId || !setting.fromPhoneNumberId)) {
+    // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
+    // rather than the stored one: switching the channel on requires the settings being saved
+    // with it to be complete. An inactive channel can be saved half-filled.
+    if (updateDto.active && (!to || !templateId || !setting.fromPhoneNumberId)) {
       throw new BadRequestException(
         'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
       )
     }
 
-    setting.isDraft = false
+    setting.active = updateDto.active
     setting.templateId = templateId
     setting.to = to
     setting.isDeleted = false
@@ -415,69 +359,31 @@ export class EventsService {
   }
 
   /**
-   * Save an event's SMS channel settings as a draft (Save draft on the SMS Notification tab)
+   * Immediately switch an event's SMS channel off (the "Channel active" switch turned off),
+   * separate from the rest of the tab's settings. There is no matching "switch on" here:
+   * activating goes through updateSmsChannelSetting, since that is where the settings
+   * activation depends on are supplied.
    *
-   * Unlike updateSmsChannelSetting, null/empty template and recipients are accepted since
-   * chk_event_channel_setting_active_complete exempts is_draft = TRUE rows from its completeness
-   * check. Does not touch `active` - the toggle owns that field directly via
-   * updateSmsChannelActive.
-   *
-   * @param tenantId The tenant ID
-   * @param eventId The event ID
-   * @param updateDto Partial SMS channel settings
-   * @param userId User saving the draft (for audit trail)
-   */
-  async updateSmsChannelDraft(
-    tenantId: string,
-    eventId: string,
-    updateDto: UpdateSmsChannelDraftDto,
-    userId: string = 'system',
-  ): Promise<EventResponseDto> {
-    const event = await this.findEvent(tenantId, eventId)
-    const templateId = updateDto.templateId ?? null
-    const to = this.normalizePhoneList(updateDto.to)
-
-    const setting = this.findOrCreateSmsSetting(event, userId)
-    setting.isDraft = true
-    setting.templateId = templateId
-    setting.to = to
-    setting.isDeleted = false
-    setting.updatedBy = userId
-
-    await this.channelSettingRepository.save(setting)
-
-    return this.getEvent(tenantId, eventId)
-  }
-
-  /**
-   * Immediately toggle an event's SMS channel on/off (the "Channel active" switch), separate
-   * from the rest of the tab's settings.
-   *
-   * If turning the channel on while it isn't fully configured yet, the row is saved as a draft
-   * so chk_event_channel_setting_active_complete is still satisfied - the tab's other fields are
-   * disabled until the channel is active, so the toggle must be able to turn it on ahead of that
-   * data existing. Otherwise `isDraft` is left untouched, since only Apply settings clears it.
+   * Deactivating a channel that was never configured is a no-op rather than an empty inactive
+   * row, so the tab keeps treating it as unconfigured.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
-   * @param updateDto The new active value
-   * @param userId User toggling the channel (for audit trail)
+   * @param userId User switching the channel off (for audit trail)
    */
-  async updateSmsChannelActive(
+  async deactivateSmsChannel(
     tenantId: string,
     eventId: string,
-    updateDto: UpdateSmsChannelActiveDto,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
-    const setting = this.findOrCreateSmsSetting(event, userId)
-    const isComplete = !!setting.to && !!setting.templateId && !!setting.fromPhoneNumberId
+    const setting = this.findSmsSetting(event)
 
-    setting.active = updateDto.active
-    if (updateDto.active && !isComplete) {
-      setting.isDraft = true
+    if (!setting) {
+      return this.toResponseDto(event)
     }
-    setting.isDeleted = false
+
+    setting.active = false
     setting.updatedBy = userId
 
     await this.channelSettingRepository.save(setting)
@@ -550,19 +456,11 @@ export class EventsService {
    */
   private toResponseDto(event: NotifyEvent): EventResponseDto {
     const settings = (event.channelSettings ?? []).filter((setting) => !setting.isDeleted)
-    // channelCodes drives the Channel badge and only reflects the on/off toggle - a channel
-    // still shows once switched on even if its settings are an unapplied draft.
+    // A channel can only be switched on with a complete set of settings, so being active is
+    // all that both the Channel badge and the status need to look at.
     const activeChannelCodes = settings
       .filter((setting) => setting.active)
       .map((setting) => setting.channelCode)
-    // Status is stricter: a channel that's active but still marked as a draft has unapplied
-    // edits - possibly incomplete ones, since Save draft can persist active = true ahead of the
-    // data being complete - so it doesn't count as a real send channel until it's been applied.
-    // Any such channel holds the whole event in DRAFT, so the event is ACTIVE only once every
-    // channel it sends on has been applied.
-    const activeSettings = settings.filter((setting) => setting.active)
-    const allActiveChannelsApplied =
-      activeSettings.length > 0 && activeSettings.every((setting) => !setting.isDraft)
     const emailSetting = this.findEmailSetting(event)
     const smsSetting = this.findSmsSetting(event)
 
@@ -571,11 +469,10 @@ export class EventsService {
       name: event.name,
       description: event.description ?? '',
       channelCodes: activeChannelCodes,
-      status: allActiveChannelsApplied ? EventStatus.ACTIVE : EventStatus.DRAFT,
+      status: activeChannelCodes.length > 0 ? EventStatus.ACTIVE : EventStatus.DRAFT,
       emailSettings: emailSetting
         ? {
             active: emailSetting.active,
-            isDraft: emailSetting.isDraft,
             senderEmail: emailSetting.senderEmail,
             templateId: emailSetting.templateId,
             to: this.splitRecipientList(emailSetting.to),

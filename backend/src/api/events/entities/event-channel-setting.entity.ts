@@ -44,22 +44,11 @@ export class EventChannelSetting {
   channel: NotificationChannelCode
 
   /**
-   * Active indicator for the channel. Cannot be set true until the template and the channel
-   * sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated, unless the
-   * row is still a draft (isDraft = true) - Save draft may persist active = true ahead of the
-   * data being complete. Apply settings always requires completeness.
+   * Active indicator for the channel. Can only be active when the channel
+   * setting is properly filled out.
    */
   @Column({ default: false })
   active: boolean
-
-  /**
-   * Set when the channel was last saved via "Save draft" rather than "Apply settings".
-   * Cleared back to false only when the channel is applied while active; left untouched
-   * when the channel is merely deactivated, so a re-activation still surfaces the
-   * pending draft.
-   */
-  @Column({ name: 'is_draft', default: false })
-  isDraft: boolean
 
   /**
    * Template used to render this channel

@@ -28,11 +28,7 @@ import type { DerivedEventFilters } from './events.service'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
-import { UpdateEmailChannelDraftDto } from './schemas/update-email-channel-draft.dto'
-import { UpdateEmailChannelActiveDto } from './schemas/update-email-channel-active.dto'
 import { UpdateSmsChannelSettingDto } from './schemas/update-sms-channel-setting.dto'
-import { UpdateSmsChannelDraftDto } from './schemas/update-sms-channel-draft.dto'
-import { UpdateSmsChannelActiveDto } from './schemas/update-sms-channel-active.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
@@ -196,47 +192,24 @@ export class EventsFrontendController {
   }
 
   /**
-   * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
-   *
-   * Bypasses the null/empty validation of updateEmailChannelSetting so a partially filled-in
-   * form can be saved. `active` is always honored directly - the channel can be saved as
-   * active ahead of the data being complete, since chk_event_channel_setting_active_complete
-   * exempts draft rows.
+   * Immediately switch an event's EMAIL channel off (the "Channel active" switch turned off),
+   * separate from the rest of the Email Notification tab's settings. Activating goes through
+   * updateEmailChannelSetting, which supplies the settings activation depends on, so this
+   * takes no body.
    */
   @Version('1')
-  @Post(':eventId/channels/email/draft')
+  @Post(':eventId/channels/email/deactivate')
   @HttpCode(200)
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
-  @ApiOperation({ summary: "Save an event's email channel settings as a draft" })
+  @ApiOperation({ summary: "Switch an event's email channel off" })
   @ApiOkResponse({ type: EventResponseDto })
-  async updateEmailChannelDraft(
+  async deactivateEmailChannel(
     @Req() req: express.Request,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
-    @Body() updateDto: UpdateEmailChannelDraftDto,
   ): Promise<EventResponseDto> {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.eventsService.updateEmailChannelDraft(tenant.id, eventId, updateDto, user)
-  }
-
-  /**
-   * Immediately toggle an event's EMAIL channel on/off (the "Channel active" switch), separate
-   * from the rest of the Email Notification tab's settings.
-   */
-  @Version('1')
-  @Post(':eventId/channels/email/active')
-  @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
-  @ApiOperation({ summary: "Toggle an event's email channel active state" })
-  @ApiOkResponse({ type: EventResponseDto })
-  async updateEmailChannelActive(
-    @Req() req: express.Request,
-    @Param('eventId', new ParseUUIDPipe()) eventId: string,
-    @Body() updateDto: UpdateEmailChannelActiveDto,
-  ): Promise<EventResponseDto> {
-    const tenant = this.getTenant(req)
-    const user = JwtUserExtractor.extractUser(req)
-    return this.eventsService.updateEmailChannelActive(tenant.id, eventId, updateDto, user)
+    return this.eventsService.deactivateEmailChannel(tenant.id, eventId, user)
   }
 
   /**
@@ -259,47 +232,24 @@ export class EventsFrontendController {
   }
 
   /**
-   * Save an event's SMS channel settings as a draft (Save draft on the SMS Notification tab)
-   *
-   * Bypasses the null/empty validation of updateSmsChannelSetting so a partially filled-in
-   * form can be saved. `active` is always honored directly - the channel can be saved as
-   * active ahead of the data being complete, since chk_event_channel_setting_active_complete
-   * exempts draft rows.
+   * Immediately switch an event's SMS channel off (the "Channel active" switch turned off),
+   * separate from the rest of the SMS Notification tab's settings. Activating goes through
+   * updateSmsChannelSetting, which supplies the settings activation depends on, so this
+   * takes no body.
    */
   @Version('1')
-  @Post(':eventId/channels/sms/draft')
+  @Post(':eventId/channels/sms/deactivate')
   @HttpCode(200)
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
-  @ApiOperation({ summary: "Save an event's SMS channel settings as a draft" })
+  @ApiOperation({ summary: "Switch an event's SMS channel off" })
   @ApiOkResponse({ type: EventResponseDto })
-  async updateSmsChannelDraft(
+  async deactivateSmsChannel(
     @Req() req: express.Request,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
-    @Body() updateDto: UpdateSmsChannelDraftDto,
   ): Promise<EventResponseDto> {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.eventsService.updateSmsChannelDraft(tenant.id, eventId, updateDto, user)
-  }
-
-  /**
-   * Immediately toggle an event's SMS channel on/off (the "Channel active" switch), separate
-   * from the rest of the SMS Notification tab's settings.
-   */
-  @Version('1')
-  @Post(':eventId/channels/sms/active')
-  @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
-  @ApiOperation({ summary: "Toggle an event's SMS channel active state" })
-  @ApiOkResponse({ type: EventResponseDto })
-  async updateSmsChannelActive(
-    @Req() req: express.Request,
-    @Param('eventId', new ParseUUIDPipe()) eventId: string,
-    @Body() updateDto: UpdateSmsChannelActiveDto,
-  ): Promise<EventResponseDto> {
-    const tenant = this.getTenant(req)
-    const user = JwtUserExtractor.extractUser(req)
-    return this.eventsService.updateSmsChannelActive(tenant.id, eventId, updateDto, user)
+    return this.eventsService.deactivateSmsChannel(tenant.id, eventId, user)
   }
 
   private getTenant(req: Request | express.Request): Tenant {

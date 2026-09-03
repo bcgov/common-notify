@@ -11,14 +11,7 @@ export class EventEmailSettingsDto {
   active: boolean
 
   /**
-   * True while this channel's settings have unapplied "Save draft" edits - cleared when
-   * Apply settings succeeds.
-   * @example false
-   */
-  isDraft: boolean
-
-  /**
-   * From address for email sends. Null while the tab is still a draft.
+   * From address for email sends. Null until the tab has a sender email saved.
    * @example "no-reply@gov.bc.ca"
    */
   senderEmail: string | null
@@ -95,15 +88,13 @@ export class EventResponseDto {
 
   /**
    * Channels switched on for the event, from its channel settings.
-   * Excludes channels that are switched off. Includes channels with unapplied "Save draft"
-   * edits - use `status` to tell whether a channel is actually applied.
+   * Excludes channels that are switched off.
    * @example ["EMAIL", "SMS"]
    */
   channelCodes: string[]
 
   /**
-   * ACTIVE once a channel is switched on and applied, DRAFT until then - including when a
-   * switched-on channel has unapplied "Save draft" edits pending
+   * ACTIVE once any channel is switched on, DRAFT until then
    * @example "DRAFT"
    */
   status: EventStatus

@@ -1,20 +1,28 @@
-import { IsArray, IsOptional, IsUUID, ValidateIf } from 'class-validator'
+import { IsArray, IsBoolean, IsOptional, IsUUID, ValidateIf } from 'class-validator'
 import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
 import { HasUniqueNormalizedPhoneNumbers } from '../../notify/schemas/validators/unique-normalized-phone-numbers.validator'
 
 /**
  * DTO for updating an event's SMS channel settings (SMS Notification tab)
  *
- * The tab owns every field it submits (other than `active`, which is toggled immediately and
- * separately via UpdateSmsChannelActiveDto), so this replaces the stored settings rather than
- * patching individual ones. `templateId` is required, explicitly nullable so a half-filled draft
- * can be saved. `to` is an optional list of recipient phone numbers, normalized and stored as a
- * comma-separated string. There is no cc/bcc for SMS.
+ * The tab owns every field it submits, so this replaces the stored settings rather than patching
+ * individual ones. `templateId` is required, explicitly nullable so an inactive channel can be
+ * saved half-filled. `to` is an optional list of recipient phone numbers, normalized and stored
+ * as a comma-separated string. There is no cc/bcc for SMS.
  *
- * If the channel is currently active, the submitted fields must be complete (template, at least
- * one "to" recipient, and a sender number), matching chk_event_channel_setting_active_complete.
+ * `active` is included here because this is the only path that switches the channel on - the
+ * tab's toggle is local until the settings are applied. When it is true the submitted fields
+ * must be complete (template, at least one "to" recipient, and a sender number), matching
+ * chk_event_channel_setting_active_complete.
  */
 export class UpdateSmsChannelSettingDto {
+  /**
+   * Whether the event should send on the SMS channel once these settings are saved.
+   * @example true
+   */
+  @IsBoolean()
+  active: boolean
+
   /**
    * Template used to render this channel. Required before the channel can be activated,
    * matching chk_event_channel_setting_active_complete.
