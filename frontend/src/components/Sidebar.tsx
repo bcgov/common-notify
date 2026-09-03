@@ -38,7 +38,7 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
-    label: 'Events',
+    label: 'Notification Events',
     to: '/events',
     icon: <WorkspacesOutlinedIcon />,
   },
@@ -134,7 +134,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
-            (item.label === 'Events' && hasTenantRole && eventsEnabled) ||
+            (item.label === 'Notification Events' && hasTenantRole && eventsEnabled) ||
             (item.label === 'Templates' && hasTenantRole) ||
             (item.label === 'Bulk Notifications' && hasTenantRole && bulkNotificationsEnabled) ||
             (item.label === 'Usage & Limits' && showUsage) ||
