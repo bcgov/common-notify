@@ -44,7 +44,8 @@
 
   .bcds-react-aria-TextField--Label,
   .bcds-react-aria-TextArea--Label,
-  .bcds-react-aria-Select--Label {
+  .bcds-react-aria-Select--Label,
+  .bcds-react-aria-CheckboxGroup--label {
     font-weight: 700;
   }
 }
@@ -112,6 +113,7 @@
 
 .events__template-preview-label {
   font: var(--typography-regular-small-body);
+  font-weight: 700;
   color: var(--typography-color-primary);
 }
 
