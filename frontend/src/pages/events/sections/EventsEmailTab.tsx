@@ -32,6 +32,7 @@ const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 // Custom headers are not implemented yet; the choice is not persisted.
 const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
 const HEADER_CUSTOM_ID = 'custom'
+const NO_LOGO_ID = 'no-logo'
 
 // Subscription service and CSTAR group recipients are not implemented yet.
 const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
@@ -166,10 +167,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
-  const logoItems = approvedLogos.map((logo) => ({
-    id: logo.id,
-    label: logo.name ?? 'Unnamed logo',
-  }))
+  const logoItems = [
+    { id: NO_LOGO_ID, label: 'No logo' },
+    ...approvedLogos.map((logo) => ({
+      id: logo.id,
+      label: logo.name ?? 'Unnamed logo',
+    })),
+  ]
   // A custom header previews its own logo and title; the tenant default previews the tenant's
   // configured logo on its own.
   const previewLogoId = headerMode === HEADER_CUSTOM_ID ? headerLogoId : tenantEmailLogoId
