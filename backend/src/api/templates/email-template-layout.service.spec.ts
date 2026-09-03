@@ -1,6 +1,7 @@
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
+import { EmailLogoStorageService } from '../email-logo/email-logo-storage.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
 import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
@@ -10,9 +11,17 @@ describe('EmailTemplateLayoutService', () => {
     findByTenantId: vi.fn(),
   } as unknown as TenantSettingsService
   const emailLogoService = {
-    buildPublicImageUrl: vi.fn(),
+    findByIdIfApproved: vi.fn(),
   } as unknown as EmailLogoService
-  const service = new EmailTemplateLayoutService(tenantSettingsService, emailLogoService)
+  const emailLogoStorage = {
+    head: vi.fn(),
+    download: vi.fn(),
+  } as unknown as EmailLogoStorageService
+  const service = new EmailTemplateLayoutService(
+    tenantSettingsService,
+    emailLogoService,
+    emailLogoStorage,
+  )
 
   const template = {
     id: 'template-id',
@@ -28,9 +37,13 @@ describe('EmailTemplateLayoutService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(emailLogoService.buildPublicImageUrl).mockReturnValue(
-      'https://gateway.example.test/logos/logo-id/image',
-    )
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      name: 'Primary logo',
+      fileKey: 'logos/logo.png',
+    } as any)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({ contentType: 'image/png' })
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('png'))
   })
 
   it('leaves output unchanged when the tenant has no selected logo', async () => {
@@ -39,7 +52,7 @@ describe('EmailTemplateLayoutService', () => {
     } as any)
 
     await expect(service.apply(template, rendered)).resolves.toBe(rendered)
-    expect(emailLogoService.buildPublicImageUrl).not.toHaveBeenCalled()
+    expect(emailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
   })
 
   it.each([TemplateEngine.HANDLEBARS, TemplateEngine.MUSTACHE, TemplateEngine.LEGACY_GC_NOTIFY])(
@@ -54,12 +67,24 @@ describe('EmailTemplateLayoutService', () => {
       expect(result).toEqual({
         subject: rendered.subject,
         body:
-          '<img src="https://gateway.example.test/logos/logo-id/image" alt="">\n' +
+          '<img src="cid:email-logo-logo-id" alt="Primary logo">\n' +
           '<p>Hello <strong>Ada</strong></p>\n',
         bodyType: 'html',
+        attachments: [
+          {
+            filename: 'logo.png',
+            content: Buffer.from('png'),
+            contentType: 'image/png',
+            sendingMethod: 'attach',
+            contentId: 'email-logo-logo-id',
+            disposition: 'inline',
+          },
+        ],
       })
       expect(tenantSettingsService.findByTenantId).toHaveBeenCalledWith('tenant-id')
-      expect(emailLogoService.buildPublicImageUrl).toHaveBeenCalledWith('logo-id')
+      expect(emailLogoService.findByIdIfApproved).toHaveBeenCalledWith('logo-id')
+      expect(emailLogoStorage.head).toHaveBeenCalledWith('logos/logo.png')
+      expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/logo.png')
     },
   )
 
@@ -77,6 +102,6 @@ describe('EmailTemplateLayoutService', () => {
       service.apply({ ...template, engineCode: TemplateEngine.MJML } as Template, mjmlOutput),
     ).resolves.toBe(mjmlOutput)
     expect(tenantSettingsService.findByTenantId).not.toHaveBeenCalled()
-    expect(emailLogoService.buildPublicImageUrl).not.toHaveBeenCalled()
+    expect(emailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
   })
 })

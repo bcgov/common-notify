@@ -3,6 +3,7 @@ import MarkdownIt from 'markdown-it'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
+import { EmailLogoStorageService } from '../email-logo/email-logo-storage.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
 
@@ -10,6 +11,14 @@ export interface RenderedEmailContent {
   subject?: string
   body: string
   bodyType: 'text' | 'markdown' | 'html'
+  attachments?: Array<{
+    filename: string
+    content: Buffer
+    contentType: string
+    sendingMethod: 'attach'
+    contentId?: string
+    disposition?: 'inline'
+  }>
 }
 
 const LAYOUT_SUPPORTED_ENGINES = new Set<TemplateEngine>([
@@ -29,6 +38,7 @@ export class EmailTemplateLayoutService {
   constructor(
     private readonly tenantSettingsService: TenantSettingsService,
     private readonly emailLogoService: EmailLogoService,
+    private readonly emailLogoStorage: EmailLogoStorageService,
   ) {}
 
   async apply(template: Template, rendered: RenderedEmailContent): Promise<RenderedEmailContent> {
@@ -51,13 +61,35 @@ export class EmailTemplateLayoutService {
       return rendered
     }
 
-    const imageUrl = this.emailLogoService.buildPublicImageUrl(tenantSettings.emailLogoId)
+    const logo = await this.emailLogoService.findByIdIfApproved(tenantSettings.emailLogoId)
+    if (!logo?.fileKey) {
+      throw new Error(`Selected email logo '${tenantSettings.emailLogoId}' is unavailable`)
+    }
+
+    const metadata = await this.emailLogoStorage.head(logo.fileKey)
+    if (!metadata) {
+      throw new Error(`Selected email logo object '${logo.fileKey}' is unavailable`)
+    }
+
+    const content = await this.emailLogoStorage.download(logo.fileKey)
+    const contentId = `email-logo-${logo.id}`
     const htmlBody = this.toHtml(rendered.body, rendered.bodyType)
 
     return {
       ...rendered,
-      body: `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="">\n${htmlBody}`,
+      body: `<img src="cid:${contentId}" alt="${this.escapeHtmlAttribute(logo.name || 'Organization logo')}">\n${htmlBody}`,
       bodyType: 'html',
+      attachments: [
+        ...(rendered.attachments ?? []),
+        {
+          filename: logo.fileKey.split('/').pop() || `${logo.id}.img`,
+          content,
+          contentType: metadata.contentType || 'application/octet-stream',
+          sendingMethod: 'attach',
+          contentId,
+          disposition: 'inline',
+        },
+      ],
     }
   }
 

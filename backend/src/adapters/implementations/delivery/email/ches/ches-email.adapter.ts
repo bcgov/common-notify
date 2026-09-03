@@ -29,6 +29,8 @@ interface ChesEmailPayload {
     contentType: string
     encoding: 'base64'
     filename: string
+    contentId?: string
+    disposition?: 'inline' | 'attachment'
   }>
 }
 
@@ -311,6 +313,8 @@ export class ChesEmailTransport implements IEmailTransport {
         contentType: a.contentType || 'application/octet-stream',
         encoding: 'base64' as const,
         filename: a.filename,
+        ...(a.contentId && { contentId: a.contentId }),
+        ...(a.disposition && { disposition: a.disposition }),
       }))
   }
 }
