@@ -122,6 +122,8 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
 
       <div className="events__tabs">
         <ToggleButtonGroup
+          size="medium"
+          orientation="horizontal"
           selectionMode="single"
           selectedKeys={[selectedTab]}
           onSelectionChange={(keys) => {
@@ -132,9 +134,15 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
           }}
           disallowEmptySelection
         >
-          <ToggleButton id="settings">Event Settings</ToggleButton>
-          <ToggleButton id="email">Email Notification</ToggleButton>
-          <ToggleButton id="sms">SMS Notification</ToggleButton>
+          <ToggleButton id="settings" size="medium">
+            Event Settings
+          </ToggleButton>
+          <ToggleButton id="email" size="medium">
+            Email Notification
+          </ToggleButton>
+          <ToggleButton id="sms" size="medium">
+            SMS Notification
+          </ToggleButton>
         </ToggleButtonGroup>
       </div>
 
