@@ -85,7 +85,6 @@ CREATE TABLE
     event_id UUID NOT NULL,
     channel_code VARCHAR(20) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT FALSE,
-    is_draft BOOLEAN NOT NULL DEFAULT FALSE,
     template_id UUID,
     sender_email VARCHAR(320),
     from_phone_number_id UUID,
@@ -137,13 +136,12 @@ CREATE TABLE
       bcc IS NULL
       OR btrim(bcc) <> ''
     ),
-    -- A channel cannot be switched on until it is fully configured, except while it's still a
-    -- draft (is_draft = true) - Save draft lets the active toggle be saved ahead of the data
-    -- being complete; Apply settings still requires completeness, since it always clears
-    -- is_draft when turning the channel on.
+    -- A channel cannot be switched on until it is fully configured. The UI's active toggle is
+    -- local until "Save" is used, so the only path that sets active = TRUE is the
+    -- one that writes a complete set of settings alongside it. Turning a channel off is
+    -- unaffected, since active = FALSE always satisfies this.
     CONSTRAINT chk_event_channel_setting_active_complete CHECK (
       active = FALSE
-      OR is_draft = TRUE
       OR (
         template_id IS NOT NULL
         AND "to" IS NOT NULL
@@ -191,9 +189,7 @@ COMMENT ON COLUMN notify.event_channel_setting.event_id IS 'Event these settings
 
 COMMENT ON COLUMN notify.event_channel_setting.channel_code IS 'Channel these settings configure (EMAIL or SMS).';
 
-COMMENT ON COLUMN notify.event_channel_setting.active IS 'Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template and the channel sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated.';
-
-COMMENT ON COLUMN notify.event_channel_setting.is_draft IS 'Set when the channel was last saved via "Save draft" rather than "Apply settings". Cleared back to false only when the channel is applied while active; left untouched when the channel is merely deactivated, so a re-activation still surfaces the pending draft.';
+COMMENT ON COLUMN notify.event_channel_setting.active IS 'Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template, recipients and the channel sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated, so it is only ever turned on by the same save that writes those settings.';
 
 COMMENT ON COLUMN notify.event_channel_setting.template_id IS 'Template used to render this channel. Must be an active template belonging to the same tenant as the event and matching channel_code; enforced by the application. Templates are authored separately by CSTAR template admins - the event only selects an existing one.';
 
