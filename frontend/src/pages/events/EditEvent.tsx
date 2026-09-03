@@ -20,7 +20,7 @@ import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchSettings } from '@/redux/thunks/settings.thunks'
+import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
 
 type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
@@ -33,14 +33,18 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
   const { canEdit } = useCstarRoles()
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
+  const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
+  const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
+  const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
   const [selectedTab, setSelectedTab] = useState<EventTab>('settings')
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Placeholder only, for the email tab's sender field. Failures are not surfaced here since
-  // the page's own load state doesn't depend on it.
+  // Placeholder only, for the email tab's sender field and custom header. Failures are not
+  // surfaced here since the page's own load state doesn't depend on either.
   useEffect(() => {
     dispatch(fetchSettings())
+    dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
 
   // The page owns the single event fetch, so the title, breadcrumb and every tab read
@@ -173,6 +177,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             isDisabled={!canEdit}
             isConfigured={event.emailSettings !== null}
             defaultSenderEmail={defaultSenderEmail}
+            approvedLogos={approvedLogos}
+            tenantEmailLogoId={tenantEmailLogoId}
+            tenantName={tenantName}
           />
         ) : selectedTab === 'sms' ? (
           // The SMS channel starts disabled until the tab has been saved with it switched on.

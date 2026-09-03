@@ -45,7 +45,8 @@
   .bcds-react-aria-TextField--Label,
   .bcds-react-aria-TextArea--Label,
   .bcds-react-aria-Select--Label,
-  .bcds-react-aria-CheckboxGroup--label {
+  .bcds-react-aria-CheckboxGroup--label,
+  .bcds-react-aria-RadioGroup--label {
     font-weight: 700;
   }
 }
@@ -83,6 +84,14 @@
     background: transparent;
     box-shadow: none;
   }
+}
+
+// Channel activation switch with its own label above it.
+.events__switch-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 // Additional recipients section
@@ -160,6 +169,41 @@
   .bcds-react-aria-TextArea[data-readonly] .bcds-react-aria-TextArea--Input {
     background: var(--surface-color-forms-default, #fff);
   }
+}
+
+// Live preview of the email header: the tenant's logo on its own, or the custom logo,
+// a divider and the header title.
+.events__header-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-padding-xsmall);
+}
+
+.events__header-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid $border-default;
+}
+
+.events__header-preview-logo {
+  height: 48px;
+  max-width: 180px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.events__header-preview-title {
+  font-size: $font-size-xl;
+  color: $dark-text;
+}
+
+// The divider only belongs between the two halves, so it hangs off the title and only
+// when a logo actually precedes it.
+.events__header-preview-logo + .events__header-preview-title {
+  padding-left: 16px;
+  border-left: 1px solid $border-default;
 }
 
 .events__section-heading {

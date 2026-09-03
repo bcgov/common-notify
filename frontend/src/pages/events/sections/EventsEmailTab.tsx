@@ -6,6 +6,8 @@ import {
   Checkbox,
   CheckboxGroup,
   Modal,
+  Radio,
+  RadioGroup,
   Select,
   Switch,
   TextField,
@@ -18,6 +20,7 @@ import type { RecipientAddresses } from '../components/EventsAdditionalRecipient
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
@@ -26,8 +29,9 @@ const SENDER_EMAIL_TOOLTIP =
 // suffix shown on the Settings > Email tab.
 const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
-// Header, footer and attachment service are not implemented yet.
-const NOT_IMPLEMENTED_ITEMS = [{ id: 'not-implemented', label: 'Not implemented' }]
+// Custom headers are not implemented yet; the choice is not persisted.
+const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
+const HEADER_CUSTOM_ID = 'custom'
 
 // Subscription service and CSTAR group recipients are not implemented yet.
 const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
@@ -66,6 +70,12 @@ type EventsEmailTabProps = {
   isConfigured: boolean
   /** Tenant's default_sender_email (local part only), used to seed the field when unset. */
   defaultSenderEmail?: string | null
+  /** Approved logos available for the custom header. */
+  approvedLogos?: ApprovedEmailLogo[]
+  /** Tenant's configured email logo, used as the starting selection for a custom header. */
+  tenantEmailLogoId?: string | null
+  /** Selected tenant's name, used as the default header title. */
+  tenantName?: string | null
 }
 
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
@@ -75,6 +85,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   isDisabled = false,
   isConfigured,
   defaultSenderEmail,
+  approvedLogos = [],
+  tenantEmailLogoId,
+  tenantName,
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
@@ -100,6 +113,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
+  // Header state is local only - none of it is persisted yet, so it stays out of the save payload
+  // and out of settingsChanged.
+  const [headerMode, setHeaderMode] = useState(HEADER_TENANT_DEFAULT_ID)
+  const [headerLogoId, setHeaderLogoId] = useState<string | undefined>(
+    tenantEmailLogoId ?? undefined,
+  )
+  const [headerTitle, setHeaderTitle] = useState(tenantName ?? '')
   const [validationAttempted, setValidationAttempted] = useState(false)
   // Save button is only active if changes have been made
   const [settingsChanged, setSettingsChanged] = useState(false)
@@ -129,8 +149,32 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     }
   }, [defaultSenderEmail, senderEmail, values.senderEmail])
 
+  // Tenant settings can also land after mount; seed the header defaults from them the same way,
+  // while both fields are still untouched.
+  useEffect(() => {
+    if (!headerLogoId && tenantEmailLogoId) {
+      setHeaderLogoId(tenantEmailLogoId)
+    }
+  }, [headerLogoId, tenantEmailLogoId])
+
+  useEffect(() => {
+    if (!headerTitle && tenantName) {
+      setHeaderTitle(tenantName)
+    }
+  }, [headerTitle, tenantName])
+
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
+
+  const logoItems = approvedLogos.map((logo) => ({
+    id: logo.id,
+    label: logo.name ?? 'Unnamed logo',
+  }))
+  // A custom header previews its own logo and title; the tenant default previews the tenant's
+  // configured logo on its own.
+  const previewLogoId = headerMode === HEADER_CUSTOM_ID ? headerLogoId : tenantEmailLogoId
+  const previewLogo = approvedLogos.find((logo) => logo.id === previewLogoId)
+  const previewTitle = headerMode === HEADER_CUSTOM_ID ? headerTitle : ''
 
   const trimmedSenderEmail = senderEmail.trim()
   const senderEmailError =
@@ -233,16 +277,18 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
   return (
     <form className="events__form" onSubmit={handleSubmit}>
-      <h2 className="events__section-heading">Email Notification Settings</h2>
-
-      <Switch
-        labelPosition="left"
-        isSelected={channelActive}
-        onChange={handleSwitchChange}
-        isDisabled={isFormDisabled}
-      >
-        Channel active
-      </Switch>
+      <div className="events__switch-field">
+        <span className="events__field-label">Activate channel</span>
+        <Switch
+          labelPosition="right"
+          aria-label="Activate channel"
+          isSelected={channelActive}
+          onChange={handleSwitchChange}
+          isDisabled={isFormDisabled}
+        >
+          {channelActive ? 'On' : 'Off'}
+        </Switch>
+      </div>
 
       <Modal
         isOpen={confirmDeactivateOpen}
@@ -385,26 +431,62 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             </div>
           )}
 
-          <Select
-            label="Header"
-            placeholder="Use tenant default"
-            items={NOT_IMPLEMENTED_ITEMS}
-            size="small"
-            isDisabled
-          />
+          <RadioGroup
+            label="Email notification header"
+            value={headerMode}
+            onChange={setHeaderMode}
+            isDisabled={areFieldsDisabled}
+          >
+            <Radio value={HEADER_TENANT_DEFAULT_ID}>Use tenant default</Radio>
+            <Radio value={HEADER_CUSTOM_ID}>Custom</Radio>
+          </RadioGroup>
 
-          <Select
-            label="Footer"
-            placeholder="Use tenant default"
-            items={NOT_IMPLEMENTED_ITEMS}
-            size="small"
-            isDisabled
-          />
+          {headerMode === HEADER_CUSTOM_ID && (
+            <>
+              <Select
+                label="Email logo/brand"
+                placeholder="Select a logo..."
+                items={logoItems}
+                value={headerLogoId}
+                onChange={(key) => setHeaderLogoId(key == null ? undefined : String(key))}
+                size="small"
+                isDisabled={areFieldsDisabled}
+              />
+
+              <TextField
+                label="Header title"
+                value={headerTitle}
+                onChange={setHeaderTitle}
+                description="Defaults to your tenant name. Changes only affect the title displayed in email notifications and do not change your tenant name."
+                size="small"
+                isDisabled={areFieldsDisabled}
+              />
+            </>
+          )}
+
+          {(previewLogo || previewTitle) && (
+            <div className="events__header-preview">
+              <span className="events__field-label">Header Preview</span>
+              <div className="events__header-preview-row">
+                {previewLogo && (
+                  <img
+                    alt=""
+                    className="events__header-preview-logo"
+                    loading="lazy"
+                    src={previewLogo.imageUrl}
+                  />
+                )}
+                {previewTitle && (
+                  <span className="events__header-preview-title">{previewTitle}</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <Select
             label="Attachment service"
             placeholder="Select an attachment..."
-            items={NOT_IMPLEMENTED_ITEMS}
+            items={[{ id: 'not-implemented', label: 'Not implemented' }]}
             size="small"
             isDisabled
           />
