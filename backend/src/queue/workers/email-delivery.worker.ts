@@ -153,7 +153,6 @@ export class EmailDeliveryWorker {
         // Resolve template if the email content carries a templateId.
         // Do this BEFORE updating status to SENDING so that errors don't leave notification stuck in SENDING state
         const emailTemplateId = emailPayload.content?.templateId
-        let inlineAttachments: SendEmailOptions['attachments'] | undefined
 
         // Inline subject/body are only required when the content is NOT template-based; a template
         // supplies them during resolution below (and they're re-validated after rendering).
@@ -191,7 +190,6 @@ export class EmailDeliveryWorker {
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
               const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
-              inlineAttachments = rendered.attachments
 
               emailPayload = {
                 ...emailPayload,
@@ -284,13 +282,6 @@ export class EmailDeliveryWorker {
           emailPayload = {
             ...emailPayload,
             attachments: resolvedAttachments as SendEmailOptions['attachments'],
-          } as ResolvedEmailDeliveryPayload
-        }
-
-        if (inlineAttachments?.length) {
-          emailPayload = {
-            ...emailPayload,
-            attachments: [...(emailPayload.attachments ?? []), ...inlineAttachments],
           } as ResolvedEmailDeliveryPayload
         }
 
@@ -505,7 +496,6 @@ export class EmailDeliveryWorker {
         let subject: string | undefined
         let body: string
         let bodyType: 'text' | 'markdown' | 'html' | undefined
-        let inlineAttachments: SendEmailOptions['attachments'] | undefined
         if (template) {
           const renderedTemplate = await templatesService.renderTemplateContent(
             template,
@@ -515,7 +505,6 @@ export class EmailDeliveryWorker {
           subject = rendered.subject
           body = rendered.body
           bodyType = rendered.bodyType
-          inlineAttachments = rendered.attachments
         } else {
           const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
           subject = rendered.subject
@@ -526,7 +515,6 @@ export class EmailDeliveryWorker {
         const emailPayload = {
           recipients: { to: [recipient.address] },
           content: { subject, body, bodyType },
-          ...(inlineAttachments?.length && { attachments: inlineAttachments }),
         }
 
         const result = await EmailDeliveryWorker.sendEmail(

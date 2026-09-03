@@ -14,8 +14,6 @@ export interface SendEmailOptions {
     content: Buffer | string
     contentType?: string
     sendingMethod: 'attach' | 'link'
-    contentId?: string
-    disposition?: 'inline' | 'attachment'
   }>
 }
 
