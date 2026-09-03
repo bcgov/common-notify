@@ -808,29 +808,13 @@ routes:
     request_buffering: true
     response_buffering: true
 
-  # /api/v1/frontend/events/:eventId/channels/email/draft (frontend variant - save email tab as draft)
-  # Declared explicitly, same convention as events-frontend-email-channel.
-  - name: ${ROUTE_PREFIX}events-frontend-email-channel-draft
+  # /api/v1/frontend/events/:eventId/channels/email/deactivate (frontend variant - switch email channel off)
+  - name: ${ROUTE_PREFIX}events-frontend-email-channel-deactivate
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/email/draft
-    methods:
-      - POST
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/events/:eventId/channels/email/active (frontend variant - toggle email channel active)
-  - name: ${ROUTE_PREFIX}events-frontend-email-channel-active
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/email/active
+      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/email/deactivate
     methods:
       - POST
     strip_path: true
@@ -854,28 +838,13 @@ routes:
     request_buffering: true
     response_buffering: true
 
-  # /api/v1/frontend/events/:eventId/channels/sms/draft (frontend variant - save sms tab as draft)
-  - name: ${ROUTE_PREFIX}events-frontend-sms-channel-draft
+  # /api/v1/frontend/events/:eventId/channels/sms/deactivate (frontend variant - switch sms channel off)
+  - name: ${ROUTE_PREFIX}events-frontend-sms-channel-deactivate
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
-      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/sms/draft
-    methods:
-      - POST
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
-  # /api/v1/frontend/events/:eventId/channels/sms/active (frontend variant - toggle sms channel active)
-  - name: ${ROUTE_PREFIX}events-frontend-sms-channel-active
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/sms/active
+      - ~${PATH_PREFIX}/api/v1/frontend/events/[^/]+/channels/sms/deactivate
     methods:
       - POST
     strip_path: true
@@ -1640,18 +1609,11 @@ plugins:
     route: ${ROUTE_PREFIX}events-frontend-email-channel
     config: *jwtConfig
 
-  # Events Frontend - Email Channel Draft
+  # Events Frontend - Email Channel Deactivate
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}events-frontend-email-channel-draft
-    config: *jwtConfig
-
-  # Events Frontend - Email Channel Active
-  - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}events-frontend-email-channel-active
+    route: ${ROUTE_PREFIX}events-frontend-email-channel-deactivate
     config: *jwtConfig
 
   # Events Frontend - SMS Channel Settings
@@ -1661,18 +1623,11 @@ plugins:
     route: ${ROUTE_PREFIX}events-frontend-sms-channel
     config: *jwtConfig
 
-  # Events Frontend - SMS Channel Draft
+  # Events Frontend - SMS Channel Deactivate
   - name: jwt-keycloak
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
-    route: ${ROUTE_PREFIX}events-frontend-sms-channel-draft
-    config: *jwtConfig
-
-  # Events Frontend - SMS Channel Active
-  - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}events-frontend-sms-channel-active
+    route: ${ROUTE_PREFIX}events-frontend-sms-channel-deactivate
     config: *jwtConfig
 
   # API Key Usage Frontend - Frontend Token
