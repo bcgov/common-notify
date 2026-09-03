@@ -36,8 +36,6 @@ const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
 
 export type EmailSettingsValues = {
   active: boolean
-  /** True while this channel has unapplied "Save draft" edits - lets Apply settings run even without further changes, since applying clears it. */
-  isDraft: boolean
   senderEmail: string
   templateId: string | null
   to: string[]
@@ -45,18 +43,10 @@ export type EmailSettingsValues = {
   bcc: string[]
 }
 
-// The Apply/Save draft payloads exclude `active` - the "Channel active" toggle saves itself
-// immediately via onActiveChange, separate from the rest of the tab's settings - and `isDraft`,
-// which the backend derives rather than accepts.
-export type EmailApplyValues = Omit<EmailSettingsValues, 'active' | 'isDraft'>
-
-export type EmailDraftValues = {
-  senderEmail: string | null
-  templateId: string | null
-  to: string[]
-  cc: string[]
-  bcc: string[]
-}
+// The Apply payload carries `active` - switching the channel on is only persisted here, since
+// the backend requires a complete set of settings alongside it. Turning it off is the one thing
+// that saves on its own, via onDeactivate.
+export type EmailApplyValues = EmailSettingsValues
 
 const EMAIL_PATTERN =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
@@ -67,12 +57,10 @@ function isValidEmail(value: string): boolean {
 
 type EventsEmailTabProps = {
   values: EmailSettingsValues
-  /** Saves the email channel settings. */
+  /** Saves the email channel settings, including whether the channel is switched on. */
   onSave: (values: EmailApplyValues) => Promise<void>
-  /** Saves the current form state as a draft, null values accepted, bad values not accepted. */
-  onSaveDraft: (values: EmailDraftValues) => Promise<void>
-  /** Immediately persists the "Channel active" toggle, ahead of the rest of the tab's settings. */
-  onActiveChange: (active: boolean) => Promise<void>
+  /** Immediately persists switching the channel off, ahead of the rest of the tab's settings. */
+  onDeactivate: () => Promise<void>
   isDisabled?: boolean
   /** False until this channel has been saved for the first time (event.emailSettings is still null). */
   isConfigured: boolean
@@ -83,8 +71,7 @@ type EventsEmailTabProps = {
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
   values,
   onSave,
-  onSaveDraft,
-  onActiveChange,
+  onDeactivate,
   isDisabled = false,
   isConfigured,
   defaultSenderEmail,
@@ -107,17 +94,14 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
   )
   const [saving, setSaving] = useState(false)
-  const [savingDraft, setSavingDraft] = useState(false)
-  const [togglingActive, setTogglingActive] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
-  // Validation errors only surface after a Save draft / Apply settings attempt, not on every keystroke.
   const [validationAttempted, setValidationAttempted] = useState(false)
-  // Flipped on by any edit below and only cleared by a successful save - editing a field back to
-  // its saved value still counts as a change.
+  // Save button is only active if changes have been made
   const [settingsChanged, setSettingsChanged] = useState(false)
 
   // Failures are not surfaced since the form is still usable without the template list loaded.
@@ -163,13 +147,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     invalidRecipients.cc.length > 0 ||
     invalidRecipients.bcc.length > 0
   const hasValidationError = Boolean(senderEmailError) || recipientsHaveError
-  // Only blocks Apply settings - a draft is allowed to have no recipients picked yet.
   const recipientSelectionError =
     selectedRecipients.length === 0 ? 'Select at least one recipient.' : ''
   // Recipients validate live; the sender email error only surfaces once a save attempt has run it.
   const displayedSenderEmailError = validationAttempted ? senderEmailError : ''
   const displayedRecipientSelectionError = validationAttempted ? recipientSelectionError : ''
-  const isFormDisabled = isDisabled || saving || savingDraft || togglingActive
+  const isFormDisabled = isDisabled || saving || deactivating
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
@@ -177,37 +160,18 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // hidden entirely until it's switched on for the first time. Once settings exist, deactivating
   // goes back to showing them disabled rather than hiding them again.
   const showFields = isConfigured || channelActive
-  // A draft channel's settings haven't been applied yet, so Apply settings stays enabled even
-  // without further edits - clicking it (once valid) both applies the current values and clears
-  // isDraft.
-  const isApplyDisabled =
-    isFormDisabled || (!settingsChanged && !values.isDraft) || recipientsHaveError
+  // Switching the channel on is only a local change until it's saved, so it counts as a
+  // pending edit in its own right - otherwise Save would stay disabled on a freshly
+  // activated channel that hasn't had any other field touched yet.
+  const activeChanged = channelActive !== values.active
+  const isSaveDisabled =
+    isFormDisabled || (!settingsChanged && !activeChanged) || recipientsHaveError
 
-  async function handleActiveChange(next: boolean) {
-    const previous = channelActive
-    setChannelActive(next)
-    setTogglingActive(true)
-    try {
-      await onActiveChange(next)
-      showSuccessToast(
-        next
-          ? 'Email channel reactivated: This channel is now active and can send notifications. Your settings have been restored, and you can make changes at any time.'
-          : 'Email channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
-      )
-    } catch (error) {
-      setChannelActive(previous)
-      showErrorToast(
-        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setTogglingActive(false)
-    }
-  }
-
-  // Turning the channel on saves immediately; turning it off asks for confirmation first.
+  // Turning the channel on only unlocks the fields - it isn't persisted until the settings it
+  // depends on are applied. Turning it off takes effect immediately, so it asks first.
   function handleSwitchChange(next: boolean) {
     if (next) {
-      void handleActiveChange(true)
+      setChannelActive(true)
     } else {
       setConfirmDeactivateOpen(true)
     }
@@ -215,17 +179,32 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
   async function handleConfirmDeactivate() {
     setConfirmDeactivateOpen(false)
-    await handleActiveChange(false)
+    setChannelActive(false)
+    setDeactivating(true)
+    try {
+      await onDeactivate()
+      showSuccessToast(
+        'Email channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
+      )
+    } catch (error) {
+      setChannelActive(true)
+      showErrorToast(
+        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+      )
+    } finally {
+      setDeactivating(false)
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (isApplyDisabled) {
+    if (isSaveDisabled) {
       return
     }
 
-    if (hasValidationError || recipientSelectionError) {
+    // Only an active channel has to be complete, matching what the backend enforces.
+    if (hasValidationError || (channelActive && recipientSelectionError)) {
       setValidationAttempted(true)
       return
     }
@@ -233,6 +212,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     setSaving(true)
     try {
       await onSave({
+        active: channelActive,
         senderEmail: trimmedSenderEmail,
         templateId: selectedTemplateId ?? null,
         to: recipients.to,
@@ -241,40 +221,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       })
       setValidationAttempted(false)
       setSettingsChanged(false)
-      showSuccessToast('Settings applied: Your email notification settings have been saved.')
+      showSuccessToast('Settings saved: Your email notification settings have been saved.')
     } catch (error) {
       showErrorToast(
-        `Unable to apply settings: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+        `Unable to save settings: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
       )
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSaveDraft() {
-    if (hasValidationError) {
-      setValidationAttempted(true)
-      return
-    }
-
-    setSavingDraft(true)
-    try {
-      await onSaveDraft({
-        senderEmail: trimmedSenderEmail || null,
-        templateId: selectedTemplateId ?? null,
-        to: recipients.to,
-        cc: recipients.cc,
-        bcc: recipients.bcc,
-      })
-      setValidationAttempted(false)
-      setSettingsChanged(false)
-      showSuccessToast('Draft saved: Your changes have been saved. Continue editing anytime.')
-    } catch (error) {
-      showErrorToast(
-        `Unable to save draft: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setSavingDraft(false)
     }
   }
 
@@ -293,7 +246,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
       <Modal
         isOpen={confirmDeactivateOpen}
-        isDismissable={!togglingActive}
+        isDismissable={!deactivating}
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
         }}
@@ -310,7 +263,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               <Button
                 variant="tertiary"
                 onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={togglingActive}
+                isDisabled={deactivating}
               >
                 Cancel
               </Button>
@@ -318,7 +271,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
                 variant="secondary"
                 danger
                 onPress={handleConfirmDeactivate}
-                isDisabled={togglingActive}
+                isDisabled={deactivating}
               >
                 Deactivate
               </Button>
@@ -377,7 +330,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             isDisabled={areFieldsDisabled}
             isRequired
             // Native validation flags an empty group as soon as it is touched; drive the error
-            // from validationAttempted instead so it only appears after Apply settings.
+            // from validationAttempted instead so it only appears after a save attempt.
             validationBehavior="aria"
             isInvalid={Boolean(displayedRecipientSelectionError)}
             errorMessage={displayedRecipientSelectionError}
@@ -460,16 +413,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             <Button variant="secondary" isDisabled>
               Preview
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              isDisabled={isFormDisabled || !settingsChanged || recipientsHaveError}
-              onPress={handleSaveDraft}
-            >
-              {savingDraft ? 'Saving…' : 'Save draft'}
-            </Button>
-            <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
-              {saving ? 'Saving…' : 'Apply settings'}
+            <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
         </>

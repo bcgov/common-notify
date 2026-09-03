@@ -32,14 +32,10 @@ export type SmsSettingsValues = {
   to: string[]
 }
 
-// The Apply/Save draft payloads exclude `active` - the "Channel active" toggle saves itself
-// immediately via onActiveChange, separate from the rest of the tab's settings.
-export type SmsApplyValues = Omit<SmsSettingsValues, 'active'>
-
-export type SmsDraftValues = {
-  templateId: string | null
-  to: string[]
-}
+// The Apply payload carries `active` - switching the channel on is only persisted here, since
+// the backend requires a complete set of settings alongside it. Turning it off is the one thing
+// that saves on its own, via onDeactivate.
+export type SmsApplyValues = SmsSettingsValues
 
 function sameAddresses(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((address, index) => address === b[index])
@@ -89,12 +85,10 @@ function duplicatePhoneNumbers(addresses: string[]): string[] {
 
 type EventsSmsTabProps = {
   values: SmsSettingsValues
-  /** Saves the SMS channel settings. */
+  /** Saves the SMS channel settings, including whether the channel is switched on. */
   onSave: (values: SmsApplyValues) => Promise<void>
-  /** Saves the current form state as a draft, null values accepted, bad values not accepted. */
-  onSaveDraft: (values: SmsDraftValues) => Promise<void>
-  /** Immediately persists the "Channel active" toggle, ahead of the rest of the tab's settings. */
-  onActiveChange: (active: boolean) => Promise<void>
+  /** Immediately persists switching the channel off, ahead of the rest of the tab's settings. */
+  onDeactivate: () => Promise<void>
   isDisabled?: boolean
   /** False until this channel has been saved for the first time (event.smsSettings is still null). */
   isConfigured: boolean
@@ -103,8 +97,7 @@ type EventsSmsTabProps = {
 const EventsSmsTab: FC<EventsSmsTabProps> = ({
   values,
   onSave,
-  onSaveDraft,
-  onActiveChange,
+  onDeactivate,
   isDisabled = false,
   isConfigured,
 }) => {
@@ -120,8 +113,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
     values.to.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
   )
   const [saving, setSaving] = useState(false)
-  const [savingDraft, setSavingDraft] = useState(false)
-  const [togglingActive, setTogglingActive] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
@@ -166,8 +158,14 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   }
   const hasValidationError = invalidRecipients.to.length > 0
   const recipientsChanged = !sameAddresses(recipients.to, values.to)
-  const settingsChanged = (selectedTemplateId ?? null) !== values.templateId || recipientsChanged
-  const isFormDisabled = isDisabled || saving || savingDraft || togglingActive
+  // Switching the channel on is only a local change until it's applied, so it counts as a
+  // pending edit in its own right - otherwise Save would stay disabled on a freshly
+  // activated channel that hasn't had any other field touched yet.
+  const settingsChanged =
+    (selectedTemplateId ?? null) !== values.templateId ||
+    recipientsChanged ||
+    channelActive !== values.active
+  const isFormDisabled = isDisabled || saving || deactivating
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
@@ -175,33 +173,13 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   // hidden entirely until it's switched on for the first time. Once settings exist, deactivating
   // goes back to showing them disabled rather than hiding them again.
   const showFields = isConfigured || channelActive
-  const isApplyDisabled = isFormDisabled || !settingsChanged || hasValidationError
+  const isSaveDisabled = isFormDisabled || !settingsChanged || hasValidationError
 
-  async function handleActiveChange(next: boolean) {
-    const previous = channelActive
-    setChannelActive(next)
-    setTogglingActive(true)
-    try {
-      await onActiveChange(next)
-      showSuccessToast(
-        next
-          ? 'SMS channel reactivated: This channel is now active and can send notifications. Your settings have been restored, and you can make changes at any time.'
-          : 'SMS channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
-      )
-    } catch (error) {
-      setChannelActive(previous)
-      showErrorToast(
-        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setTogglingActive(false)
-    }
-  }
-
-  // Turning the channel on saves immediately; turning it off asks for confirmation first.
+  // Turning the channel on only unlocks the fields - it isn't persisted until the settings it
+  // depends on are applied. Turning it off takes effect immediately, so it asks first.
   function handleSwitchChange(next: boolean) {
     if (next) {
-      void handleActiveChange(true)
+      setChannelActive(true)
     } else {
       setConfirmDeactivateOpen(true)
     }
@@ -209,50 +187,44 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
 
   async function handleConfirmDeactivate() {
     setConfirmDeactivateOpen(false)
-    await handleActiveChange(false)
+    setChannelActive(false)
+    setDeactivating(true)
+    try {
+      await onDeactivate()
+      showSuccessToast(
+        'SMS channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
+      )
+    } catch (error) {
+      setChannelActive(true)
+      showErrorToast(
+        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+      )
+    } finally {
+      setDeactivating(false)
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (isApplyDisabled) {
+    if (isSaveDisabled) {
       return
     }
 
     setSaving(true)
     try {
       await onSave({
+        active: channelActive,
         templateId: selectedTemplateId ?? null,
         to: recipients.to,
       })
       showSuccessToast('Settings applied: Your SMS notification settings have been saved.')
     } catch (error) {
       showErrorToast(
-        `Unable to apply settings: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
+        `Unable to save: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
       )
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSaveDraft() {
-    if (hasValidationError) {
-      return
-    }
-
-    setSavingDraft(true)
-    try {
-      await onSaveDraft({
-        templateId: selectedTemplateId ?? null,
-        to: recipients.to,
-      })
-      showSuccessToast('Draft saved: Your changes have been saved. Continue editing anytime.')
-    } catch (error) {
-      showErrorToast(
-        `Unable to save draft: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setSavingDraft(false)
     }
   }
 
@@ -271,7 +243,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
 
       <Modal
         isOpen={confirmDeactivateOpen}
-        isDismissable={!togglingActive}
+        isDismissable={!deactivating}
         aria-label="Deactivate this channel?"
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
@@ -286,14 +258,14 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
                 variant="secondary"
                 danger
                 onPress={handleConfirmDeactivate}
-                isDisabled={togglingActive}
+                isDisabled={deactivating}
               >
                 Deactivate
               </Button>
               <Button
                 variant="primary"
                 onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={togglingActive}
+                isDisabled={deactivating}
               >
                 Cancel
               </Button>
@@ -359,16 +331,8 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
             <Button variant="secondary" isDisabled>
               Preview
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              isDisabled={isFormDisabled || !settingsChanged || hasValidationError}
-              onPress={handleSaveDraft}
-            >
-              {savingDraft ? 'Saving…' : 'Save draft'}
-            </Button>
-            <Button type="submit" variant="primary" isDisabled={isApplyDisabled}>
-              {saving ? 'Saving…' : 'Apply settings'}
+            <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
         </>

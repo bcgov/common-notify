@@ -5,18 +5,16 @@ import PageHeading from '@/components/PageHeading'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
-import type { EmailApplyValues, EmailDraftValues } from './sections/EventsEmailTab'
+import type { EmailApplyValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
-import type { SmsApplyValues, SmsDraftValues } from './sections/EventsSmsTab'
+import type { SmsApplyValues } from './sections/EventsSmsTab'
 import {
   getEventById,
   updateEvent,
   updateEventEmailSettings,
-  updateEventEmailDraft,
-  updateEventEmailActive,
+  deactivateEventEmailChannel,
   updateEventSmsSettings,
-  updateEventSmsDraft,
-  updateEventSmsActive,
+  deactivateEventSmsChannel,
 } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -78,10 +76,11 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     }
   }
 
-  // Errors and success messages are surfaced by EventsEmailTab itself via InlineAlert, so these
-  // just persist and re-sync state - failures propagate up to the tab's own try/catch.
+  // Errors and success messages are surfaced by the channel tabs themselves, so these just
+  // persist and re-sync state - failures propagate up to the tab's own try/catch.
   async function handleSaveEmailSettings(values: EmailApplyValues) {
     const updated = await updateEventEmailSettings(eventId, {
+      active: values.active,
       senderEmail: values.senderEmail || null,
       templateId: values.templateId,
       to: values.to,
@@ -91,31 +90,22 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
     setEvent(updated)
   }
 
-  async function handleSaveEmailDraft(values: EmailDraftValues) {
-    const updated = await updateEventEmailDraft(eventId, values)
-    setEvent(updated)
-  }
-
-  async function handleToggleEmailActive(active: boolean) {
-    const updated = await updateEventEmailActive(eventId, active)
+  async function handleDeactivateEmail() {
+    const updated = await deactivateEventEmailChannel(eventId)
     setEvent(updated)
   }
 
   async function handleSaveSmsSettings(values: SmsApplyValues) {
     const updated = await updateEventSmsSettings(eventId, {
+      active: values.active,
       templateId: values.templateId,
       to: values.to,
     })
     setEvent(updated)
   }
 
-  async function handleSaveSmsDraft(values: SmsDraftValues) {
-    const updated = await updateEventSmsDraft(eventId, values)
-    setEvent(updated)
-  }
-
-  async function handleToggleSmsActive(active: boolean) {
-    const updated = await updateEventSmsActive(eventId, active)
+  async function handleDeactivateSms() {
+    const updated = await deactivateEventSmsChannel(eventId)
     setEvent(updated)
   }
 
@@ -164,7 +154,6 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
           <EventsEmailTab
             values={{
               active: event.emailSettings?.active ?? false,
-              isDraft: event.emailSettings?.isDraft ?? false,
               senderEmail: event.emailSettings?.senderEmail ?? '',
               templateId: event.emailSettings?.templateId ?? null,
               to: event.emailSettings?.to ?? [],
@@ -172,8 +161,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
               bcc: event.emailSettings?.bcc ?? [],
             }}
             onSave={handleSaveEmailSettings}
-            onSaveDraft={handleSaveEmailDraft}
-            onActiveChange={handleToggleEmailActive}
+            onDeactivate={handleDeactivateEmail}
             isDisabled={!canEdit}
             isConfigured={event.emailSettings !== null}
             defaultSenderEmail={defaultSenderEmail}
@@ -187,8 +175,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
               to: event.smsSettings?.to ?? [],
             }}
             onSave={handleSaveSmsSettings}
-            onSaveDraft={handleSaveSmsDraft}
-            onActiveChange={handleToggleSmsActive}
+            onDeactivate={handleDeactivateSms}
             isDisabled={!canEdit}
             isConfigured={event.smsSettings !== null}
           />

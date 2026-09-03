@@ -26,8 +26,6 @@ export enum EventStatus {
 
 export interface EventEmailSettings {
   active: boolean
-  /** True while this channel has unapplied "Save draft" edits - cleared once Apply settings succeeds. */
-  isDraft: boolean
   senderEmail: string | null
   templateId: string | null
   to: string[]
@@ -213,14 +211,15 @@ export async function updateEvent(
   }
 }
 
-export type EventEmailSettingsUpdate = Omit<EventEmailSettings, 'active' | 'isDraft'>
+export type EventEmailSettingsUpdate = EventEmailSettings
 
 /**
  * Update an event's email channel settings (Email Notification tab)
  *
- * Replaces the stored settings, so the tab must send every field it owns. Does not include
- * `active` - the "Channel active" toggle is saved immediately and separately via
- * updateEventEmailActive.
+ * Replaces the stored settings, so the tab must send every field it owns. Includes `active`:
+ * this is the only path that switches the channel on, since activating requires the settings
+ * being saved alongside it to be complete. Turning the channel off immediately goes through
+ * updateEventEmailActive instead.
  *
  * @param eventId Event ID
  * @param settings Email channel settings
@@ -261,75 +260,22 @@ export async function updateEventEmailSettings(
   }
 }
 
-export interface EventEmailDraftSettings {
-  senderEmail: string | null
-  templateId: string | null
-  to: string[]
-  cc: string[]
-  bcc: string[]
-}
-
 /**
- * Save an event's email channel settings as a draft (Save draft on the Email Notification tab)
- *
- * Bypasses the required-field validation of updateEventEmailSettings, so a partially filled-in
- * form can be saved. Does not include `active` - the "Channel active" toggle is saved
- * immediately and separately via updateEventEmailActive. The event still shows as a draft until
- * the settings are applied via updateEventEmailSettings.
+ * Immediately switch an event's email channel off (the "Channel active" switch on the Email
+ * Notification tab turned off), independent of the rest of the tab's settings. Switching it on
+ * goes through updateEventEmailSettings, which sends the settings activation depends on, so
+ * this takes no payload.
  *
  * @param eventId Event ID
- * @param settings Partial email channel settings
- * @returns Updated event, including the saved draft settings
- * @throws Error if the save fails
+ * @returns Updated event, with the email channel switched off
+ * @throws Error if the deactivation fails
  */
-export async function updateEventEmailDraft(
-  eventId: string,
-  settings: EventEmailDraftSettings,
-): Promise<EventResponse> {
+export async function deactivateEventEmailChannel(eventId: string): Promise<EventResponse> {
   try {
-    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email/draft`)
-    return await post<EventResponse>({ ...params, data: settings })
-  } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to save draft: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
+    const params = generateApiParameters(
+      `/api/v1/frontend/events/${eventId}/channels/email/deactivate`,
     )
-  }
-}
-
-/**
- * Immediately toggle an event's email channel on/off (the "Channel active" switch on the Email
- * Notification tab), independent of the rest of the tab's settings.
- *
- * @param eventId Event ID
- * @param active The new active value
- * @returns Updated event, reflecting the new active state
- * @throws Error if the toggle fails
- */
-export async function updateEventEmailActive(
-  eventId: string,
-  active: boolean,
-): Promise<EventResponse> {
-  try {
-    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email/active`)
-    return await post<EventResponse>({ ...params, data: { active } })
+    return await post<EventResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}
@@ -345,21 +291,22 @@ export async function updateEventEmailActive(
     }
 
     throw new Error(
-      `Failed to update channel active state: ${
+      `Failed to deactivate the channel: ${
         responseData.message || (error instanceof Error ? error.message : 'Unknown error')
       }`,
     )
   }
 }
 
-export type EventSmsSettingsUpdate = Omit<EventSmsSettings, 'active'>
+export type EventSmsSettingsUpdate = EventSmsSettings
 
 /**
  * Update an event's SMS channel settings (SMS Notification tab)
  *
- * Replaces the stored settings, so the tab must send every field it owns. Does not include
- * `active` - the "Channel active" toggle is saved immediately and separately via
- * updateEventSmsActive.
+ * Replaces the stored settings, so the tab must send every field it owns. Includes `active`:
+ * this is the only path that switches the channel on, since activating requires the settings
+ * being saved alongside it to be complete. Turning the channel off immediately goes through
+ * updateEventSmsActive instead.
  *
  * @param eventId Event ID
  * @param settings SMS channel settings
@@ -400,72 +347,22 @@ export async function updateEventSmsSettings(
   }
 }
 
-export interface EventSmsDraftSettings {
-  templateId: string | null
-  to: string[]
-}
-
 /**
- * Save an event's SMS channel settings as a draft (Save draft on the SMS Notification tab)
- *
- * Bypasses the required-field validation of updateEventSmsSettings, so a partially filled-in
- * form can be saved. Does not include `active` - the "Channel active" toggle is saved
- * immediately and separately via updateEventSmsActive. The event still shows as a draft until
- * the settings are applied via updateEventSmsSettings.
+ * Immediately switch an event's SMS channel off (the "Channel active" switch on the SMS
+ * Notification tab turned off), independent of the rest of the tab's settings. Switching it on
+ * goes through updateEventSmsSettings, which sends the settings activation depends on, so this
+ * takes no payload.
  *
  * @param eventId Event ID
- * @param settings Partial SMS channel settings
- * @returns Updated event, including the saved draft settings
- * @throws Error if the save fails
+ * @returns Updated event, with the SMS channel switched off
+ * @throws Error if the deactivation fails
  */
-export async function updateEventSmsDraft(
-  eventId: string,
-  settings: EventSmsDraftSettings,
-): Promise<EventResponse> {
+export async function deactivateEventSmsChannel(eventId: string): Promise<EventResponse> {
   try {
-    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms/draft`)
-    return await post<EventResponse>({ ...params, data: settings })
-  } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to save draft: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
+    const params = generateApiParameters(
+      `/api/v1/frontend/events/${eventId}/channels/sms/deactivate`,
     )
-  }
-}
-
-/**
- * Immediately toggle an event's SMS channel on/off (the "Channel active" switch on the SMS
- * Notification tab), independent of the rest of the tab's settings.
- *
- * @param eventId Event ID
- * @param active The new active value
- * @returns Updated event, reflecting the new active state
- * @throws Error if the toggle fails
- */
-export async function updateEventSmsActive(
-  eventId: string,
-  active: boolean,
-): Promise<EventResponse> {
-  try {
-    const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms/active`)
-    return await post<EventResponse>({ ...params, data: { active } })
+    return await post<EventResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
     const responseData = (axiosError.response?.data as any) || {}
@@ -481,7 +378,7 @@ export async function updateEventSmsActive(
     }
 
     throw new Error(
-      `Failed to update channel active state: ${
+      `Failed to deactivate the channel: ${
         responseData.message || (error instanceof Error ? error.message : 'Unknown error')
       }`,
     )
