@@ -82,10 +82,56 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('Notify API')
-    .setDescription('The Notify API for sending notifications via email and SMS')
+    .setTitle('BC Notify API')
+    .setDescription(
+      [
+        'Send email and SMS notifications on behalf of a BC Public Service tenant.',
+        '',
+        '### Getting started',
+        '',
+        '1. Obtain an API key for the gateway and bind it to your tenant with ' +
+          '`POST /api/v1/service/api-key/bind`. A key belongs to exactly one tenant.',
+        '2. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
+        '3. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
+          'register a webhook so Notify calls you instead.',
+        '',
+        '### Authentication',
+        '',
+        'Every request goes through the API gateway and carries your key in the `X-API-KEY` ' +
+          'header. The gateway rate-limits per key; the tenant is resolved from the key, so no ' +
+          'tenant identifier is sent in the request.',
+        '',
+        '### Sending is asynchronous',
+        '',
+        'A send returns `202 Accepted` with a `notifyId` once the request is accepted - not once ' +
+          'the message is delivered. Delivery happens afterwards, and its outcome is reported per ' +
+          'recipient on the notification status endpoints.',
+        '',
+        '### Templates and parameters',
+        '',
+        'Message content can be sent inline or stored as a template and referenced by ' +
+          '`templateId`. Either way, placeholders such as `{{firstName}}` are filled from the ' +
+          '`params` supplied with the send. Give a channel a `templateId` or inline `content`, ' +
+          'never both.',
+      ].join('\n'),
+    )
     .setVersion('1.0')
-    .addTag('notify')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'X-API-KEY',
+        in: 'header',
+        description: 'API key issued for the gateway and bound to your tenant.',
+      },
+      'api-key',
+    )
+    .addTag('Send', 'Submit a notification for delivery')
+    .addTag('Notification status', 'Find out what happened to a notification')
+    .addTag('Templates', 'Reusable message content')
+    .addTag('Webhooks', 'Be called when a notification changes state')
+    .addTag('Reference data', 'Code tables for statuses, channels and event types')
+    .addTag('API keys', 'Bind an API key to a tenant')
+    .addTag('Service', 'Availability')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

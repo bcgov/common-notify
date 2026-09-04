@@ -62,7 +62,12 @@ export class GcNotifyController {
   ) {}
 
   @Get('notifications')
-  @ApiOperation({ summary: 'Get list of notifications' })
+  @ApiOperation({
+    summary: 'List notifications',
+    description:
+      'GC Notify-compatible listing of notifications sent by this tenant. Response shape matches ' +
+      'GC Notify so an existing integration works unchanged.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,
@@ -122,7 +127,13 @@ export class GcNotifyController {
 
   @Post('notifications/email')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send an email notification' })
+  @ApiOperation({
+    summary: 'Send an email',
+    description:
+      'GC Notify-compatible email send. Accepts the GC Notify request shape (`email_address`, ' +
+      '`template_id`, `personalisation`) and delivers through Notify. Returns the GC Notify ' +
+      'response shape, so a migrating integration only changes its base URL and key.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,
@@ -153,7 +164,12 @@ export class GcNotifyController {
 
   @Post('notifications/sms')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send an SMS notification' })
+  @ApiOperation({
+    summary: 'Send an SMS',
+    description:
+      'GC Notify-compatible SMS send, taking `phone_number`, `template_id` and ' +
+      '`personalisation`. Requires the sms_notifications feature flag for the tenant.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,
@@ -180,7 +196,13 @@ export class GcNotifyController {
 
   @Post('notifications/bulk')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send a batch of notifications' })
+  @ApiOperation({
+    summary: 'Send a batch of notifications',
+    description:
+      'GC Notify-compatible bulk send: one template applied to many recipients, supplied as rows ' +
+      'where the first row is the header. Accepted as a single request and delivered ' +
+      'asynchronously.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,
@@ -213,7 +235,12 @@ export class GcNotifyController {
   }
 
   @Get('notifications/:notificationId')
-  @ApiOperation({ summary: 'Get notification by ID' })
+  @ApiOperation({
+    summary: 'Get a notification',
+    description:
+      'GC Notify-compatible status lookup for one notification, using the id returned when it ' +
+      'was accepted.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,
@@ -240,7 +267,12 @@ export class GcNotifyController {
   }
 
   @Get('templates')
-  @ApiOperation({ summary: 'Get list of templates' })
+  @ApiOperation({
+    summary: 'List templates',
+    description:
+      'GC Notify-compatible template listing for this tenant. The ids returned can be used as ' +
+      '`template_id` on the send endpoints.',
+  })
   @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
   @ApiHeader({
     name: 'Authorization',
@@ -265,7 +297,10 @@ export class GcNotifyController {
   }
 
   @Get('template/:templateId')
-  @ApiOperation({ summary: 'Get template by ID' })
+  @ApiOperation({
+    summary: 'Get a template',
+    description: 'GC Notify-compatible lookup of one template, including its subject and body.',
+  })
   @ApiHeader({
     name: 'Authorization',
     required: true,

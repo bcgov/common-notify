@@ -1,3 +1,5 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+
 /**
  * Data Transfer Object for Code Table Entries
  *
@@ -17,42 +19,31 @@
  * - updatedBy: User/system that performed the last update
  */
 export class CodeTableDto {
-  /**
-   * Unique code identifier (primary key)
-   * Examples: 'SENT', 'EMAIL', 'PASSWORD_RESET', 'sms_notifications'
-   */
+  @ApiProperty({
+    description: 'The value used in requests and responses to refer to this entry.',
+    example: 'SENT',
+  })
   code: string
 
-  /**
-   * Human-readable display name for UI rendering
-   * Examples: 'Sent', 'Email', 'Password Reset', 'SMS Notifications'
-   */
+  @ApiProperty({ description: 'Label suitable for display to a person.', example: 'Sent' })
   displayName: string
 
-  /**
-   * Detailed description of what this code represents
-   * Examples: 'Notification has been sent', 'Email channel for notifications'
-   */
+  @ApiProperty({
+    description: 'What this code means.',
+    example: 'The notification was handed to the delivery provider',
+  })
   description: string
 
-  /**
-   * Timestamp when the record was created
-   */
+  @ApiProperty({ format: 'date-time', example: '2026-01-04T18:22:11.000Z' })
   createdAt: Date
 
-  /**
-   * User or system that created this record (optional)
-   */
+  @ApiPropertyOptional({ example: 'system' })
   createdBy?: string
 
-  /**
-   * Timestamp when the record was last updated
-   */
+  @ApiProperty({ format: 'date-time', example: '2026-01-04T18:22:11.000Z' })
   updatedAt: Date
 
-  /**
-   * User or system that performed the last update (optional)
-   */
+  @ApiPropertyOptional({ example: 'system' })
   updatedBy?: string
 }
 
@@ -60,19 +51,16 @@ export class CodeTableDto {
  * Response DTO for all code tables grouped by type
  */
 export class CodeTablesResponseDto {
-  /**
-   * Notification status codes (e.g., SENT, FAILED, PENDING, QUEUED)
-   */
+  @ApiProperty({
+    type: [CodeTableDto],
+    description: 'The statuses a notification can hold.',
+  })
   statuses: CodeTableDto[]
 
-  /**
-   * Notification delivery channel codes (e.g., EMAIL, SMS, MSGAPP)
-   */
+  @ApiProperty({ type: [CodeTableDto], description: 'The channels a notification can be sent on.' })
   channels: CodeTableDto[]
 
-  /**
-   * Notification event type codes (e.g., PASSWORD_RESET, INVOICE_SENT)
-   */
+  @ApiProperty({ type: [CodeTableDto], description: 'The event types a notification can carry.' })
   eventTypes: CodeTableDto[]
 
   /**

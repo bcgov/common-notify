@@ -14,7 +14,18 @@ import {
   ParseUUIDPipe,
   Req,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiCreatedResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiBody,
+  ApiParam,
+  ApiResponse,
+  ApiSecurity,
+} from '@nestjs/swagger'
 import * as express from 'express'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -43,7 +54,8 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
  * - DELETE /templates/:templateId - Delete a template
  * - POST /templates/:templateId/preview - Preview a template with sample data
  */
-@ApiTags('templates')
+@ApiTags('Templates')
+@ApiSecurity('api-key')
 @Controller('templates')
 @UseGuards(NotifyServiceGuard)
 @ApiBearerAuth()
@@ -95,7 +107,13 @@ export class TemplatesController {
   @Version('1')
   @Get()
   @HttpCode(200)
-  @ApiOperation({ summary: 'List all templates for the authenticated tenant' })
+  @ApiOperation({
+    summary: 'List templates',
+    description:
+      'Returns the templates belonging to the tenant the API key is bound to, newest first by ' +
+      'default. Use `page` and `limit` to paginate, `sort` to order, and repeat `filter` to narrow ' +
+      'the result set.',
+  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -145,6 +163,20 @@ export class TemplatesController {
   @Version('1')
   @Get(':templateId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Get a template',
+    description:
+      'Returns the current version of one template, including its body, subject and the ' +
+      'parameters it expects.',
+  })
+  @ApiParam({
+    name: 'templateId',
+    format: 'uuid',
+    example: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33',
+    description: 'Template ID.',
+  })
+  @ApiOkResponse({ description: 'The template.', type: TemplateResponseDto })
+  @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
   async getTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
@@ -163,6 +195,42 @@ export class TemplatesController {
   @Version('1')
   @Post()
   @HttpCode(201)
+  @ApiOperation({
+    summary: 'Create a template',
+    description:
+      'Stores a reusable template so a send can reference it by `templateId` instead of carrying ' +
+      'its content. Placeholders are filled from the `params` supplied at send time, using the ' +
+      'rendering engine named here.',
+  })
+  @ApiBody({
+    type: CreateTemplateDto,
+    examples: {
+      email: {
+        summary: 'Email template',
+        value: {
+          name: 'Permit approved',
+          description: 'Sent when a permit application is approved',
+          channelCode: 'EMAIL',
+          subject: 'Permit {{permitNumber}} approved',
+          body: '<p>Hello {{firstName}},</p><p>Permit {{permitNumber}} has been approved.</p>',
+          bodyType: 'html',
+          engine: 'handlebars',
+        },
+      },
+      sms: {
+        summary: 'SMS template',
+        value: {
+          name: 'Appointment reminder',
+          channelCode: 'SMS',
+          body: 'Reminder: your appointment is at {{appointmentTime}} tomorrow.',
+          engine: 'handlebars',
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({ description: 'The created template.', type: TemplateResponseDto })
+  @ApiResponse({ status: 400, description: 'Malformed request, or an unknown channel or engine.' })
+  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async createTemplate(
     @Req() req: express.Request,
@@ -185,6 +253,30 @@ export class TemplatesController {
   @Version('1')
   @Patch(':templateId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Update a template',
+    description:
+      'Applies the supplied fields and stores the result as a new version; earlier versions are ' +
+      'kept, so notifications already scheduled against this template are unaffected.',
+  })
+  @ApiParam({
+    name: 'templateId',
+    format: 'uuid',
+    example: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33',
+    description: 'Template ID.',
+  })
+  @ApiBody({
+    type: UpdateTemplateDto,
+    examples: {
+      subjectOnly: {
+        summary: 'Change the subject line',
+        value: { subject: 'Permit {{permitNumber}} is ready for collection' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'The updated template.', type: TemplateResponseDto })
+  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
+  @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async updateTemplate(
     @Req() req: express.Request,
@@ -206,6 +298,21 @@ export class TemplatesController {
   @Version('1')
   @Delete(':templateId')
   @HttpCode(204)
+  @ApiOperation({
+    summary: 'Delete a template',
+    description:
+      'Marks the template inactive so it can no longer be used for new sends. Existing ' +
+      'notifications and version history are retained.',
+  })
+  @ApiParam({
+    name: 'templateId',
+    format: 'uuid',
+    example: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33',
+    description: 'Template ID.',
+  })
+  @ApiResponse({ status: 204, description: 'Deleted.' })
+  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
+  @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async deleteTemplate(
     @Req() req: Request,
@@ -227,6 +334,37 @@ export class TemplatesController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview a template',
+    description:
+      'Renders the template with the parameters supplied and returns the result without sending ' +
+      'or storing anything. Use it to check placeholders resolve before a real send.',
+  })
+  @ApiParam({
+    name: 'templateId',
+    format: 'uuid',
+    example: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33',
+    description: 'Template ID.',
+  })
+  @ApiBody({
+    type: PreviewTemplateDto,
+    examples: {
+      preview: {
+        summary: 'Render with sample parameters',
+        value: { params: { firstName: 'Alice', permitNumber: 'BC-2026-00417' } },
+      },
+    },
+  })
+  @ApiOkResponse({
+    description: 'The rendered subject and body.',
+    schema: {
+      example: {
+        subject: 'Permit BC-2026-00417 approved',
+        body: '<p>Hello Alice,</p><p>Permit BC-2026-00417 has been approved.</p>',
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
   async previewTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,

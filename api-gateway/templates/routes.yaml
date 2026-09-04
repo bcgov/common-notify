@@ -184,33 +184,6 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: ${ROUTE_PREFIX}notify-list
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/notify
-    methods:
-      - GET
-      - DELETE
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-  - name: ${ROUTE_PREFIX}notify-status
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/notify/status
-    methods:
-      - GET
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
   - name: ${ROUTE_PREFIX}notify-callbacks
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
@@ -1043,32 +1016,6 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-types
-    config: *rateLimitConfig
-  - name: key-auth
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-list
-    config: *keyAuthConfig
-
-  # Rate limiting (per API key) - see &rateLimitConfig for details
-  - name: rate-limiting
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-list
-    config: *rateLimitConfig
-  - name: key-auth
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-status
-    config: *keyAuthConfig
-
-  # Rate limiting (per API key) - see &rateLimitConfig for details
-  - name: rate-limiting
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-status
     config: *rateLimitConfig
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]

@@ -1323,27 +1323,11 @@ describe('Notify Controllers', () => {
       expect(controller).toBeDefined()
     })
 
+    // The list, cancel and status endpoints were removed; notification listing and status
+    // live on /api/v1/notification_request.
     describe('GET /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify').expect(501)
-      })
-
-      it('should accept query parameters', async () => {
-        return request(app.getHttpServer())
-          .get('/api/v1/notify?limit=20&status=sent&startDate=2025-01-01')
-          .expect(501)
-      })
-    })
-
-    describe('DELETE /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).delete('/api/v1/notify?notifyId=notify-123').expect(501)
-      })
-    })
-
-    describe('GET /api/v1/notify/status/:notifyId', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify/status/notify-123').expect(501)
+      it('is no longer routed', async () => {
+        return request(app.getHttpServer()).get('/api/v1/notify').expect(404)
       })
     })
 

@@ -10,7 +10,7 @@ import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 
-@ApiTags('code-tables')
+@ApiTags('Reference data')
 @Controller('code-tables')
 @UseGuards(JwtGuard)
 @ApiBearerAuth()

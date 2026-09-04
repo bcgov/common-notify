@@ -33,18 +33,30 @@ export class NotifyEmailChannel {
   attachments?: NotifyAttachment[]
 
   @ApiPropertyOptional({
-    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
+    description:
+      'Hold the message until this time. Omit to send as soon as possible. Accepts ISO 8601 and ' +
+      'other common date formats.',
+    example: '2026-06-01T16:00:00Z',
   })
   @IsOptional()
   @IsValidDateString()
   delayedSend?: string
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description: "Values for this channel's template placeholders. Overrides top-level params.",
+    example: { firstName: 'Alice' },
+  })
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Sender identity to send as, when the tenant has more than one configured.',
+    example: 'e2f7a0d5-8c31-4b92-a7de-1f6b4c0e9a52',
+  })
   @IsOptional()
   @IsUUID()
   identityId?: string
