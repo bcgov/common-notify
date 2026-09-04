@@ -149,7 +149,37 @@ export class TemplatesRepository {
    * Update a template
    */
   async update(template: Template): Promise<Template> {
-    return this.templateRepository.save(template)
+    // Persist only scalar columns. Templates are loaded with eager channel/engine relations, and
+    // TypeORM gives a populated relation precedence over a scalar foreign-key property when both
+    // map to the same database column. Saving the whole entity would therefore let a stale
+    // `template.engine` overwrite a newly assigned `template.engineCode` (and likewise for the
+    // channel). A direct partial update keeps those relation objects out of the write payload.
+    const result = await this.templateRepository.update(
+      { id: template.id, tenantId: template.tenantId, active: true },
+      {
+        name: template.name,
+        description: template.description,
+        channelCode: template.channelCode,
+        subject: template.subject,
+        body: template.body,
+        engineCode: template.engineCode,
+        bodyType: template.bodyType,
+        updatedBy: template.updatedBy,
+      },
+    )
+
+    if (result.affected !== 1) {
+      throw new Error(`Template ${template.id} could not be updated`)
+    }
+
+    // Reload so database-generated values, including the version set by the update trigger and
+    // the updated timestamp, are reflected in the API response.
+    const updated = await this.findById(template.tenantId, template.id)
+    if (!updated) {
+      throw new Error(`Template ${template.id} was not found after update`)
+    }
+
+    return updated
   }
 
   /**
