@@ -6,6 +6,7 @@ import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { AttachmentService } from '../../api/attachment/attachment.service'
+import { FAILED_JOB_RETENTION } from '../job-retention'
 
 describe('IngestionWorker', () => {
   let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
@@ -620,7 +621,7 @@ describe('IngestionWorker', () => {
             delay: 2000,
           },
           removeOnComplete: true,
-          removeOnFail: false,
+          removeOnFail: FAILED_JOB_RETENTION,
         }),
       )
     })
@@ -846,7 +847,7 @@ describe('IngestionWorker', () => {
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
             removeOnComplete: true,
-            removeOnFail: false,
+            removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
             backoff: {
               type: 'exponential',

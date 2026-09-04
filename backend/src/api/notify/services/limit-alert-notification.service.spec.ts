@@ -7,6 +7,7 @@ import { ClaimedLimitAlert, LimitAlertService } from '../../api-keys/limit-alert
 import { NotificationService } from '../../notification/notification.service'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 import {
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
   buildLimitAlertEmail,
   LimitAlertNotificationService,
   ProcessLimitAlertNotificationsInput,
@@ -242,8 +243,8 @@ describe('LimitAlertNotificationService', () => {
         jobId: 'notification-1',
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: false,
-        removeOnFail: false,
+        removeOnComplete: COMPLETED_JOB_RETENTION,
+        removeOnFail: FAILED_JOB_RETENTION,
       },
     )
     expect(notificationService.update).toHaveBeenCalledWith('notification-1', 'tenant-1', {
