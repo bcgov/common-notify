@@ -236,7 +236,8 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
         labelPosition="left"
         isSelected={channelActive}
         onChange={handleSwitchChange}
-        isDisabled={isFormDisabled}
+        // isDisabled={isFormDisabled}
+        isDisabled // disable for now as SMS designs are no longer ready for dev
       >
         Channel active
       </Switch>
