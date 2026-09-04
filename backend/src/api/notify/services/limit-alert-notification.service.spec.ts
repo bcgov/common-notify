@@ -147,9 +147,9 @@ describe('LimitAlertNotificationService', () => {
         email: {
           recipients: { to: ['operations@example.com'] },
           content: {
-            subject: 'BC Notify usage warning: EMAIL daily limit at 80%',
+            subject: 'Notify usage warning: EMAIL daily limit at 80%',
             body: [
-              'BC Notify usage alert',
+              'Notify usage alert',
               '',
               'Tenant: Tenant One',
               'Monitored channel: EMAIL',
@@ -177,7 +177,7 @@ describe('LimitAlertNotificationService', () => {
     expect(createInput.payload.email).toMatchObject({
       recipients: { to: ['tenant-ops@example.com'] },
       content: {
-        subject: 'BC Notify usage limit reached: SMS annual limit',
+        subject: 'Notify usage limit reached: SMS annual limit',
       },
     })
     expect(createInput.payload.email.content.body).toContain('Monitored channel: SMS')

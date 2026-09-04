@@ -37,11 +37,11 @@ export function buildLimitAlertEmail(
   const levelLabel = claim.alertLevel === 'WARN' ? 'Warning' : 'Limit reached'
   const subject =
     claim.alertLevel === 'WARN'
-      ? `BC Notify usage warning: ${claim.channelCode} ${periodLabel} limit at ${claim.percent}%`
-      : `BC Notify usage limit reached: ${claim.channelCode} ${periodLabel} limit`
+      ? `Notify usage warning: ${claim.channelCode} ${periodLabel} limit at ${claim.percent}%`
+      : `Notify usage limit reached: ${claim.channelCode} ${periodLabel} limit`
 
   const body = [
-    'BC Notify usage alert',
+    'Notify usage alert',
     '',
     `Tenant: ${tenantDisplayName}`,
     `Monitored channel: ${claim.channelCode}`,

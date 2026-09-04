@@ -82,15 +82,21 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('BC Notify API')
+    .setTitle('Notify API')
     .setDescription(
       [
-        'Send email and SMS notifications on behalf of a BC Public Service tenant.',
+        'Notify sends email and SMS for your application. You post a message - or the id of a ' +
+          'template Notify already holds - and Notify renders it, delivers it, retries when a ' +
+          'provider fails, and records what happened to each recipient.',
+        '',
+        'Your API key identifies who the messages are sent for - a program, a project, an ' +
+          'application, a team. Notify calls that a tenant, and it decides which templates, ' +
+          'sender addresses and send limits apply. A key belongs to exactly one tenant.',
         '',
         '### Getting started',
         '',
-        '1. Obtain an API key for the gateway and bind it to your tenant with ' +
-          '`POST /api/v1/service/api-key/bind`. A key belongs to exactly one tenant.',
+        '1. Bind your API key to your tenant with `POST /api/v1/service/api-key/bind`. Once, ' +
+          'before your first send.',
         '2. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
         '3. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
@@ -98,8 +104,8 @@ export async function bootstrap() {
         '### Authentication',
         '',
         'Every request goes through the API gateway and carries your key in the `X-API-KEY` ' +
-          'header. The gateway rate-limits per key; the tenant is resolved from the key, so no ' +
-          'tenant identifier is sent in the request.',
+          'header. There is no tenant identifier to send - the key already says who you are. ' +
+          'The gateway also rate-limits per key.',
         '',
         '### Sending is asynchronous',
         '',
