@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEmail,
   IsOptional,
+  IsString,
   IsUUID,
   MaxLength,
   ValidateIf,
@@ -73,4 +74,31 @@ export class UpdateEmailChannelSettingDto {
   @IsArray()
   @IsEmail({}, { each: true })
   bcc?: string[]
+
+  /**
+   * Whether the email uses a custom header rather than the tenant's default one. Omitted means
+   * the tenant default, which is also what clears any stored header values.
+   * @example true
+   */
+  @IsOptional()
+  @IsBoolean()
+  useCustomHeader?: boolean
+
+  /**
+   * Approved email logo shown in the custom header. Null for a custom header with no logo.
+   * Ignored unless useCustomHeader is true.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  @IsOptional()
+  @IsUUID()
+  headerLogoId?: string | null
+
+  /**
+   * Title text shown beside the logo in the custom header. Ignored unless useCustomHeader is true.
+   * @example "Ministry of Education"
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  headerTitle?: string | null
 }

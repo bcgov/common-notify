@@ -90,6 +90,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
       to: values.to,
       cc: values.cc,
       bcc: values.bcc,
+      useCustomHeader: values.useCustomHeader,
+      headerLogoId: values.headerLogoId,
+      headerTitle: values.headerTitle || null,
     })
     setEvent(updated)
   }
@@ -171,6 +174,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
               to: event.emailSettings?.to ?? [],
               cc: event.emailSettings?.cc ?? [],
               bcc: event.emailSettings?.bcc ?? [],
+              useCustomHeader: event.emailSettings?.useCustomHeader ?? false,
+              headerLogoId: event.emailSettings?.headerLogoId ?? null,
+              headerTitle: event.emailSettings?.headerTitle ?? '',
             }}
             onSave={handleSaveEmailSettings}
             onDeactivate={handleDeactivateEmail}

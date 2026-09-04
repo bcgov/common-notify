@@ -31,6 +31,12 @@ export interface EventEmailSettings {
   to: string[]
   cc: string[]
   bcc: string[]
+  /** False when the email uses the tenant's default header. */
+  useCustomHeader: boolean
+  /** Approved logo shown in the custom header; null when there is none. */
+  headerLogoId: string | null
+  /** Title shown beside the logo in the custom header; null when there is none. */
+  headerTitle: string | null
 }
 
 export interface EventSmsSettings {

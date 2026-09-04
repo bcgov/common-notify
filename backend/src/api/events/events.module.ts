@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
+import { EmailLogoModule } from '../email-logo/email-logo.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
@@ -18,6 +19,7 @@ import { EventsService } from './events.service'
     TenantsModule,
     CstarModule,
     FeatureFlagModule,
+    EmailLogoModule,
   ],
   controllers: [EventsFrontendController],
   providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard, PhoneNumberService],

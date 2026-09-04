@@ -95,6 +95,26 @@ export class EventChannelSetting {
   @Column({ type: 'varchar', length: 10000, nullable: true })
   bcc: string | null
 
+  /**
+   * False when the email uses the tenant's default header, true when it uses headerLogoId and
+   * headerTitle. EMAIL only; always false on SMS rows.
+   */
+  @Column({ name: 'use_custom_header', default: false })
+  useCustomHeader: boolean
+
+  /**
+   * Approved email logo shown in the custom header. Null means the custom header has no logo.
+   */
+  @Column({ name: 'header_logo_id', type: 'uuid', nullable: true })
+  headerLogoId: string | null
+
+  /**
+   * Title text shown beside the logo in the custom header. Null means the custom header has no
+   * title.
+   */
+  @Column({ name: 'header_title', type: 'varchar', length: 200, nullable: true })
+  headerTitle: string | null
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 

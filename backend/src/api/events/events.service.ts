@@ -17,6 +17,7 @@ import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { normalizeRecipient } from '../safelist/safelist.util'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
@@ -65,6 +66,7 @@ export class EventsService {
     @InjectRepository(EventChannelSetting)
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
     private readonly phoneNumberService: PhoneNumberService,
+    private readonly emailLogoService: EmailLogoService,
   ) {}
 
   /**
@@ -229,6 +231,20 @@ export class EventsService {
     const to = this.normalizeEmailList(updateDto.to)
     const cc = this.normalizeEmailList(updateDto.cc)
     const bcc = this.normalizeEmailList(updateDto.bcc)
+    // When useCustomHeader is false the header columns stay null and inherit from tenant_settings
+    // at render time, so a tenant default title added there later needs no change here.
+    const useCustomHeader = updateDto.useCustomHeader ?? false
+    const headerLogoId = useCustomHeader ? (updateDto.headerLogoId ?? null) : null
+    const headerTitle = useCustomHeader ? updateDto.headerTitle?.trim() || null : null
+
+    if (headerLogoId) {
+      const approvedLogo = await this.emailLogoService.findByIdIfApproved(headerLogoId)
+      if (!approvedLogo) {
+        throw new BadRequestException(
+          'headerLogoId must reference an approved, non-deleted email logo',
+        )
+      }
+    }
 
     const setting = this.findOrCreateEmailSetting(event, userId)
 
@@ -247,6 +263,9 @@ export class EventsService {
     setting.to = to
     setting.cc = cc
     setting.bcc = bcc
+    setting.useCustomHeader = useCustomHeader
+    setting.headerLogoId = headerLogoId
+    setting.headerTitle = headerTitle
     setting.isDeleted = false
     setting.updatedBy = userId
 
@@ -478,6 +497,9 @@ export class EventsService {
             to: this.splitRecipientList(emailSetting.to),
             cc: this.splitRecipientList(emailSetting.cc),
             bcc: this.splitRecipientList(emailSetting.bcc),
+            useCustomHeader: emailSetting.useCustomHeader,
+            headerLogoId: emailSetting.headerLogoId,
+            headerTitle: emailSetting.headerTitle,
           }
         : null,
       smsSettings: smsSetting

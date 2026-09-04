@@ -39,6 +39,26 @@ export class EventEmailSettingsDto {
    * @example ["carol@example.com"]
    */
   bcc: string[]
+
+  /**
+   * Whether the email uses a custom header rather than the tenant's default one
+   * @example false
+   */
+  useCustomHeader: boolean
+
+  /**
+   * Approved email logo shown in the custom header. Null when there is no custom header, or when
+   * the custom header has no logo.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  headerLogoId: string | null
+
+  /**
+   * Title text shown beside the logo in the custom header. Null when there is no custom header,
+   * or when the custom header has no title.
+   * @example "Ministry of Education"
+   */
+  headerTitle: string | null
 }
 
 /**

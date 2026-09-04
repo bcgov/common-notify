@@ -7,6 +7,7 @@ import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 
 describe('EventsService', () => {
@@ -14,6 +15,7 @@ describe('EventsService', () => {
 
   const tenantId = 'tenant-uuid-1'
   const eventId = 'event-uuid-1'
+  const logoId = 'logo-uuid-1'
 
   const buildEvent = (channelSettings: Partial<EventChannelSetting>[] = []): NotifyEvent =>
     ({
@@ -38,6 +40,10 @@ describe('EventsService', () => {
     save: vi.fn(),
   }
 
+  const mockEmailLogoService = {
+    findByIdIfApproved: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,6 +54,7 @@ describe('EventsService', () => {
           provide: getRepositoryToken(EventChannelSetting),
           useValue: mockChannelSettingRepository,
         },
+        { provide: EmailLogoService, useValue: mockEmailLogoService },
       ],
     }).compile()
 
@@ -65,6 +72,9 @@ describe('EventsService', () => {
             active: false,
             senderEmail: 'a@gov.bc.ca',
             templateId: null,
+            useCustomHeader: false,
+            headerLogoId: null,
+            headerTitle: null,
           },
         ]),
       )
@@ -96,6 +106,9 @@ describe('EventsService', () => {
         to: [],
         cc: [],
         bcc: [],
+        useCustomHeader: false,
+        headerLogoId: null,
+        headerTitle: null,
       })
       expect(result.status).toBe(EventStatus.DRAFT)
     })
@@ -359,6 +372,109 @@ describe('EventsService', () => {
           templateId: null,
         }),
       ).rejects.toThrow(NotFoundException)
+    })
+
+    it('stores a custom header', async () => {
+      const existing = {
+        id: 'setting-uuid-1',
+        channelCode: NotificationChannel.EMAIL,
+      } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent([existing]))
+        .mockResolvedValueOnce(buildEvent([existing]))
+      mockEmailLogoService.findByIdIfApproved.mockResolvedValueOnce({ id: logoId })
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        useCustomHeader: true,
+        headerLogoId: logoId,
+        headerTitle: '  Ministry of Education  ',
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useCustomHeader: true,
+          headerLogoId: logoId,
+          headerTitle: 'Ministry of Education',
+        }),
+      )
+    })
+
+    it('stores a custom header with no logo and no title', async () => {
+      const existing = {
+        id: 'setting-uuid-1',
+        channelCode: NotificationChannel.EMAIL,
+      } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent([existing]))
+        .mockResolvedValueOnce(buildEvent([existing]))
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        useCustomHeader: true,
+        headerLogoId: null,
+        headerTitle: '   ',
+      })
+
+      expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useCustomHeader: true,
+          headerLogoId: null,
+          headerTitle: null,
+        }),
+      )
+    })
+
+    it('clears the header values when the tenant default is selected', async () => {
+      const existing = {
+        id: 'setting-uuid-1',
+        channelCode: NotificationChannel.EMAIL,
+        useCustomHeader: true,
+        headerLogoId: logoId,
+        headerTitle: 'Ministry of Education',
+      } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent([existing]))
+        .mockResolvedValueOnce(buildEvent([existing]))
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        useCustomHeader: false,
+        headerLogoId: logoId,
+        headerTitle: 'Ministry of Education',
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          useCustomHeader: false,
+          headerLogoId: null,
+          headerTitle: null,
+        }),
+      )
+    })
+
+    it('rejects a header logo that is not approved', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockEmailLogoService.findByIdIfApproved.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          useCustomHeader: true,
+          headerLogoId: logoId,
+        }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
   })
 

@@ -29,9 +29,9 @@ const SENDER_EMAIL_TOOLTIP =
 // suffix shown on the Settings > Email tab.
 const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
-// Custom headers are not implemented yet; the choice is not persisted.
 const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
 const HEADER_CUSTOM_ID = 'custom'
+// Sentinel for the "No logo" entry in the logo select; saved as a null headerLogoId.
 const NO_LOGO_ID = 'no-logo'
 
 // Subscription service and CSTAR group recipients are not implemented yet.
@@ -46,6 +46,9 @@ export type EmailSettingsValues = {
   to: string[]
   cc: string[]
   bcc: string[]
+  useCustomHeader: boolean
+  headerLogoId: string | null
+  headerTitle: string
 }
 
 // The Apply payload carries `active` - switching the channel on is only persisted here, since
@@ -114,13 +117,17 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
-  // Header state is local only - none of it is persisted yet, so it stays out of the save payload
-  // and out of settingsChanged.
-  const [headerMode, setHeaderMode] = useState(HEADER_TENANT_DEFAULT_ID)
-  const [headerLogoId, setHeaderLogoId] = useState<string | undefined>(
-    tenantEmailLogoId ?? undefined,
+  // A saved custom header is shown as saved; otherwise the fields start on the tenant's own logo
+  // and name, so switching to Custom opens on a sensible default rather than empty controls.
+  const [headerMode, setHeaderMode] = useState(
+    values.useCustomHeader ? HEADER_CUSTOM_ID : HEADER_TENANT_DEFAULT_ID,
   )
-  const [headerTitle, setHeaderTitle] = useState(tenantName ?? '')
+  const [headerLogoId, setHeaderLogoId] = useState<string | undefined>(
+    values.useCustomHeader ? (values.headerLogoId ?? NO_LOGO_ID) : (tenantEmailLogoId ?? undefined),
+  )
+  const [headerTitle, setHeaderTitle] = useState(
+    values.useCustomHeader ? values.headerTitle : (tenantName ?? ''),
+  )
   const [validationAttempted, setValidationAttempted] = useState(false)
   // Save button is only active if changes have been made
   const [settingsChanged, setSettingsChanged] = useState(false)
@@ -151,18 +158,18 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   }, [defaultSenderEmail, senderEmail, values.senderEmail])
 
   // Tenant settings can also land after mount; seed the header defaults from them the same way,
-  // while both fields are still untouched.
+  // while both fields are still untouched and no custom header has been saved.
   useEffect(() => {
-    if (!headerLogoId && tenantEmailLogoId) {
+    if (!values.useCustomHeader && !headerLogoId && tenantEmailLogoId) {
       setHeaderLogoId(tenantEmailLogoId)
     }
-  }, [headerLogoId, tenantEmailLogoId])
+  }, [headerLogoId, tenantEmailLogoId, values.useCustomHeader])
 
   useEffect(() => {
-    if (!headerTitle && tenantName) {
+    if (!values.useCustomHeader && !headerTitle && tenantName) {
       setHeaderTitle(tenantName)
     }
-  }, [headerTitle, tenantName])
+  }, [headerTitle, tenantName, values.useCustomHeader])
 
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
@@ -259,6 +266,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
     setSaving(true)
     try {
+      const useCustomHeader = headerMode === HEADER_CUSTOM_ID
       await onSave({
         active: channelActive,
         senderEmail: trimmedSenderEmail,
@@ -266,6 +274,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         to: recipients.to,
         cc: recipients.cc,
         bcc: recipients.bcc,
+        useCustomHeader,
+        // "No logo" is a real choice, so it saves as no logo rather than as the tenant default.
+        headerLogoId:
+          useCustomHeader && headerLogoId && headerLogoId !== NO_LOGO_ID ? headerLogoId : null,
+        headerTitle: useCustomHeader ? headerTitle.trim() : '',
       })
       setValidationAttempted(false)
       setSettingsChanged(false)
@@ -438,7 +451,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           <RadioGroup
             label="Email notification header"
             value={headerMode}
-            onChange={setHeaderMode}
+            onChange={(value) => {
+              setHeaderMode(value)
+              setSettingsChanged(true)
+            }}
             isDisabled={areFieldsDisabled}
           >
             <Radio value={HEADER_TENANT_DEFAULT_ID}>Use tenant default</Radio>
@@ -452,7 +468,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
                 placeholder="Select a logo..."
                 items={logoItems}
                 value={headerLogoId}
-                onChange={(key) => setHeaderLogoId(key == null ? undefined : String(key))}
+                onChange={(key) => {
+                  setHeaderLogoId(key == null ? undefined : String(key))
+                  setSettingsChanged(true)
+                }}
                 size="small"
                 isDisabled={areFieldsDisabled}
               />
@@ -460,7 +479,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               <TextField
                 label="Header title"
                 value={headerTitle}
-                onChange={setHeaderTitle}
+                onChange={(value) => {
+                  setHeaderTitle(value)
+                  setSettingsChanged(true)
+                }}
                 description="Defaults to your tenant name. Changes only affect the title displayed in email notifications and do not change your tenant name."
                 size="small"
                 isDisabled={areFieldsDisabled}

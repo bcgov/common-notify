@@ -16,7 +16,7 @@
 -- change.
 --
 -- Deliberately NOT in this migration (pending design):
---   - header/footer overrides on the email tab
+--   - footer overrides on the email tab
 --   - attachment service linkage
 --   - linking a dispatched notification_request back to the event that produced it
 BEGIN;
@@ -91,6 +91,11 @@ CREATE TABLE
     "to" VARCHAR(10000),
     cc VARCHAR(10000),
     bcc VARCHAR(10000),
+    -- Email header. When use_custom_header is FALSE the two value columns are NULL and
+    -- they inherit from tenant_settings.
+    use_custom_header BOOLEAN NOT NULL DEFAULT FALSE,
+    header_logo_id UUID,
+    header_title VARCHAR(200),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now (),
     created_by VARCHAR(200),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now (),
@@ -101,6 +106,7 @@ CREATE TABLE
     CONSTRAINT fk_event_channel_setting_channel FOREIGN KEY (channel_code) REFERENCES notify.notification_channel_code (channel_code),
     CONSTRAINT fk_event_channel_setting_template FOREIGN KEY (template_id) REFERENCES notify.template (id),
     CONSTRAINT fk_event_channel_setting_number FOREIGN KEY (from_phone_number_id) REFERENCES notify.provisioned_phone_number (id),
+    CONSTRAINT fk_event_channel_setting_header_logo FOREIGN KEY (header_logo_id) REFERENCES notify.email_logo (id),
     CONSTRAINT uq_event_channel_setting UNIQUE (event_id, channel_code),
     CONSTRAINT chk_event_channel_setting_channel CHECK (channel_code IN ('EMAIL', 'SMS')),
     -- Channel-appropriate columns only.
@@ -114,7 +120,23 @@ CREATE TABLE
         AND sender_email IS NULL
         AND cc IS NULL
         AND bcc IS NULL
+        AND use_custom_header = FALSE
+        AND header_logo_id IS NULL
+        AND header_title IS NULL
       )
+    ),
+    -- The tenant default carries no header of its own, so the two value columns only ever hold
+    -- something for a custom header.
+    CONSTRAINT chk_event_channel_setting_custom_header CHECK (
+      use_custom_header = TRUE
+      OR (
+        header_logo_id IS NULL
+        AND header_title IS NULL
+      )
+    ),
+    CONSTRAINT chk_event_channel_setting_header_title CHECK (
+      header_title IS NULL
+      OR btrim(header_title) <> ''
     ),
     -- Pragmatic syntax check only; deliverability/ownership of the sender address is verified
     -- by the application against the mail provider.
@@ -177,6 +199,12 @@ WHERE
   is_deleted = FALSE
   AND template_id IS NOT NULL;
 
+-- "Which events use this logo?" - guards email logo deletion/unapproval.
+CREATE INDEX idx_event_channel_setting_header_logo ON notify.event_channel_setting (header_logo_id)
+WHERE
+  is_deleted = FALSE
+  AND header_logo_id IS NOT NULL;
+
 CREATE TRIGGER trg_event_channel_setting_updated_at BEFORE
 UPDATE ON notify.event_channel_setting FOR EACH ROW
 EXECUTE FUNCTION notify.set_updated_at ();
@@ -202,6 +230,12 @@ COMMENT ON COLUMN notify.event_channel_setting."to" IS 'Comma-separated, normali
 COMMENT ON COLUMN notify.event_channel_setting.cc IS 'Comma-separated, normalized, lowercased/trimmed CC email addresses. EMAIL only; NULL on SMS rows.';
 
 COMMENT ON COLUMN notify.event_channel_setting.bcc IS 'Comma-separated, normalized, lowercased/trimmed BCC email addresses. EMAIL only; NULL on SMS rows.';
+
+COMMENT ON COLUMN notify.event_channel_setting.use_custom_header IS 'When false the email inherits the tenant''s default header from notify.tenant_settings and the header columns here stay NULL; when true the event owns its header outright, inherits nothing, and uses header_logo_id and header_title as given. EMAIL only; always false on SMS rows. Stored explicitly so a custom header with no logo and no title stays distinct from the tenant default.';
+
+COMMENT ON COLUMN notify.event_channel_setting.header_logo_id IS 'Approved email logo shown in the custom email header. NULL means the custom header has no logo, never "inherit the tenant logo". Only set when use_custom_header = TRUE.';
+
+COMMENT ON COLUMN notify.event_channel_setting.header_title IS 'Title text shown beside the logo in the custom email header, defaulted in the UI to the tenant name. NULL means the custom header has no title, never "inherit the tenant title". Only set when use_custom_header = TRUE, so a tenant-level default title added to notify.tenant_settings later applies to exactly the rows with use_custom_header = FALSE and needs no change here.';
 
 COMMENT ON COLUMN notify.event_channel_setting.created_at IS 'Timestamp with timezone when the channel setting was created.';
 
