@@ -68,9 +68,13 @@ export async function bootstrap() {
   // changing just the hostname would.
   app.setGlobalPrefix('api', {
     exclude: [
+      // Email logo images are not API surface: buildPublicImageUrl bakes this path into
+      // the <img src> of every email sent, where recipients' mail clients fetch it for as
+      // long as they keep the message. It sits outside /api/v1 because a versioned path
+      // implies a v2 someday, and this one can never move without breaking the logo in
+      // mail already delivered.
       { path: 'logos/(.*)', method: RequestMethod.ALL },
       { path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL },
-      { path: 'gcnotify-passthrough/v2/(.*)', method: RequestMethod.ALL },
     ],
   })
   app.enableVersioning({
