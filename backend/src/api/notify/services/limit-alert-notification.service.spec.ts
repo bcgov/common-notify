@@ -7,11 +7,11 @@ import { ClaimedLimitAlert, LimitAlertService } from '../../api-keys/limit-alert
 import { NotificationService } from '../../notification/notification.service'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 import {
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
   buildLimitAlertEmail,
   LimitAlertNotificationService,
   ProcessLimitAlertNotificationsInput,
 } from './limit-alert-notification.service'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
 
 describe('LimitAlertNotificationService', () => {
   let service: LimitAlertNotificationService
