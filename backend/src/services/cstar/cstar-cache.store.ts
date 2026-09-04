@@ -31,10 +31,20 @@ export class CstarCacheStore implements OnModuleDestroy {
 
     // Fail fast rather than queue: this sits in front of every tenant-scoped request, so a
     // Redis outage has to degrade to a live CSTAR call in milliseconds.
+    const redisConfig = this.configService.get<RedisConfig>('redis')
     this.client = createRedisClient(
-      this.configService.get<RedisConfig>('redis') as RedisConfig,
+      {
+        host: redisConfig?.host ?? 'localhost',
+        port: redisConfig?.port ?? 6379,
+        password: redisConfig?.password,
+        db: redisConfig?.db ?? 0,
+      },
       CstarCacheStore.name,
       {
+        // Connect on first use: a cache must not open a socket just because the module
+        // loaded, and an unreachable Redis then surfaces as a rejected command, which the
+        // read and write paths already treat as a miss.
+        lazyConnect: true,
         enableOfflineQueue: false,
         maxRetriesPerRequest: 1,
         commandTimeout: 250,
