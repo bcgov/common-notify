@@ -11,6 +11,7 @@ import { QueueName } from '../../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../../queue/queue.types'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
 
 export type ProcessLimitAlertNotificationsInput = ProcessLimitAlertUsageInput
 
@@ -130,8 +131,8 @@ export class LimitAlertNotificationService {
       jobId: notificationRecord.id,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
-      removeOnComplete: false,
-      removeOnFail: false,
+      removeOnComplete: COMPLETED_JOB_RETENTION,
+      removeOnFail: FAILED_JOB_RETENTION,
     })
 
     await this.notificationService.update(notificationRecord.id, claim.tenantId, {
