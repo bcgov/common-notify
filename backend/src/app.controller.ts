@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
+import { ApiExcludeEndpoint } from '@nestjs/swagger'
 import { AppService } from './app.service'
 import { Public } from './common/decorators/public.decorator'
 
@@ -6,6 +7,8 @@ import { Public } from './common/decorators/public.decorator'
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // No Kong route: reachable only by hitting the backend directly.
+  @ApiExcludeEndpoint()
   @Get()
   @Public()
   getHello() {

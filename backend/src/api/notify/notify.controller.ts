@@ -48,6 +48,7 @@ import { NotificationRequestDto } from '../notification/schemas/notification-req
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { WebhookService } from '../webhook/webhook.service'
+import { ApiExcludeController } from '@nestjs/swagger'
 import {
   CallbackRegistrationRequest,
   CallbackRegistrationResponse,
@@ -249,6 +250,8 @@ export class NotifySimpleController {
  * rules based on client type (internal service vs frontend application).
  * Both controllers delegate to the same service for consistency.
  */
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/notifysimple')
 @UseGuards(NotifyFrontendRoleGuard)
 export class NotifySimpleFrontendController {
@@ -447,6 +450,8 @@ export class NotifyController {
   }
 }
 
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('ches/api/v1/email')
 @UseGuards(NotifyServiceGuard)
 export class ChesEmailController {

@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Patch, Req, Request, UseGuards, Version } from '@nestjs/common'
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
@@ -21,6 +27,8 @@ import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-u
  * alert threshold.
  */
 @ApiTags('api-key-usage')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/api-key-usage')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()

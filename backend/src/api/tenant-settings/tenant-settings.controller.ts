@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Patch, Req, Request, UseGuards, Version } from '@nestjs/common'
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { CstarRole } from '../../enum/cstar-role.enum'
@@ -13,6 +19,8 @@ import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
 import { TenantSettingsService } from './tenant-settings.service'
 
 @ApiTags('tenant-settings')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/tenant-settings')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
