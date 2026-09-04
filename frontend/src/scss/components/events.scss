@@ -20,6 +20,13 @@
 .events__tabs {
   .bcds-react-aria-ToggleButtonGroup {
     width: fit-content;
+    gap: 8px;
+  }
+
+  // The DS ToggleButton hardcodes 2px 8px regardless of `size`, so the design's
+  // 12x6 has to be set here. Matches the same override in settings.scss.
+  .bcds-react-aria-ToggleButton {
+    padding: 6px 12px;
   }
 }
 
@@ -231,4 +238,20 @@
   margin: 0;
   font-size: $font-size-sm;
   color: $text-secondary;
+}
+
+// Saved email settings shown back as the notification they produce: the subject line, the
+// header it is sent under and the template body.
+.events__saved-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.events__saved-subject,
+.events__saved-body {
+  margin: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  white-space: pre-wrap;
 }

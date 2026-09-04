@@ -231,31 +231,43 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
 
   return (
     <form className="events__form" onSubmit={handleSubmit}>
-      <h2 className="events__section-heading">SMS Notification Settings</h2>
-
-      <Switch
-        labelPosition="left"
-        isSelected={channelActive}
-        onChange={handleSwitchChange}
-        // isDisabled={isFormDisabled}
-        isDisabled // disable for now as SMS designs are no longer ready for dev
-      >
-        Channel active
-      </Switch>
+      <div className="events__switch-field">
+        <span className="events__field-label">Activate channel</span>
+        <Switch
+          labelPosition="right"
+          aria-label="Activate channel"
+          isSelected={channelActive}
+          onChange={handleSwitchChange}
+          // isDisabled={isFormDisabled}
+          isDisabled // disable for now as SMS designs are no longer ready for dev
+        >
+          {channelActive ? 'On' : 'Off'}
+        </Switch>
+      </div>
 
       <Modal
         isOpen={confirmDeactivateOpen}
         isDismissable={!deactivating}
-        aria-label="Deactivate this channel?"
         onOpenChange={(open) => {
           if (!open) setConfirmDeactivateOpen(false)
         }}
       >
         <AlertDialog
           variant="confirmation"
+          isIconHidden
           title="Deactivate this channel?"
+          // AlertDialog renders `title` as a plain div rather than a <Heading slot="title">, so
+          // the underlying Dialog needs an explicit label.
+          aria-label="Deactivate this channel?"
           buttons={
             <>
+              <Button
+                variant="tertiary"
+                onPress={() => setConfirmDeactivateOpen(false)}
+                isDisabled={deactivating}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="secondary"
                 danger
@@ -263,13 +275,6 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
                 isDisabled={deactivating}
               >
                 Deactivate
-              </Button>
-              <Button
-                variant="primary"
-                onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={deactivating}
-              >
-                Cancel
               </Button>
             </>
           }

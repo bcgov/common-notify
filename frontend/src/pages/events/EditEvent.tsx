@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import EventsTab from './sections/EventsTab'
@@ -8,6 +9,7 @@ import EventsEmailTab from './sections/EventsEmailTab'
 import type { EmailApplyValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
 import type { SmsApplyValues } from './sections/EventsSmsTab'
+import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
 import {
   getEventById,
   updateEvent,
@@ -23,20 +25,23 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
 
-type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
+export type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
 
 interface EditEventProps {
   eventId: string
+  /** Tab to open on, e.g. when the email saved page hands back to its own settings. */
+  initialTab?: EventTab
 }
 
-const EditEvent: FC<EditEventProps> = ({ eventId }) => {
+const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => {
   const { canEdit } = useCstarRoles()
+  const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
-  const [selectedTab, setSelectedTab] = useState<EventTab>('settings')
+  const [selectedTab, setSelectedTab] = useState<EventTab>(initialTab)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -95,6 +100,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
       headerTitle: values.headerTitle || null,
     })
     setEvent(updated)
+    // Saved email settings hand off to their own page, which confirms what was saved and
+    // carries on to sending a test notification.
+    navigate({ to: '/events/$eventId/saved', params: { eventId } })
   }
 
   async function handleDeactivateEmail() {
@@ -150,6 +158,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
           <ToggleButton id="sms" size="medium">
             SMS Notification
           </ToggleButton>
+          <ToggleButton id="third-party" size="medium">
+            Third-party Notification
+          </ToggleButton>
         </ToggleButtonGroup>
       </div>
 
@@ -201,7 +212,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId }) => {
             isConfigured={event.smsSettings !== null}
           />
         ) : (
-          <p className="events__help">Not yet implemented</p>
+          <EventsThirdPartyTab />
         )}
       </section>
     </div>
