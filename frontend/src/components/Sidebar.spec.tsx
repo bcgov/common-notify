@@ -108,6 +108,18 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
   })
 
+  it('hides Events when the events feature flag is disabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'])
+
+    expect(screen.queryByRole('link', { name: /events/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Events when the events feature flag is enabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'], true)
+
+    expect(screen.getByRole('link', { name: /events/i })).toBeInTheDocument()
+  })
+
   it('hides tenant pages when user has no CSTAR roles', () => {
     renderSidebar()
 

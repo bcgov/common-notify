@@ -38,6 +38,11 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
+    label: 'Notification Events',
+    to: '/events',
+    icon: <WorkspacesOutlinedIcon />,
+  },
+  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
@@ -80,9 +85,11 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
+  // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
+  const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
   const bulkNotificationsEnabled = useFeatureFlag('bulk_notifications', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
@@ -127,6 +134,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
+            (item.label === 'Notification Events' && hasTenantRole && eventsEnabled) ||
             (item.label === 'Templates' && hasTenantRole) ||
             (item.label === 'Bulk Notifications' && hasTenantRole && bulkNotificationsEnabled) ||
             (item.label === 'Usage & Limits' && showUsage) ||
