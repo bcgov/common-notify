@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   AlertDialog,
@@ -134,6 +134,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [validationAttempted, setValidationAttempted] = useState(false)
   // Save button is only active if changes have been made
   const [settingsChanged, setSettingsChanged] = useState(false)
+  // Once the field has been edited it is the user's, including when they empty it - the tenant
+  // default must not be reapplied on top of a deliberately cleared field.
+  const senderEmailTouched = useRef(false)
 
   // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
@@ -155,7 +158,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // The tenant default loads asynchronously and can arrive after this tab has already mounted;
   // backfill it once it does, but only while the field is still untouched and unsaved.
   useEffect(() => {
-    if (!values.senderEmail && !senderEmail && defaultSenderEmail) {
+    if (!senderEmailTouched.current && !values.senderEmail && !senderEmail && defaultSenderEmail) {
       setSenderEmail(`${defaultSenderEmail}@${SENDER_EMAIL_DOMAIN}`)
     }
   }, [defaultSenderEmail, senderEmail, values.senderEmail])
@@ -191,10 +194,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const previewTitle = headerMode === HEADER_CUSTOM_ID ? headerTitle : ''
 
   const trimmedSenderEmail = senderEmail.trim()
-  const senderEmailError =
+  const senderEmailFormatError =
     trimmedSenderEmail !== '' && !isValidEmail(trimmedSenderEmail)
       ? 'Enter a valid sender email address.'
       : ''
+  const senderEmailError =
+    trimmedSenderEmail === '' ? 'Sender email address cannot be empty.' : senderEmailFormatError
   const invalidRecipients: RecipientAddresses = {
     to: recipients.to.filter((address) => !isValidEmail(address)),
     cc: recipients.cc.filter((address) => !isValidEmail(address)),
@@ -204,12 +209,23 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     invalidRecipients.to.length > 0 ||
     invalidRecipients.cc.length > 0 ||
     invalidRecipients.bcc.length > 0
-  const hasValidationError = Boolean(senderEmailError) || recipientsHaveError
+  // Malformed input is rejected whatever the channel's state; the required-but-empty fields
+  // below only have to be complete while it is active, matching what the backend enforces.
+  const hasValidationError = Boolean(senderEmailFormatError) || recipientsHaveError
+  // "Additional recipient(s)" is only a complete choice once it has a To address, so an empty
+  // To counts as no recipient selected and reports the same error under the checkbox group.
   const recipientSelectionError =
-    selectedRecipients.length === 0 ? 'Select at least one recipient.' : ''
-  // Recipients validate live; the sender email error only surfaces once a save attempt has run it.
+    selectedRecipients.length === 0 ||
+    (selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && recipients.to.length === 0)
+      ? 'Please select at least one recipient.'
+      : ''
+  const templateError = selectedTemplateId ? '' : 'Please select a template.'
+  const isIncomplete = Boolean(senderEmailError || recipientSelectionError || templateError)
+  // Recipients validate live; the required-field errors all surface together, once a save
+  // attempt has run them.
   const displayedSenderEmailError = validationAttempted ? senderEmailError : ''
   const displayedRecipientSelectionError = validationAttempted ? recipientSelectionError : ''
+  const displayedTemplateError = validationAttempted ? templateError : ''
   const isFormDisabled = isDisabled || saving || deactivating
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
@@ -262,7 +278,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     }
 
     // Only an active channel has to be complete, matching what the backend enforces.
-    if (hasValidationError || (channelActive && recipientSelectionError)) {
+    if (hasValidationError || (channelActive && isIncomplete)) {
       setValidationAttempted(true)
       return
     }
@@ -375,6 +391,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             }
             value={senderEmail}
             onChange={(value) => {
+              senderEmailTouched.current = true
               setSenderEmail(value)
               setSettingsChanged(true)
             }}
@@ -382,8 +399,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             size="small"
             isDisabled={areFieldsDisabled}
             isRequired
-            isInvalid={displayedSenderEmailError ? true : undefined}
-            errorMessage={displayedSenderEmailError || 'Sender email address cannot be empty.'}
+            // Native validation blocks the submit outright on an empty required field, which
+            // hides the other fields' errors; drive this from validationAttempted instead.
+            validationBehavior="aria"
+            isInvalid={Boolean(displayedSenderEmailError)}
+            errorMessage={displayedSenderEmailError}
           />
 
           <CheckboxGroup
@@ -434,6 +454,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             size="small"
             isDisabled={areFieldsDisabled}
             isRequired
+            validationBehavior="aria"
+            isInvalid={Boolean(displayedTemplateError)}
+            errorMessage={displayedTemplateError}
           />
 
           {selectedTemplate && (
