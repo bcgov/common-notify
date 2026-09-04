@@ -2,10 +2,12 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type Redis from 'ioredis'
 import { formatRedisError } from '../../common/redis/redis-error.util'
+import { redisKey } from '../../common/redis/redis-namespace'
 import { createRedisClient, type RedisConfig } from '../../queue/redis-connection'
 
-const TENANTS_KEY_PREFIX = 'cstar:tenants:'
-const ROLES_KEY_PREFIX = 'cstar:roles:'
+// Namespaced per deployment: the Redis instance is shared by every deployment in the namespace.
+const TENANTS_KEY_PREFIX = redisKey('cstar:tenants:')
+const ROLES_KEY_PREFIX = redisKey('cstar:roles:')
 
 /**
  * Redis-backed cache for the two CSTAR lookups on the authorization hot path. Shared by

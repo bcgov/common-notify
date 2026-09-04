@@ -7,10 +7,15 @@ import { NotificationRequest } from '../../api/notification/entities/notificatio
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { QueueName } from '../../enum/queue-name.enum'
+import { redisKey } from '../../common/redis/redis-namespace'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
 
-/** Redis key held by whichever pod is currently sweeping. */
-const SWEEP_LOCK_KEY = 'notify:pending-retry:lock'
+/**
+ * Redis key held by whichever pod is currently sweeping. Namespaced per deployment: the Redis
+ * instance is shared, and one deployment must not hold a lock that stops another sweeping its
+ * own database.
+ */
+const SWEEP_LOCK_KEY = redisKey('pending-retry:lock')
 
 /**
  * Release only our own lock. A sweep that overran its TTL must not delete the lock a

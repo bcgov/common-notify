@@ -50,7 +50,7 @@ describe('CstarCacheStore', () => {
   it('writes with a millisecond TTL so entries expire without a sweeper', async () => {
     await build(30000).writeRoles('tenant-a', USER, ['Admin'])
     expect(clientMock.set).toHaveBeenCalledWith(
-      'cstar:roles:tenant-a:idir-guid',
+      'notify:cstar:roles:tenant-a:idir-guid',
       JSON.stringify(['Admin']),
       'PX',
       30000,
@@ -89,8 +89,8 @@ describe('CstarCacheStore', () => {
     const store = build()
     await store.readRoles('tenant-a', USER)
     await store.readRoles('tenant-b', USER)
-    expect(clientMock.get).toHaveBeenNthCalledWith(1, 'cstar:roles:tenant-a:idir-guid')
-    expect(clientMock.get).toHaveBeenNthCalledWith(2, 'cstar:roles:tenant-b:idir-guid')
+    expect(clientMock.get).toHaveBeenNthCalledWith(1, 'notify:cstar:roles:tenant-a:idir-guid')
+    expect(clientMock.get).toHaveBeenNthCalledWith(2, 'notify:cstar:roles:tenant-b:idir-guid')
   })
 
   it('encodes identifiers so one cannot span the key separator into another entry', async () => {
@@ -98,7 +98,7 @@ describe('CstarCacheStore', () => {
     // Without encoding, tenant "a:victim" + user "u" would read the same key as
     // tenant "a" + user "victim:u".
     await build().readRoles('a:victim', 'u')
-    expect(clientMock.get).toHaveBeenCalledWith('cstar:roles:a%3Avictim:u')
+    expect(clientMock.get).toHaveBeenCalledWith('notify:cstar:roles:a%3Avictim:u')
   })
 
   it('does not touch Redis at all when the TTL is zero', async () => {
@@ -119,11 +119,18 @@ describe('CstarCacheStore', () => {
     )
   })
 
+  it('namespaces keys per deployment, so environments sharing one Redis cannot collide', async () => {
+    // RELEASE_NAME is unset under test, so the prefix falls back to "notify".
+    clientMock.get.mockResolvedValue(null)
+    await build().readTenants(USER)
+    expect(clientMock.get).toHaveBeenCalledWith('notify:cstar:tenants:idir-guid')
+  })
+
   it('deletes both entries when invalidating a user within a tenant', async () => {
     await build().invalidateUser(USER, 'tenant-a')
     expect(clientMock.del).toHaveBeenCalledWith(
-      'cstar:tenants:idir-guid',
-      'cstar:roles:tenant-a:idir-guid',
+      'notify:cstar:tenants:idir-guid',
+      'notify:cstar:roles:tenant-a:idir-guid',
     )
   })
 })
