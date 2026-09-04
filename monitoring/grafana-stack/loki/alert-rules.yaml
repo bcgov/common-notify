@@ -15,6 +15,7 @@ groups:
           severity: warning
           service: common-notify
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} error rate elevated"
           summary: "High error rate detected in {{ $labels.namespace }}/{{ $labels.app }}"
           description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} over the last 5 minutes"
 
@@ -27,6 +28,7 @@ groups:
           severity: critical
           service: common-notify
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} very high error rate"
           summary: "CRITICAL: Very high error rate in {{ $labels.namespace }}/{{ $labels.app }}"
           description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} - immediate attention required!"
 
@@ -40,6 +42,7 @@ groups:
           service: common-notify
           component: database
         annotations:
+          short: "{{ $labels.namespace }} database connection errors"
           summary: "Database connection errors in {{ $labels.namespace }}"
           description: "Database connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
 
@@ -53,21 +56,15 @@ groups:
           service: common-notify
           component: redis
         annotations:
+          short: "{{ $labels.namespace }} Redis connection errors"
           summary: "Redis connection errors in {{ $labels.namespace }}"
           description: "Redis connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
 
-      # API errors (500 status codes)
-      - alert: HighAPI500ErrorRate
-        expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "500" [5m])) by (namespace) > 5
-        for: 5m
-        labels:
-          severity: warning
-          service: common-notify
-          component: api
-        annotations:
-          summary: "High rate of 500 errors in {{ $labels.namespace }}"
-          description: "API 500 error rate is {{ $value }} errors/sec in {{ $labels.namespace }}"
+      # NOTE: The log-grep `HighAPI500ErrorRate` alert (matched the string "500"
+      # in logs — noisy: any log line containing "500" tripped it) was removed.
+      # API 5xx alerting is now metric-based and accurate via `ApiHigh5xxRate`
+      # (http_request_duration_seconds_count{status_code=~"5.."}) in
+      # monitoring/grafana-stack/grafana/infra-alert-rules.yaml.
 
       # Email sending failures
       - alert: EmailSendingFailures
@@ -79,20 +76,17 @@ groups:
           service: common-notify
           component: email
         annotations:
+          short: "{{ $labels.namespace }} email send failures elevated"
           summary: "Email sending failures in {{ $labels.namespace }}"
           description: "Email sending failure rate is {{ $value }} failures/sec in {{ $labels.namespace }}"
 
-      # No logs received (service down)
-      - alert: NoLogsReceived
-        expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"}[5m])) by (namespace, app) == 0
-        for: 10m
-        labels:
-          severity: critical
-          service: common-notify
-        annotations:
-          summary: "No logs received from {{ $labels.namespace }}/{{ $labels.app }}"
-          description: "No logs have been received from {{ $labels.namespace}}/{{ $labels.app }} for 10 minutes - service may be down!"
+      # NOTE: The old `NoLogsReceived` alert (critical if no logs for 10m) was
+      # removed. Absence of logs is NOT a reliable "service down" signal — a
+      # healthy but idle service produces no logs and fired false criticals.
+      # Liveness/readiness is now sourced from pod state (Kubernetes healthchecks)
+      # via the Grafana metric rules `PodNotReady`, `PodCrashLoopBackOff` and
+      # `DeploymentReplicasMismatch` in
+      # monitoring/grafana-stack/grafana/infra-alert-rules.yaml.
 
   - name: common-notify-performance
     interval: 1m
@@ -107,6 +101,7 @@ groups:
           service: common-notify
           component: performance
         annotations:
+          short: "{{ $labels.namespace }} slow API responses (>5s)"
           summary: "Slow API responses detected in {{ $labels.namespace }}"
           description: "High rate of slow responses (>5s) detected in {{ $labels.namespace }}"
 
@@ -120,6 +115,7 @@ groups:
           service: common-notify
           component: resources
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} memory warnings in logs"
           summary: "Memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
           description: "Application reporting memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
 
@@ -136,6 +132,7 @@ groups:
           service: common-notify
           component: security
         annotations:
+          short: "{{ $labels.namespace }} high auth failure rate"
           summary: "High authentication failure rate in {{ $labels.namespace }}"
           description: "Authentication failure rate is {{ $value }} failures/sec in {{ $labels.namespace }} - possible brute force attack"
 
@@ -149,6 +146,7 @@ groups:
           service: common-notify
           component: security
         annotations:
+          short: "{{ $labels.namespace }} ClamAV detected a virus"
           summary: "VIRUS DETECTED in {{ $labels.namespace }}"
           description: "ClamAV detected a virus in uploaded file in {{ $labels.namespace }} - immediate investigation required!"
 
@@ -165,6 +163,7 @@ groups:
           service: loki
           component: ingestion
         annotations:
+          short: "Loki ingestion lag — logs may be delayed"
           summary: "Loki ingestion lag detected"
           description: "Loki is experiencing ingestion lag - logs may be delayed"
 
@@ -177,5 +176,107 @@ groups:
           severity: warning
           service: loki
         annotations:
+          short: "Loki reporting errors — log aggregation impacted"
           summary: "Loki errors detected"
           description: "Loki is reporting errors ({{ $value }} errors/sec) - log aggregation may be impacted"
+
+  # ===========================================================================
+  # NOTIFICATION DELIVERY & QUEUE  (log-based — STOPGAP)
+  # ---------------------------------------------------------------------------
+  # These providers/queues expose NO Prometheus metrics today. The backend only
+  # exposes HTTP + Node metrics (express-prom-bundle), so CHES/ACS provider
+  # health, BullMQ queue depth, stuck/failed jobs, and per-channel delivery rates
+  # cannot be measured directly. Until the backend is instrumented (tracked as a
+  # separate developer ticket: "Add Prometheus metrics for queue depth, job
+  # outcomes, and provider delivery"), these alerts approximate the signal by
+  # matching log patterns. Thresholds are rate-of-log-lines, NOT true rates —
+  # tune per environment. Replace with metric-based rules once metrics exist.
+  # ===========================================================================
+  - name: common-notify-delivery
+    interval: 1m
+    rules:
+      # CHES (email provider) repeated failures
+      - alert: ChesDeliveryFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [5m])) by (namespace) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: common-notify
+          component: ches
+        annotations:
+          short: "{{ $labels.namespace }} repeated CHES delivery failures"
+          summary: "CHES delivery failures in {{ $labels.namespace }}"
+          description: "Repeated CHES (email provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). Email delivery may be degraded."
+
+      # ACS (SMS provider) repeated failures
+      - alert: AcsDeliveryFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [5m])) by (namespace) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: common-notify
+          component: acs
+        annotations:
+          short: "{{ $labels.namespace }} repeated ACS delivery failures"
+          summary: "ACS delivery failures in {{ $labels.namespace }}"
+          description: "Repeated ACS (SMS provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). SMS delivery may be degraded."
+
+      # SMS send failures (channel-level, any provider)
+      - alert: SmsSendingFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [5m])) by (namespace) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+          component: sms
+        annotations:
+          short: "{{ $labels.namespace }} SMS send failures elevated"
+          summary: "SMS sending failures in {{ $labels.namespace }}"
+          description: "SMS sending failure log rate is {{ $value }}/sec in {{ $labels.namespace }} over 5m."
+
+      # Webhook/callback delivery failures
+      - alert: WebhookDeliveryFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [5m])) by (namespace) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: common-notify
+          component: webhook
+        annotations:
+          short: "{{ $labels.namespace }} webhook/callback failures elevated"
+          summary: "Webhook delivery failures in {{ $labels.namespace }}"
+          description: "Webhook/callback delivery failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m)."
+
+      # BullMQ jobs failing (worker-level)
+      - alert: QueueJobFailures
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [5m])) by (namespace) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: common-notify
+          component: queue
+        annotations:
+          short: "{{ $labels.namespace }} queue jobs failing"
+          summary: "Queue job failures in {{ $labels.namespace }}"
+          description: "BullMQ job failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). Check the failed/dead-letter queue."
+
+      # Notifications stuck / not being drained (queue backlog)
+      # Heuristic: worker/queue errors persist AND no "completed"/"delivered"
+      # success lines are being produced — approximates a stalled queue.
+      - alert: QueueNotDraining
+        expr: |
+          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace) > 0
+        for: 10m
+        labels:
+          severity: critical
+          service: common-notify
+          component: queue
+        annotations:
+          short: "{{ $labels.namespace }} queue not draining / jobs stuck"
+          summary: "Queue not draining in {{ $labels.namespace }}"
+          description: "Signs of a stalled/stuck queue in {{ $labels.namespace }} over 10m — notifications may be sitting queued longer than expected. Verify worker health and Redis."

@@ -78,6 +78,7 @@ groups:
           service: common-notify
           component: pod-state
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} in CrashLoopBackOff"
           summary: "CrashLoopBackOff: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in pod {{ $labels.pod }} ({{ $labels.namespace }}) is in CrashLoopBackOff. It is repeatedly starting and crashing."
 
@@ -112,6 +113,7 @@ groups:
           service: common-notify
           component: pod-state
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} restarted >3x in 15m"
           summary: "Frequent restarts: {{ $labels.namespace }}/{{ $labels.pod }}"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) restarted more than 3 times in the last 15 minutes."
 
@@ -143,12 +145,13 @@ groups:
                 - evaluator: { type: gt, params: [0] }
               refId: C
         labels:
-          severity: warning
+          severity: critical
           service: common-notify
           component: pod-state
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} not ready for 10m+"
           summary: "Pod not ready: {{ $labels.namespace }}/{{ $labels.pod }}"
-          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has been in a non-running phase for over 10 minutes."
+          description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has been in a non-running phase (Pending/Unknown/Failed) for over 10 minutes."
 
       - uid: cn-deployment-replicas
         title: DeploymentReplicasMismatch
@@ -181,6 +184,7 @@ groups:
           service: common-notify
           component: pod-state
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.deployment }} under desired replicas"
           summary: "Deployment under-replicated: {{ $labels.namespace }}/{{ $labels.deployment }}"
           description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has fewer available replicas than desired for 10+ minutes."
 
@@ -227,6 +231,7 @@ groups:
           service: common-notify
           component: memory
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 85%"
           summary: "High memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is using {{ printf \"%.0f\" $values.A.Value }}% of its memory limit (threshold 85%). Risk of OOMKill."
 
@@ -265,6 +270,7 @@ groups:
           service: common-notify
           component: memory
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 95%"
           summary: "CRITICAL memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is above 95% of its memory limit and likely to be OOMKilled imminently."
 
@@ -299,6 +305,7 @@ groups:
           service: common-notify
           component: memory
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled"
           summary: "OOMKilled: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) was OOMKilled in the last 10 minutes. Increase memory limits or investigate a leak."
 
@@ -347,5 +354,278 @@ groups:
           service: common-notify
           component: cpu
         annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} CPU throttled >25%"
           summary: "CPU throttling: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is being CPU-throttled >25% of the time for 15+ minutes."
+
+  # =========================================================================
+  # NOTIFY API — 5xx rate & latency, from the app /api/metrics scrape
+  # (express-prom-bundle: http_request_duration_seconds{status_code,method,path}).
+  # These fire only on ACTUAL traffic — no traffic means the *_count rate is 0,
+  # so an idle service does NOT alert (this is the correct replacement for the
+  # removed log-absence "NoLogsReceived" alert).
+  # =========================================================================
+  - orgId: 1
+    name: notify-api
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-api-5xx-high
+        title: ApiHigh5xxRate
+        condition: C
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                (
+                  sum by (namespace) (
+                    rate(http_request_duration_seconds_count{
+                      namespace=~"f6bc3f-(dev|test|prod)", status_code=~"5.."
+                    }[5m])
+                  )
+                  /
+                  sum by (namespace) (
+                    rate(http_request_duration_seconds_count{
+                      namespace=~"f6bc3f-(dev|test|prod)"
+                    }[5m])
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: api
+        annotations:
+          short: "{{ $labels.namespace }} API 5xx rate above 5%"
+          summary: "Elevated 5xx rate: {{ $labels.namespace }}"
+          description: "The Notify API in {{ $labels.namespace }} is returning 5xx for more than 5% of requests over the last 5 minutes."
+
+      - uid: cn-api-latency-high
+        title: ApiHighLatency
+        condition: C
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                histogram_quantile(0.95,
+                  sum by (namespace, le) (
+                    rate(http_request_duration_seconds_bucket{
+                      namespace=~"f6bc3f-(dev|test|prod)"
+                    }[5m])
+                  )
+                )
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: api
+        annotations:
+          short: "{{ $labels.namespace }} API p95 latency above 2s"
+          summary: "Elevated response times: {{ $labels.namespace }}"
+          description: "p95 request latency in {{ $labels.namespace }} has been above 2s for 10+ minutes."
+
+  # =========================================================================
+  # STORAGE — PVC utilisation. Uses kubelet volume metrics.
+  # ⚠️ CAVEAT: kubelet_volume_stats_* come from the kubelet, NOT
+  # kube-state-metrics. A namespace-scoped Prometheus may not scrape the
+  # kubelet (needs node-level RBAC). If these metrics are absent, these two
+  # rules simply never fire (no error) — same caveat as the memory-% rules.
+  # Validate `kubelet_volume_stats_available_bytes` exists in Prometheus; if
+  # not, PVC alerting must move to a cluster-level monitoring stack.
+  # =========================================================================
+  - orgId: 1
+    name: storage
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-pvc-high
+        title: PVCUsageHigh
+        condition: C
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 85%"
+          summary: "PVC usage high: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 85% full."
+
+      - uid: cn-pvc-critical
+        title: PVCUsageCritical
+        condition: C
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 95%"
+          summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
+
+  # =========================================================================
+  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
+  # readiness. We can't scrape the DB/Redis exporters directly from this
+  # namespace-scoped Prometheus, so availability is inferred from pod Ready
+  # state of the primary DB / Redis master pods (kube_pod_status_ready).
+  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
+  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
+  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
+  # Completed/Error and would otherwise register as "not ready" and fire a
+  # permanent false-positive:
+  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
+  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
+  # =========================================================================
+  - orgId: 1
+    name: dependencies
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-postgres-down
+        title: PostgresUnavailable
+        condition: C
+        for: 3m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace) (
+                  kube_pod_status_ready{
+                    namespace=~"f6bc3f-(dev|test|prod)",
+                    condition="true",
+                    pod=~"pg-.*-crunchy-db-.*"
+                  }
+                ) < 1
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: database
+        annotations:
+          short: "{{ $labels.namespace }} PostgreSQL has no ready pod"
+          summary: "PostgreSQL unavailable: {{ $labels.namespace }}"
+          description: "No ready PostgreSQL (Crunchy) pod in {{ $labels.namespace }} for 3+ minutes — the database is unavailable."
+
+      - uid: cn-redis-down
+        title: RedisUnavailable
+        condition: C
+        for: 3m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace) (
+                  kube_pod_status_ready{
+                    namespace=~"f6bc3f-(dev|test|prod)",
+                    condition="true",
+                    pod=~"common-notify-redis-master-.*"
+                  }
+                ) < 1
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: redis
+        annotations:
+          short: "{{ $labels.namespace }} Redis has no ready pod"
+          summary: "Redis unavailable: {{ $labels.namespace }}"
+          description: "No ready Redis pod in {{ $labels.namespace }} for 3+ minutes — the queue/cache backend is unavailable."

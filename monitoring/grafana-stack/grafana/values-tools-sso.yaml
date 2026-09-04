@@ -73,33 +73,19 @@ alerting:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
               title: 'Grafana Alert Notification'
+              # Message format: Status → Severity → Alert name → Short description
+              #   🔴 FIRING | CRITICAL | Notify: <alertname> — <short>
+              #   🟠 FIRING | WARNING  | Notify: <alertname> — <short>
+              #   🟢 RESOLVED | Notify: <alertname> — <short>
+              # Icon is derived from .Labels.severity (no per-alert icon needed).
+              # Headline text uses the `short` annotation when present, else falls
+              # back to `summary`. One line per alert — detail stays in Grafana.
               message: |
-                {{ `{{ if gt (len .Alerts.Firing) 0 }}` }}
-                **🔴 FIRING ALERTS ({{ `{{ len .Alerts.Firing }}` }})**
                 {{ `{{ range .Alerts.Firing }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Severity:** {{ `{{ .Labels.severity }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Service:** {{ `{{ .Labels.service }}` }}
-                {{ `{{ if .Labels.app }}` }}**App:** {{ `{{ .Labels.app }}{{ end }}` }}
-
-                **Summary:** {{ `{{ .Annotations.summary }}` }}
-                {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
-
-                **Status:** Firing since {{ `{{ .StartsAt }}` }}
-                [View in Grafana]({{ `{{ .GeneratorURL }}` }})
+                {{ `{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }}` }} FIRING | {{ `{{ .Labels.severity | toUpper }}` }} | Notify: {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
-                {{ `{{ end }}` }}
-
-                {{ `{{ if gt (len .Alerts.Resolved) 0 }}` }}
-                **✅ RESOLVED ALERTS ({{ `{{ len .Alerts.Resolved }}` }})**
                 {{ `{{ range .Alerts.Resolved }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Resolved at:** {{ `{{ .EndsAt }}` }}
-                {{ `{{ end }}` }}
+                🟢 RESOLVED | Notify: {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
             disableResolveMessage: false
 
