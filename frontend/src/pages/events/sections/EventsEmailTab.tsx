@@ -17,6 +17,7 @@ import {
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -113,6 +114,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [saving, setSaving] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
@@ -518,13 +520,30 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           />
 
           <div className="events__actions">
-            <Button variant="secondary" isDisabled>
+            <Button
+              variant="secondary"
+              type="button"
+              onPress={() => setPreviewOpen(true)}
+              isDisabled={areFieldsDisabled || !selectedTemplate}
+            >
               Preview
             </Button>
             <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
+
+          {selectedTemplate && (
+            <EventsEmailPreviewModal
+              isOpen={previewOpen}
+              onClose={() => setPreviewOpen(false)}
+              template={selectedTemplate}
+              senderEmail={trimmedSenderEmail}
+              toAddresses={recipients.to}
+              ccAddresses={recipients.cc}
+              bccAddresses={recipients.bcc}
+            />
+          )}
         </>
       )}
     </form>
