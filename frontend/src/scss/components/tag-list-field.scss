@@ -12,6 +12,12 @@
     border-color: var(--surface-color-border-active);
   }
 
+  // The DS tags default to the near-white info surface; the design calls for the
+  // light blue fill instead. The disabled state keeps its own grey.
+  .bcds-react-aria-Tag.blue:not([data-disabled]) {
+    background-color: var(--theme-blue-20, #d8eafd);
+  }
+
   // The DS TextArea brings its own bordered container; strip it (including its own
   // invalid-state border) so the input blends into this container's border instead
   // of nesting one inside the other.

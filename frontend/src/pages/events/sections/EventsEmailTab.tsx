@@ -436,7 +436,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           />
 
           {selectedTemplate && (
-            <div className="events__template-preview">
+            <div
+              className={`events__template-preview${
+                areFieldsDisabled ? ' events__template-preview--disabled' : ''
+              }`}
+            >
               <span className="events__template-preview-label">Template Preview</span>
               <div className="events__template-preview-box">
                 <p className="events__template-preview-subject">

@@ -152,6 +152,20 @@
   white-space: pre-wrap;
 }
 
+// Matches the greyed-out look of the DS form controls when the channel is inactive.
+.events__template-preview--disabled {
+  .events__template-preview-label,
+  .events__template-preview-subject,
+  .events__template-preview-body-label,
+  .events__template-preview-content {
+    color: var(--typography-color-disabled, #9f9d9c);
+  }
+
+  .events__template-preview-box {
+    background: var(--surface-color-forms-disabled);
+  }
+}
+
 // Grows the read-only preview TextArea to fit its content instead of scrolling,
 // while still letting the user resize it by hand. Same pattern as
 // template-preview__raw in templates.scss.
