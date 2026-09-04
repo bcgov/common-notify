@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import { Button, TextArea, TextField } from '@bcgov/design-system-react-components'
+import StickyBar from '@/components/StickyBar'
 
 export type EventSettingsValues = {
   name: string
@@ -64,9 +65,11 @@ const EventsTab: FC<EventsTabProps> = ({ values, onSave, isDisabled = false }) =
         isRequired
       />
 
-      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-        {saving ? 'Saving…' : 'Save Event Settings'}
-      </Button>
+      <StickyBar>
+        <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+          {saving ? 'Saving…' : 'Save Event Settings'}
+        </Button>
+      </StickyBar>
     </form>
   )
 }

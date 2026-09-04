@@ -18,6 +18,7 @@ import {
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
+import StickyBar from '@/components/StickyBar'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -523,20 +524,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             isDisabled
           />
 
-          <div className="events__actions">
-            <Button
-              variant="secondary"
-              type="button"
-              onPress={() => setPreviewOpen(true)}
-              isDisabled={areFieldsDisabled || !selectedTemplate}
-            >
-              Preview
-            </Button>
-            <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-
           {selectedTemplate && (
             <EventsEmailPreviewModal
               isOpen={previewOpen}
@@ -548,6 +535,20 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               bccAddresses={recipients.bcc}
             />
           )}
+
+          <StickyBar>
+            <Button
+              variant="secondary"
+              type="button"
+              onPress={() => setPreviewOpen(true)}
+              isDisabled={areFieldsDisabled || !selectedTemplate}
+            >
+              Preview
+            </Button>
+            <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </StickyBar>
         </>
       )}
     </form>

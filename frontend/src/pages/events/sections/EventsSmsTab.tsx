@@ -12,6 +12,7 @@ import {
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import StickyBar from '@/components/StickyBar'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -328,14 +329,14 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
             />
           )}
 
-          <div className="events__actions">
+          <StickyBar>
             <Button variant="secondary" isDisabled>
               Preview
             </Button>
             <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
-          </div>
+          </StickyBar>
         </>
       )}
     </form>

@@ -36,7 +36,12 @@
   flex-direction: column;
   gap: 24px;
   width: 100%;
-  max-width: 418px;
+
+  // The narrow measure sits on the fields rather than on the form itself, so the
+  // action bar at the end can span the full width of the page column.
+  > *:not(.sticky-bar) {
+    max-width: 418px;
+  }
 
   .bcds-react-aria-Button {
     align-self: flex-start;
@@ -49,11 +54,6 @@
   .bcds-react-aria-RadioGroup--label {
     font-weight: 700;
   }
-}
-
-.events__actions {
-  display: flex;
-  gap: 8px;
 }
 
 // Borrowed from templates info icon scss
