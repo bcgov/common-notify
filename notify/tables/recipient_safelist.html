@@ -399,12 +399,12 @@
                                     <td>((channel_code)::text &#61; ANY ((ARRAY[&#39;EMAIL&#39;::character varying, &#39;SMS&#39;::character varying])::text[]))</td>
                                 </tr>
                                 <tr>
-                                    <td>chk_recipient_safelist_normalized</td>
-                                    <td>(((recipient_normalized)::text &#61; btrim((recipient_normalized)::text)) AND (length((recipient_normalized)::text) &gt; 0))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_recipient_safelist_recipient</td>
                                     <td>(length(btrim((recipient)::text)) &gt; 0)</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_recipient_safelist_normalized</td>
+                                    <td>(((recipient_normalized)::text &#61; btrim((recipient_normalized)::text)) AND (length((recipient_normalized)::text) &gt; 0))</td>
                                 </tr>
                                 </tbody>
                             </table>

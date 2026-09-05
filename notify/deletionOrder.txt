@@ -10,15 +10,16 @@ template_version
 notification_request_detail
 api_key_usage
 user_identity
+tenant_settings
 recipient_safelist
 feature_flag
 api_key_limit_alert
 api_key_limit
-tenant_settings
 client_tenant_mapping
 attachment
 webhook_config
 template
+email_logo
 notification_request
 api_key_consumer
 tenant
@@ -27,6 +28,8 @@ tenant_status_code
 notify_user
 identity_provider
 feature_flag_code
+email_logo_status_code
+email_logo_source_code
 usage_period_type_code
 template_engine_code
 notification_status_code

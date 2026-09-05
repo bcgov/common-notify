@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>api_key_limit - default.notify</title>
+        <title>email_logo - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>api_key_limit</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>email_logo</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>Configured numeric notification limits per (API key, channel). Populated once when an API key is linked to a tenant during onboarding.</p>
+                            <p>Email logo metadata for system-provided and tenant-provided logos.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -130,17 +130,56 @@
                                     <td>gen_random_uuid()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_settings.email_logo_id references email_logo.id via fk_tenant_settings_email_logo"><a href='tenant_settings.html'>tenant_settings</a><span class='relatedKey'>.email_logo_id</span></td>
+                                                <td class="constraint detail">fk_tenant_settings_email_logo</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td></td>
+                                    <td><p>Email logo ID (UUID). Primary key.</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="api_key_consumer_id">api_key_consumer_id</span></td>
-                                    <td>uuid</td>
+                                    <td><span id="name">name</span></td>
+                                    <td>varchar</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Display name for the email logo.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="file_key">file_key</span></td>
+                                    <td>varchar</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Object storage key for the email logo file; not a URL.</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="source_code">source_code</span></td>
+                                    <td>varchar</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
                                     <td title=''></td>
@@ -152,18 +191,18 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="api_key_limit.api_key_consumer_id references api_key_consumer.id via fk_api_key_limit_consumer"><a href='api_key_consumer.html'>api_key_consumer</a><span class='relatedKey'>.id</span></td>
-                                                <td class="constraint detail">fk_api_key_limit_consumer</td>
-                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                                <td title="email_logo.source_code references email_logo_source_code.source_code via fk_email_logo_source"><a href='email_logo_source_code.html'>email_logo_source_code</a><span class='relatedKey'>.source_code</span></td>
+                                                <td class="constraint detail">fk_email_logo_source</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
                                         </table>
                                     </td>
-                                    <td><p>The API key (api_key_consumer) these limits apply to.</p></td>
+                                    <td><p>Foreign key to email_logo_source_code. Identifies whether the logo is system-provided or tenant-provided.</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="status_code">status_code</span></td>
                                     <td>varchar</td>
-                                    <td>20</td>
+                                    <td>2147483647</td>
                                     <td title=''></td>
                                     <td title=''></td>
                                     <td>null</td>
@@ -174,19 +213,19 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="api_key_limit.channel_code references notification_channel_code.channel_code via fk_api_key_limit_channel"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
-                                                <td class="constraint detail">fk_api_key_limit_channel</td>
+                                                <td title="email_logo.status_code references email_logo_status_code.status_code via fk_email_logo_status"><a href='email_logo_status_code.html'>email_logo_status_code</a><span class='relatedKey'>.status_code</span></td>
+                                                <td class="constraint detail">fk_email_logo_status</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
                                         </table>
                                     </td>
-                                    <td><p>Channel the limits apply to (EMAIL, SMS). Limits differ per channel.</p></td>
+                                    <td><p>Foreign key to email_logo_status_code. Identifies the logo approval status.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="rate_limit_per_minute">rate_limit_per_minute</span></td>
-                                    <td>int4</td>
-                                    <td>10</td>
-                                    <td title=''></td>
+                                    <td><span id="tenant_id">tenant_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
                                     <td title=''></td>
                                     <td>null</td>
                                     <td>
@@ -197,13 +236,13 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Maximum notifications accepted per minute (API rate limit).</p></td>
+                                    <td><p>Tenant that owns the logo. Null for system-provided logos.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="daily_limit">daily_limit</span></td>
-                                    <td>int8</td>
-                                    <td>19</td>
-                                    <td title=''></td>
+                                    <td><span id="submitted_by">submitted_by</span></td>
+                                    <td>varchar</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
                                     <td title=''></td>
                                     <td>null</td>
                                     <td>
@@ -214,13 +253,13 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Maximum notifications per calendar day.</p></td>
+                                    <td><p>Identifier of the user or process that submitted the logo.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="annual_limit">annual_limit</span></td>
-                                    <td>int8</td>
-                                    <td>19</td>
-                                    <td title=''></td>
+                                    <td><span id="approved_by">approved_by</span></td>
+                                    <td>varchar</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
                                     <td title=''></td>
                                     <td>null</td>
                                     <td>
@@ -231,7 +270,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Maximum notifications per fiscal year. The year boundary is set globally via notify.configuration key &lsquo;fiscal_year_start&rsquo;.</p></td>
+                                    <td><p>Identifier of the user or process that approved or rejected the logo.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="created_at">created_at</span></td>
@@ -248,24 +287,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="created_by">created_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td></td>
+                                    <td><p>Timestamp when the email logo was created.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="updated_at">updated_at</span></td>
@@ -282,15 +304,15 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td></td>
+                                    <td><p>Timestamp when the email logo was last updated.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="updated_by">updated_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
+                                    <td><span id="is_deleted">is_deleted</span></td>
+                                    <td>bool</td>
+                                    <td>1</td>
                                     <td title=''></td>
-                                    <td>null</td>
+                                    <td title=''></td>
+                                    <td>false</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
@@ -299,7 +321,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td></td>
+                                    <td><p>Soft delete flag. When true, the email logo is considered inactive.</p></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -332,66 +354,14 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_api_key_limit</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> email_logo_pkey</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
                                     <td>id</td>
                                 </tr>
-                                <tr>
-                                    <td title='Indexed'>idx_api_key_limit_consumer</td>
-                                    <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>api_key_consumer_id</td>
-                                </tr>
-                                <tr>
-                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_api_key_limit</td>
-                                    <td>Must be unique</td>
-                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
-                                    <td>api_key_consumer_id + channel_code</td>
-                                </tr>
                                 </tbody>
                             </table>
                         </div><!-- /.box-body -->
-                    </div>
-                    <div class="box box-primary">
-                        <div class="box-header with-border">
-                            <i class="fa fa-sitemap"></i>
-                            <h3 class="box-title">Check Constraints</h3>
-                            <div class="box-tools pull-right">
-                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
-                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
-                            </div>
-                        </div>
-                        <div class="box-body">
-                            <table
-                                    id="check_table"
-                                    class="table table-bordered table-striped dataTable"
-                                    role="grid"
-                                    data-paging="true"
-                                    data-page-length="10"
-                                    data-length-change="false">
-                                <thead align='left'>
-                                <tr>
-                                    <th>Constraint Name</th>
-                                    <th>Constraint</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr>
-                                    <td>chk_api_key_limit_annual</td>
-                                    <td>(annual_limit &gt; 0)</td>
-                                </tr>
-                                <tr>
-                                    <td>chk_api_key_limit_rate</td>
-                                    <td>(rate_limit_per_minute &gt; 0)</td>
-                                </tr>
-                                <tr>
-                                    <td>chk_api_key_limit_daily</td>
-                                    <td>(daily_limit &gt; 0)</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
@@ -412,27 +382,22 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="337,56,700,419">
-<area shape="rect" id="node2" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="37,5,262,181">
-<area shape="rect" id="node3" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,199,293,345">
+<area shape="rect" id="node1" href="email_logo.html" target="_top" title="email_logo" alt="" coords="317,61,629,453">
+<area shape="rect" id="node2" href="email_logo_source_code.html" target="_top" title="email_logo_source_code" alt="" coords="5,99,273,216">
+<area shape="rect" id="node3" href="email_logo_status_code.html" target="_top" title="email_logo_status_code" alt="" coords="7,233,272,351">
+<area shape="rect" id="node4" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="673,5,953,181">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/api_key_limit.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/email_logo.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="214,488,439,664">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,684,139,772">
-<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="515,5,877,368">
-<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="183,689,471,836">
-<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="582,385,810,473">
-<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="567,491,825,579">
-<area shape="rect" id="node7" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="600,596,792,684">
-<area shape="rect" id="node8" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="549,843,843,931">
-<area shape="rect" id="node9" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="588,948,804,1036">
-<area shape="rect" id="node10" href="template.html" target="_top" title="template" alt="" coords="620,701,772,789">
-<area shape="rect" id="node11" href="template_version.html" target="_top" title="template_version" alt="" coords="921,736,1140,824">
+<area shape="rect" id="node1" href="email_logo.html" target="_top" title="email_logo" alt="" coords="317,111,629,503">
+<area shape="rect" id="node2" href="email_logo_source_code.html" target="_top" title="email_logo_source_code" alt="" coords="5,148,273,265">
+<area shape="rect" id="node3" href="email_logo_status_code.html" target="_top" title="email_logo_status_code" alt="" coords="7,283,272,400">
+<area shape="rect" id="node4" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="673,15,953,191">
+<area shape="rect" id="node5" href="tenant.html" target="_top" title="tenant" alt="" coords="407,5,540,93">
 </map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/api_key_limit.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/email_logo.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

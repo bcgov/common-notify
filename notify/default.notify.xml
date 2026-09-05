@@ -229,6 +229,57 @@
             <column ascending="true" name="key"/>
          </index>
       </table>
+      <table name="email_logo" remarks="Email logo metadata for system-provided and tenant-provided logos." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Email logo ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
+            <child column="email_logo_id" foreignKey="fk_tenant_settings_email_logo" implied="false" onDeleteCascade="false" schema="notify" table="tenant_settings"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="name" nullable="true" remarks="Display name for the email logo." size="2147483647" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="file_key" nullable="true" remarks="Object storage key for the email logo file; not a URL." size="2147483647" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="source_code" nullable="false" remarks="Foreign key to email_logo_source_code. Identifies whether the logo is system-provided or tenant-provided." size="2147483647" type="varchar" typeCode="12">
+            <parent column="source_code" foreignKey="fk_email_logo_source" implied="false" onDeleteCascade="false" schema="notify" table="email_logo_source_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="status_code" nullable="false" remarks="Foreign key to email_logo_status_code. Identifies the logo approval status." size="2147483647" type="varchar" typeCode="12">
+            <parent column="status_code" foreignKey="fk_email_logo_status" implied="false" onDeleteCascade="false" schema="notify" table="email_logo_status_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="tenant_id" nullable="true" remarks="Tenant that owns the logo. Null for system-provided logos." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="submitted_by" nullable="true" remarks="Identifier of the user or process that submitted the logo." size="2147483647" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="approved_by" nullable="true" remarks="Identifier of the user or process that approved or rejected the logo." size="2147483647" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="created_at" nullable="false" remarks="Timestamp when the email logo was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="9" name="updated_at" nullable="false" remarks="Timestamp when the email logo was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="10" name="is_deleted" nullable="false" remarks="Soft delete flag. When true, the email logo is considered inactive." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="email_logo_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+      </table>
+      <table name="email_logo_source_code" remarks="Code table for email logo sources." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="source_code" nullable="false" remarks="Email logo source code. Primary key." size="50" type="varchar" typeCode="12">
+            <child column="source_code" foreignKey="fk_email_logo_source" implied="false" onDeleteCascade="false" schema="notify" table="email_logo"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the email logo source." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the source code was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the source code was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="source_code" sequenceNumberInPK="1"/>
+         <index name="email_logo_source_code_pkey" unique="true">
+            <column ascending="true" name="source_code"/>
+         </index>
+      </table>
+      <table name="email_logo_status_code" remarks="Code table for email logo approval statuses." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="status_code" nullable="false" remarks="Email logo approval status code. Primary key." size="50" type="varchar" typeCode="12">
+            <child column="status_code" foreignKey="fk_email_logo_status" implied="false" onDeleteCascade="false" schema="notify" table="email_logo"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the email logo approval status." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the status code was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the status code was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="status_code" sequenceNumberInPK="1"/>
+         <index name="email_logo_status_code_pkey" unique="true">
+            <column ascending="true" name="status_code"/>
+         </index>
+      </table>
       <table name="feature_flag" remarks="Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier (UUID) for this feature flag record." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="code" nullable="false" remarks="Foreign key to feature_flag_code lookup table. Defines which feature this flag controls. Ensures only valid feature codes are used." size="255" type="varchar" typeCode="12">
@@ -768,6 +819,9 @@
          <column autoUpdated="false" defaultValue="true" digits="0" id="15" name="include_tenant_name_in_sms" nullable="false" remarks="When true, SMS messages are prefixed with the tenant name." size="1" type="bool" typeCode="-7"/>
          <column autoUpdated="false" defaultValue="false" digits="0" id="16" name="international_sms_enabled" nullable="false" remarks="When true, the tenant may send SMS to international numbers." size="1" type="bool" typeCode="-7"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="17" name="safelist_max_entries" nullable="true" remarks="Optional per-tenant override of the maximum number of recipient safelist entries. NULL means use the global notify.configuration key 'safelist_max_entries'." size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="18" name="email_logo_id" nullable="true" remarks="Optional email logo selected for this tenant." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_settings_email_logo" implied="false" onDeleteCascade="false" schema="notify" table="email_logo"/>
+         </column>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="pk_tenant_settings" unique="true">
             <column ascending="true" name="id"/>

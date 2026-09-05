@@ -432,6 +432,28 @@
                                     </td>
                                     <td><p>Optional per-tenant override of the maximum number of recipient safelist entries. NULL means use the global notify.configuration key &lsquo;safelist_max_entries&rsquo;.</p></td>
                                 </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="email_logo_id">email_logo_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_settings.email_logo_id references email_logo.id via fk_tenant_settings_email_logo"><a href='email_logo.html'>email_logo</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_tenant_settings_email_logo</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Optional email logo selected for this tenant.</p></td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -509,20 +531,20 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_tenant_settings_default_sender_email</td>
-                                    <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
+                                    <td>chk_tenant_settings_custom_header</td>
+                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
                                 </tr>
                                 <tr>
                                     <td>chk_tenant_settings_safelist_max</td>
                                     <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
                                 </tr>
                                 <tr>
-                                    <td>chk_tenant_settings_custom_header</td>
-                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_tenant_settings_reply_to_email</td>
                                     <td>((reply_to_email IS NULL) OR ((reply_to_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_tenant_settings_default_sender_email</td>
+                                    <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -547,24 +569,28 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="191,5,609,603">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,37,147,213">
+<area shape="rect" id="node1" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="213,5,632,632">
+<area shape="rect" id="node2" href="email_logo.html" target="_top" title="email_logo" alt="" coords="5,536,169,712">
+<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="17,37,158,213">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant_settings.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="566,5,791,93">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,387,425,563">
-<area shape="rect" id="node8" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,448,240,536">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="592,111,765,199">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="548,216,809,304">
-<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="591,321,766,409">
-<area shape="rect" id="node6" href="notification_request.html" target="_top" title="notification_request" alt="" coords="558,463,799,551">
-<area shape="rect" id="node7" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="571,673,787,761">
-<area shape="rect" id="node9" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="469,779,888,1376">
-<area shape="rect" id="node10" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="575,568,783,656">
-<area shape="rect" id="node11" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="932,463,1187,551">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="622,5,847,93">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="329,387,470,563">
+<area shape="rect" id="node11" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="22,448,257,536">
+<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="648,111,821,199">
+<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="604,216,865,304">
+<area shape="rect" id="node5" href="email_logo.html" target="_top" title="email_logo" alt="" coords="317,1309,481,1485">
+<area shape="rect" id="node6" href="email_logo_source_code.html" target="_top" title="email_logo_source_code" alt="" coords="5,1303,273,1391">
+<area shape="rect" id="node7" href="email_logo_status_code.html" target="_top" title="email_logo_status_code" alt="" coords="7,1408,272,1496">
+<area shape="rect" id="node8" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="647,321,822,409">
+<area shape="rect" id="node9" href="notification_request.html" target="_top" title="notification_request" alt="" coords="614,463,855,551">
+<area shape="rect" id="node10" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="627,673,843,761">
+<area shape="rect" id="node12" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="525,779,944,1405">
+<area shape="rect" id="node13" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="631,568,839,656">
+<area shape="rect" id="node14" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="988,463,1243,551">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant_settings.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
