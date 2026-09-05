@@ -78,6 +78,14 @@ spec:
               value: info
             - name: GC_NOTIFY_BASE_URL
               value: https://api.notification.canada.ca
+            # Which transport actually sends. Not secret - the credentials behind each one are,
+            # and those come from app-api-secrets below. Without these the container falls through
+            # to the defaults in configuration.ts, which is why the adapter could not previously be
+            # chosen per environment.
+            - name: DELIVERY_EMAIL_ADAPTER
+              value: {{ .Values.backend.delivery.emailAdapter | default "ches" | quote }}
+            - name: DELIVERY_SMS_ADAPTER
+              value: {{ .Values.backend.delivery.smsAdapter | default "acs" | quote }}
             - name: REDIS_HOST
               value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Release.Name) }}
             - name: REDIS_PORT

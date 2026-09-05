@@ -81,6 +81,15 @@ backend:
     # 3. Monitoring namespace (monitoring policy-group)
     # 4. Any namespace on port 3000 (for Kong API Gateway)
     # NOTE: More restrictive namespace selector needed from platform team
+  #-- which transport each channel sends through. The credentials for the selected adapter must
+  #-- exist in app-api-secrets, or the adapter logs instead of sending.
+  delivery:
+    #-- email transport: ches | nodemailer | log ("log" is a non-delivering sink, load tests only)
+    emailAdapter: ches
+    #-- sms transport: acs | twilio
+    #-- Both report per-recipient outcomes, so a partial failure marks only the recipients that
+    #-- actually failed and the queue retry does not re-send to the rest.
+    smsAdapter: acs
   #-- ClamAV antivirus scanning configuration
   clamav:
     #-- enable or disable ClamAV deployment

@@ -105,6 +105,19 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  - name: ${ROUTE_PREFIX}notify-simple-frontend-sms
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/notifysimple/sms
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-frontend-cancel-reschedule
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     hosts:
@@ -978,6 +991,11 @@ plugins:
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-frontend-sms
+    config: *jwtConfig
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     protocols: [http, https]

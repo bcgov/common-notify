@@ -227,9 +227,49 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
  * ValidationPipe has already validated the body, so the presence of `email.recipients.mergeArray` is
  * sufficient to route the request through the mail merge fan-out flow.
  */
-function isEmailMergeRequest(payload: unknown): payload is NotifySimpleRequest {
-  const email = (payload as NotifySimpleRequest | undefined)?.email
-  return Array.isArray(email?.recipients?.mergeArray)
+function mergeRequestChannel(payload: unknown): NotificationChannel | null {
+  const request = payload as NotifySimpleRequest | undefined
+  if (Array.isArray(request?.email?.recipients?.mergeArray)) return NotificationChannel.EMAIL
+  if (Array.isArray(request?.sms?.recipients?.mergeArray)) return NotificationChannel.SMS
+  return null
+}
+
+/**
+ * Billable message count for a merge.
+ *
+ * Email is one message per recipient. SMS is billed in segments and every recipient of a merge
+ * receives a *different* body, so the count is the sum of each recipient's own segments - not
+ * recipients x segments, which is only exact when every body is identical.
+ */
+async function countMergeMessages(
+  ctx: QueueableContext,
+  tenantId: string,
+  channel: NotificationChannel,
+  dto: NotifySimpleRequest,
+  recipients: Array<{ address: string; params: Record<string, unknown> }>,
+  globalParams: Record<string, unknown>,
+): Promise<number> {
+  if (channel !== NotificationChannel.SMS) {
+    return recipients.length
+  }
+
+  let total = 0
+  for (const recipient of recipients) {
+    // Each row is costed against its own rendered body; per-recipient params win over global ones,
+    // matching how the delivery worker renders it.
+    const perRecipient: NotifySimpleRequest = {
+      ...dto,
+      sms: {
+        ...dto.sms!,
+        recipients: { to: [recipient.address] },
+        params: { ...globalParams, ...recipient.params },
+      },
+    } as NotifySimpleRequest
+
+    total += await resolveSmsSegments(ctx, tenantId, perRecipient as never)
+  }
+
+  return total
 }
 
 /**
@@ -238,7 +278,7 @@ function isEmailMergeRequest(payload: unknown): payload is NotifySimpleRequest {
  * per-batch delivery jobs (and creates the per-recipient detail rows), so this does not call
  * createPending here.
  */
-async function handleEmailMerge(
+async function handleMerge(
   ctx: QueueableContext,
   queue: Bull.Queue,
   queueName: QueueName,
@@ -246,21 +286,23 @@ async function handleEmailMerge(
   dto: NotifySimpleRequest,
   apiKeyConsumerId: string | undefined,
   requestRoute: string | undefined,
+  channel: NotificationChannel,
 ) {
-  const logger = new Logger(`Queueable[${queueName}][emailMerge]`)
+  const isSms = channel === NotificationChannel.SMS
+  const logger = new Logger(`Queueable[${queueName}][${isSms ? 'smsMerge' : 'emailMerge'}]`)
 
-  const email = dto.email!
-  const mergeArray = email.recipients.mergeArray!
-  const delayedSendTimestamp = email.delayedSend
+  const channelPayload = (isSms ? dto.sms : dto.email)!
+  const mergeArray = channelPayload.recipients.mergeArray!
+  const delayedSendTimestamp = channelPayload.delayedSend
   // Global params cascade: request-level params augmented/overridden by channel-level params
-  const globalParams = { ...dto.params, ...email.params }
+  const globalParams = { ...dto.params, ...channelPayload.params }
 
-  const errors = await ctx.notificationService.validateMailMergeRules(tenantId, dto)
+  const errors = await ctx.notificationService.validateMailMergeRules(tenantId, dto, channel)
   if (errors.length > 0) {
     throw new UnprocessableEntityException({ message: 'Request validation failed', errors })
   }
 
-  const allRecipients = ctx.notificationService.parseMailMergeRecipients(mergeArray)
+  const allRecipients = ctx.notificationService.parseMailMergeRecipients(mergeArray, channel)
 
   // Non-production guardrail. A merge is a list of independent sends, so non-safelisted rows are
   // dropped from the fan-out and recorded individually as `blocked` instead of failing the whole
@@ -268,7 +310,7 @@ async function handleEmailMerge(
   const blockedAddresses = ctx.safelistService
     ? await ctx.safelistService.findBlocked(
         tenantId,
-        allRecipients.map(({ address }) => ({ address, channel: NotificationChannel.EMAIL })),
+        allRecipients.map(({ address }) => ({ address, channel })),
       )
     : []
   const blockedSet = new Set(blockedAddresses)
@@ -286,10 +328,24 @@ async function handleEmailMerge(
     )
   }
 
-  // Enforce daily/annual EMAIL limits BEFORE accepting the merge request (throws HTTP 429).
-  await enforceLimits(ctx, apiKeyConsumerId, [
-    { channel: NotificationChannel.EMAIL, count: recipients.length },
-  ])
+  // Billable count, before accepting the request. For SMS this renders every row, because each
+  // recipient's body - and therefore its segment count - differs.
+  const messageCount = await countMergeMessages(
+    ctx,
+    tenantId,
+    channel,
+    dto,
+    recipients,
+    globalParams,
+  )
+  if (isSms && messageCount > recipients.length) {
+    logger.debug(
+      `SMS merge: ${recipients.length} recipient(s) bill as ${messageCount} segment(s) (tenant=${tenantId})`,
+    )
+  }
+
+  // Enforce daily/annual limits BEFORE accepting the merge request (throws HTTP 429).
+  await enforceLimits(ctx, apiKeyConsumerId, [{ channel, count: messageCount }])
 
   // Persist the parent request (PENDING) for durability before queuing
   const notificationRecord = await ctx.notificationService.create({
@@ -300,7 +356,7 @@ async function handleEmailMerge(
     requestRoute,
   })
   logger.debug(
-    `Email merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
+    `${isSms ? 'SMS' : 'Email'} merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
 
   // Record the dropped recipients so "why didn't this one arrive?" is answerable from the
@@ -310,7 +366,7 @@ async function handleEmailMerge(
       await ctx.notificationRequestDetailService.createBlocked(
         notificationRecord.id,
         // blockedSet, not blockedAddresses: a merge can list the same address on several rows.
-        [...blockedSet].map((address) => ({ address, channel: NotificationChannel.EMAIL })),
+        [...blockedSet].map((address) => ({ address, channel })),
         'Recipient is not on the tenant safelist',
         tenantId,
       )
@@ -323,9 +379,10 @@ async function handleEmailMerge(
     }
   }
 
-  // Attribute accepted merge emails against the API key's usage limits (non-fatal).
+  // Attribute the accepted merge against the API key's usage limits (non-fatal). SMS is recorded
+  // in segments, matching what was enforced above.
   const usageResults = await recordAcceptedUsage(ctx, apiKeyConsumerId, [
-    { channel: NotificationChannel.EMAIL, count: recipients.length },
+    { channel, count: messageCount },
   ])
   await processLimitAlerts(ctx, apiKeyConsumerId, usageResults)
 
@@ -356,7 +413,7 @@ async function handleEmailMerge(
           : undefined,
       })
       .catch((err: Error) =>
-        logger.error('Failed to publish SSE event on email merge create', { error: err.message }),
+        logger.error('Failed to publish SSE event on merge create', { error: err.message }),
       )
   }
 
@@ -367,18 +424,21 @@ async function handleEmailMerge(
   }
   const hasDelayedSend = !!delayedSendTimestamp
 
+  const label = isSms ? 'SMS merge' : 'Email merge'
   const response = {
     notifyId: notificationRecord.id,
-    templateId: email.content?.templateId,
+    templateId: channelPayload.content?.templateId,
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
-    channels: ['email'],
+    channels: [isSms ? 'sms' : 'email'],
     createdAt: notificationRecord.createdAt || new Date(),
     // Accepted recipients only - safelist-blocked rows are reported separately below, so a caller
     // can tell "242 queued" from "250 rows uploaded" without parsing the message string.
     recipientCount: recipients.length,
+    // SMS only: recipients are billed in segments, so this can exceed recipientCount.
+    ...(isSms && { billableMessageCount: messageCount }),
     message: hasDelayedSend
-      ? `Email merge send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
-      : `Email merge send accepted with ${recipients.length} recipient(s)`,
+      ? `${label} send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
+      : `${label} send accepted with ${recipients.length} recipient(s)`,
     ...(blockedSet.size > 0 && {
       blockedRecipientCount: blockedSet.size,
       blockedMessage: `${blockedSet.size} recipient(s) were not sent to because they are not on this tenant's safelist`,
@@ -392,11 +452,12 @@ async function handleEmailMerge(
       const jobPayload = {
         notifyId: notificationRecord.id,
         tenantId,
-        request: { templateId: email.content?.templateId },
+        request: { templateId: channelPayload.content?.templateId },
         requestedAt: new Date().toISOString(),
         mailMerge: true,
+        mailMergeChannel: channel,
         mailMergeData: {
-          content: email.content,
+          content: channelPayload.content,
           params: globalParams,
           recipients,
         },
@@ -539,15 +600,17 @@ export function Queueable(
               : tenantId
 
         // Email merge send: a different payload/flow that fans out into batches downstream.
-        if (isEmailMergeRequest(payload)) {
-          return await handleEmailMerge(
+        const mergeChannel = mergeRequestChannel(payload)
+        if (mergeChannel) {
+          return await handleMerge(
             this as QueueableContext,
             queue,
             queueName,
             tenantId,
-            payload,
+            payload as NotifySimpleRequest,
             req?.apiKeyConsumerId,
             requestRoute,
+            mergeChannel,
           )
         }
 

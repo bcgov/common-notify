@@ -923,6 +923,103 @@ describe('Notify Controllers', () => {
         })
       })
 
+      describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
+        const validSmsMerge = {
+          sms: {
+            content: { templateId: '12345678-1234-4234-8234-123456789012' },
+            recipients: {
+              mergeArray: [
+                ['to', 'firstName'],
+                ['+12505550123', 'Alice'],
+                ['+16045550147', 'Bob'],
+              ],
+            },
+          },
+        }
+
+        it('should accept an SMS merge and report the recipient count', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.channels).toEqual(['sms'])
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.message).toContain('SMS merge send accepted with 2 recipient(s)')
+            })
+        })
+
+        it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
+          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
+          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
+          mockSmsSegmentService.countSegmentsPerRecipient
+            .mockResolvedValueOnce(3)
+            .mockResolvedValueOnce(1)
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.billableMessageCount).toBe(4)
+            })
+        })
+
+        it('should enforce limits on segments, not on recipients', async () => {
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockApiKeyConsumerId = 'consumer-1'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-1', [
+            { channel: 'SMS', count: 8 },
+          ])
+        })
+
+        it('should return 422 with the row that failed validation', async () => {
+          mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+            'Row 2: "not-a-number" is not a valid phone number',
+          ])
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.errors).toContain('Row 2: "not-a-number" is not a valid phone number')
+            })
+        })
+
+        it('should return 400 when both to and mergeArray are given', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({
+              sms: {
+                ...validSmsMerge.sms,
+                recipients: {
+                  to: ['+12505550123'],
+                  mergeArray: [['to'], ['+16045550147']],
+                },
+              },
+            })
+            .expect(400)
+        })
+
+        it('should still reject an empty to list', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({ sms: { ...validSmsMerge.sms, recipients: { to: [] } } })
+            .expect(400)
+        })
+      })
+
       describe('POST /api/v1/notifysimple/email (mail-merge)', () => {
         // A mail-merge is a bare email channel whose recipients use mergeArray, posted to /email.
         const validMergeBody = {

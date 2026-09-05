@@ -14,6 +14,8 @@ import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -61,6 +63,10 @@ export class NotificationService {
   private readonly smsMaxBodyLength: number
   private readonly msgAppMaxRecipients: number
   private readonly msgAppMaxBodyLength: number
+
+  // Stateless helper, instantiated rather than injected so the constructor signature (and every
+  // spec that builds this service) stays put.
+  private readonly phoneNumberService = new PhoneNumberService()
 
   constructor(
     @InjectRepository(NotificationRequest)
@@ -234,13 +240,23 @@ export class NotificationService {
    * every row's email address must be well-formed. Returns a bounded list of error strings
    * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
    */
-  async validateMailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
+  async validateMailMergeRules(
+    tenantId: string,
+    dto: NotifySimpleRequest,
+    channel: NotificationChannel = NotificationChannel.EMAIL,
+  ): Promise<string[]> {
     const errors: string[] = []
 
-    const email = dto.email
-    const mergeArray = email?.recipients?.mergeArray ?? []
-    const templateId = email?.content?.templateId
-    const hasInlineContent = !!(email?.content && (email.content.subject || email.content.body))
+    const isSms = channel === NotificationChannel.SMS
+    const channelPayload = isSms ? dto.sms : dto.email
+    const mergeArray = channelPayload?.recipients?.mergeArray ?? []
+    const templateId = channelPayload?.content?.templateId
+    const content = channelPayload?.content
+    // An SMS has no subject, so inline content means a body.
+    const hasInlineContent = !!(
+      content &&
+      (content.body || (!isSms && (content as { subject?: string }).subject))
+    )
 
     const tenant = await this.tenantsService.findOne(tenantId)
     if (!tenant) {
@@ -260,15 +276,17 @@ export class NotificationService {
       const template = await this.templatesRepository.findById(tenantId, templateId)
       if (!template) {
         errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)
-      } else if (template.channelCode !== 'EMAIL') {
-        errors.push(`Template '${templateId}' is not an EMAIL template`)
+      } else if (template.channelCode !== channel) {
+        errors.push(`Template '${templateId}' is not a ${channel} template`)
       }
     } else if (!hasInlineContent) {
-      errors.push('Request must provide either a templateId or inline content (subject/body)')
+      errors.push(
+        `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`,
+      )
     }
 
-    if (email?.delayedSend) {
-      const scheduledTime = new Date(email.delayedSend).getTime()
+    if (channelPayload?.delayedSend) {
+      const scheduledTime = new Date(channelPayload.delayedSend).getTime()
       const now = Date.now()
       if (scheduledTime <= now) {
         errors.push(`delayedSend must be in the future`)
@@ -292,17 +310,23 @@ export class NotificationService {
         break
       }
       const address = (mergeArray[i]?.[0] ?? '').trim()
+      // SMS rows are keyed by their E.164 form, so the same number written two ways is still a
+      // duplicate; email rows are keyed case-insensitively.
+      const normalised = isSms ? this.phoneNumberService.normalize(address) : address.toLowerCase()
+
       if (!address) {
-        errors.push(`Row ${i}: email address is missing`)
-      } else if (!isEmail(address)) {
-        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+        errors.push(`Row ${i}: ${isSms ? 'phone number' : 'email address'} is missing`)
+      } else if (isSms ? normalised === null : !isEmail(address)) {
+        errors.push(
+          `Row ${i}: "${address}" is not a valid ${isSms ? 'phone number' : 'email address'}`,
+        )
       } else {
-        const normalised = address.toLowerCase()
-        const firstSeen = seen.get(normalised)
+        const key = normalised as string
+        const firstSeen = seen.get(key)
         if (firstSeen !== undefined) {
           errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
         } else {
-          seen.set(normalised, i)
+          seen.set(key, i)
         }
       }
     }
@@ -314,13 +338,24 @@ export class NotificationService {
    * Parse the mergeArray into per-recipient data. Returns one entry per data row containing
    * the recipient address (from the "to" column) and any extra columns as template params.
    * Per-recipient params take precedence over global params when rendering.
+   *
+   * SMS addresses are normalised to E.164 here, through the same PhoneNumberService the non-merge
+   * path uses in the ingestion worker. This is the single point every downstream consumer reads
+   * from - segment counting, the safelist check, the per-recipient detail rows and the send itself
+   * - so normalising once here keeps them all consistent. Without it a spreadsheet cell like
+   * "2507447721" reached the transport unchanged, and ACS rejects anything that is not E.164.
    */
   parseMailMergeRecipients(
     mergeArray: string[][],
+    channel: NotificationChannel = NotificationChannel.EMAIL,
   ): Array<{ address: string; params: Record<string, unknown> }> {
     const header = mergeArray[0] ?? []
+    const isSms = channel === NotificationChannel.SMS
     return mergeArray.slice(1).map((row) => {
-      const address = (row[0] ?? '').trim()
+      const raw = (row[0] ?? '').trim()
+      // Falls back to the raw value if it will not normalise; validateMailMergeRules has already
+      // rejected those, so this only guards the ordering of the two calls.
+      const address = isSms ? (this.phoneNumberService.normalize(raw) ?? raw) : raw
       const params: Record<string, unknown> = {}
       for (let i = 1; i < header.length; i++) {
         const key = (header[i] ?? '').trim()

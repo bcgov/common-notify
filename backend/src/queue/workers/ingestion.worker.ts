@@ -120,9 +120,13 @@ export class IngestionWorker {
         if (job.data.mailMerge && job.data.mailMergeData) {
           const { content, params, recipients } = job.data.mailMergeData
           const batchSize = configService?.get<number>('queue.batchSize') || 100
+          // Older jobs queued before SMS merge existed carry no channel and are email.
+          const mergeChannel = job.data.mailMergeChannel ?? NotificationChannel.EMAIL
+          const isSmsMerge = mergeChannel === NotificationChannel.SMS
+          const mergeQueue = isSmsMerge ? smsQueue : emailQueue
 
           logger.log(
-            `[${notifyId}] Processing mail merge email job: ${recipients.length} recipient(s), batchSize=${batchSize}`,
+            `[${notifyId}] Processing ${mergeChannel} merge job: ${recipients.length} recipient(s), batchSize=${batchSize}`,
           )
 
           let batchIndex = 0
@@ -130,19 +134,20 @@ export class IngestionWorker {
             const chunk = recipients.slice(start, start + batchSize)
             // Format: {notification_request id}-{channel}-{index}; reused as the delivery jobId
             // so a failed batch is easy to identify and retry.
-            const batchId = `${notifyId}-${NotificationChannel.EMAIL}-${batchIndex}`
+            const batchId = `${notifyId}-${mergeChannel}-${batchIndex}`
 
-            await requestDetailService.createEmailMergePending(
+            await requestDetailService.createMergePending(
               notifyId,
               batchId,
               chunk.map((r) => r.address),
+              mergeChannel,
               tenantId,
             )
 
             const deliveryPayload: DeliveryJobPayload = {
               notifyId,
               tenantId,
-              channel: NotificationChannel.EMAIL,
+              channel: mergeChannel,
               request,
               payload: {} as any,
               attempt: 0,
@@ -151,7 +156,7 @@ export class IngestionWorker {
               mailMergeData: { content, params, recipients: chunk },
             }
 
-            await emailQueue.add(deliveryPayload, {
+            await mergeQueue.add(deliveryPayload, {
               jobId: batchId,
               removeOnComplete: true,
               removeOnFail: false,

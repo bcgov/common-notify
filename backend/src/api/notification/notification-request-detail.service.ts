@@ -1,6 +1,7 @@
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { FindOptionsWhere, Not, Repository } from 'typeorm'
 import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -89,21 +90,24 @@ export class NotificationRequestDetailService {
    * Create pending request detail records for one batch of a mail merge email send.
    * Each record is tagged with the shared batchId so a delivery worker can scope updates to its batch.
    */
-  async createEmailMergePending(
+  async createMergePending(
     notificationRequestId: string,
     batchId: string,
     addresses: string[],
+    channel: NotificationChannel = NotificationChannel.EMAIL,
     createdBy?: string,
   ): Promise<void> {
     if (addresses.length === 0) return
     const now = new Date()
+    const isEmail = channel === NotificationChannel.EMAIL
     const entities = addresses.map((address) =>
       this.detailRepository.create({
         notificationRequestId,
         batchId,
         recipientAddress: address,
-        channel: 'EMAIL',
-        emailAddressType: 'primary',
+        channel,
+        // Only meaningful for email, where a recipient can be a to/cc/bcc.
+        ...(isEmail && { emailAddressType: 'primary' }),
         status: 'pending',
         attemptCount: 1,
         lastAttemptAt: now,
@@ -154,12 +158,13 @@ export class NotificationRequestDetailService {
    */
   async markRecipientSent(
     notificationRequestId: string,
-    batchId: string,
+    batchId: string | null,
     recipientAddress: string,
     providerResponseId?: string,
   ): Promise<void> {
     await this.detailRepository.update(
-      { notificationRequestId, batchId, recipientAddress },
+      // A non-merge send has no batch, and one recipient has one row either way.
+      { notificationRequestId, recipientAddress, ...(batchId ? { batchId } : {}) },
       {
         status: 'sent',
         lastAttemptAt: new Date(),
@@ -174,12 +179,12 @@ export class NotificationRequestDetailService {
    */
   async markRecipientFailed(
     notificationRequestId: string,
-    batchId: string,
+    batchId: string | null,
     recipientAddress: string,
     errorMessage: string,
   ): Promise<void> {
     await this.detailRepository.update(
-      { notificationRequestId, batchId, recipientAddress },
+      { notificationRequestId, recipientAddress, ...(batchId ? { batchId } : {}) },
       { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
     )
   }
@@ -233,11 +238,19 @@ export class NotificationRequestDetailService {
    * Increment attempt_count and reset status to pending before a retry attempt.
    */
   async resetForRetry(notificationRequestId: string): Promise<void> {
-    await this.detailRepository.increment({ notificationRequestId }, 'attemptCount', 1)
-    await this.detailRepository.update(
-      { notificationRequestId },
-      { status: 'pending', lastAttemptAt: new Date(), updatedBy: 'system' },
-    )
+    // Only rows that have not been delivered. Resetting a sent row to pending would have the
+    // retry send to that recipient a second time - which is the whole reason a partial failure
+    // must not fail the job.
+    const retryable: FindOptionsWhere<NotificationRequestDetail> = {
+      notificationRequestId,
+      status: Not('sent'),
+    }
+    await this.detailRepository.increment(retryable, 'attemptCount', 1)
+    await this.detailRepository.update(retryable, {
+      status: 'pending',
+      lastAttemptAt: new Date(),
+      updatedBy: 'system',
+    })
   }
 
   /**

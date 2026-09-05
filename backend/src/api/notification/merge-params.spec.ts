@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { Test } from '@nestjs/testing'
 import { NotificationService } from './notification.service'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 
 /**
  * Covers the flat-CSV-to-nested-params expansion. The service has a wide constructor, so it is
@@ -18,6 +19,34 @@ describe('parseMailMergeRecipients nesting', () => {
       .compile()
 
     service = module.get(NotificationService)
+  })
+
+  it('normalises an SMS recipient to E.164, which is all ACS accepts', () => {
+    const [recipient] = service.parseMailMergeRecipients(
+      [
+        ['to', 'firstName'],
+        ['2507447721', 'Alice'],
+      ],
+      NotificationChannel.SMS,
+    )
+
+    // The raw spreadsheet value reached the transport unchanged before this.
+    expect(recipient.address).toBe('+12507447721')
+  })
+
+  it('accepts a number that is already E.164', () => {
+    const [recipient] = service.parseMailMergeRecipients(
+      [['to'], ['+12507447721']],
+      NotificationChannel.SMS,
+    )
+
+    expect(recipient.address).toBe('+12507447721')
+  })
+
+  it('leaves an email address alone', () => {
+    const [recipient] = service.parseMailMergeRecipients([['to'], ['Alice@GOV.bc.ca']])
+
+    expect(recipient.address).toBe('Alice@GOV.bc.ca')
   })
 
   it('keeps a flat column flat', () => {

@@ -12,7 +12,7 @@ import { SsoRole } from '@/enum/sso-role.enum'
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import OutboxOutlinedIcon from '@mui/icons-material/OutboxOutlined'
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 // import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
@@ -45,7 +45,7 @@ const navItems = [
   {
     label: 'Bulk Notifications',
     to: '/bulk-notifications',
-    icon: <OutboxOutlinedIcon />,
+    icon: <SendOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',

@@ -16,6 +16,7 @@ import {
   Request,
   Req,
 } from '@nestjs/common'
+import { ApiOperation, ApiResponse } from '@nestjs/swagger'
 import Bull from 'bull'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
@@ -28,6 +29,7 @@ import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
+import { MAIL_MERGE_MAX_RECIPIENTS } from './schemas/mail-merge.constants'
 import {
   CancelNotificationDto,
   RescheduleNotificationDto,
@@ -114,6 +116,58 @@ export class NotifySimpleController {
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
   @Queueable(QueueName.INGESTION)
+  @ApiOperation({
+    summary: 'Send an SMS notification, to one list of recipients or as a mail merge',
+    description: [
+      'Accepts an SMS send and returns immediately. Delivery happens asynchronously, so a 202 means',
+      'the request was accepted and persisted - not that any message has been sent. Track delivery',
+      'with the returned notifyId via GET /api/v1/notify/status/{notifyId}.',
+      '',
+      'Two shapes of send are supported, chosen by what `sms.recipients` contains:',
+      '',
+      '- `to`: a list of phone numbers. Every recipient receives the same body.',
+      '- `mergeArray`: a mail merge. The first row is a header whose first column must be `to`;',
+      "  every following row is one recipient, and the remaining columns become that recipient's",
+      '  template params. Each recipient therefore receives a different message.',
+      '',
+      'Exactly one of the two must be present. Phone numbers may be given in any format that',
+      'normalises to E.164 (Canadian numbers are assumed when no country code is supplied); a number',
+      'that cannot be normalised is rejected with the row it appeared on.',
+      '',
+      'Billing note: SMS is charged in segments, and a body longer than a single segment is sent as',
+      'several concatenated messages. For a merge, every row is rendered and costed individually, so',
+      'the accepted request can consume more of the tenant allowance than it has recipients. The',
+      'response reports both numbers.',
+      '',
+      `Limits: at most ${MAIL_MERGE_MAX_RECIPIENTS.toLocaleString()} recipients per merge. Daily and`,
+      'annual send limits are enforced per API key before the request is accepted. This route is',
+      'gated by the `sms_notifications` feature flag and returns 404 for a tenant without it.',
+    ].join('\n'),
+  })
+  @ApiResponse({
+    status: 202,
+    description:
+      'Request accepted for delivery. `recipientCount` is the number of accepted recipients; for a merge, `billableMessageCount` is the total SMS segments those recipients will consume.',
+    type: NotificationAcceptanceResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'The request body failed validation - for example both `to` and `mergeArray` were supplied, a phone number could not be normalised to E.164, or a merge row had a different column count to its header.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'The `sms_notifications` feature flag is not enabled for this tenant.',
+  })
+  @ApiResponse({
+    status: 422,
+    description:
+      'The request was well-formed but its contents were rejected. The body carries an `errors` array naming each problem, row by row for a merge (missing number, invalid number, duplicate).',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'This send would exceed the daily or annual SMS limit for the calling API key.',
+  })
   simpleSendSms(
     @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
@@ -294,6 +348,28 @@ export class NotifySimpleFrontendController {
   sendEmail(
     @Req() _req: any,
     @Body() _body: NotifyEmailChannel,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable
+    return undefined as any
+  }
+
+  /**
+   * The SMS counterpart of sendEmail, gated on both flags: BULK_NOTIFICATIONS for the screen and
+   * SMS_NOTIFICATIONS for the channel, so a tenant needs the channel as well as the feature.
+   *
+   * Takes a full NotifySimpleRequest rather than a bare channel body, matching the service SMS
+   * route so the two request shapes stay identical.
+   */
+  @Version('1')
+  @Post('sms')
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard, SmsChannelFeatureFlagGuard, MailMergeUiLimitsGuard)
+  @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
+  @Queueable(QueueName.INGESTION)
+  sendSms(
+    @Req() _req: any,
+    @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Implementation provided by @Queueable
     return undefined as any

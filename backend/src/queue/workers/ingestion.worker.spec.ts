@@ -26,7 +26,7 @@ describe('IngestionWorker', () => {
 
     mockRequestDetailService = {
       createPending: vi.fn().mockResolvedValue(undefined),
-      createEmailMergePending: vi.fn().mockResolvedValue(undefined),
+      createMergePending: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -826,11 +826,12 @@ describe('IngestionWorker', () => {
         const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(1)
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledWith(
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
           ['alice@example.com', 'bob@example.com'],
+          'EMAIL',
           'tenant-bulk',
         )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
@@ -899,7 +900,7 @@ describe('IngestionWorker', () => {
 
         // 3 addresses, batchSize=2 → 2 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({

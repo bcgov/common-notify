@@ -50,8 +50,16 @@ export class NotificationAcceptanceResponse {
   @ApiPropertyOptional({
     description:
       'Mail merge only: number of recipients accepted for sending, excluding any dropped by the safelist',
+    example: 242,
   })
   recipientCount?: number
+
+  @ApiPropertyOptional({
+    description:
+      'SMS mail merge only: total billable segments the accepted recipients will consume. A body longer than one segment is sent as several concatenated messages, and every merge row is costed on its own rendered body, so this can exceed recipientCount.',
+    example: 318,
+  })
+  billableMessageCount?: number
 
   @ApiPropertyOptional({
     description:

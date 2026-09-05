@@ -100,7 +100,7 @@ export default () => {
     // Delivery Adapter Selection
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
-      sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+      sms: process.env.DELIVERY_SMS_ADAPTER || 'acs',
     },
 
     // Load-test-only switches. MUST stay false outside DEV / ephemeral PR dev envs.

@@ -17,6 +17,8 @@ export interface BulkNotificationsSendResponse {
   message: string
   /** Recipients accepted for sending, after any safelist filtering. */
   recipientCount?: number
+  /** SMS only: total billable segments, which can exceed recipientCount. */
+  billableMessageCount?: number
   /** Present only when the tenant safelist dropped recipients (non-production environments). */
   blockedRecipientCount?: number
   blockedMessage?: string
@@ -42,15 +44,19 @@ export class BulkNotificationsValidationError extends Error {
 export async function sendBulkNotifications(
   templateId: string,
   mergeArray: string[][],
+  channel: 'email' | 'sms' = 'email',
 ): Promise<BulkNotificationsSendResponse> {
   try {
-    const apiParams = generateApiParameters('/api/v1/frontend/notifysimple')
+    const apiParams = generateApiParameters(
+      channel === 'sms' ? '/api/v1/frontend/notifysimple/sms' : '/api/v1/frontend/notifysimple',
+    )
     return await post<BulkNotificationsSendResponse>({
       ...apiParams,
-      data: {
-        content: { templateId },
-        recipients: { mergeArray },
-      },
+      // The SMS route takes a full request; the email route takes a bare channel body.
+      data:
+        channel === 'sms'
+          ? { sms: { content: { templateId }, recipients: { mergeArray } } }
+          : { content: { templateId }, recipients: { mergeArray } },
     })
   } catch (error) {
     const axiosError = error as AxiosError
