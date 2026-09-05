@@ -11,6 +11,7 @@ import { QueueName } from '../../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../../queue/queue.types'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
 
 export type ProcessLimitAlertNotificationsInput = ProcessLimitAlertUsageInput
 
@@ -36,11 +37,11 @@ export function buildLimitAlertEmail(
   const levelLabel = claim.alertLevel === 'WARN' ? 'Warning' : 'Limit reached'
   const subject =
     claim.alertLevel === 'WARN'
-      ? `BC Notify usage warning: ${claim.channelCode} ${periodLabel} limit at ${claim.percent}%`
-      : `BC Notify usage limit reached: ${claim.channelCode} ${periodLabel} limit`
+      ? `Notify usage warning: ${claim.channelCode} ${periodLabel} limit at ${claim.percent}%`
+      : `Notify usage limit reached: ${claim.channelCode} ${periodLabel} limit`
 
   const body = [
-    'BC Notify usage alert',
+    'Notify usage alert',
     '',
     `Tenant: ${tenantDisplayName}`,
     `Monitored channel: ${claim.channelCode}`,
@@ -130,8 +131,8 @@ export class LimitAlertNotificationService {
       jobId: notificationRecord.id,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
-      removeOnComplete: false,
-      removeOnFail: false,
+      removeOnComplete: COMPLETED_JOB_RETENTION,
+      removeOnFail: FAILED_JOB_RETENTION,
     })
 
     await this.notificationService.update(notificationRecord.id, claim.tenantId, {

@@ -22,30 +22,34 @@ export class CreateSmsNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description: 'Variables to substitute in the template',
+    description: 'Values for the template placeholders.',
+    example: { appointmentTime: '09:00' },
   })
   @IsOptional()
   @IsObject()
   personalisation?: Record<string, string>
 
   @ApiPropertyOptional({
-    description: 'Optional reference identifier',
+    description: 'Your own identifier for this send, echoed back on status lookups.',
+    example: 'appointment-48219',
   })
   @IsOptional()
   @IsString()
   reference?: string
 
   @ApiPropertyOptional({
-    description: 'Schedule notification for future delivery',
+    description: 'Hold the message until this time instead of sending immediately.',
     format: 'date-time',
+    example: '2026-06-01T16:00:00Z',
   })
   @IsOptional()
   @IsString()
   scheduled_for?: string
 
   @ApiPropertyOptional({
-    description: 'ID of the SMS sender to use',
+    description: 'Sender identity to send from, when the tenant has more than one configured.',
     format: 'uuid',
+    example: 'e2f7a0d5-8c31-4b92-a7de-1f6b4c0e9a52',
   })
   @IsOptional()
   @IsUUID()

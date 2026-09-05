@@ -9,7 +9,14 @@ import {
   UseGuards,
   Version,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
@@ -28,6 +35,8 @@ import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
  * x-tenant-id header is required. Mirrors the feature-flag admin controller.
  */
 @ApiTags('api-key-usage')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/admin/api-key-usage')
 @UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()

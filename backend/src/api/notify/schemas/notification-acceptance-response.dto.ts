@@ -8,12 +8,17 @@ import { NotificationStatus } from '../../../enum/notification-status.enum'
  * until the scheduled retry job processes it).
  */
 export class NotificationAcceptanceResponse {
-  @ApiProperty({ format: 'uuid', description: 'Unique notification request ID' })
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Identifier for this request. Use it to look the notification up later.',
+    example: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  })
   notifyId: string
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'Template ID if the notification was created using a template',
+    description: 'The template used, if the notification referenced one.',
+    example: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33',
   })
   templateId?: string
 
@@ -25,42 +30,51 @@ export class NotificationAcceptanceResponse {
       NotificationStatus.SCHEDULED,
     ],
     description:
-      'Current status: ACCEPTED if request is acknowledged, SCHEDULED if request is accepted and scheduled for future processing, QUEUED if immediately added to queue, PENDING if queued to retry job',
+      'ACCEPTED once acknowledged, QUEUED once handed to the delivery queue, SCHEDULED when ' +
+      'delayedSend is in the future, PENDING when acknowledged but not yet queued.',
+    example: 'QUEUED',
   })
   status: NotificationStatus
 
   @ApiProperty({
     type: 'array',
     items: { type: 'string', enum: ['email', 'sms', 'msgApp'] },
-    description: 'Channels that will be used to send the notification',
+    description: 'The channels this notification will be delivered on.',
+    example: ['email'],
   })
   channels: string[]
 
   @ApiProperty({
-    description: 'Timestamp when the notification was created',
+    description: 'When the request was accepted.',
     format: 'date-time',
+    example: '2026-05-15T10:00:00.000Z',
   })
   createdAt: Date
 
   @ApiProperty({
-    description: 'Human-readable status message',
+    description: 'Human-readable summary of what was accepted.',
+    example: 'Notification accepted for delivery',
   })
   message: string
 
   @ApiPropertyOptional({
     description:
-      'Mail merge only: number of recipients accepted for sending, excluding any dropped by the safelist',
+      'Mail merge only: how many recipients were accepted, excluding any dropped by the safelist.',
+    example: 2,
   })
   recipientCount?: number
 
   @ApiPropertyOptional({
     description:
-      'Mail merge only: number of distinct recipients dropped because they are not on the tenant safelist. Omitted when none were dropped.',
+      'Mail merge only: how many distinct recipients were dropped because they are not on the ' +
+      'tenant safelist. Omitted when none were dropped.',
+    example: 1,
   })
   blockedRecipientCount?: number
 
   @ApiPropertyOptional({
-    description: 'Mail merge only: human-readable explanation of the dropped recipients',
+    description: 'Mail merge only: explains which recipients were dropped and why.',
+    example: '1 recipient was not on the safelist and was not sent to.',
   })
   blockedMessage?: string
 }

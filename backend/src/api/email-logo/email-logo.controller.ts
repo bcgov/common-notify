@@ -4,7 +4,10 @@ import * as path from 'path'
 import { Public } from '../../common/decorators/public.decorator'
 import { EmailLogoService } from './email-logo.service'
 import { EmailLogoStorageService } from './email-logo-storage.service'
+import { ApiExcludeController } from '@nestjs/swagger'
 
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('logos')
 export class EmailLogoController {
   constructor(

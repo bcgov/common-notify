@@ -18,7 +18,13 @@ function e164RecipientMessage(args: ValidationArguments): string {
 }
 
 export class NotifySmsRecipients {
-  @ApiProperty({ type: [String], description: 'Phone number recipients' })
+  @ApiProperty({
+    type: [String],
+    description:
+      'Recipient phone numbers. Normalised to E.164, so "250 555 0123" and "+12505550123" are ' +
+      'equivalent.',
+    example: ['+12505550123'],
+  })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })

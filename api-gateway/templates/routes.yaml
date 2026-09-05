@@ -48,6 +48,33 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
+  # Live Swagger UI for the decorator-generated OpenAPI document, which Nest
+  # serves at /api/docs (see backend/src/app.ts). This is deliberately separate
+  # from the hand-maintained static spec the frontend serves at /api-docs
+  # (CCP-5519) - this one cannot drift from the controllers.
+  #
+  # strip_path is false here, unlike every other route in this file. Those match
+  # a single endpoint; this one is a prefix, because Swagger UI fetches its own
+  # assets from /api/docs/swagger-ui-bundle.js, /api/docs/swagger-ui-init.js and
+  # the spec from /api/docs-json. Stripping would rewrite those to
+  # /swagger-ui-bundle.js and 404 against the backend, leaving a blank page.
+  #
+  # Public and unauthenticated, matching the existing /api-docs surface. The
+  # backend needs no auth exemption: SwaggerModule registers on the Express
+  # adapter, below Nest's router, so the global JwtGuard never sees these paths.
+  - name: ${ROUTE_PREFIX}notify-api-docs
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/docs
+    methods:
+      - GET
+    strip_path: false
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
 
   # ============================================================================
   # SERVICE-TO-SERVICE ROUTES (Client Credentials)
@@ -150,33 +177,6 @@ routes:
       - ${GATEWAY_HOSTNAME}
     paths:
       - ${PATH_PREFIX}/api/v1/notifyevent/types
-    methods:
-      - GET
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-  - name: ${ROUTE_PREFIX}notify-list
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/notify
-    methods:
-      - GET
-      - DELETE
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-  - name: ${ROUTE_PREFIX}notify-status
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/notify/status
     methods:
       - GET
     strip_path: true
@@ -1016,32 +1016,6 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-event-types
-    config: *rateLimitConfig
-  - name: key-auth
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-list
-    config: *keyAuthConfig
-
-  # Rate limiting (per API key) - see &rateLimitConfig for details
-  - name: rate-limiting
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-list
-    config: *rateLimitConfig
-  - name: key-auth
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-status
-    config: *keyAuthConfig
-
-  # Rate limiting (per API key) - see &rateLimitConfig for details
-  - name: rate-limiting
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-status
     config: *rateLimitConfig
   - name: key-auth
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]

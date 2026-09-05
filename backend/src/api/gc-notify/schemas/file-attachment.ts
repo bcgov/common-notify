@@ -3,20 +3,24 @@ import { IsString, IsIn } from 'class-validator'
 
 export class FileAttachment {
   @ApiProperty({
-    description: 'File content as base64 encoded string',
+    description: 'File contents, base64 encoded.',
+    example: 'JVBERi0xLjQKJcfsj6IK...',
   })
   @IsString()
   file: string
 
   @ApiProperty({
-    description: 'Custom filename for the attachment',
+    description: 'Name the file is given on the message.',
+    example: 'permit.pdf',
   })
   @IsString()
   filename: string
 
   @ApiProperty({
-    description: 'How the file should be sent - as attachment or as a link',
+    description:
+      'Whether the file rides on the message ("attach") or is replaced by a download link ("link").',
     enum: ['attach', 'link'],
+    example: 'attach',
   })
   @IsIn(['attach', 'link'])
   sending_method: 'attach' | 'link'
