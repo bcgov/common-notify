@@ -1,6 +1,10 @@
 # Loki Alerting Rules for Common Notify
 # Deployed in f6bc3f-tools namespace
-# Alerts on critical log patterns across dev/test/prod environments
+# Alerts on critical log patterns in f6bc3f-TEST and f6bc3f-PROD only.
+# Dev is deliberately excluded — it is deployed to constantly and its log
+# noise (transient errors during redeploys) is expected, not actionable.
+# The only dev-scoped alert lives in the Grafana metric rules
+# (PodCrashLoopBackOff), see infra-alert-rules.yaml.
 
 groups:
   - name: common-notify-errors
@@ -9,7 +13,7 @@ groups:
       # High error rate alert
       - alert: HighErrorRate
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 10
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 10
         for: 5m
         labels:
           severity: warning
@@ -22,7 +26,7 @@ groups:
       # Critical error rate alert
       - alert: CriticalErrorRate
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 50
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app) > 50
         for: 2m
         labels:
           severity: critical
@@ -35,7 +39,7 @@ groups:
       # Database connection errors
       - alert: DatabaseConnectionErrors
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [5m])) by (namespace) > 1
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [5m])) by (namespace) > 1
         for: 3m
         labels:
           severity: critical
@@ -49,7 +53,7 @@ groups:
       # Redis connection errors
       - alert: RedisConnectionErrors
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [5m])) by (namespace) > 1
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [5m])) by (namespace) > 1
         for: 3m
         labels:
           severity: warning
@@ -69,7 +73,7 @@ groups:
       # Email sending failures
       - alert: EmailSendingFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [5m])) by (namespace) > 2
         for: 5m
         labels:
           severity: warning
@@ -94,7 +98,7 @@ groups:
       # Slow API responses
       - alert: SlowAPIResponses
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [5m])) by (namespace) > 5
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [5m])) by (namespace) > 5
         for: 10m
         labels:
           severity: warning
@@ -108,7 +112,7 @@ groups:
       # High memory usage warnings in logs
       - alert: HighMemoryUsageWarnings
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [5m])) by (namespace, app) > 1
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [5m])) by (namespace, app) > 1
         for: 10m
         labels:
           severity: warning
@@ -125,7 +129,7 @@ groups:
       # Authentication failures
       - alert: HighAuthenticationFailureRate
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [5m])) by (namespace) > 10
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [5m])) by (namespace) > 10
         for: 5m
         labels:
           severity: warning
@@ -139,7 +143,7 @@ groups:
       # ClamAV virus detected
       - alert: VirusDetected
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [5m])) by (namespace) > 0
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [5m])) by (namespace) > 0
         for: 1m
         labels:
           severity: critical
@@ -198,7 +202,7 @@ groups:
       # CHES (email provider) repeated failures
       - alert: ChesDeliveryFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [5m])) by (namespace) > 2
         for: 5m
         labels:
           severity: critical
@@ -212,7 +216,7 @@ groups:
       # ACS (SMS provider) repeated failures
       - alert: AcsDeliveryFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [5m])) by (namespace) > 2
         for: 5m
         labels:
           severity: critical
@@ -226,7 +230,7 @@ groups:
       # SMS send failures (channel-level, any provider)
       - alert: SmsSendingFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [5m])) by (namespace) > 2
         for: 5m
         labels:
           severity: warning
@@ -240,7 +244,7 @@ groups:
       # Webhook/callback delivery failures
       - alert: WebhookDeliveryFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [5m])) by (namespace) > 2
         for: 10m
         labels:
           severity: warning
@@ -254,7 +258,7 @@ groups:
       # BullMQ jobs failing (worker-level)
       - alert: QueueJobFailures
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [5m])) by (namespace) > 2
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [5m])) by (namespace) > 2
         for: 5m
         labels:
           severity: warning
@@ -270,7 +274,7 @@ groups:
       # success lines are being produced — approximates a stalled queue.
       - alert: QueueNotDraining
         expr: |
-          sum(rate({namespace=~"f6bc3f-(dev|test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace) > 0
+          sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace) > 0
         for: 10m
         labels:
           severity: critical

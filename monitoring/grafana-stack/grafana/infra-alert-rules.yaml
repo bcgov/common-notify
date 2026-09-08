@@ -32,7 +32,12 @@
 #   alert and drop/disable the two usage-% rules.
 #
 # SCOPE
-#   Namespaces f6bc3f-dev|test|prod. App workloads (backend/frontend/redis/db).
+#   Alerts are scoped to f6bc3f-TEST and f6bc3f-PROD only. Dev is deliberately
+#   EXCLUDED because it is deployed to constantly, producing transient pod
+#   churn / restarts / brief unavailability that is expected, not actionable.
+#   The SINGLE exception is PodCrashLoopBackOff (cn-pod-crashloop), which still
+#   covers dev|test|prod — a crash-loop in dev is a real breakage worth knowing
+#   about even mid-deploy. App workloads (backend/frontend/redis/db).
 # ---------------------------------------------------------------------------
 
 apiVersion: 1
@@ -45,6 +50,9 @@ groups:
     folder: Common Notify Infra
     interval: 1m
     rules:
+      # NOTE: this rule intentionally keeps dev in scope (f6bc3f-(dev|test|prod)).
+      # It is the ONE alert we want in dev — a crash-loop is a real failure even
+      # during constant dev deploys. Every other rule below is test|prod only.
       - uid: cn-pod-crashloop
         title: PodCrashLoopBackOff
         condition: C
@@ -95,7 +103,7 @@ groups:
               expr: |
                 sum by (namespace, pod, container) (
                   increase(kube_pod_container_status_restarts_total{
-                    namespace=~"f6bc3f-(dev|test|prod)"
+                    namespace=~"f6bc3f-(test|prod)"
                   }[15m])
                 )
               instant: true
@@ -130,7 +138,7 @@ groups:
               expr: |
                 sum by (namespace, pod) (
                   kube_pod_status_phase{
-                    namespace=~"f6bc3f-(dev|test|prod)",
+                    namespace=~"f6bc3f-(test|prod)",
                     phase=~"Pending|Unknown|Failed"
                   }
                 ) > 0
@@ -165,9 +173,9 @@ groups:
               editorMode: code
               expr: |
                 (
-                  kube_deployment_status_replicas_available{namespace=~"f6bc3f-(dev|test|prod)"}
+                  kube_deployment_status_replicas_available{namespace=~"f6bc3f-(test|prod)"}
                   <
-                  kube_deployment_spec_replicas{namespace=~"f6bc3f-(dev|test|prod)"}
+                  kube_deployment_spec_replicas{namespace=~"f6bc3f-(test|prod)"}
                 )
               instant: true
               refId: A
@@ -209,11 +217,11 @@ groups:
               expr: |
                 max by (namespace, pod, container) (
                   container_memory_working_set_bytes{
-                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
                   }
                   /
                   kube_pod_container_resource_limits{
-                    namespace=~"f6bc3f-(dev|test|prod)", resource="memory"
+                    namespace=~"f6bc3f-(test|prod)", resource="memory"
                   }
                 ) * 100
               instant: true
@@ -248,11 +256,11 @@ groups:
               expr: |
                 max by (namespace, pod, container) (
                   container_memory_working_set_bytes{
-                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
                   }
                   /
                   kube_pod_container_resource_limits{
-                    namespace=~"f6bc3f-(dev|test|prod)", resource="memory"
+                    namespace=~"f6bc3f-(test|prod)", resource="memory"
                   }
                 ) * 100
               instant: true
@@ -287,7 +295,7 @@ groups:
               expr: |
                 sum by (namespace, pod, container) (
                   increase(kube_pod_container_status_last_terminated_reason{
-                    namespace=~"f6bc3f-(dev|test|prod)", reason="OOMKilled"
+                    namespace=~"f6bc3f-(test|prod)", reason="OOMKilled"
                   }[10m])
                 )
               instant: true
@@ -330,13 +338,13 @@ groups:
               expr: |
                 sum by (namespace, pod, container) (
                   rate(container_cpu_cfs_throttled_periods_total{
-                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
                   }[5m])
                 )
                 /
                 sum by (namespace, pod, container) (
                   rate(container_cpu_cfs_periods_total{
-                    namespace=~"f6bc3f-(dev|test|prod)", container!="", container!="POD"
+                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
                   }[5m])
                 ) * 100 > 25
               instant: true
@@ -384,13 +392,13 @@ groups:
                 (
                   sum by (namespace) (
                     rate(http_request_duration_seconds_count{
-                      namespace=~"f6bc3f-(dev|test|prod)", status_code=~"5.."
+                      namespace=~"f6bc3f-(test|prod)", status_code=~"5.."
                     }[5m])
                   )
                   /
                   sum by (namespace) (
                     rate(http_request_duration_seconds_count{
-                      namespace=~"f6bc3f-(dev|test|prod)"
+                      namespace=~"f6bc3f-(test|prod)"
                     }[5m])
                   )
                 ) * 100
@@ -427,7 +435,7 @@ groups:
                 histogram_quantile(0.95,
                   sum by (namespace, le) (
                     rate(http_request_duration_seconds_bucket{
-                      namespace=~"f6bc3f-(dev|test|prod)"
+                      namespace=~"f6bc3f-(test|prod)"
                     }[5m])
                   )
                 )
@@ -477,9 +485,9 @@ groups:
               expr: |
                 (
                   1 - (
-                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(test|prod)"}
                     /
-                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(test|prod)"}
                   )
                 ) * 100
               instant: true
@@ -514,9 +522,9 @@ groups:
               expr: |
                 (
                   1 - (
-                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(test|prod)"}
                     /
-                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(dev|test|prod)"}
+                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(test|prod)"}
                   )
                 ) * 100
               instant: true
@@ -569,7 +577,7 @@ groups:
               expr: |
                 max by (namespace) (
                   kube_pod_status_ready{
-                    namespace=~"f6bc3f-(dev|test|prod)",
+                    namespace=~"f6bc3f-(test|prod)",
                     condition="true",
                     pod=~"pg-.*-crunchy-db-.*"
                   }
@@ -606,7 +614,7 @@ groups:
               expr: |
                 max by (namespace) (
                   kube_pod_status_ready{
-                    namespace=~"f6bc3f-(dev|test|prod)",
+                    namespace=~"f6bc3f-(test|prod)",
                     condition="true",
                     pod=~"common-notify-redis-master-.*"
                   }
