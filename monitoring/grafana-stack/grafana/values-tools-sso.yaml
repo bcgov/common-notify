@@ -72,20 +72,20 @@ alerting:
             settings:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
-              title: 'Grafana Alert Notification'
-              # Message format: Status → Severity → Alert name → Short description
-              #   🔴 FIRING | CRITICAL | Notify: <alertname> — <short>
-              #   🟠 FIRING | WARNING  | Notify: <alertname> — <short>
-              #   🟢 RESOLVED | Notify: <alertname> — <short>
-              # Icon is derived from .Labels.severity (no per-alert icon needed).
-              # Headline text uses the `short` annotation when present, else falls
-              # back to `summary`. One line per alert — detail stays in Grafana.
+              title: 'Notify Alert'
+              # Plain-text message. NO emoji/icons. One line per alert:
+              #   FIRING <SEVERITY> | <Alert name> | <detail>
+              #   RESOLVED | <Alert name> | <detail>
+              # Detail = the `short` annotation when present, else `summary`.
+              # NOTE: the message is fully rendered here so it can be forwarded
+              # verbatim. If a downstream forwarder (e.g. the n8n webhook) wraps
+              # or re-decorates this text, the wrapper must be removed there too.
               message: |
                 {{ `{{ range .Alerts.Firing }}` }}
-                {{ `{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }}` }} FIRING | {{ `{{ .Labels.severity | toUpper }}` }} | Notify: {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
+                FIRING {{ `{{ .Labels.severity | toUpper }}` }} | {{ `{{ .Labels.alertname }}` }} | {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
                 {{ `{{ range .Alerts.Resolved }}` }}
-                🟢 RESOLVED | Notify: {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
+                RESOLVED | {{ `{{ .Labels.alertname }}` }} | {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
             disableResolveMessage: false
 
