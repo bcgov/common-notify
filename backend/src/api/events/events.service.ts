@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -16,12 +17,15 @@ import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { normalizeRecipient } from '../safelist/safelist.util'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
+
+const MAX_RECIPIENTS_KEY = 'event_max_recipients'
 
 /**
  * Filters on values derived from an event's channel settings rather than stored on the event.
@@ -66,6 +70,8 @@ export class EventsService {
     private readonly eventRepository: Repository<NotifyEvent>,
     @InjectRepository(EventChannelSetting)
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
+    @InjectRepository(NotifyConfiguration)
+    private readonly configurationRepository: Repository<NotifyConfiguration>,
     private readonly phoneNumberService: PhoneNumberService,
     private readonly emailLogoService: EmailLogoService,
     private readonly templatesRepository: TemplatesRepository,
@@ -239,6 +245,23 @@ export class EventsService {
     const headerLogoId = useCustomHeader ? (updateDto.headerLogoId ?? null) : null
     const headerTitle = useCustomHeader ? updateDto.headerTitle?.trim() || null : null
 
+    // The cap applies to each recipient list on its own, so a full To list does not eat into
+    // what CC and BCC may hold. Counted after normalization so blanks the user left behind do
+    // not consume the allowance.
+    const maxRecipients = await this.getMaxRecipients()
+    for (const [label, value] of [
+      ['To', to],
+      ['CC', cc],
+      ['BCC', bcc],
+    ] as const) {
+      const count = this.countRecipients(value)
+      if (count > maxRecipients) {
+        throw new BadRequestException(
+          `Too many ${label} recipients (${count}). The email channel allows at most ${maxRecipients} per recipient list.`,
+        )
+      }
+    }
+
     if (templateId) {
       await this.assertTemplateIsUsable(tenantId, templateId, NotificationChannel.EMAIL)
     }
@@ -359,6 +382,14 @@ export class EventsService {
     const event = await this.findEvent(tenantId, eventId)
     const templateId = updateDto.templateId ?? null
     const to = this.normalizePhoneList(updateDto.to)
+
+    const maxRecipients = await this.getMaxRecipients()
+    const recipientCount = this.countRecipients(to)
+    if (recipientCount > maxRecipients) {
+      throw new BadRequestException(
+        `Too many recipients (${recipientCount}). The SMS channel allows at most ${maxRecipients}.`,
+      )
+    }
 
     if (templateId) {
       await this.assertTemplateIsUsable(tenantId, templateId, NotificationChannel.SMS)
@@ -601,5 +632,32 @@ export class EventsService {
    */
   private splitRecipientList(value: string | null): string[] {
     return value ? value.split(',') : []
+  }
+
+  /**
+   * How many recipients a normalized, comma-separated to/cc/bcc value holds.
+   */
+  private countRecipients(value: string | null): number {
+    return this.splitRecipientList(value).length
+  }
+
+  /**
+   * Global cap on manually entered recipients per event channel, read from notify.configuration
+   * (seeded by V59). There is no in-code default: a missing or unusable row is a deployment
+   * fault, and failing here is preferable to silently enforcing a cap nobody configured.
+   */
+  private async getMaxRecipients(): Promise<number> {
+    const row = await this.configurationRepository.findOne({
+      where: { key: MAX_RECIPIENTS_KEY },
+    })
+    const value = Number(row?.config?.value)
+
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new InternalServerErrorException(
+        `Configuration '${MAX_RECIPIENTS_KEY}' is missing or is not a positive number`,
+      )
+    }
+
+    return value
   }
 }

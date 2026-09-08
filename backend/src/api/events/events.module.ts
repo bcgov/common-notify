@@ -8,6 +8,7 @@ import { TemplatesModule } from '../templates/templates.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
@@ -16,7 +17,12 @@ import { EventsService } from './events.service'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotifyEvent, EventChannelSetting, ProvisionedPhoneNumber]),
+    TypeOrmModule.forFeature([
+      NotifyEvent,
+      EventChannelSetting,
+      ProvisionedPhoneNumber,
+      NotifyConfiguration,
+    ]),
     TenantsModule,
     CstarModule,
     FeatureFlagModule,

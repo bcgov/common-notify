@@ -1,8 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common'
 import { vi } from 'vitest'
 import { EventsService } from './events.service'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventStatus } from '../../enum/event-status.enum'
@@ -50,6 +55,10 @@ describe('EventsService', () => {
     findById: vi.fn(),
   }
 
+  const mockConfigurationRepository = {
+    findOne: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +68,10 @@ describe('EventsService', () => {
         {
           provide: getRepositoryToken(EventChannelSetting),
           useValue: mockChannelSettingRepository,
+        },
+        {
+          provide: getRepositoryToken(NotifyConfiguration),
+          useValue: mockConfigurationRepository,
         },
         { provide: EmailLogoService, useValue: mockEmailLogoService },
         { provide: TemplatesRepository, useValue: mockTemplatesRepository },
@@ -71,6 +84,11 @@ describe('EventsService', () => {
     mockTemplatesRepository.findById.mockResolvedValue({
       id: templateId,
       channelCode: NotificationChannel.EMAIL,
+    })
+    // Every recipient save reads the cap; tests about the cap itself override this.
+    mockConfigurationRepository.findOne.mockResolvedValue({
+      key: 'event_max_recipients',
+      config: { value: 100 },
     })
   })
 
@@ -743,6 +761,187 @@ describe('EventsService', () => {
 
       expect(result.channelCodes).toEqual([NotificationChannel.EMAIL, NotificationChannel.SMS])
       expect(result.status).toBe(EventStatus.ACTIVE)
+    })
+  })
+  describe('recipient cap (event_max_recipients)', () => {
+    const emails = (count: number, prefix = 'user'): string[] =>
+      Array.from({ length: count }, (_, index) => `${prefix}${index}@example.com`)
+    const phones = (count: number): string[] =>
+      Array.from({ length: count }, (_, index) => `+1250555${1000 + index}`)
+
+    const setCap = (value: unknown) =>
+      mockConfigurationRepository.findOne.mockResolvedValueOnce({
+        key: 'event_max_recipients',
+        config: { value },
+      })
+
+    it('rejects an email save whose recipients exceed the cap', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap(100)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(101),
+        }),
+      ).rejects.toThrow(
+        'Too many To recipients (101). The email channel allows at most 100 per recipient list.',
+      )
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('caps CC on its own, naming the list that is over', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap(100)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(1, 'to'),
+          cc: emails(101, 'cc'),
+        }),
+      ).rejects.toThrow('Too many CC recipients (101)')
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('caps BCC on its own, naming the list that is over', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap(100)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(1, 'to'),
+          bcc: emails(101, 'bcc'),
+        }),
+      ).rejects.toThrow('Too many BCC recipients (101)')
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('gives each recipient list its own full allowance', async () => {
+      const created = { eventId, channelCode: NotificationChannel.EMAIL } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+      mockChannelSettingRepository.create.mockReturnValue(created)
+      setCap(100)
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        to: emails(100, 'to'),
+        cc: emails(100, 'cc'),
+        bcc: emails(100, 'bcc'),
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalled()
+    })
+
+    it('allows a To list sitting exactly on the cap', async () => {
+      const created = { eventId, channelCode: NotificationChannel.EMAIL } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+      mockChannelSettingRepository.create.mockReturnValue(created)
+      setCap(100)
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        to: emails(100),
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalled()
+    })
+
+    it('rejects an SMS save whose recipients exceed the cap', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap(50)
+
+      await expect(
+        service.updateSmsChannelSetting(tenantId, eventId, {
+          active: false,
+          templateId: null,
+          to: phones(51),
+        }),
+      ).rejects.toThrow('Too many recipients (51). The SMS channel allows at most 50.')
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('honours a configured cap other than the default', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap(2)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(3),
+        }),
+      ).rejects.toThrow('allows at most 2')
+    })
+
+    it('fails the save when the configuration row is missing', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockConfigurationRepository.findOne.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(1),
+        }),
+      ).rejects.toThrow(InternalServerErrorException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('fails the save when the configured cap is not a positive number', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      setCap('not a number')
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(1),
+        }),
+      ).rejects.toThrow(
+        "Configuration 'event_max_recipients' is missing or is not a positive number",
+      )
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('propagates a failure to read the configuration', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockConfigurationRepository.findOne.mockRejectedValueOnce(new Error('connection lost'))
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          to: emails(1),
+        }),
+      ).rejects.toThrow('connection lost')
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })
   })
 })

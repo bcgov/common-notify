@@ -1,7 +1,7 @@
 -- V56: Configuration that turns the V54/V55 event feature on.
 --
 --   1. configuration 'event_max_recipients' - global cap on manually entered recipients per
---                                             event channel.
+--                                             recipient list on an event channel.
 --   2. feature flag 'events'                - global kill switch, default FALSE.
 --
 -- Defaults are chosen so this migration changes no existing behaviour: the feature flag starts
@@ -16,7 +16,7 @@ INSERT INTO
 VALUES
   (
     'event_max_recipients',
-    '{"value": 100, "type": "number", "description": "Maximum number of manually entered recipients per event channel (email or SMS tab)."}'::JSONB,
+    '{"value": 100, "type": "number", "description": "Maximum number of manually entered recipients per recipient list on an event channel: the email tab''s To, CC and BCC are each allowed this many, as is the SMS tab''s To."}'::JSONB,
     'system',
     'system'
   ) ON CONFLICT (key) DO NOTHING;
