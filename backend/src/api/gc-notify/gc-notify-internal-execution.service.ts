@@ -31,6 +31,7 @@ import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-reques
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
 import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
 
 const TEMPLATE_LIST_QUERY_CONFIG: QueryableFieldsConfig = {
   sortableFields: { name: 'template.name', updatedAt: 'template.updatedAt' },
@@ -492,8 +493,8 @@ export class GcNotifyInternalExecutionService {
           jobId: notificationRecord.id,
           attempts: 3,
           backoff: { type: 'exponential', delay: 2000 },
-          removeOnComplete: false,
-          removeOnFail: false,
+          removeOnComplete: COMPLETED_JOB_RETENTION,
+          removeOnFail: FAILED_JOB_RETENTION,
           ...(delayMs > 0 && { delay: delayMs }),
         })
 

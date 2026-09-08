@@ -18,19 +18,29 @@ export const TRIGGER_VALUES = ['success', 'failure'] as const
 
 export class CallbackRegistrationRequest {
   @ApiProperty({
-    description: 'HTTPS URL to receive webhook POST requests',
+    description: 'HTTPS endpoint Notify POSTs delivery events to. Plain HTTP is rejected.',
     format: 'uri',
+    example: 'https://example.gov.bc.ca/hooks/notify',
   })
   @IsNotEmpty()
   @IsUrl({ protocols: ['https'], require_protocol: true })
   url: string
 
-  @ApiPropertyOptional({ description: 'Optional HMAC secret for X-Webhook-Signature signing' })
+  @ApiPropertyOptional({
+    description:
+      'Shared secret. When set, each call carries an HMAC of the body in X-Webhook-Signature so ' +
+      'you can verify it came from Notify.',
+    example: 's3cr3t-value-you-generate',
+  })
   @IsOptional()
   @IsString()
   secret?: string
 
-  @ApiPropertyOptional({ description: 'Custom headers to include in webhook POST requests' })
+  @ApiPropertyOptional({
+    description:
+      'Extra headers sent with every call, for example an auth token your endpoint expects.',
+    example: { 'X-Environment': 'production' },
+  })
   @IsOptional()
   @IsObject()
   headers?: Record<string, string>
@@ -55,15 +65,20 @@ export class CallbackRegistrationRequest {
   @IsIn(TRIGGER_VALUES, { each: true })
   trigger: string[]
 
-  @ApiPropertyOptional({ description: 'Enable or disable this webhook configuration' })
+  @ApiPropertyOptional({
+    description: 'Set false to stop deliveries without deleting the registration.',
+    example: true,
+  })
   @IsOptional()
   @IsBoolean()
   active?: boolean
 
   @ApiPropertyOptional({
     description:
-      'Webhook type. "teams" sends a Teams MessageCard payload; "generic" sends raw JSON. Defaults to "generic".',
+      'Payload shape. "teams" posts a Teams MessageCard; "generic" posts raw JSON. Defaults to ' +
+      '"generic".',
     enum: WebhookType,
+    example: 'generic',
   })
   @IsOptional()
   @IsEnum(WebhookType)
@@ -73,9 +88,22 @@ export class CallbackRegistrationRequest {
 export class CallbackRegistrationUpdateRequest extends PartialType(CallbackRegistrationRequest) {}
 
 export class CallbackRegistrationResponse {
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Identifier for this registration. Use it to update or delete the webhook.',
+    example: 'b7f4c9e1-2a35-4d68-9f10-5c8e3a2b7d64',
+  })
   callbackId: string
+
+  @ApiProperty({ format: 'uri', example: 'https://example.gov.bc.ca/hooks/notify' })
   url: string
+
+  @ApiPropertyOptional({ example: { 'X-Environment': 'production' } })
   headers?: Record<string, string>
+
+  @ApiProperty({ type: [String], enum: CHANNEL_TYPE_VALUES, example: ['email', 'sms'] })
   channelType: string[]
+
+  @ApiProperty({ type: [String], enum: TRIGGER_VALUES, example: ['success', 'failure'] })
   trigger: string[]
 }

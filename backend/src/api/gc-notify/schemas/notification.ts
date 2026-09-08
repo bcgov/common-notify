@@ -9,16 +9,23 @@ export class Notification {
   })
   id: string
 
-  @ApiPropertyOptional({ description: 'Reference identifier' })
+  @ApiPropertyOptional({
+    description: 'The reference supplied when the notification was sent.',
+    example: 'permit-BC-2026-00417',
+  })
   reference?: string
 
   @ApiPropertyOptional({
-    description: 'Recipient email address',
+    description: 'Recipient address, for an email notification.',
     format: 'email',
+    example: 'citizen@example.com',
   })
   email_address?: string
 
-  @ApiPropertyOptional({ description: 'Recipient phone number' })
+  @ApiPropertyOptional({
+    description: 'Recipient number, for an SMS notification.',
+    example: '+12505550123',
+  })
   phone_number?: string
 
   @ApiPropertyOptional()
@@ -42,7 +49,11 @@ export class Notification {
   @ApiPropertyOptional()
   postcode?: string
 
-  @ApiProperty({ description: 'Notification type', enum: ['sms', 'email'] })
+  @ApiProperty({
+    description: 'The channel this notification was sent on.',
+    enum: ['sms', 'email'],
+    example: 'email',
+  })
   type: 'sms' | 'email'
 
   @ApiProperty({
@@ -58,42 +69,65 @@ export class Notification {
       'pending-virus-check',
       'virus-scan-failed',
     ],
+    example: 'delivered',
   })
   status: string
 
-  @ApiPropertyOptional({ description: 'Status description' })
+  @ApiPropertyOptional({
+    description: 'Human-readable form of the status.',
+    example: 'Delivered',
+  })
   status_description?: string
 
-  @ApiPropertyOptional({ description: 'Provider response' })
+  @ApiPropertyOptional({
+    description: 'What the delivery provider reported, when it reported anything.',
+    example: 'Message accepted by recipient server',
+  })
   provider_response?: string
 
   @ApiProperty({ description: 'Template information' })
   template: NotificationTemplate
 
-  @ApiProperty({ description: 'Message body' })
+  @ApiProperty({
+    description: 'The rendered message that was sent.',
+    example: 'Hello Alice, permit BC-2026-00417 has been approved.',
+  })
   body: string
 
-  @ApiPropertyOptional({ description: 'Email subject (email only)' })
+  @ApiPropertyOptional({
+    description: 'The rendered subject line. Email only.',
+    example: 'Permit BC-2026-00417 approved',
+  })
   subject?: string
 
-  @ApiProperty({ description: 'Created timestamp', format: 'date-time' })
+  @ApiProperty({
+    description: 'When the notification was accepted.',
+    format: 'date-time',
+    example: '2026-05-15T10:00:00.000Z',
+  })
   created_at: string
 
-  @ApiPropertyOptional({ description: 'Created by name' })
+  @ApiPropertyOptional({ description: 'Who submitted it.', example: 'permits-service' })
   created_by_name?: string
 
-  @ApiPropertyOptional({ description: 'Sent timestamp', format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'When it was handed to the delivery provider.',
+    format: 'date-time',
+    example: '2026-05-15T10:00:04.512Z',
+  })
   sent_at?: string
 
   @ApiPropertyOptional({
-    description: 'Completed timestamp',
+    description: 'When delivery finished, successfully or not.',
     format: 'date-time',
+    example: '2026-05-15T10:00:07.004Z',
   })
   completed_at?: string
 
   @ApiPropertyOptional({
-    description: 'Scheduled timestamp',
+    description: 'When a delayed notification is due to be sent.',
     format: 'date-time',
+    example: '2026-06-01T16:00:00.000Z',
   })
   scheduled_for?: string
 
