@@ -6,6 +6,7 @@ import { WebhookService } from '../../api/webhook/webhook.service'
 import { WebhookJobPayload } from '../queue.types'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationRequestDto } from '../../api/notification/schemas/notification-request'
+import { FAILED_JOB_RETENTION } from '../job-retention'
 
 /**
  * Webhook Trigger Service
@@ -146,7 +147,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: true,
-          removeOnFail: false,
+          removeOnFail: FAILED_JOB_RETENTION,
         })
         this.logger.log(
           `[${notification.id}] Queued webhook delivery for webhook=${webhook.id} (status=${notificationStatus})`,

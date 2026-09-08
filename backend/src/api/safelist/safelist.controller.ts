@@ -20,6 +20,7 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
@@ -37,6 +38,8 @@ import { SafelistService } from './safelist.service'
  * response (the `recipient_safelist` feature flag).
  */
 @ApiTags('safelist')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/safelist')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()

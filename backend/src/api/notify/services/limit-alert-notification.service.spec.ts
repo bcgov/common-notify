@@ -11,6 +11,7 @@ import {
   LimitAlertNotificationService,
   ProcessLimitAlertNotificationsInput,
 } from './limit-alert-notification.service'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
 
 describe('LimitAlertNotificationService', () => {
   let service: LimitAlertNotificationService
@@ -146,9 +147,9 @@ describe('LimitAlertNotificationService', () => {
         email: {
           recipients: { to: ['operations@example.com'] },
           content: {
-            subject: 'BC Notify usage warning: EMAIL daily limit at 80%',
+            subject: 'Notify usage warning: EMAIL daily limit at 80%',
             body: [
-              'BC Notify usage alert',
+              'Notify usage alert',
               '',
               'Tenant: Tenant One',
               'Monitored channel: EMAIL',
@@ -176,7 +177,7 @@ describe('LimitAlertNotificationService', () => {
     expect(createInput.payload.email).toMatchObject({
       recipients: { to: ['tenant-ops@example.com'] },
       content: {
-        subject: 'BC Notify usage limit reached: SMS annual limit',
+        subject: 'Notify usage limit reached: SMS annual limit',
       },
     })
     expect(createInput.payload.email.content.body).toContain('Monitored channel: SMS')
@@ -242,8 +243,8 @@ describe('LimitAlertNotificationService', () => {
         jobId: 'notification-1',
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: false,
-        removeOnFail: false,
+        removeOnComplete: COMPLETED_JOB_RETENTION,
+        removeOnFail: FAILED_JOB_RETENTION,
       },
     )
     expect(notificationService.update).toHaveBeenCalledWith('notification-1', 'tenant-1', {

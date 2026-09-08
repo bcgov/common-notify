@@ -25,6 +25,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
+import { ApiExcludeController } from '@nestjs/swagger'
 
 /**
  * Feature Flag Controller
@@ -41,6 +42,8 @@ import { SsoRole } from '../../enum/sso-role.enum'
  * Client Route (any authenticated user):
  * - GET    /api/v1/feature-flags                          Get feature flags for user's tenant
  */
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/admin/feature-flags')
 @UseGuards(NotifyAdminGuard)
 export class FeatureFlagController {
@@ -164,6 +167,8 @@ export class FeatureFlagController {
  * Routes for getting feature flags for the current user's tenant
  * Available to any authenticated user
  */
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('feature-flags')
 @UseGuards(NotifyServiceGuard)
 export class FeatureFlagClientController {
@@ -235,6 +240,8 @@ export class FeatureFlagClientController {
  * - FeatureFlagClientController: /api/v1/feature-flags (service-to-service auth)
  * - FeatureFlagClientFrontendController: /api/v1/frontend/feature-flags (frontend auth)
  */
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/feature-flags')
 @UseGuards(NotifyFrontendRoleGuard)
 export class FeatureFlagClientFrontendController {

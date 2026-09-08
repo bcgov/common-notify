@@ -1,21 +1,45 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ConfigService } from '@nestjs/config'
 import { CstarApiClient } from './cstar-api.client'
+import type { CstarCacheStore } from './cstar-cache.store'
 
 /**
- * Covers the request coalescing and caching added because rapid navigation fired one
- * CSTAR call per request, and the resulting failures surfaced as
- * "Authorization failed: Failed to verify tenant access".
+ * Covers the client's request coalescing and its never-cache-a-failure rule. The store's
+ * own behaviour lives in cstar-cache.store.spec.ts.
  */
 describe('CstarApiClient.getUserTenants', () => {
   const USER = 'idir-guid'
   let fetchMock: ReturnType<typeof vi.fn>
 
+  /** In-memory stand-in for the Redis store, with the same TTL semantics. */
+  const fakeStore = (ttlMs: number) => {
+    const entries = new Map<string, { expiresAt: number; value: unknown }>()
+    const read = async (key: string) => {
+      if (ttlMs <= 0) return null
+      const hit = entries.get(key)
+      if (!hit || hit.expiresAt <= Date.now()) return null
+      return hit.value
+    }
+    const write = async (key: string, value: unknown) => {
+      if (ttlMs <= 0) return
+      entries.set(key, { expiresAt: Date.now() + ttlMs, value })
+    }
+    return {
+      entries,
+      readTenants: vi.fn((user: string) => read(`t:${user}`)),
+      writeTenants: vi.fn((user: string, value: unknown) => write(`t:${user}`, value)),
+      readRoles: vi.fn((tenant: string, user: string) => read(`r:${tenant}:${user}`)),
+      writeRoles: vi.fn((tenant: string, user: string, value: unknown) =>
+        write(`r:${tenant}:${user}`, value),
+      ),
+    }
+  }
+
   const build = (ttlMs = 15000) => {
     const config = {
       get: vi.fn((key: string) => (key === 'cstar.baseUrl' ? 'https://cstar.example' : ttlMs)),
     } as unknown as ConfigService
-    return new CstarApiClient(config)
+    return new CstarApiClient(config, fakeStore(ttlMs) as unknown as CstarCacheStore)
   }
 
   const ok = (tenants: unknown[]) => ({
@@ -145,6 +169,54 @@ describe('CstarApiClient.getUserTenants', () => {
     await all
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('coalesces even while the cache read is still outstanding', async () => {
+    // Both callers can miss before either registers an in-flight request.
+    let releaseRead: () => void = () => {}
+    const slowRead = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    const config = {
+      get: vi.fn((key: string) => (key === 'cstar.baseUrl' ? 'https://cstar.example' : 15000)),
+    } as unknown as ConfigService
+    const store = {
+      readTenants: vi.fn(async () => {
+        await slowRead
+        return null
+      }),
+      writeTenants: vi.fn(async () => {}),
+      readRoles: vi.fn(async () => null),
+      writeRoles: vi.fn(async () => {}),
+    }
+    fetchMock.mockResolvedValue(ok([{ id: 'tenant-a' }]))
+    const client = new CstarApiClient(config, store as unknown as CstarCacheStore)
+
+    const all = Promise.all([client.getUserTenants(USER), client.getUserTenants(USER)])
+    releaseRead()
+    await all
+
+    expect(store.readTenants).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls CSTAR when the cache is unavailable, rather than failing the request', async () => {
+    const config = {
+      get: vi.fn((key: string) => (key === 'cstar.baseUrl' ? 'https://cstar.example' : 15000)),
+    } as unknown as ConfigService
+    // The store reports a miss when Redis is unavailable; the client proceeds to CSTAR.
+    const store = {
+      readTenants: vi.fn(async () => null),
+      writeTenants: vi.fn(async () => {}),
+      readRoles: vi.fn(async () => null),
+      writeRoles: vi.fn(async () => {}),
+    }
+    fetchMock.mockResolvedValue(ok([{ id: 'tenant-a' }]))
+    const client = new CstarApiClient(config, store as unknown as CstarCacheStore)
+
+    await expect(client.getUserTenants(USER)).resolves.toEqual([{ id: 'tenant-a' }])
+    await expect(client.getUserTenants(USER)).resolves.toEqual([{ id: 'tenant-a' }])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('still coalesces when caching is disabled', async () => {

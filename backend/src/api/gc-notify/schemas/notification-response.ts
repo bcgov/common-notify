@@ -12,9 +12,10 @@ export class NotificationResponse {
   id: string
 
   @ApiProperty({
-    description: 'Reference identifier provided when creating the notification, or null if not set',
+    description: 'The reference supplied when sending, or null if none was given.',
     nullable: true,
     type: 'string',
+    example: 'permit-BC-2026-00417',
   })
   reference: string | null
 
