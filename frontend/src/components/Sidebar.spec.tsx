@@ -115,7 +115,7 @@ describe('Sidebar', () => {
   })
 
   it('shows Events when the events feature flag is enabled', () => {
-    renderSidebar(null, ['NOTIFY_VIEWER'], true)
+    renderSidebar(null, ['NOTIFY_VIEWER'], { events: true })
 
     expect(screen.getByRole('link', { name: /events/i })).toBeInTheDocument()
   })
