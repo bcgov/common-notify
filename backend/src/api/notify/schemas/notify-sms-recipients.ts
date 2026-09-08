@@ -27,13 +27,14 @@ function e164RecipientMessage(args: ValidationArguments): string {
 }
 
 export class NotifySmsRecipients {
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [String],
     description:
-      'Recipient phone numbers. Normalised to E.164, so "250 555 0123" and "+12505550123" are ' +
-      'equivalent.',
-    example: ['+12505550123'],
+      'Phone number recipients. Every recipient receives the same body. Normalised to E.164, so ' +
+      '"250 555 0123" and "+12505550123" are equivalent. Mutually exclusive with "mergeArray".',
+    example: ['+12505550123', '+16045550147'],
   })
+  @IsOptional()
   @IsArray()
   // Optional because a merge supplies recipients instead - but an empty list is still a mistake.
   @ArrayMinSize(1)
