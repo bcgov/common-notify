@@ -6,7 +6,7 @@ import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
-import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
+import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
@@ -82,8 +82,8 @@ const Sidebar: FC = () => {
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const bulkNotificationsEnabled = useFeatureFlag('bulk_notifications', selectedTenant?.id)
+  // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
+  const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -128,7 +128,7 @@ const Sidebar: FC = () => {
             (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Bulk Notifications' && hasTenantRole && bulkNotificationsEnabled) ||
+            (item.label === 'Bulk Notifications' && canBulkNotify) ||
             (item.label === 'Usage & Limits' && showUsage) ||
             (item.label === 'Settings' && hasTenantRole)
 
