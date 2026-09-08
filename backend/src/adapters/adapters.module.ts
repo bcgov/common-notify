@@ -83,13 +83,13 @@ export class AdaptersModule {
             map: Record<string, ISmsTransport>,
             configService: ConfigService,
           ): ISmsTransport => {
-            const key = configService.get<string>('delivery.sms') ?? 'twilio'
+            const key = configService.get<string>('delivery.sms') ?? 'acs'
             // Passthrough keys use GcNotifyApiClient, not ISmsTransport; fallback for DI
             if (key?.includes(':passthrough')) {
-              return map['twilio']
+              return map['acs']
             }
             const provider = key?.includes(':') ? key.split(':')[0] : key
-            return map[provider] ?? map['twilio']
+            return map[provider] ?? map['acs']
           },
           inject: [SMS_ADAPTER_MAP, ConfigService],
         },

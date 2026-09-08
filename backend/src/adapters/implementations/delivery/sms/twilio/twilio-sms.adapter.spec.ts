@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { TwilioSmsTransport } from '../../../../../../src/adapters/implementations/delivery/sms/twilio/twilio-sms.adapter'
@@ -88,8 +89,48 @@ describe('TwilioSmsTransport', () => {
 
     expect(result).toEqual({
       messageId: 'SM123456',
-      providerResponse: 'sent to 1 recipient(s)',
+      providerResponse: 'sent to 1 of 1 recipient(s)',
+      results: [{ to: '+15559876543', success: true, messageId: 'SM123456' }],
     })
+  })
+
+  it('reports a partial failure per recipient instead of letting it escape', async () => {
+    transport = await createModule({
+      accountSid: 'AC1',
+      authToken: 'token',
+      fromNumber: '+15551234567',
+    })
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined)
+    mockMessagesCreate
+      .mockResolvedValueOnce({ sid: 'SM123456' })
+      .mockRejectedValueOnce(new Error('Invalid recipient'))
+
+    // The loop used to let the second failure escape, losing the fact that the first was sent -
+    // so the queue's retry messaged that recipient again.
+    const result = await transport.send({
+      to: ['+15559876543', '+15550000001'],
+      body: 'Hello',
+    })
+
+    expect(result.results).toEqual([
+      { to: '+15559876543', success: true, messageId: 'SM123456' },
+      { to: '+15550000001', success: false, error: 'Invalid recipient' },
+    ])
+    expect(result.providerResponse).toBe('sent to 1 of 2 recipient(s)')
+  })
+
+  it('still throws when every recipient fails, so the job is retried', async () => {
+    transport = await createModule({
+      accountSid: 'AC1',
+      authToken: 'token',
+      fromNumber: '+15551234567',
+    })
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined)
+    mockMessagesCreate.mockRejectedValue(new Error('Bad credential'))
+
+    await expect(
+      transport.send({ to: ['+15559876543', '+15550000001'], body: 'Hello' }),
+    ).rejects.toThrow('Twilio send failed for all 2 recipient(s)')
   })
 
   it('uses from in options over config when credentials configured', async () => {

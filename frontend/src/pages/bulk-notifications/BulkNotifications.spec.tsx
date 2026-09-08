@@ -15,6 +15,12 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
+// SMS availability is a feature flag; default it on and let one test turn it off.
+const featureFlagMock = vi.fn(() => true)
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
+  useFeatureFlag: (code: string) => featureFlagMock(code),
+}))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),
@@ -110,18 +116,21 @@ vi.mock('@bcgov/design-system-react-components', () => {
   const RadioGroup = ({
     label,
     isRequired,
+    description,
     value,
     onChange,
     children,
   }: {
     label: string
     isRequired?: boolean
+    description?: string
     value?: string
     onChange?: (value: string) => void
     children: ReactNode
   }) => (
     <fieldset>
       <legend>{isRequired ? `${label} (required)` : label}</legend>
+      {description ? <p>{description}</p> : null}
       <div
         onChange={(event) => onChange?.((event.target as HTMLInputElement).value)}
         data-value={value}
@@ -253,6 +262,7 @@ function csv(contents: string) {
 describe('BulkNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    featureFlagMock.mockReturnValue(true)
     getTemplatesMock.mockResolvedValue({
       data: [emailTemplate],
       count: 1,
@@ -283,8 +293,14 @@ describe('BulkNotifications', () => {
     })
   })
 
-  it('requests only email templates for the selected tenant', async () => {
+  it('requests templates for the chosen channel, not before one is chosen', async () => {
     renderPage()
+
+    await screen.findByRole('radio', { name: 'Email notification' })
+    // Fetching on mount would show email templates to someone about to pick SMS.
+    expect(getTemplatesMock).not.toHaveBeenCalled()
+
+    await chooseEmailChannel()
 
     await waitFor(() =>
       expect(getTemplatesMock).toHaveBeenCalledWith(1, 100, undefined, 'name', [
@@ -293,11 +309,31 @@ describe('BulkNotifications', () => {
     )
   })
 
-  it('offers email and shows SMS as unavailable, since the send pipeline is email-only', async () => {
+  it('requests SMS templates when the SMS channel is chosen', async () => {
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'SMS notification' }))
+
+    await waitFor(() =>
+      expect(getTemplatesMock).toHaveBeenCalledWith(1, 100, undefined, 'name', [
+        'channelCode:eq:SMS',
+      ]),
+    )
+  })
+
+  it('offers SMS when the tenant has the SMS channel', async () => {
     renderPage()
 
     expect(await screen.findByRole('radio', { name: 'Email notification' })).toBeEnabled()
-    expect(screen.getByRole('radio', { name: 'SMS notification' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'SMS notification' })).toBeEnabled()
+  })
+
+  it('disables SMS when the tenant does not have the channel, and says why', async () => {
+    featureFlagMock.mockImplementation((code: string) => code !== 'sms_notifications')
+    renderPage()
+
+    expect(await screen.findByRole('radio', { name: 'SMS notification' })).toBeDisabled()
+    expect(screen.getByText('SMS is not enabled for this tenant.')).toBeInTheDocument()
   })
 
   it('asks for a channel before it offers a template', async () => {
@@ -457,11 +493,15 @@ describe('BulkNotifications', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
 
     await waitFor(() =>
-      expect(sendBulkMock).toHaveBeenCalledWith('template-1', [
-        ['to', 'permitType', 'firstName'],
-        ['alice@gov.bc.ca', 'parking', 'Alice'],
-        ['bob@gov.bc.ca', 'parking', 'Bob'],
-      ]),
+      expect(sendBulkMock).toHaveBeenCalledWith(
+        'template-1',
+        [
+          ['to', 'permitType', 'firstName'],
+          ['alice@gov.bc.ca', 'parking', 'Alice'],
+          ['bob@gov.bc.ca', 'parking', 'Bob'],
+        ],
+        'email',
+      ),
     )
     expect(await screen.findByText('2 notifications queued')).toBeInTheDocument()
   })
