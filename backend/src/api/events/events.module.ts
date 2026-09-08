@@ -4,6 +4,7 @@ import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { EmailLogoModule } from '../email-logo/email-logo.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { TemplatesModule } from '../templates/templates.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
@@ -20,6 +21,7 @@ import { EventsService } from './events.service'
     CstarModule,
     FeatureFlagModule,
     EmailLogoModule,
+    TemplatesModule,
   ],
   controllers: [EventsFrontendController],
   providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard, PhoneNumberService],

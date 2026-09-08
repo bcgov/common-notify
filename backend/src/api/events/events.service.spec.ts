@@ -9,6 +9,7 @@ import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { TemplatesRepository } from '../templates/templates.repository'
 
 describe('EventsService', () => {
   let service: EventsService
@@ -16,6 +17,7 @@ describe('EventsService', () => {
   const tenantId = 'tenant-uuid-1'
   const eventId = 'event-uuid-1'
   const logoId = 'logo-uuid-1'
+  const templateId = 'template-uuid-1'
 
   const buildEvent = (channelSettings: Partial<EventChannelSetting>[] = []): NotifyEvent =>
     ({
@@ -44,6 +46,10 @@ describe('EventsService', () => {
     findByIdIfApproved: vi.fn(),
   }
 
+  const mockTemplatesRepository = {
+    findById: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,11 +61,17 @@ describe('EventsService', () => {
           useValue: mockChannelSettingRepository,
         },
         { provide: EmailLogoService, useValue: mockEmailLogoService },
+        { provide: TemplatesRepository, useValue: mockTemplatesRepository },
       ],
     }).compile()
 
     service = module.get<EventsService>(EventsService)
     vi.clearAllMocks()
+    // Every save carrying a templateId validates it; tests about the template itself override this.
+    mockTemplatesRepository.findById.mockResolvedValue({
+      id: templateId,
+      channelCode: NotificationChannel.EMAIL,
+    })
   })
 
   describe('updateEmailChannelSetting', () => {
@@ -460,6 +472,56 @@ describe('EventsService', () => {
       )
     })
 
+    it('rejects a template the tenant has no access to', async () => {
+      // findById only returns the tenant's active templates, so another tenant's template, a
+      // soft-deleted one, and one that never existed all arrive here as null.
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockTemplatesRepository.findById.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId,
+        }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockTemplatesRepository.findById).toHaveBeenCalledWith(tenantId, templateId)
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('rejects a template belonging to another channel', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockTemplatesRepository.findById.mockResolvedValueOnce({
+        id: templateId,
+        channelCode: NotificationChannel.SMS,
+      })
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId,
+        }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('does not look up a template when the tab submits none', async () => {
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+      })
+
+      expect(mockTemplatesRepository.findById).not.toHaveBeenCalled()
+    })
+
     it('rejects a header logo that is not approved', async () => {
       mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
       mockEmailLogoService.findByIdIfApproved.mockResolvedValueOnce(null)
@@ -475,6 +537,56 @@ describe('EventsService', () => {
       ).rejects.toThrow(BadRequestException)
 
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateSmsChannelSetting', () => {
+    it('rejects a template the tenant has no access to', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockTemplatesRepository.findById.mockResolvedValueOnce(null)
+
+      await expect(
+        service.updateSmsChannelSetting(tenantId, eventId, { active: false, templateId }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockTemplatesRepository.findById).toHaveBeenCalledWith(tenantId, templateId)
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('rejects a template belonging to another channel', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockTemplatesRepository.findById.mockResolvedValueOnce({
+        id: templateId,
+        channelCode: NotificationChannel.EMAIL,
+      })
+
+      await expect(
+        service.updateSmsChannelSetting(tenantId, eventId, { active: false, templateId }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('saves an SMS template belonging to the tenant', async () => {
+      const created = { eventId, channelCode: NotificationChannel.SMS } as EventChannelSetting
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(
+          buildEvent([
+            { channelCode: NotificationChannel.SMS, active: false, templateId, isDeleted: false },
+          ]),
+        )
+      mockChannelSettingRepository.create.mockReturnValue(created)
+      mockTemplatesRepository.findById.mockResolvedValueOnce({
+        id: templateId,
+        channelCode: NotificationChannel.SMS,
+      })
+
+      await service.updateSmsChannelSetting(tenantId, eventId, { active: false, templateId })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ templateId, active: false }),
+      )
     })
   })
 

@@ -19,6 +19,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { normalizeRecipient } from '../safelist/safelist.util'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { TemplatesRepository } from '../templates/templates.repository'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -67,6 +68,7 @@ export class EventsService {
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
     private readonly phoneNumberService: PhoneNumberService,
     private readonly emailLogoService: EmailLogoService,
+    private readonly templatesRepository: TemplatesRepository,
   ) {}
 
   /**
@@ -237,6 +239,10 @@ export class EventsService {
     const headerLogoId = useCustomHeader ? (updateDto.headerLogoId ?? null) : null
     const headerTitle = useCustomHeader ? updateDto.headerTitle?.trim() || null : null
 
+    if (templateId) {
+      await this.assertTemplateIsUsable(tenantId, templateId, NotificationChannel.EMAIL)
+    }
+
     if (headerLogoId) {
       const approvedLogo = await this.emailLogoService.findByIdIfApproved(headerLogoId)
       if (!approvedLogo) {
@@ -354,6 +360,10 @@ export class EventsService {
     const templateId = updateDto.templateId ?? null
     const to = this.normalizePhoneList(updateDto.to)
 
+    if (templateId) {
+      await this.assertTemplateIsUsable(tenantId, templateId, NotificationChannel.SMS)
+    }
+
     const setting = this.findOrCreateSmsSetting(event, userId)
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
@@ -427,6 +437,26 @@ export class EventsService {
         createdBy: userId,
       })
     )
+  }
+
+  /**
+   * Reject a template the tenant cannot render this channel with.
+   *
+   * findById includes checks to verify that the template is active, not deleted,
+   * and is owned by the tenant already.
+   */
+  private async assertTemplateIsUsable(
+    tenantId: string,
+    templateId: string,
+    channelCode: NotificationChannel,
+  ): Promise<void> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+
+    if (!template || template.channelCode !== channelCode) {
+      throw new BadRequestException(
+        `templateId must reference an active ${channelCode} template belonging to this tenant`,
+      )
+    }
   }
 
   /**
