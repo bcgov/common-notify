@@ -73,19 +73,25 @@ alerting:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
               title: 'Notify Alert'
-              # Plain-text message. NO emoji/icons. One line per alert:
-              #   FIRING <SEVERITY> | <Alert name> | <detail>
-              #   RESOLVED | <Alert name> | <detail>
-              # Detail = the `short` annotation when present, else `summary`.
-              # NOTE: the message is fully rendered here so it can be forwarded
-              # verbatim. If a downstream forwarder (e.g. the n8n webhook) wraps
-              # or re-decorates this text, the wrapper must be removed there too.
+              # Message format (per the alerting ticket). One line per alert:
+              #   🔴 FIRING | CRITICAL | <env> | <Alert name> — <detail>
+              #   🟠 FIRING | WARNING  | <env> | <Alert name> — <detail>
+              #   🟢 RESOLVED | <env> | <Alert name> — <detail>
+              # - Icon derived from severity (🔴 critical / 🟠 warning; 🟢 resolved).
+              # - <env> derived from .Labels.namespace (f6bc3f-dev→dev, etc.). PR
+              #   apps deploy into f6bc3f-dev; the PR number is not a label, but the
+              #   pod name (e.g. common-notify-211-backend) appears in <detail>.
+              # - <detail> = the `short` annotation when present, else `summary`.
+              # IMPORTANT: this is the COMPLETE, final message. The downstream n8n
+              # webhook must forward `message` VERBATIM (title/body), not rebuild
+              # its own envelope — otherwise the 🚨/State/Severity wrapper returns.
+              # That node lives in n8n, not this repo, and must be changed there.
               message: |
                 {{ `{{ range .Alerts.Firing }}` }}
-                FIRING {{ `{{ .Labels.severity | toUpper }}` }} | {{ `{{ .Labels.alertname }}` }} | {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
+                {{ `{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }}` }} FIRING | {{ `{{ .Labels.severity | toUpper }}` }} | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
                 {{ `{{ range .Alerts.Resolved }}` }}
-                RESOLVED | {{ `{{ .Labels.alertname }}` }} | {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
+                🟢 RESOLVED | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
             disableResolveMessage: false
 

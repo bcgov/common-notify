@@ -56,6 +56,8 @@ groups:
       - uid: cn-pod-crashloop
         title: PodCrashLoopBackOff
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 2m
         data:
           - refId: A
@@ -93,6 +95,8 @@ groups:
       - uid: cn-pod-restarts-high
         title: PodRestartsHigh
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 5m
         data:
           - refId: A
@@ -128,6 +132,8 @@ groups:
       - uid: cn-pod-not-ready
         title: PodNotReady
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 10m
         data:
           - refId: A
@@ -164,6 +170,8 @@ groups:
       - uid: cn-deployment-replicas
         title: DeploymentReplicasMismatch
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 10m
         data:
           - refId: A
@@ -207,6 +215,8 @@ groups:
       - uid: cn-mem-high
         title: ContainerMemoryHigh
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 10m
         data:
           - refId: A
@@ -246,6 +256,8 @@ groups:
       - uid: cn-mem-critical
         title: ContainerMemoryCritical
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 5m
         data:
           - refId: A
@@ -285,6 +297,8 @@ groups:
       - uid: cn-oomkilled
         title: ContainerOOMKilled
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 1m
         data:
           - refId: A
@@ -328,6 +342,8 @@ groups:
       - uid: cn-cpu-throttling
         title: ContainerCPUThrottlingHigh
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 15m
         data:
           - refId: A
@@ -381,6 +397,8 @@ groups:
       - uid: cn-api-5xx-high
         title: ApiHigh5xxRate
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 5m
         data:
           - refId: A
@@ -424,6 +442,8 @@ groups:
       - uid: cn-api-latency-high
         title: ApiHighLatency
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 10m
         data:
           - refId: A
@@ -475,6 +495,8 @@ groups:
       - uid: cn-pvc-high
         title: PVCUsageHigh
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 5m
         data:
           - refId: A
@@ -512,6 +534,8 @@ groups:
       - uid: cn-pvc-critical
         title: PVCUsageCritical
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 5m
         data:
           - refId: A
@@ -567,6 +591,8 @@ groups:
       - uid: cn-postgres-down
         title: PostgresUnavailable
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 3m
         data:
           - refId: A
@@ -604,6 +630,8 @@ groups:
       - uid: cn-redis-down
         title: RedisUnavailable
         condition: C
+        noDataState: OK
+        execErrState: OK
         for: 3m
         data:
           - refId: A
