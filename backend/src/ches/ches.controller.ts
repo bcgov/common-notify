@@ -19,6 +19,7 @@ import {
   ApiQuery,
   ApiParam,
   ApiBody,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { ChesApiClient } from './ches-api.client'
 import type { ChesStatusQuery } from './ches-api.client'
@@ -28,6 +29,9 @@ import { ChesMergeRequest } from './schemas/ches-merge-request'
 import { ChesStatusObject } from './schemas/ches-status-object'
 import { NotifyServiceGuard } from '../common/guards/notify-service.guard'
 
+// routes.yaml declares no Kong route for any of these, so they are unreachable; kept out
+// of the published spec.
+@ApiExcludeController()
 @ApiTags('CHES')
 @ApiSecurity('api-key')
 @UseGuards(NotifyServiceGuard)

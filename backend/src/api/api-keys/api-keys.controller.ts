@@ -10,6 +10,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { ApiExcludeController } from '@nestjs/swagger'
+import { ApiBody, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
@@ -40,6 +41,8 @@ import { ApiKeysService } from './api-keys.service'
  * Hidden from the public API docs: it is infrastructure, not something to integrate with.
  */
 @ApiExcludeController()
+@ApiTags('API keys')
+@ApiSecurity('api-key')
 @Controller('service/api-key')
 export class ApiKeysController {
   private readonly logger = new Logger(ApiKeysController.name)
@@ -61,6 +64,39 @@ export class ApiKeysController {
 
     // Set by Kong's key-auth plugin. Absent means the request did not come through the
     // gateway with a valid key.
+  @ApiOperation({
+    summary: 'Bind an API key to a tenant',
+    description:
+      'Associates the API key presented in `X-API-KEY` with a CSTAR tenant, so every later ' +
+      'request made with that key is scoped to it. Do this once, before your first send.\n\n' +
+      'The call must go through the API gateway (Kong validates the key) and must also carry a ' +
+      'user SSO JWT in `Authorization`, because the backend checks that the user is a member of ' +
+      'the tenant being claimed. A key can be bound to exactly one tenant.',
+  })
+  @ApiBody({
+    type: BindApiKeyDto,
+    examples: {
+      bind: {
+        summary: 'Bind to a tenant',
+        value: { cstarTenantId: 'd290f1ee-6c54-4b01-90e6-d701748f0851' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bound. Later requests with this key resolve to the tenant.',
+    schema: { example: { message: 'API key successfully bound to tenant' } },
+  })
+  @ApiResponse({ status: 401, description: 'API key not authenticated by gateway or invalid JWT' })
+  @ApiResponse({ status: 403, description: 'User is not a member of the specified CSTAR tenant' })
+  @ApiResponse({ status: 404, description: 'No Notify tenant configured for the CSTAR tenant ID' })
+  @ApiResponse({ status: 409, description: 'API key is already bound to a different tenant' })
+  async bindApiKey(
+    @Body() dto: BindApiKeyDto,
+    @Req() request: Request,
+  ): Promise<{ message: string }> {
+    // x-credential-identifier is set by Kong's key-auth plugin.
+    // If missing, the request did not come through the gateway with a valid key.
     const credentialIdentifier = request.headers['x-credential-identifier'] as string
     if (!credentialIdentifier) {
       throw new UnauthorizedException(

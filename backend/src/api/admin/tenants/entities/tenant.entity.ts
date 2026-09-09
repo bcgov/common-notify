@@ -3,7 +3,7 @@ import { TenantStatusCode } from './tenant-status-code.entity'
 
 /**
  * Tenant Entity
- * Represents an organization or service using BC Notify.
+ * Represents an organization or service using Notify.
  * All data in the system is scoped under a tenant.
  */
 @Entity('tenant')

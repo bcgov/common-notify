@@ -125,10 +125,15 @@ jobs:
               exit 0
             fi
             llen() { n=$(rc LLEN "$1" | tr -dc '0-9'); echo "${n:-0}"; }
+            # Bull keys are namespaced per deployment (REDIS_KEY_PREFIX, defaulting to
+            # RELEASE_NAME) because every deployment in the namespace shares one Redis.
+            PREFIX=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="RELEASE_NAME")].value}' 2>/dev/null)
+            PREFIX=${PREFIX:-notify}
+            echo "bull key prefix: $PREFIX"
             depth() {
               t=0
-              for q in ingestion email-delivery; do
-                for s in wait active; do t=$((t + $(llen "bull:$q:$s"))); done
+              for q in notification-ingestion email-delivery; do
+                for s in wait active; do t=$((t + $(llen "$PREFIX:$q:$s"))); done
               done
               echo "$t"
             }

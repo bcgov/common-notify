@@ -2,21 +2,32 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { TenantDto } from './tenant'
 
 export class NotificationStatusCodeDto {
-  @ApiProperty({ description: 'Status code identifier' })
+  @ApiProperty({ description: 'Status code identifier.', example: 'SENT' })
   code: string
 
-  @ApiProperty({ description: 'Display name for the status' })
+  @ApiProperty({ description: 'Label suitable for display to a person.', example: 'Sent' })
   displayName: string
 
-  @ApiPropertyOptional({ description: 'Description of the status' })
+  @ApiPropertyOptional({
+    description: 'What the status means.',
+    example: 'The notification was handed to the delivery provider',
+  })
   description?: string
 }
 
 export class NotificationRequestDto {
-  @ApiProperty({ description: 'Unique identifier for the notification request', format: 'uuid' })
+  @ApiProperty({
+    description: 'The notifyId returned when the notification was accepted.',
+    format: 'uuid',
+    example: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  })
   id: string
 
-  @ApiProperty({ description: 'Tenant that submitted the request', format: 'uuid' })
+  @ApiProperty({
+    description: 'Tenant that submitted the request.',
+    format: 'uuid',
+    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
+  })
   tenantId: string
 
   @ApiProperty({ type: TenantDto, description: 'Tenant information including name and slug' })
@@ -53,26 +64,49 @@ export class NotificationRequestDto {
   }
 
   @ApiPropertyOptional({
-    description: 'Scheduled send time for delayed notifications',
+    description: 'When a delayed notification is due to be sent.',
     format: 'date-time',
+    example: '2026-06-01T16:00:00.000Z',
   })
   delayedSendTime?: Date
 
-  @ApiPropertyOptional({ description: 'Full notification payload' })
+  @ApiPropertyOptional({
+    description: 'The request body as submitted.',
+    example: {
+      email: {
+        recipients: { to: ['citizen@example.com'] },
+        content: {
+          subject: 'Your permit application',
+          body: 'Your application has been received.',
+        },
+      },
+    },
+  })
   payload?: any
 
-  @ApiProperty({ description: 'Timestamp when the request was created' })
+  @ApiProperty({
+    description: 'When the request was accepted.',
+    format: 'date-time',
+    example: '2026-05-15T10:00:00.000Z',
+  })
   createdAt: Date
 
-  @ApiPropertyOptional({ description: 'User or system that created the request' })
+  @ApiPropertyOptional({ description: 'Who submitted the request.', example: 'permits-service' })
   createdBy?: string
 
-  @ApiProperty({ description: 'Timestamp when the request was last updated' })
+  @ApiProperty({
+    description: 'When the request last changed state.',
+    format: 'date-time',
+    example: '2026-05-15T10:00:04.512Z',
+  })
   updatedAt: Date
 
-  @ApiPropertyOptional({ description: 'User or system that last updated the request' })
+  @ApiPropertyOptional({ description: 'Who last changed the request.', example: 'system' })
   updatedBy?: string
 
-  @ApiPropertyOptional({ description: 'Error reason if the notification failed' })
+  @ApiPropertyOptional({
+    description: 'Why the notification failed, when it did.',
+    example: 'Recipient address rejected by the provider',
+  })
   errorReason?: string
 }
