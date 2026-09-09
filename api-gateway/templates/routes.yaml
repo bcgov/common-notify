@@ -36,7 +36,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}email-logo-image
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -63,7 +63,7 @@ routes:
   # backend needs no auth exemption: SwaggerModule registers on the Express
   # adapter, below Nest's router, so the global JwtGuard never sees these paths.
   - name: ${ROUTE_PREFIX}notify-api-docs
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -120,7 +120,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-frontend
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
