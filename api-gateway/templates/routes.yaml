@@ -49,9 +49,9 @@ routes:
     request_buffering: true
     response_buffering: true
   # Live Swagger UI for the decorator-generated OpenAPI document, which Nest
-  # serves at /api/docs (see backend/src/app.ts). This is deliberately separate
-  # from the hand-maintained static spec the frontend serves at /api-docs
-  # (CCP-5519) - this one cannot drift from the controllers.
+  # serves at /api/docs (see backend/src/app.ts). This is the only API doc, and
+  # it cannot drift from the controllers. Caddy redirects the frontend's older
+  # /api-docs path here.
   #
   # strip_path is false here, unlike every other route in this file. Those match
   # a single endpoint; this one is a prefix, because Swagger UI fetches its own
@@ -59,7 +59,7 @@ routes:
   # the spec from /api/docs-json. Stripping would rewrite those to
   # /swagger-ui-bundle.js and 404 against the backend, leaving a blank page.
   #
-  # Public and unauthenticated, matching the existing /api-docs surface. The
+  # Public and unauthenticated, as the /api-docs page it replaced was. The
   # backend needs no auth exemption: SwaggerModule registers on the Express
   # adapter, below Nest's router, so the global JwtGuard never sees these paths.
   - name: ${ROUTE_PREFIX}notify-api-docs

@@ -40,19 +40,17 @@ window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE="{$VITE_MAX_NOTIFICATION_RESULTS_P
 window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	}
 
-	# Serve API documentation (OpenAPI/Swagger)
-	handle_path /api-docs* {
-		root * /srv/api-docs
-		encode zstd gzip
-		file_server browse
-	}
+	# Nest generates the API spec from the controllers and serves it at
+	# /api/docs, which the reverse_proxy above forwards to Kong. These keep
+	# links to the frontend's older /api-docs path working.
+	redir /api-docs /api/docs permanent
+	redir /api-docs/* /api/docs permanent
 
 	root * /srv
 	encode zstd gzip
 	file_server
 	@spa_router {
 		not path /api*
-		not path /api-docs*
 		not path /static/config.js
 		file {
 			try_files {path} /index.html
@@ -63,14 +61,27 @@ window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 		-Server
 		X-Frame-Options "SAMEORIGIN"
 		X-XSS-Protection "1;mode=block"
-		Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 		X-Content-Type-Options "nosniff"
 		Strict-Transport-Security "max-age=31536000"
-		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;;
-			script-src 'self' 'unsafe-inline' https://*.gov.bc.ca ;
-			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
-			font-src 'self' https://fonts.gstatic.com;
-			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
+		# script-src has no 'unsafe-inline', so nothing we serve may carry an
+		# inline <script> - index.html loads /static/config.js and the hashed
+		# bundles by src. An inline one added later is blocked, not degraded.
+		#
+		# style-src still needs 'unsafe-inline' and cannot drop it: emotion (via
+		# @mui/icons-material) and react-toastify inject <style> elements at
+		# runtime, and react-aria positions overlays with inline style
+		# attributes, which no nonce or hash covers. ZAP flags it; accepted.
+		#
+		# Fonts are bundled, so font-src is 'self'. img-src keeps *.gov.bc.ca
+		# for the tenant email logo, which the browser fetches from the API
+		# gateway host rather than through this proxy.
+		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
+			script-src 'self';
+			style-src 'self' 'unsafe-inline';
+			font-src 'self';
+			img-src 'self' data: https://*.gov.bc.ca;
+			base-uri 'self';
+			object-src 'none';
 			frame-ancestors 'self';
 			form-action 'self';
 			block-all-mixed-content;
@@ -79,7 +90,37 @@ window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
 		Cross-Origin-Resource-Policy "cross-origin"
 		Cross-Origin-Opener-Policy "same-origin"
+		# Completes site isolation alongside COOP/CORP. Every cross-origin
+		# subresource must now opt in with its own CORP header - the email logo
+		# does (see EmailLogoController).
+		Cross-Origin-Embedder-Policy "require-corp"
 	}
+
+	# Cache-Control is matched rather than blanket no-store. The SPA shell and
+	# the runtime config must never be cached, but hashed build assets can be
+	# held forever - a new build changes the filename. The `file` matcher keeps
+	# a missing asset (an old pod during a rolling deploy) out of the immutable
+	# bucket, so a 404 is never cached for a year.
+	@immutable_assets {
+		path /assets/*
+		file
+	}
+	header @immutable_assets Cache-Control "public, max-age=31536000, immutable"
+
+	# Not content-hashed, so these get a short TTL rather than an immutable one.
+	@static_files {
+		path /favicon.ico /robots.txt
+		file
+	}
+	header @static_files Cache-Control "public, max-age=3600"
+
+	@uncacheable {
+		not {
+			path /assets/* /favicon.ico /robots.txt
+			file
+		}
+	}
+	header @uncacheable Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 }
 :3001 {
 	handle /health {

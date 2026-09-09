@@ -74,6 +74,7 @@ jobs:
   zap:
     name: ZAP Scans
     permissions:
+      contents: read
       issues: write
     runs-on: ubuntu-24.04
     strategy:
@@ -84,11 +85,15 @@ jobs:
             path: api
           - name: frontend
     steps:
+      # The action reads rules_file_name out of the workspace, so the repo has
+      # to be on disk before it runs.
+      - uses: actions/checkout@v6
       - name: ZAP Scan
         uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
         with:
           allow_issue_writing: true
           artifact_name: ${{ matrix.name }}
           issue_title: "ZAP Security Report: ${{ matrix.name }}"
+          rules_file_name: .zap/rules.tsv
           token: ${{ secrets.GITHUB_TOKEN }}
           target: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca/${{ matrix.path }}
