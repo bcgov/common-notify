@@ -22,6 +22,7 @@ import RequestStatusSummary from '@/components/RequestStatusSummary'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import PageHeading from '@/components/PageHeading'
 import PageSubHeading from '@/components/PageSubHeading'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -87,6 +88,7 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
     filters,
     isLoading,
     hasLoaded,
+    error,
   } = useAppSelector((state) => state.notificationDetail)
   const [searchInput, setSearchInput] = useState(search)
 
@@ -97,6 +99,14 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
   useEffect(() => {
     dispatch(fetchNotificationDetails(notificationRequestId))
   }, [notificationRequestId, page, limit, search, sortBy, sortOrder, filters, dispatch])
+
+  // Report a failed load, so a rejected sort/filter request doesn't just leave the previous rows
+  // on screen. The fixed toastId keeps repeat failures from stacking.
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error, undefined, { toastId: 'notification-detail-error' })
+    }
+  }, [error])
 
   function handleSearch() {
     dispatch(setSearch(searchInput))
