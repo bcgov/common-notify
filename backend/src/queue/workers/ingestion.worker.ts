@@ -10,6 +10,7 @@ import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
 import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+import { FAILED_JOB_RETENTION } from '../job-retention'
 
 /**
  * Ingestion Worker
@@ -154,7 +155,7 @@ export class IngestionWorker {
             await emailQueue.add(deliveryPayload, {
               jobId: batchId,
               removeOnComplete: true,
-              removeOnFail: false,
+              removeOnFail: FAILED_JOB_RETENTION,
               attempts: 3,
               backoff: { type: 'exponential', delay: 2000 },
             })
@@ -333,7 +334,7 @@ export class IngestionWorker {
             jobId: jobKey,
             delay: Math.max(0, delay), // BullMQ ignores negative delays
             removeOnComplete: true,
-            removeOnFail: false, // Keep failed jobs for debugging
+            removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3, // Retry up to 3 times
             backoff: {
               type: 'exponential',
