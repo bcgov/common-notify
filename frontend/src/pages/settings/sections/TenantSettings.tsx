@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import ApiKeyField from './ApiKeyField'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { updateTenantSettings } from '@/redux/thunks/settings.thunks'
@@ -38,6 +39,8 @@ const TenantSettings: FC = () => {
   )
   const { hasRole } = useCstarRoles()
   const canEdit = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
+  const apiKeySelfServiceEnabled = useFeatureFlag('api_key_self_service', selectedTenantId)
   // Seeded once at mount. Settings.tsx remounts this section whenever new data lands,
   // so there is no effect keeping these in sync.
   const [emailInput, setEmailInput] = useState(alertEmail ?? '')
@@ -171,8 +174,13 @@ const TenantSettings: FC = () => {
       </div>
 
       {/* Grouped with the rate limit because both are gateway concerns. Owns its own
-          fetch and its own dialogs; it contributes nothing to this form's submit. */}
-      <ApiKeyField />
+          fetch and its own dialogs; it contributes nothing to this form's submit.
+
+          Hidden unless the environment can actually issue keys: that needs the APS
+          Credential Issuer API, which exists only on the APS test instance. Off in PROD,
+          where tenants request a key through the API Services Portal and bind it. The
+          backend gates the same flag, so this is presentation, not enforcement. */}
+      {apiKeySelfServiceEnabled && <ApiKeyField />}
 
       <div className="settings__field">
         <span className="settings__label" id="alert-email-label">

@@ -49,6 +49,11 @@ export class ApiKeyIssuanceService {
     return this.configService.get<string>('aps.aclGroup') || 'notify-api'
   }
 
+  /** Which deployed environment issued a credential. See configuration.ts. */
+  private get releaseName(): string {
+    return this.configService.get<string>('releaseName') || 'local'
+  }
+
   constructor(
     @InjectRepository(ApiKeyConsumer)
     private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
@@ -110,6 +115,11 @@ export class ApiKeyIssuanceService {
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
+        // Which environment issued this. DEV, TEST and every PR share one gateway and one
+        // Product Environment, so without this the Consumers page is a single undifferentiated
+        // list and there is no way to tell a DEV consumer from a TEST one. The Helm release
+        // name is the only thing that separates them — NODE_ENV is 'production' in all three.
+        'notify-environment': this.releaseName,
         // The CSTAR tenant id, not Notify's internal primary key. These labels exist to
         // be read on the Portal Consumers page by someone cross-referencing a consumer
         // against another system, and CSTAR is the identifier those systems share —

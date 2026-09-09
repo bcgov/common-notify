@@ -66,7 +66,11 @@ describe('ApiKeyIssuanceService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: vi.fn((key: string) => (key === 'aps.aclGroup' ? 'notify-api' : 'ENV123')),
+            get: vi.fn((key: string) => {
+              if (key === 'aps.aclGroup') return 'notify-api'
+              if (key === 'releaseName') return 'common-notify-dev'
+              return 'ENV123'
+            }),
           },
         },
       ],
@@ -94,6 +98,9 @@ describe('ApiKeyIssuanceService', () => {
         labels: {
           'issued-by': 'notify',
           'notify-tenant': 'tenant-a',
+          // DEV, TEST and every PR issue into the same gateway, so the consumer has to
+          // say which one it came from.
+          'notify-environment': 'common-notify-dev',
           // The CSTAR guid, not the Notify row id — see the service for why.
           'cstar-tenant-id': 'cstar-guid',
         },

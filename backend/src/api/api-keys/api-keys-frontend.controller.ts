@@ -21,6 +21,9 @@ import {
 } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
+import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ApiKeyIssuanceService } from './api-key-issuance.service'
@@ -53,7 +56,13 @@ import { ApiKeySummaryDto, IssuedApiKeyDto } from './schemas/api-key-response.dt
  */
 @ApiTags('api-keys')
 @Controller('frontend/api-keys')
-@UseGuards(NotifyFrontendRoleGuard)
+// Gated at the class level, so every route goes dark together. Issuing calls the APS
+// Credential Issuer API, which exists only on the APS test instance — on the production
+// instance it 404s. The flag is off in PROD, where tenants still bind a key requested
+// through the API Services Portal. Hiding the UI alone would leave the endpoints
+// reachable by anyone who kept the URL.
+@FeatureFlag(FeatureFlagCode.API_KEY_SELF_SERVICE)
+@UseGuards(NotifyFrontendRoleGuard, FeatureFlagGuard)
 @ApiBearerAuth()
 export class ApiKeysFrontendController {
   constructor(private readonly issuanceService: ApiKeyIssuanceService) {}

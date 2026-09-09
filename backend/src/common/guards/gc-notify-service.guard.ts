@@ -78,7 +78,8 @@ export class GcNotifyServiceGuard implements CanActivate {
       )
       throw new NotFoundException(
         'This API key has not been associated with a tenant. ' +
-          'Request a key from the Notify UI, or call POST /api/v1/service/api-key/bind to complete setup.',
+          'Request a key from the Notify UI, or, where the UI does not offer one, call ' +
+          'POST /api/v1/service/api-key/bind to complete setup.',
       )
     }
 

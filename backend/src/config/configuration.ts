@@ -12,6 +12,11 @@ export default () => {
     // Application
     port: parseInt(process.env.PORT || '3000', 10),
     environment: process.env.NODE_ENV || 'development',
+    // Helm release name — common-notify-dev, common-notify-test, common-notify-<pr>. The
+    // only value that tells the deployed environments apart: NODE_ENV is 'production'
+    // everywhere. Used to label issued gateway credentials, since DEV, TEST and every PR
+    // now issue into the same APS gateway and Environment.
+    releaseName: process.env.RELEASE_NAME || 'local',
     /** Express `trust proxy` hop count when `TRUST_PROXY` is set (required behind API gateway / LB for correct client IP + rate limiting). */
 
     // Logging (trace, debug, info, warn, error, fatal)

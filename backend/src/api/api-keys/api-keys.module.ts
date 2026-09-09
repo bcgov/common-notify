@@ -16,9 +16,10 @@ import { ApiKeysController } from './api-keys.controller'
 import { ApiKeysFrontendController } from './api-keys-frontend.controller'
 import { ApiKeyUsageFrontendController } from './api-key-usage-frontend.controller'
 import { ApiKeyUsageAdminController } from './api-key-usage-admin.controller'
+import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { TenantsModule } from '../admin/tenants/tenants.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { CredentialIssuerModule } from '../../services/credential-issuer/credential-issuer.module'
-import { TenantsModule } from '../admin/tenants/tenants.module'
 
 @Module({
   imports: [
@@ -33,8 +34,10 @@ import { TenantsModule } from '../admin/tenants/tenants.module'
       NotifyConfiguration,
     ]),
     CstarModule,
-    CredentialIssuerModule,
+    // Both required by FeatureFlagGuard on ApiKeysFrontendController.
+    FeatureFlagModule,
     TenantsModule,
+    CredentialIssuerModule,
   ],
   providers: [ApiKeysService, ApiKeyIssuanceService, ApiKeyUsageService, LimitAlertService],
   controllers: [
