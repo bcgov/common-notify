@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
@@ -34,8 +34,12 @@ import { CredentialIssuerModule } from '../../services/credential-issuer/credent
       NotifyConfiguration,
     ]),
     CstarModule,
-    // Both required by FeatureFlagGuard on ApiKeysFrontendController.
-    FeatureFlagModule,
+    // Both required by FeatureFlagGuard on ApiKeysFrontendController. forwardRef because
+    // FeatureFlagModule already imports this module (for NotifyServiceGuard), and a plain
+    // import closes the cycle — which tsc and the unit tests do not catch, but the
+    // compiled CommonJS output does, at boot:
+    //   ReferenceError: Cannot access 'ApiKeysModule' before initialization
+    forwardRef(() => FeatureFlagModule),
     TenantsModule,
     CredentialIssuerModule,
   ],
