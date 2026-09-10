@@ -72,34 +72,26 @@ alerting:
             settings:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
-              title: 'Grafana Alert Notification'
+              title: 'Notify Alert'
+              # Message format (per the alerting ticket). One line per alert:
+              #   🔴 FIRING | CRITICAL | <env> | <Alert name> — <detail>
+              #   🟠 FIRING | WARNING  | <env> | <Alert name> — <detail>
+              #   🟢 RESOLVED | <env> | <Alert name> — <detail>
+              # - Icon derived from severity (🔴 critical / 🟠 warning; 🟢 resolved).
+              # - <env> derived from .Labels.namespace (f6bc3f-dev→dev, etc.). PR
+              #   apps deploy into f6bc3f-dev; the PR number is not a label, but the
+              #   pod name (e.g. common-notify-211-backend) appears in <detail>.
+              # - <detail> = the `short` annotation when present, else `summary`.
+              # IMPORTANT: this is the COMPLETE, final message. The downstream n8n
+              # webhook must forward `message` VERBATIM (title/body), not rebuild
+              # its own envelope — otherwise the 🚨/State/Severity wrapper returns.
+              # That node lives in n8n, not this repo, and must be changed there.
               message: |
-                {{ `{{ if gt (len .Alerts.Firing) 0 }}` }}
-                **🔴 FIRING ALERTS ({{ `{{ len .Alerts.Firing }}` }})**
                 {{ `{{ range .Alerts.Firing }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Severity:** {{ `{{ .Labels.severity }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Service:** {{ `{{ .Labels.service }}` }}
-                {{ `{{ if .Labels.app }}` }}**App:** {{ `{{ .Labels.app }}{{ end }}` }}
-
-                **Summary:** {{ `{{ .Annotations.summary }}` }}
-                {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
-
-                **Status:** Firing since {{ `{{ .StartsAt }}` }}
-                [View in Grafana]({{ `{{ .GeneratorURL }}` }})
+                {{ `{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }}` }} FIRING | {{ `{{ .Labels.severity | toUpper }}` }} | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
-                {{ `{{ end }}` }}
-
-                {{ `{{ if gt (len .Alerts.Resolved) 0 }}` }}
-                **✅ RESOLVED ALERTS ({{ `{{ len .Alerts.Resolved }}` }})**
                 {{ `{{ range .Alerts.Resolved }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Resolved at:** {{ `{{ .EndsAt }}` }}
-                {{ `{{ end }}` }}
+                🟢 RESOLVED | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
             disableResolveMessage: false
 

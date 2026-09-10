@@ -102,6 +102,13 @@ serverFiles:
       # rely on kube-state-metrics for PR pod-state (no app metrics for PRs).
       - job_name: common-notify-app
         metrics_path: /api/metrics
+        # The backend /api/metrics endpoint returns the exposition body with a
+        # blank Content-Type. Prometheus 3.x rejects such targets ("non-compliant
+        # scrape target sending blank Content-Type") unless a fallback protocol is
+        # declared. Without this the whole app scrape is DOWN and every API/5xx/
+        # latency alert reads NoData. (Proper long-term fix: have the backend set
+        # Content-Type: text/plain; version=0.0.4 on the metrics response.)
+        fallback_scrape_protocol: PrometheusText0.0.4
         static_configs:
           - targets: ['common-notify-dev-backend.f6bc3f-dev.svc.cluster.local:80']
             labels: { namespace: f6bc3f-dev, app: backend }
