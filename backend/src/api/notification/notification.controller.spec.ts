@@ -6,7 +6,8 @@ import request from 'supertest'
 import { vi } from 'vitest'
 import { NotificationController } from './notification.controller'
 import { NotificationService } from './notification.service'
-import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { GUARDS_METADATA } from '@nestjs/common/constants'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotificationRequestDetailService } from './notification-request-detail.service'
 
 // Mock AuthGuard to bypass authentication and populate request.tenant
@@ -47,7 +48,7 @@ describe('NotificationController', () => {
         },
       ],
     })
-      .overrideGuard(NotifyFrontendRoleGuard)
+      .overrideGuard(NotifyServiceGuard)
       .useValue(mockAuthGuard)
       .compile()
 
@@ -63,6 +64,13 @@ describe('NotificationController', () => {
   afterEach(async () => {
     await app.close()
     vi.clearAllMocks()
+  })
+
+  it('authenticates with an API key through the gateway, not a user JWT', () => {
+    // Published, non-frontend endpoint. The UI has its own controller for this data.
+    expect(Reflect.getMetadata(GUARDS_METADATA, NotificationController)).toEqual([
+      NotifyServiceGuard,
+    ])
   })
 
   it('should be defined', () => {
