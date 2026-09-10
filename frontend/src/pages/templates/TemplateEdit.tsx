@@ -31,6 +31,7 @@ interface TemplateEditProps {
 }
 
 const REQUIRED_FIELD_ERROR = 'Please fill out this field to continue.'
+const TEMPLATE_BODY_MAX_LENGTH = 10_000
 
 const SYNTAX_TOOLTIPS = [
   {
@@ -133,6 +134,10 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       ...previous,
       [field]: '',
     }))
+  }
+
+  const handleBodyChange = (value: string) => {
+    handleFieldChange('body')(value.slice(0, TEMPLATE_BODY_MAX_LENGTH))
   }
 
   const handleCopyTemplateId = async () => {
@@ -257,6 +262,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               description="This will be the name of your template. Use a name that will help you easily find it later."
               value={formData.name}
               onChange={handleFieldChange('name')}
+              maxLength={255}
               {...({ placeholder: 'Type a template title' } as any)}
               className="bcds-react-aria-TextField template-form__field"
               size="small"
@@ -282,7 +288,6 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               isDisabled
             >
               <Radio value={NotificationChannel.EMAIL}>Email</Radio>
-
               <Radio value={NotificationChannel.SMS}>SMS</Radio>
             </RadioGroup>
           </div>
@@ -294,6 +299,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 description="Use a subject line that clearly describes the email content."
                 value={formData.subject}
                 onChange={handleFieldChange('subject')}
+                maxLength={500}
                 className="bcds-react-aria-TextField template-form__field template-form__field--full"
                 size="small"
                 isRequired
@@ -366,7 +372,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
                 formErrors.body ? ' is-invalid' : ''
               }`}
               value={formData.body}
-              onChange={(event) => handleFieldChange('body')(event.target.value)}
+              onChange={(event) => handleBodyChange(event.target.value)}
               readOnly={isReadOnly}
             />
 
