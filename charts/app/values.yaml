@@ -8,7 +8,13 @@ global:
   registry: ghcr.io # ghcr.io for directly streaming from github container registry or "artifacts.developer.gov.bc.ca/github-docker-remote" for artifactory, or any other registry. Templates use default "ghcr.io" as fallback if overridden to null.
   #-- the tag of the image, it can be latest, 1.0.0 etc..., or the sha256 hash
   tag: ~
-  #-- turn off autoscaling for the entire suite by setting this to false. default is true.
+  #-- master switch for autoscaling across the suite. No HPA is created unless
+  #-- BOTH this and the component's own autoscaling.enabled are true, and the
+  #-- deployments omit their `replicas` field under exactly that same condition.
+  #-- Kept FALSE by default on purpose: these defaults are the DEV/PR profile,
+  #-- and f6bc3f-dev hosts every open PR environment in one namespace against a
+  #-- 3-core quota — HPAs with minReplicas 3 per PR would exhaust it immediately.
+  #-- TEST and PROD turn it on via values-test.yaml / values-prod.yaml.
   autoscaling: false
   #-- global secrets, can be accessed by sub-charts.
   secrets:
@@ -28,11 +34,17 @@ global:
 backend:
   #-- enable or disable backend
   enabled: true
-  #-- the deployment strategy, can be "Recreate" or "RollingUpdate"
+  #-- the deployment strategy, can be "Recreate" or "RollingUpdate".
+  #-- Recreate is the DEV/PR default: those run a single replica in a quota-tight
+  #-- shared namespace, where RollingUpdate's surge pod is more expensive than the
+  #-- brief restart is painful. TEST and PROD use RollingUpdate (see values-*.yaml).
   deploymentStrategy: Recreate
-  #-- the number of replicas when autoscaling is disabled
+  #-- the number of replicas. Only applied when autoscaling is off for this
+  #-- component (global.autoscaling AND backend.autoscaling.enabled); when
+  #-- autoscaling is on, the HPA owns the replica count instead.
   replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.
+  #-- NOTE: enabled:true alone does nothing — global.autoscaling gates it too.
   autoscaling:
     #-- enable or disable autoscaling.
     enabled: true
@@ -71,8 +83,13 @@ backend:
     port: 80 # this is the service port, where it will be exposed internal to the namespace.
     targetPort: 3000 # this is container port where app listens on
   pdb:
-    enabled: false # enable it in PRODUCTION for having pod disruption budget.
-    minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+    # Off for DEV/PR. A PDB is only safe once there is more than one replica:
+    # with replicaCount 1, minAvailable 1 permits zero voluntary disruptions and
+    # blocks node drains indefinitely. Enabled in values-test.yaml and
+    # values-prod.yaml, where minReplicas is 2 and 5 respectively.
+    enabled: false
+    # Must stay strictly BELOW the replica count, or drains never complete.
+    minAvailable: 1
   networkPolicy:
     enabled: true # enable NetworkPolicy to restrict traffic to backend
     # Allows traffic from:
@@ -142,9 +159,12 @@ backend:
 frontend:
   # -- enable or disable a component deployment.
   enabled: true
-  # -- the deployment strategy, can be "Recreate" or "RollingUpdate"
+  # -- the deployment strategy, can be "Recreate" or "RollingUpdate".
+  # -- Recreate is the DEV/PR default; TEST and PROD use RollingUpdate
+  # -- (see values-test.yaml / values-prod.yaml).
   deploymentStrategy: Recreate
-  #-- the number of replicas when autoscaling is disabled
+  #-- the number of replicas. Only applied when autoscaling is off for this
+  #-- component (global.autoscaling AND frontend.autoscaling.enabled).
   replicaCount: 1
 
   # -- Kubernetes Secret containing Keycloak and API Gateway configuration
@@ -198,8 +218,11 @@ frontend:
       haproxy.router.openshift.io/rate-limit-connections.rate-tcp: '500'
       haproxy.router.openshift.io/disable_cookies: 'true'
   pdb:
-    enabled: false # enable it in PRODUCTION for having pod disruption budget.
-    minAvailable: 1 # the minimum number of pods that must be available during the disruption budget.
+    # Off for DEV/PR — with a single replica, minAvailable 1 blocks node drains.
+    # Enabled in values-test.yaml and values-prod.yaml.
+    enabled: false
+    # Must stay strictly BELOW the replica count, or drains never complete.
+    minAvailable: 1
 
   #-- Promtail sidecar configuration for log shipping to Loki
   promtail:
