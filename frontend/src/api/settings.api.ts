@@ -1,6 +1,7 @@
 import type { AxiosError } from 'axios'
 import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type {
+  ApprovedEmailLogo,
   EmailSettingsValues,
   SmsSettingsValues,
   TenantSettings,
@@ -28,6 +29,16 @@ export async function getSettings(): Promise<TenantSettings | null> {
     return await get<TenantSettings | null>(params)
   } catch (error) {
     throw toReadableError(error, 'settings', 'load')
+  }
+}
+
+/** Get the approved logos available for the authenticated tenant's email settings. */
+export async function getApprovedEmailLogos(): Promise<ApprovedEmailLogo[]> {
+  try {
+    const params = generateApiParameters(`${BASE_URL}/email-logos`)
+    return await get<ApprovedEmailLogo[]>(params)
+  } catch (error) {
+    throw toReadableError(error, 'email logos', 'load')
   }
 }
 

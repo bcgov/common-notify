@@ -88,4 +88,17 @@ export class TemplateResponseDto {
    * @example "2024-05-01T12:30:00Z"
    */
   updatedAt: Date
+
+  /**
+   * What a bulk (CSV) send needs to know about this template's placeholders.
+   *
+   * Returned by the single-template endpoint only - the list endpoint would parse every template
+   * on every page load for information no list view uses.
+   */
+  placeholders?: {
+    /** Full dotted paths a person fills in, one spreadsheet column each. */
+    paths: string[]
+    /** Placeholders that repeat or re-scope, which a flat file cannot supply. */
+    unsupported: string[]
+  }
 }

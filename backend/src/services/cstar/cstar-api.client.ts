@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CstarCacheStore } from './cstar-cache.store'
 import type { CstarRolesResponseDto, CstarTenantsResponseDto } from './schemas/cstar.schema'
 
 interface CstarErrorResponse {
@@ -38,7 +39,18 @@ export class CstarApiClient {
   private readonly baseUrl: string
   private static readonly SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]{1,128}$/
 
-  constructor(private readonly configService: ConfigService) {
+  /**
+   * Lookups currently in flight, so a burst of requests shares a single CSTAR call.
+   * Process-local by design: these are unresolved promises, which cannot be shared through
+   * Redis. The values themselves live in CstarCacheStore, where every pod sees them.
+   */
+  private readonly tenantsInFlight = new Map<string, Promise<any[]>>()
+  private readonly rolesInFlight = new Map<string, Promise<string[]>>()
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cacheStore: CstarCacheStore,
+  ) {
     this.baseUrl = this.configService.get<string>('cstar.baseUrl') || ''
   }
 
@@ -60,7 +72,11 @@ export class CstarApiClient {
    * @throws ForbiddenException if user doesn't have access to tenant
    * @throws InternalServerErrorException if CSTAR API error
    */
-  async getUserRoles(tenantId: string, ssoUserId: string, authHeader?: string): Promise<string[]> {
+  private async fetchUserRoles(
+    tenantId: string,
+    ssoUserId: string,
+    authHeader?: string,
+  ): Promise<string[]> {
     if (!this.baseUrl) {
       this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')
@@ -158,6 +174,93 @@ export class CstarApiClient {
   }
 
   /**
+   * Reuse a cached result, and let concurrent callers share one in-flight request. Both
+   * lookups sit on the hot path: NotifyFrontendRoleGuard calls getUserTenants on every
+   * tenant-scoped frontend request and getUserRoles on every role-gated one.
+   *
+   * Failures are never cached - the write runs only on a resolved fetch - so a transient
+   * CSTAR problem is retried by the very next request rather than locking a user out.
+   */
+  private async cachedLookup<T>(
+    inFlight: Map<string, Promise<T>>,
+    key: string,
+    readCache: () => Promise<T | null>,
+    writeCache: (value: T) => Promise<void>,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    // Join before reading: an in-flight request exists only after a miss, so Redis has
+    // nothing to offer that this promise will not deliver sooner.
+    const pending = inFlight.get(key)
+    if (pending) {
+      return pending
+    }
+
+    const cached = await readCache()
+    if (cached !== null) {
+      return cached
+    }
+
+    // Re-check: the read is asynchronous, so two callers can both pass the check above
+    // before either registers, and would each then call CSTAR.
+    const started = inFlight.get(key)
+    if (started) {
+      return started
+    }
+
+    const request = fetcher()
+      .then(async (value) => {
+        await writeCache(value)
+        return value
+      })
+      .finally(() => {
+        inFlight.delete(key)
+      })
+
+    inFlight.set(key, request)
+    return request
+  }
+
+  /**
+   * Reject a missing or non-string identifier before it becomes a cache key. The
+   * path-segment regexes stringify their argument, so `undefined` passes them as the
+   * literal "undefined", and every caller missing the claim would share one entry.
+   */
+  private requireIdentifier(value: string, field: string): string {
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new BadRequestException(`Invalid ${field}`)
+    }
+    return value
+  }
+
+  /** The tenants a user belongs to, according to CSTAR. */
+  async getUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
+    this.requireIdentifier(ssoUserId, 'ssoUserId')
+    return this.cachedLookup(
+      this.tenantsInFlight,
+      ssoUserId,
+      () => this.cacheStore.readTenants(ssoUserId),
+      (value) => this.cacheStore.writeTenants(ssoUserId, value),
+      () => this.fetchUserTenants(ssoUserId, authHeader),
+    )
+  }
+
+  /**
+   * A user's roles within one tenant. Keyed by tenant and user: a user holds different
+   * roles in different tenants, so switching tenants must not read the same entry.
+   */
+  async getUserRoles(tenantId: string, ssoUserId: string, authHeader?: string): Promise<string[]> {
+    this.requireIdentifier(tenantId, 'tenantId')
+    this.requireIdentifier(ssoUserId, 'ssoUserId')
+    return this.cachedLookup(
+      this.rolesInFlight,
+      `${tenantId}:${ssoUserId}`,
+      () => this.cacheStore.readRoles(tenantId, ssoUserId),
+      (value) => this.cacheStore.writeRoles(tenantId, ssoUserId, value),
+      () => this.fetchUserRoles(tenantId, ssoUserId, authHeader),
+    )
+  }
+
+  /**
    * Fetch user's accessible tenants from CSTAR
    *
    * @param ssoUserId The user's SSO/IDIR user ID (GUID)
@@ -166,7 +269,7 @@ export class CstarApiClient {
    * @throws UnauthorizedException if user not found or credentials invalid
    * @throws InternalServerErrorException if CSTAR API error
    */
-  async getUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
+  private async fetchUserTenants(ssoUserId: string, authHeader?: string): Promise<any[]> {
     if (!this.baseUrl) {
       this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')

@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
-import { Footer, Header } from '@bcgov/design-system-react-components'
+import { Header } from '@bcgov/design-system-react-components'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
@@ -9,7 +9,6 @@ import LoadingSpinner from './LoadingSpinner'
 import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
-import { APP_VERSION } from '@/utils/version'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import UserService from '@/service/user-service'
 import { SsoRole } from '@/enum/sso-role.enum'
@@ -132,9 +131,9 @@ const Layout: FC<Props> = ({ children }) => {
     <>
       <LoadingSpinner />
       <ToastContainer
-        position="top-right"
+        position="bottom-right"
         autoClose={5000}
-        hideProgressBar={false}
+        hideProgressBar
         newestOnTop={false}
         closeOnClick
         rtl={false}
@@ -146,7 +145,7 @@ const Layout: FC<Props> = ({ children }) => {
       <TenantSelectionModal />
       <div className="layout-container">
         <div className="layout-header">
-          <Header title={'BC Notify'}>
+          <Header title={'Notify'}>
             <div className="layout-header-nav">
               <div className="layout-header-user">
                 <TenantSwitcher />
@@ -159,10 +158,6 @@ const Layout: FC<Props> = ({ children }) => {
             {showSidebar && <Sidebar />}
             <div className="layout-content">{children}</div>
           </div>
-        </div>
-        <div className="layout-footer">
-          <Footer />
-          <div className="footer-version">v{APP_VERSION}</div>
         </div>
       </div>
     </>

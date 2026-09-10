@@ -6,6 +6,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { CstarRole } from '../../enum/cstar-role.enum'
 import { TenantSettingsController } from './tenant-settings.controller'
 import { TenantSettingsService } from './tenant-settings.service'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 
 describe('TenantSettingsController', () => {
   let controller: TenantSettingsController
@@ -16,11 +17,18 @@ describe('TenantSettingsController', () => {
     upsertEmailSettings: vi.fn(),
     upsertSmsSettings: vi.fn(),
   }
+  const mockEmailLogoService = {
+    findApproved: vi.fn(),
+    buildPublicImageUrl: vi.fn(),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TenantSettingsController],
-      providers: [{ provide: TenantSettingsService, useValue: mockService }],
+      providers: [
+        { provide: TenantSettingsService, useValue: mockService },
+        { provide: EmailLogoService, useValue: mockEmailLogoService },
+      ],
     })
       .overrideGuard(NotifyFrontendRoleGuard)
       .useValue({})
@@ -32,6 +40,19 @@ describe('TenantSettingsController', () => {
 
   it('allows any CSTAR role to read via getSettings', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, TenantSettingsController.prototype.getSettings)
+
+    expect(roles).toEqual([
+      CstarRole.NOTIFY_VIEWER,
+      CstarRole.NOTIFY_TEMPLATE_EDITOR,
+      CstarRole.NOTIFY_OPERATIONS_ADMIN,
+    ])
+  })
+
+  it('allows any CSTAR role to list approved email logos', () => {
+    const roles = Reflect.getMetadata(
+      ROLES_KEY,
+      TenantSettingsController.prototype.getApprovedEmailLogos,
+    )
 
     expect(roles).toEqual([
       CstarRole.NOTIFY_VIEWER,
@@ -63,6 +84,28 @@ describe('TenantSettingsController', () => {
     expect(
       Reflect.getMetadata(PATH_METADATA, TenantSettingsController.prototype.updateSmsSettings),
     ).toBe('sms')
+    expect(
+      Reflect.getMetadata(PATH_METADATA, TenantSettingsController.prototype.getApprovedEmailLogos),
+    ).toBe('email-logos')
+  })
+
+  it('returns approved logos with service-built public image URLs', async () => {
+    mockEmailLogoService.findApproved.mockResolvedValue([
+      { id: 'logo-1', name: 'Primary', fileKey: 'logos/primary.png' },
+    ])
+    mockEmailLogoService.buildPublicImageUrl.mockReturnValue(
+      'https://gateway.example.test/logos/logo-1/image',
+    )
+
+    await expect(controller.getApprovedEmailLogos()).resolves.toEqual([
+      {
+        id: 'logo-1',
+        name: 'Primary',
+        imageUrl: 'https://gateway.example.test/logos/logo-1/image',
+      },
+    ])
+    expect(mockEmailLogoService.findApproved).toHaveBeenCalledOnce()
+    expect(mockEmailLogoService.buildPublicImageUrl).toHaveBeenCalledWith('logo-1')
   })
 
   it('uses the tenant resolved by the guard for GET', async () => {
@@ -109,6 +152,7 @@ describe('TenantSettingsController', () => {
     mockService.upsertEmailSettings.mockResolvedValue(settings)
 
     const dto = {
+      emailLogoId: null,
       emailNotificationsEnabled: false,
       replyToEmail: 'noreply',
       emailAttachmentsEnabled: true,

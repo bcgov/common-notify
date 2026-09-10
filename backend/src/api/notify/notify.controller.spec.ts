@@ -1183,6 +1183,87 @@ describe('Notify Controllers', () => {
     })
   })
 
+  describe('NotifySimpleFrontendController', () => {
+    // The mail merge screen posts here. Same pipeline as /api/v1/notifysimple/email, different
+    // guard - so these cover the wiring, not the merge rules (covered above).
+    describe('POST /api/v1/frontend/notifysimple (mail merge)', () => {
+      const validMergeBody = {
+        content: { templateId: '12345678-1234-4234-8234-123456789012' },
+        recipients: {
+          mergeArray: [
+            ['to', 'firstname'],
+            ['alice@example.com', 'Alice'],
+            ['bob@example.com', 'Bob'],
+          ],
+        },
+      }
+
+      it('should return 202 and report the accepted recipient count', async () => {
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.notifyId).toBeDefined()
+            expect(res.body.status).toBe('accepted')
+            expect(res.body.recipientCount).toBe(2)
+            expect(res.body.channels).toEqual(['email'])
+          })
+      })
+
+      it('should report recipients dropped by the safelist alongside the accepted count', async () => {
+        mockSafelistService.findBlocked.mockResolvedValueOnce(['bob@example.com'])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.recipientCount).toBe(1)
+            expect(res.body.blockedRecipientCount).toBe(1)
+            expect(res.body.blockedMessage).toContain('safelist')
+          })
+      })
+
+      it('should return 422 with the row-level errors when merge validation fails', async () => {
+        mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+          'Row 2: "not-an-email" is not a valid email address',
+        ])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(422)
+          .expect((res) => {
+            expect(res.body.message).toBe('Request validation failed')
+            expect(res.body.errors).toContain('Row 2: "not-an-email" is not a valid email address')
+          })
+      })
+
+      it('should return 400 when every recipient is blocked by the safelist', async () => {
+        mockSafelistService.findBlocked.mockResolvedValueOnce([
+          'alice@example.com',
+          'bob@example.com',
+        ])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(400)
+          .expect(() => {
+            expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+          })
+      })
+
+      it('should return 400 when the mergeArray header has no "to" column', async () => {
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send({ ...validMergeBody, recipients: { mergeArray: [['name'], ['Alice']] } })
+          .expect(400)
+      })
+    })
+  })
+
   describe('NotifyEventController', () => {
     it('should be defined', () => {
       const controller = app.get(NotifyEventController)
@@ -1242,27 +1323,11 @@ describe('Notify Controllers', () => {
       expect(controller).toBeDefined()
     })
 
+    // The list, cancel and status endpoints were removed; notification listing and status
+    // live on /api/v1/notification_request.
     describe('GET /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify').expect(501)
-      })
-
-      it('should accept query parameters', async () => {
-        return request(app.getHttpServer())
-          .get('/api/v1/notify?limit=20&status=sent&startDate=2025-01-01')
-          .expect(501)
-      })
-    })
-
-    describe('DELETE /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).delete('/api/v1/notify?notifyId=notify-123').expect(501)
-      })
-    })
-
-    describe('GET /api/v1/notify/status/:notifyId', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify/status/notify-123').expect(501)
+      it('is no longer routed', async () => {
+        return request(app.getHttpServer()).get('/api/v1/notify').expect(404)
       })
     })
 

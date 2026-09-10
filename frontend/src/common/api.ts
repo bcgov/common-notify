@@ -3,12 +3,37 @@ import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { trackRequestEnd, trackRequestStart } from '@/redux/utils/globalLoading'
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * Keep this request out of the app-wide loading overlay. For background work the user did not
+     * ask for - polling, prefetching - where a full-screen spinner would be noise.
+     */
+    skipGlobalLoading?: boolean
+  }
+}
 
 export interface ApiRequestParameters<T = object> {
   url: string
   params?: T
   requiresAuthentication?: boolean
   enableNotification?: boolean
+  /** Passed through to the axios config; see the declaration above. */
+  skipGlobalLoading?: boolean
+}
+
+/** Build the axios config shared by every helper below. */
+const buildConfig = <M>(
+  parameters: ApiRequestParameters<M>,
+  headers?: object,
+): AxiosRequestConfig => {
+  const config: AxiosRequestConfig = { headers }
+  if (parameters.skipGlobalLoading) {
+    config.skipGlobalLoading = true
+  }
+  return config
 }
 
 export const STATUS_CODES = {
@@ -53,6 +78,9 @@ const registerRequestInterceptor = () => {
           console.warn('[API Interceptor] No selected tenant in localStorage')
         }
       }
+      if (!config.skipGlobalLoading) {
+        trackRequestStart()
+      }
       return config
     },
     (error) => Promise.reject(error),
@@ -64,9 +92,17 @@ const registerRequestInterceptor = () => {
 if (!responseInterceptorRegistered) {
   registerRequestInterceptor() // Also register request interceptor
   axios.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      if (!response.config?.skipGlobalLoading) {
+        trackRequestEnd()
+      }
+      return response
+    },
     (error: AxiosError) => {
       const { response, config } = error
+      if (!config?.skipGlobalLoading) {
+        trackRequestEnd()
+      }
       if (response && response.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
         // This could be either:
@@ -129,7 +165,7 @@ export const get = async <T, M = object>(
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
-  const requestConfig: AxiosRequestConfig = { headers }
+  const requestConfig: AxiosRequestConfig = buildConfig(parameters, headers)
   if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.get(url, requestConfig).then((response: AxiosResponse) => {
@@ -145,7 +181,7 @@ export const deleteMethod = async <T, M = object>(
   headers?: object,
 ): Promise<T> => {
   const { url, requiresAuthentication, params } = parameters
-  const requestConfig: AxiosRequestConfig = { headers }
+  const requestConfig: AxiosRequestConfig = buildConfig(parameters, headers)
   if (requiresAuthentication) await setAuthHeader()
   if (params) requestConfig.params = params
   return axios.delete(url, requestConfig).then((response: AxiosResponse) => {
@@ -161,7 +197,9 @@ export const post = async <T, M = object>(
   if (requiresAuthentication) await setAuthHeader()
   // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
   const bodyData = data || params
-  return axios.post(url, bodyData).then((response: AxiosResponse) => response.data as T)
+  return axios
+    .post(url, bodyData, buildConfig(parameters))
+    .then((response: AxiosResponse) => response.data as T)
 }
 
 export const patch = async <T, M = object>(

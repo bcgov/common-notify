@@ -1,9 +1,17 @@
 import { Body, Controller, Get, Patch, Req, Request, UseGuards, Version } from '@nestjs/common'
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { CstarRole } from '../../enum/cstar-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { EmailLogoService } from '../email-logo/email-logo.service'
+import { ApprovedEmailLogoDto } from '../email-logo/schemas/approved-email-logo.dto'
 import { TenantSettings } from './entities/tenant-settings.entity'
 import { UpdateEmailSettingsDto } from './schemas/update-email-settings.dto'
 import { UpdateSmsSettingsDto } from './schemas/update-sms-settings.dto'
@@ -11,11 +19,16 @@ import { UpdateTenantSettingsDto } from './schemas/update-tenant-settings.dto'
 import { TenantSettingsService } from './tenant-settings.service'
 
 @ApiTags('tenant-settings')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/tenant-settings')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class TenantSettingsController {
-  constructor(private readonly tenantSettingsService: TenantSettingsService) {}
+  constructor(
+    private readonly tenantSettingsService: TenantSettingsService,
+    private readonly emailLogoService: EmailLogoService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -29,6 +42,25 @@ export class TenantSettingsController {
   getSettings(@Req() req: Request): Promise<TenantSettings | null> {
     const tenant = (req as any).tenant as Tenant
     return this.tenantSettingsService.findByTenantId(tenant.id)
+  }
+
+  @Version('1')
+  @Get('email-logos')
+  @Roles(
+    CstarRole.NOTIFY_VIEWER,
+    CstarRole.NOTIFY_TEMPLATE_EDITOR,
+    CstarRole.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'List approved email logos available to the tenant' })
+  @ApiOkResponse({ isArray: true, type: ApprovedEmailLogoDto })
+  async getApprovedEmailLogos(): Promise<ApprovedEmailLogoDto[]> {
+    const logos = await this.emailLogoService.findApproved()
+
+    return logos.map(({ id, name }) => ({
+      id,
+      name,
+      imageUrl: this.emailLogoService.buildPublicImageUrl(id),
+    }))
   }
 
   // Tenant tab update

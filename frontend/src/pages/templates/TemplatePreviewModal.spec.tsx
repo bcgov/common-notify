@@ -8,7 +8,7 @@ import {
   type PreviewTemplateBodyResponse,
 } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
-import TemplatePreviewModal, { detectVariables } from './TemplatePreviewModal'
+import TemplatePreviewModal from './TemplatePreviewModal'
 
 const previewTemplateBodyMock = vi.fn()
 const dispatchMock = vi.fn()
@@ -119,48 +119,25 @@ vi.mock('@bcgov/design-system-react-components', async () => {
     <button type="button">{children}</button>
   )
 
-  return { Button, Dialog, Modal, Switch, TextArea, TextField, ToggleButton, ToggleButtonGroup }
-})
+  const ProgressCircle = ({ 'aria-label': label }: { 'aria-label'?: string }) => (
+    <div role="progressbar" aria-label={label} />
+  )
+  const SvgChevronLeftIcon = () => <svg aria-hidden="true" />
+  const SvgChevronRightIcon = () => <svg aria-hidden="true" />
 
-describe('detectVariables', () => {
-  it('detects legacy GC Notify interpolations and conditionals', () => {
-    expect(
-      detectVariables(
-        'Hello ((name))\n((showDetails??Visible content))\n((name??Conditional content))',
-        TemplateEngine.LEGACY_GC_NOTIFY,
-      ),
-    ).toEqual([
-      { name: 'name', type: 'boolean' },
-      { name: 'showDetails', type: 'boolean' },
-    ])
-  })
-
-  it('detects Handlebars blocks and helpers, ignoring dotted paths', () => {
-    // Dotted paths (user.createdAt) are excluded: the renderer receives a flat
-    // params object, so a nested lookup can never bind and would render empty.
-    expect(
-      detectVariables(
-        'Hi {{firstName}} {{#if hasUpdates}}updates{{/if}} {{formatDate user.createdAt}}',
-        TemplateEngine.HANDLEBARS,
-      ),
-    ).toEqual([
-      { name: 'firstName', type: 'text' },
-      { name: 'hasUpdates', type: 'boolean' },
-    ])
-  })
-
-  it('detects Mustache sections and inverted sections as booleans', () => {
-    expect(
-      detectVariables(
-        '{{#items}}{{/items}} {{^isArchived}}hidden{{/isArchived}} {{name}}',
-        TemplateEngine.MUSTACHE,
-      ),
-    ).toEqual([
-      { name: 'items', type: 'boolean' },
-      { name: 'isArchived', type: 'boolean' },
-      { name: 'name', type: 'text' },
-    ])
-  })
+  return {
+    Button,
+    Dialog,
+    Modal,
+    ProgressCircle,
+    Switch,
+    SvgChevronLeftIcon,
+    SvgChevronRightIcon,
+    TextArea,
+    TextField,
+    ToggleButton,
+    ToggleButtonGroup,
+  }
 })
 
 describe('TemplatePreviewModal apply flow', () => {
@@ -222,6 +199,6 @@ describe('TemplatePreviewModal apply flow', () => {
       )
     })
 
-    expect(screen.getByDisplayValue('rendered:Ada:Lovelace')).toBeTruthy()
+    expect(screen.getByText('rendered:Ada:Lovelace')).toBeTruthy()
   })
 })

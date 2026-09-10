@@ -145,6 +145,8 @@ services:
       CLAMAV_PORT: 3310
       S3_ENDPOINT: http://minio:9000
       S3_BUCKET: notify-local
+      EMAIL_LOGO_SEED_ASSET_DIRECTORY: /app/email-logo-seed-assets
+      PUBLIC_API_GATEWAY_BASE_URL: http://localhost:8000
       S3_REGION: us-east-1
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin123
@@ -155,7 +157,10 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
     working_dir: "/app"
-    volumes: ["../backend:/app", "/app/node_modules"]
+    volumes:
+      - "../backend:/app"
+      - "/app/node_modules"
+      - "../migrations/assets/email-logos:/app/email-logo-seed-assets:ro"
 
   frontend:
     container_name: frontend

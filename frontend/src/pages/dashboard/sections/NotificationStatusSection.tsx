@@ -7,7 +7,7 @@ import PageSubHeading from '../../../components/PageSubHeading'
  */
 export const NotificationStatusSection: FC = () => {
   return (
-    <section>
+    <section className="page__section">
       <PageSubHeading title="Notification Status" />
       <NotificationStatusTable />
     </section>

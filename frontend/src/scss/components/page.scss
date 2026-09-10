@@ -1,0 +1,128 @@
+@import '../variables.scss';
+
+/**
+ * Shared page frame.
+ *
+ * Every page except Settings (which keeps its own layout) wraps its content in
+ * `.page`, so gutters, heading placement and vertical rhythm are the same
+ * everywhere. `.layout-content` supplies the top/bottom padding; `.page`
+ * supplies the side gutter and the spacing between the blocks stacked inside
+ * it. Pages should not add their own top/left margins on top of this.
+ */
+
+$page-gutter: $layout-gutter; // Side inset from the sidebar / window edge
+$page-block-gap: 24px; // Space between the blocks stacked inside a page
+$page-toolbar-gap: 73px; // Search/toolbar row to the table beneath it
+$page-narrow-width: 572px; // Single-column form pages (template create/edit)
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: $page-block-gap;
+  padding: 0 $page-gutter;
+}
+
+// Centred single-column variant. Each block still stretches to the column, so
+// fields keep their own max-widths inside it.
+.page--narrow > * {
+  width: 100%;
+  max-width: $page-narrow-width;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Heading block: optional breadcrumb, the page title, and an optional meta line */
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $page-block-gap;
+}
+
+.page-header__titles {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.page-heading {
+  margin: 0;
+  font-family: $font-family-sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.5;
+  color: $dark-text;
+}
+
+.page-header__meta {
+  margin: 0;
+  font-family: $font-family-sans-serif;
+  font-weight: 700;
+  font-size: $font-size-base;
+  color: $dark-text;
+}
+
+/* Blocks a page stacks under its heading */
+
+// A titled block within a page (see PageSubHeading)
+.page__section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: $page-block-gap;
+}
+
+// Content under a section heading, at the tighter within-section rhythm
+.page__section-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-md;
+}
+
+// Section title within a page (renders as an h2)
+.page__section-heading {
+  margin: 0;
+  font-family: $font-family-sans-serif;
+  font-weight: 700;
+  font-size: $font-size-xl;
+  line-height: 1.5;
+  color: $dark-text;
+}
+
+// Search / action row sitting directly above the page's main table. The extra
+// margin tops the page's own block gap up to $page-toolbar-gap.
+.page__toolbar {
+  margin-bottom: $page-toolbar-gap - $page-block-gap;
+
+  .search-field {
+    margin: 0;
+  }
+}
+
+// Footnotes under the main content (limits caveats, permission notes, ...)
+.page__notes {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  // Every note can be conditional; don't leave a block gap behind when none show.
+  &:empty {
+    display: none;
+  }
+}
+
+.page__note {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+// DataTable ships its own outer margin for pages that place it standalone;
+// inside `.page` the block gap owns that spacing.
+.page .data-table {
+  margin-top: 0;
+  margin-bottom: 0;
+}

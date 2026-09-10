@@ -1,3 +1,5 @@
+import * as path from 'path'
+
 export default () => {
   const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
@@ -71,6 +73,15 @@ export default () => {
     // Used to fetch user roles for role-based access control
     cstar: {
       baseUrl: process.env.CSTAR_API_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca',
+      // How long a user's CSTAR tenant list and roles stay reusable. Every tenant-scoped
+      // frontend request verifies membership, so without this a user clicking quickly
+      // through the nav fires a burst of identical calls at CSTAR.
+      //
+      // This caches an authorization input, so it is deliberately short: a user removed
+      // from a tenant keeps access for at most this long. Entries live in Redis
+      // (CstarCacheStore), shared across pods and deletable ahead of expiry. Set to 0 to
+      // disable caching; concurrent identical requests are still coalesced into one call.
+      userTenantsCacheTtlMs: parseInt(process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000', 10),
     },
 
     // Twilio SMS Service
@@ -113,6 +124,15 @@ export default () => {
       accessKey: process.env.S3_ACCESS_KEY,
       secretKey: process.env.S3_SECRET_KEY,
       forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+    },
+
+    emailLogo: {
+      seedAssetDirectory:
+        process.env.EMAIL_LOGO_SEED_ASSET_DIRECTORY ||
+        path.resolve(process.cwd(), '../migrations/assets/email-logos'),
+      publicBaseUrl:
+        process.env.PUBLIC_API_GATEWAY_BASE_URL || process.env.VITE_API_GATEWAY_NOTIFY_URL,
+      publicPathPrefix: process.env.PUBLIC_API_GATEWAY_PATH_PREFIX || '',
     },
 
     // ClamAV

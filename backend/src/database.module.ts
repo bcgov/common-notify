@@ -25,6 +25,7 @@ import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.en
 import { ApiKeyLimitAlertLog } from './api/api-keys/entities/api-key-limit-alert-log.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
+import { EmailLogo } from './api/tenant-settings/entities/email-logo.entity'
 import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
@@ -70,6 +71,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         ApiKeyLimitAlertLog,
         AttachmentEntity,
         TenantSettings,
+        EmailLogo,
         RecipientSafelist,
       ],
       synchronize: false, // Use Flyway for migrations

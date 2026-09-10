@@ -2,14 +2,24 @@
 
 .sidebar {
   width: 296px;
+  // Never let the flex row steal width from the nav. Without this the sidebar
+  // is the only shrinkable item beside `.layout-content`, so a page with a wide
+  // table squeezes the nav narrower and shifts every page's content with it.
+  flex-shrink: 0;
   padding: 24px;
-  margin-right: 64px;
+  // No margin-right: the 64px between the nav and page content is $page-gutter in
+  // page.scss, so a single value owns that gap on both sides of every page.
   transition: width 0.3s ease;
 
   display: flex;
   flex-direction: column;
   position: relative;
+  // Stays visible so the collapse toggle, absolutely positioned past the right edge,
+  // is not clipped. The scroll therefore lives on __nav, never here.
   overflow: visible;
+  // Full height of the shell's body row, independent of how tall the page beside it is.
+  height: 100%;
+  min-height: 0;
 
   background-color: $secondary-color;
   border-right: 1px solid $border-default;
@@ -70,6 +80,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--layout-margin-small, 8px);
+    // Takes the space between the toggle and the footer, and scrolls within it when
+    // the link list is taller than the viewport. This is what keeps the footer at the
+    // bottom of the screen rather than at the bottom of the page's content.
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   &__item {
@@ -95,8 +111,16 @@
       background-color: rgba($primary-color, 0.08);
     }
 
-    &:focus-visible,
+    // Pressed feedback is the background alone. The outline is the keyboard focus
+    // indicator, and :focus-visible already covers that — pairing it with :active also
+    // drew a 2px ring under the pointer for as long as the mouse button was held, which
+    // read as a glitch on every click. `__subitem` below has only ever had the
+    // :focus-visible half; this matches it.
     &:active {
+      background-color: rgba($primary-color, 0.08);
+    }
+
+    &:focus-visible {
       outline: 2px solid $border-active;
       outline-offset: 0;
       background-color: rgba($primary-color, 0.08);
@@ -139,7 +163,10 @@
   }
 
   &__footer {
+    // __nav's flex-grow already pins this to the bottom; margin-top: auto keeps it
+    // there in the collapsed state too, where the nav is short.
     margin-top: auto;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: $spacing-md;

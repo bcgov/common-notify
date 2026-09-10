@@ -23,6 +23,7 @@ import type { LimitAlertNotificationService } from '../../api/notify/services/li
 import type { SafelistCandidate, SafelistService } from '../../api/safelist/safelist.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -373,6 +374,9 @@ async function handleEmailMerge(
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
     channels: ['email'],
     createdAt: notificationRecord.createdAt || new Date(),
+    // Accepted recipients only - safelist-blocked rows are reported separately below, so a caller
+    // can tell "242 queued" from "250 rows uploaded" without parsing the message string.
+    recipientCount: recipients.length,
     message: hasDelayedSend
       ? `Email merge send scheduled for delivery at ${delayedSendTimestamp} with ${recipients.length} recipient(s)`
       : `Email merge send accepted with ${recipients.length} recipient(s)`,
@@ -404,8 +408,8 @@ async function handleEmailMerge(
         jobId: notificationRecord.id,
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: false,
-        removeOnFail: false,
+        removeOnComplete: COMPLETED_JOB_RETENTION,
+        removeOnFail: FAILED_JOB_RETENTION,
       }
 
       // Add delay if this is a scheduled send
@@ -739,8 +743,8 @@ export function Queueable(
                 type: 'exponential',
                 delay: 2000,
               },
-              removeOnComplete: false,
-              removeOnFail: false,
+              removeOnComplete: COMPLETED_JOB_RETENTION,
+              removeOnFail: FAILED_JOB_RETENTION,
             }
 
             // Add delay if this is a scheduled send

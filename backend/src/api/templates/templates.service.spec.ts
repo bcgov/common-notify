@@ -1,6 +1,7 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { BadRequestException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -8,6 +9,7 @@ import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import { EmailTemplateLayoutService } from './email-template-layout.service'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -96,6 +98,10 @@ describe('TemplatesService', () => {
     findAll: vi.fn(),
   }
 
+  const mockEmailTemplateLayoutService = {
+    apply: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -108,6 +114,17 @@ describe('TemplatesService', () => {
         {
           provide: TenantsService,
           useValue: mockTenantsService,
+        },
+        {
+          provide: EmailTemplateLayoutService,
+          useValue: mockEmailTemplateLayoutService,
+        },
+        {
+          // The preview reports the address a send would use, resolved from config.
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) => (key === 'ches.from' ? 'noreply@gov.bc.ca' : undefined),
+          },
         },
       ],
     }).compile()

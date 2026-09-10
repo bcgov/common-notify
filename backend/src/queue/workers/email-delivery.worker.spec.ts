@@ -60,6 +60,7 @@ describe('EmailDeliveryWorker', () => {
 
     mockTemplatesService = {
       renderTemplateContent: vi.fn(),
+      applyEmailLayout: vi.fn((_template, rendered) => Promise.resolve(rendered)),
     }
 
     mockInlineRenderingService = {
@@ -409,14 +410,21 @@ describe('EmailDeliveryWorker', () => {
         mockRequestDetailService,
       )
 
-      mockTemplatesRepository.findById.mockResolvedValue({
+      const template = {
         id: 'template-uuid',
         channelCode: 'EMAIL',
         name: 'Stored Email Template',
-      })
-      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+      }
+      const renderedTemplate = {
         subject: 'Rendered subject',
         body: 'Rendered body',
+        bodyType: 'markdown',
+      }
+      mockTemplatesRepository.findById.mockResolvedValue(template)
+      mockTemplatesService.renderTemplateContent.mockResolvedValue(renderedTemplate)
+      mockTemplatesService.applyEmailLayout.mockResolvedValue({
+        ...renderedTemplate,
+        body: '<img src="https://gateway.example.test/logos/logo-id/image">\n<p>Rendered body</p>',
         bodyType: 'html',
       })
 
@@ -450,11 +458,13 @@ describe('EmailDeliveryWorker', () => {
         { firstName: 'Test' },
         undefined,
       )
+      expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(template, renderedTemplate)
       expect(mockEmailAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
           content: expect.objectContaining({
             subject: 'Rendered subject',
-            body: 'Rendered body',
+            body: '<img src="https://gateway.example.test/logos/logo-id/image">\n<p>Rendered body</p>',
+            bodyType: 'html',
           }),
         }),
       )

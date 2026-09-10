@@ -1,0 +1,187 @@
+@import '../variables.scss';
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.file-upload__label {
+  font-weight: 700;
+  color: $dark-text;
+}
+
+.file-upload__zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  min-height: 180px;
+  padding: $spacing-xl $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $light-bg;
+  text-align: center;
+}
+
+.file-upload__zone--dragging {
+  border-color: $primary-color;
+  border-style: solid;
+  background: $white;
+}
+
+.file-upload__zone--disabled {
+  opacity: 0.6;
+}
+
+.file-upload__prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.file-upload__prompt-icon {
+  color: $dark-text;
+}
+
+.file-upload__prompt-text,
+.file-upload__prompt-types {
+  margin: 0;
+  color: $dark-text;
+}
+
+.file-upload__prompt-types {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+// Selected state: the chip replaces the drop prompt, so the control always shows where it is.
+.file-upload__selected {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  width: 100%;
+}
+
+.file-upload__chip {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border-radius: 4px;
+  background: $light-bg;
+}
+
+.file-upload__file-icon {
+  flex-shrink: 0;
+  color: $dark-text;
+}
+
+.file-upload__file-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.file-upload__progress {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  width: 100%;
+}
+
+.file-upload__progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+// The native element is restyled rather than replaced so assistive tech still reports the value.
+.file-upload__progress-bar {
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 3px;
+  background: $border-default;
+  appearance: none;
+
+  &::-webkit-progress-bar {
+    border-radius: 3px;
+    background: $border-default;
+  }
+
+  &::-webkit-progress-value {
+    border-radius: 3px;
+    background: $primary-color;
+  }
+
+  &::-moz-progress-bar {
+    border-radius: 3px;
+    background: $primary-color;
+  }
+}
+
+.file-upload__success {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  margin: 0;
+  color: $success-color;
+  font-size: $font-size-sm;
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+// The native input is visually hidden but still focusable, so its focus ring has to land on the
+// label that stands in for it.
+.file-upload__browse {
+  display: inline-block;
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $primary-color;
+  border-radius: 4px;
+  background: $white;
+  color: $primary-color;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.file-upload__zone--disabled .file-upload__browse {
+  cursor: not-allowed;
+}
+
+.file-upload__browse:hover {
+  background: $primary-color;
+  color: $white;
+}
+
+.file-upload__input:focus-visible + .file-upload__browse {
+  outline: 2px solid $border-active;
+  outline-offset: 2px;
+}
+
+.file-upload__hint {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.file-upload__file-name {
+  font-weight: 700;
+}
+
+.file-upload__file-size {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+.file-upload__error {
+  margin: 0;
+  color: $danger-color;
+}

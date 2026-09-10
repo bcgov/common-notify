@@ -1,7 +1,16 @@
-import { IsBoolean, Matches, ValidateIf } from 'class-validator'
+import { IsBoolean, IsUUID, Matches, ValidateIf } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class UpdateEmailSettingsDto {
+  @ApiProperty({
+    description: 'Approved email logo to use, or null to clear the selection',
+    format: 'uuid',
+    nullable: true,
+  })
+  @ValidateIf((_object, value) => value !== null)
+  @IsUUID()
+  emailLogoId: string | null
+
   @ApiProperty({ description: 'When false, the tenant cannot send email notifications' })
   @IsBoolean()
   emailNotificationsEnabled: boolean

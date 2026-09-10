@@ -6,7 +6,12 @@
  */
 
 .tenant-switcher {
+  // Sizes to the selected tenant's name, but never below a width that still reads as a
+  // control. Without the floor, a short name ("Forests") collapsed the switcher to a
+  // stub in the header, and — because the popover is capped at the trigger's width (see
+  // styles.scss) — dragged the whole dropdown narrow with it.
   width: fit-content;
+  min-width: 260px;
 
   .bcds-react-aria-Select--Button {
     padding-right: calc(var(--layout-padding-small) + 10px);

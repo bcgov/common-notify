@@ -1,6 +1,7 @@
 import Bull from 'bull'
 import Redis from 'ioredis'
 import { attachRedisErrorLogging } from '../common/redis/redis-error.util'
+import { REDIS_KEY_PREFIX } from '../common/redis/redis-namespace'
 import { QueueName } from '../enum/queue-name.enum'
 
 /** Shape of the `redis` block in configuration.ts. */
@@ -39,6 +40,10 @@ export function buildRedisOptions(
  */
 export function createQueue(name: QueueName, redisConfig: RedisConfig): Bull.Queue {
   const queue = new Bull(name, {
+    // Scope the queue to this deployment. Without it every deployment sharing the Redis
+    // instance consumes from the same queue, and a job is processed by whichever pod wins the
+    // race - which then cannot find the notification in its own database.
+    prefix: REDIS_KEY_PREFIX,
     redis: buildRedisOptions(redisConfig, {
       enableReadyCheck: false,
       maxRetriesPerRequest: null,

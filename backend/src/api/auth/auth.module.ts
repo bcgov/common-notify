@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common'
 import { AuthController } from './auth.controller'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 
 @Module({
-  imports: [TenantsModule],
+  imports: [TenantsModule, CstarModule],
   controllers: [AuthController],
-  providers: [CstarApiClient],
-  exports: [CstarApiClient],
+  // Re-exported rather than provided here, so this module shares CstarModule's client and
+  // its in-flight coalescing instead of running a second copy.
+  exports: [CstarModule],
 })
 export class AuthModule {}

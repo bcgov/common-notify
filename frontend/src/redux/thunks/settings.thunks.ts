@@ -1,11 +1,13 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import {
+  getApprovedEmailLogos,
   getSettings,
   updateEmailSettings as updateEmailSettingsApi,
   updateSmsSettings as updateSmsSettingsApi,
   updateTenantSettings as updateTenantSettingsApi,
 } from '@/api/settings.api'
 import type {
+  ApprovedEmailLogo,
   EmailSettingsValues,
   SmsSettingsValues,
   TenantSettings,
@@ -30,6 +32,20 @@ export const fetchSettings = createAsyncThunk<
     return await getSettings()
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load settings')
+  }
+})
+
+export const fetchApprovedEmailLogos = createAsyncThunk<
+  ApprovedEmailLogo[],
+  void,
+  { rejectValue: string }
+>('emailSettings/fetchApprovedLogos', async (_, { rejectWithValue }) => {
+  try {
+    return await getApprovedEmailLogos()
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : 'Failed to load approved email logos',
+    )
   }
 })
 

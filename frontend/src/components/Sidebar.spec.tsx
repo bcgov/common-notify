@@ -6,6 +6,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '@/redux/slices/auth.slice'
 import cstarReducer from '@/redux/slices/cstar.slice'
 import userReducer from '@/redux/slices/user.slice'
+import tenantReducer from '@/redux/slices/tenant.slice'
+import featureFlagsReducer from '@/redux/slices/featureFlags.slice'
 import UserService from '@/service/user-service'
 import Sidebar from './Sidebar'
 
@@ -31,9 +33,19 @@ const mockUser = {
   displayName: 'Test User',
 }
 
-function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
+function makeStore(
+  user: typeof mockUser | null = null,
+  cstarRoles: string[] = [],
+  featureFlags: Record<string, boolean> = {},
+) {
   return configureStore({
-    reducer: { auth: authReducer, cstar: cstarReducer, user: userReducer },
+    reducer: {
+      auth: authReducer,
+      cstar: cstarReducer,
+      user: userReducer,
+      tenant: tenantReducer,
+      featureFlags: featureFlagsReducer,
+    },
     preloadedState: {
       auth: {
         user,
@@ -55,13 +67,29 @@ function makeStore(user: typeof mockUser | null = null, cstarRoles: string[] = [
         error: null,
         rolesError: null,
       },
+      tenant: {
+        selectedTenant: { id: 'tenant-1', name: 'Test Tenant' } as any,
+        showTenantModal: false,
+      },
+      featureFlags: {
+        byCode: featureFlags,
+        flagsList: [],
+        loading: false,
+        // Synced for this tenant, so the flag hook does not fire a fetch during the test.
+        synced: true,
+        tenantId: 'tenant-1',
+      },
     },
   })
 }
 
-function renderSidebar(user: typeof mockUser | null = null, cstarRoles: string[] = []) {
+function renderSidebar(
+  user: typeof mockUser | null = null,
+  cstarRoles: string[] = [],
+  featureFlags: Record<string, boolean> = {},
+) {
   return render(
-    <Provider store={makeStore(user, cstarRoles)}>
+    <Provider store={makeStore(user, cstarRoles, featureFlags)}>
       <Sidebar />
     </Provider>,
   )
@@ -97,6 +125,27 @@ describe('Sidebar', () => {
     renderSidebar()
 
     expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the bulk notifications link when the bulk notifications flag is on', () => {
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'], { bulk_notifications: true })
+
+    expect(screen.getByRole('link', { name: /bulk notifications/i })).toHaveAttribute(
+      'href',
+      '/bulk-notifications',
+    )
+  })
+
+  it('hides the bulk notifications link when the bulk notifications flag is off', () => {
+    renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
+
+    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the bulk notifications link from users with no CSTAR role', () => {
+    renderSidebar(null, [], { bulk_notifications: true })
+
+    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

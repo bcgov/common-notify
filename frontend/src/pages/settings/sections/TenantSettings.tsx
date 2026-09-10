@@ -7,8 +7,8 @@ import {
   SvgUpRightFromSquareIcon,
   TextField,
   Tooltip,
-  TooltipTrigger,
 } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { updateTenantSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'

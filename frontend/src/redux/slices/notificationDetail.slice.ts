@@ -8,6 +8,8 @@ import {
   fetchNotificationDetails,
   fetchNotificationRequest,
 } from '../thunks/notificationDetail.thunks'
+import { selectTenant } from './tenant.slice'
+import { isStaleResponse } from '../utils/latestRequest'
 
 interface NotificationDetailState {
   notificationRequest: NotificationRequest | null
@@ -23,6 +25,9 @@ interface NotificationDetailState {
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
+  /** Request ids of the fetches currently being awaited; see utils/latestRequest. */
+  currentRequestId: string | null
+  requestFetchId: string | null
 }
 
 const initialState: NotificationDetailState = {
@@ -39,6 +44,8 @@ const initialState: NotificationDetailState = {
   isLoading: false,
   hasLoaded: false,
   error: null,
+  currentRequestId: null,
+  requestFetchId: null,
 }
 
 export const notificationDetailSlice = createSlice({
@@ -76,11 +83,18 @@ export const notificationDetailSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchNotificationDetails.pending, (state) => {
+      // A notification request belongs to one tenant, so neither the request header nor
+      // its delivery rows can survive a tenant switch.
+      // Every page holding this data refetches on tenant change, so the reset marks the
+      // slice as loading rather than briefly rendering an empty table between the two.
+      .addCase(selectTenant, () => ({ ...initialState, isLoading: true }))
+      .addCase(fetchNotificationDetails.pending, (state, action) => {
         state.isLoading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchNotificationDetails.fulfilled, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.items = action.payload.data
         state.count = action.payload.count
         state.page = action.payload.page
@@ -88,13 +102,21 @@ export const notificationDetailSlice = createSlice({
         state.totalPages = action.payload.totalPages
         state.isLoading = false
         state.hasLoaded = true
+        state.currentRequestId = null
       })
       .addCase(fetchNotificationDetails.rejected, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.isLoading = false
         state.error = action.payload ?? 'Failed to load notification details'
+        state.currentRequestId = null
+      })
+      .addCase(fetchNotificationRequest.pending, (state, action) => {
+        state.requestFetchId = action.meta.requestId
       })
       .addCase(fetchNotificationRequest.fulfilled, (state, action) => {
+        if (isStaleResponse(state.requestFetchId, action)) return
         state.notificationRequest = action.payload
+        state.requestFetchId = null
       })
   },
 })
