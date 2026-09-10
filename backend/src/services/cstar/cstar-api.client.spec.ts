@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ConfigService } from '@nestjs/config'
+import { ForbiddenException, InternalServerErrorException } from '@nestjs/common'
 import { CstarApiClient } from './cstar-api.client'
 import type { CstarCacheStore } from './cstar-cache.store'
 
@@ -238,5 +239,123 @@ describe('CstarApiClient.getUserTenants', () => {
 
     await client.getUserTenants(USER)
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+/**
+ * The group lookups behind the events Email tab: listing a tenant's groups for the picker, and
+ * resolving a group's members to the email addresses a notification is actually sent to.
+ */
+describe('CstarApiClient group lookups', () => {
+  const TENANT = 'cstar-tenant-1'
+  const GROUP = '3a3fafee-d41b-4fbe-92df-62dbebf0f73a'
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  const build = () => {
+    const config = {
+      get: vi.fn((key: string) => (key === 'cstar.baseUrl' ? 'https://cstar.example' : 15000)),
+    } as unknown as ConfigService
+    const store = {
+      readTenants: vi.fn(async () => null),
+      writeTenants: vi.fn(async () => {}),
+      readRoles: vi.fn(async () => null),
+      writeRoles: vi.fn(async () => {}),
+    }
+    return new CstarApiClient(config, store as unknown as CstarCacheStore)
+  }
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('lists a tenant groups, passing the caller token through', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { groups: [{ id: GROUP, name: 'Development Team' }] } }),
+    })
+
+    const groups = await build().getTenantGroups(TENANT, 'Bearer token')
+
+    expect(groups).toEqual([{ id: GROUP, name: 'Development Team' }])
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/groups`)
+    expect(init.headers.Authorization).toBe('Bearer token')
+  })
+
+  it('resolves group members to unique, lowercased email addresses', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          users: [
+            { ssoUser: { email: 'Alice@gov.bc.ca' } },
+            { ssoUser: { email: 'alice@gov.bc.ca ' } },
+            { ssoUser: { email: 'bob@gov.bc.ca' } },
+            // A user with no address, and one with no SSO user at all: neither is a recipient,
+            // and neither may become a blank entry in the list.
+            { ssoUser: { email: null } },
+            { ssoUser: null },
+          ],
+        },
+      }),
+    })
+
+    const emails = await build().getGroupMemberEmails(TENANT, [GROUP], 'Bearer token')
+
+    expect(emails).toEqual(['alice@gov.bc.ca', 'bob@gov.bc.ca'])
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/users?groupIds=${GROUP}`)
+    expect(init.headers.Authorization).toBe('Bearer token')
+  })
+
+  it('resolves every requested group in a single call', async () => {
+    const OTHER_GROUP = '8f01087b-edfe-4957-97c4-f0aece2bc514'
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { users: [{ ssoUser: { email: 'alice@gov.bc.ca' } }] } }),
+    })
+
+    await build().getGroupMemberEmails(TENANT, [GROUP, OTHER_GROUP])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `https://cstar.example/api/v1/tenants/${TENANT}/users?groupIds=${GROUP}%2C${OTHER_GROUP}`,
+    )
+  })
+
+  it('returns no addresses for a group with no members', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { users: [] } }),
+    })
+
+    await expect(build().getGroupMemberEmails(TENANT, [GROUP])).resolves.toEqual([])
+  })
+
+  it('asks CSTAR nothing when no groups were selected', async () => {
+    await expect(build().getGroupMemberEmails(TENANT, [])).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('treats a group the caller cannot see as forbidden rather than a server error', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => '{"message":"Tenant not found"}',
+    })
+
+    await expect(build().getGroupMemberEmails(TENANT, [GROUP])).rejects.toThrow(ForbiddenException)
+  })
+
+  it('surfaces a CSTAR outage as a server error', async () => {
+    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
+
+    await expect(build().getTenantGroups(TENANT)).rejects.toThrow(InternalServerErrorException)
   })
 })

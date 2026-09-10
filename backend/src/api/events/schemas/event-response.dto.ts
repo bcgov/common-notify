@@ -41,6 +41,24 @@ export class EventEmailSettingsDto {
   bcc: string[]
 
   /**
+   * CSTAR groups addressed in the To field. Empty when the channel addresses no groups.
+   * @example ["3a3fafee-d41b-4fbe-92df-62dbebf0f73a"]
+   */
+  cstarGroupIdsTo: string[]
+
+  /**
+   * CSTAR groups addressed in the CC field.
+   * @example ["8f01087b-edfe-4957-97c4-f0aece2bc514"]
+   */
+  cstarGroupIdsCc: string[]
+
+  /**
+   * CSTAR groups addressed in the BCC field.
+   * @example ["02630496-ac01-407b-84f6-d542c8f4cc8c"]
+   */
+  cstarGroupIdsBcc: string[]
+
+  /**
    * Whether the email uses a custom header rather than the tenant's default one
    * @example false
    */

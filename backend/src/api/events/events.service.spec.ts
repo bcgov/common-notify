@@ -15,6 +15,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 
 describe('EventsService', () => {
   let service: EventsService
@@ -59,6 +60,11 @@ describe('EventsService', () => {
     findOne: vi.fn(),
   }
 
+  const mockCstarApiClient = {
+    getTenantGroups: vi.fn(),
+    getGroupMemberEmails: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,6 +81,7 @@ describe('EventsService', () => {
         },
         { provide: EmailLogoService, useValue: mockEmailLogoService },
         { provide: TemplatesRepository, useValue: mockTemplatesRepository },
+        { provide: CstarApiClient, useValue: mockCstarApiClient },
       ],
     }).compile()
 
@@ -136,6 +143,9 @@ describe('EventsService', () => {
         to: [],
         cc: [],
         bcc: [],
+        cstarGroupIdsTo: [],
+        cstarGroupIdsCc: [],
+        cstarGroupIdsBcc: [],
         useCustomHeader: false,
         headerLogoId: null,
         headerTitle: null,
@@ -553,6 +563,184 @@ describe('EventsService', () => {
           headerLogoId: logoId,
         }),
       ).rejects.toThrow(BadRequestException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('listCstarGroups', () => {
+    const cstar = { tenantId: 'cstar-tenant-1', authHeader: 'Bearer token' }
+
+    it("returns the tenant's groups, passing the CSTAR tenant and token through", async () => {
+      mockCstarApiClient.getTenantGroups.mockResolvedValueOnce([
+        { id: 'group-a', name: 'Development Team', description: 'Devs' },
+        // A group with no description still needs one for the picker to render.
+        { id: 'group-b', name: 'Ops', description: null },
+      ])
+      mockCstarApiClient.getGroupMemberEmails.mockResolvedValueOnce([])
+
+      const result = await service.listCstarGroups(cstar)
+
+      expect(result).toEqual({
+        groups: [
+          { id: 'group-a', name: 'Development Team', description: 'Devs' },
+          { id: 'group-b', name: 'Ops', description: '' },
+        ],
+      })
+      expect(mockCstarApiClient.getTenantGroups).toHaveBeenCalledWith(
+        'cstar-tenant-1',
+        'Bearer token',
+      )
+    })
+
+    it('surfaces a CSTAR failure rather than returning an empty picker', async () => {
+      mockCstarApiClient.getTenantGroups.mockRejectedValueOnce(new Error('CSTAR down'))
+
+      await expect(service.listCstarGroups(cstar)).rejects.toThrow('CSTAR down')
+    })
+  })
+
+  describe('updateEmailChannelSetting CSTAR groups', () => {
+    const groupA = '3a3fafee-d41b-4fbe-92df-62dbebf0f73a'
+    const groupB = '8f01087b-edfe-4957-97c4-f0aece2bc514'
+    const cstar = { tenantId: 'cstar-tenant-1', authHeader: 'Bearer token' }
+
+    it('stores the selected group IDs per recipient field, deduplicated and lowercased', async () => {
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+      mockChannelSettingRepository.create.mockReturnValue({} as EventChannelSetting)
+      mockCstarApiClient.getTenantGroups.mockResolvedValueOnce([{ id: groupA }, { id: groupB }])
+
+      await service.updateEmailChannelSetting(
+        tenantId,
+        eventId,
+        {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          cstarGroupIdsTo: [groupA.toUpperCase(), groupA],
+          cstarGroupIdsCc: [groupB],
+        },
+        'user-guid',
+        cstar,
+      )
+
+      expect(mockCstarApiClient.getTenantGroups).toHaveBeenCalledWith(
+        'cstar-tenant-1',
+        'Bearer token',
+      )
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cstarGroupIdsTo: groupA,
+          cstarGroupIdsCc: groupB,
+          cstarGroupIdsBcc: null,
+        }),
+      )
+    })
+
+    it('rejects a group that does not belong to the tenant', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockCstarApiClient.getTenantGroups.mockResolvedValueOnce([{ id: groupA }])
+
+      await expect(
+        service.updateEmailChannelSetting(
+          tenantId,
+          eventId,
+          {
+            active: false,
+            senderEmail: 'a@gov.bc.ca',
+            templateId: null,
+            cstarGroupIdsTo: [groupB],
+          },
+          'user-guid',
+          cstar,
+        ),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('does not call CSTAR when no groups are selected', async () => {
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+      mockChannelSettingRepository.create.mockReturnValue({} as EventChannelSetting)
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+      })
+
+      expect(mockCstarApiClient.getTenantGroups).not.toHaveBeenCalled()
+    })
+
+    it('activates on a To group alone, with no typed-in recipients', async () => {
+      mockEventRepository.findOne
+        .mockResolvedValueOnce(buildEvent())
+        .mockResolvedValueOnce(buildEvent())
+      mockChannelSettingRepository.create.mockReturnValue({} as EventChannelSetting)
+      mockCstarApiClient.getTenantGroups.mockResolvedValueOnce([{ id: groupA }])
+      mockTemplatesRepository.findById.mockResolvedValueOnce({
+        id: templateId,
+        channelCode: NotificationChannel.EMAIL,
+      })
+
+      await service.updateEmailChannelSetting(
+        tenantId,
+        eventId,
+        {
+          active: true,
+          senderEmail: 'a@gov.bc.ca',
+          templateId,
+          cstarGroupIdsTo: [groupA],
+        },
+        'user-guid',
+        cstar,
+      )
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ active: true, to: null, cstarGroupIdsTo: groupA }),
+      )
+    })
+
+    it('does not let a CC group alone satisfy the recipient requirement', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockCstarApiClient.getTenantGroups.mockResolvedValueOnce([{ id: groupA }])
+      mockTemplatesRepository.findById.mockResolvedValueOnce({
+        id: templateId,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockChannelSettingRepository.create.mockReturnValue({} as EventChannelSetting)
+
+      await expect(
+        service.updateEmailChannelSetting(
+          tenantId,
+          eventId,
+          {
+            active: true,
+            senderEmail: 'a@gov.bc.ca',
+            templateId,
+            cstarGroupIdsCc: [groupA],
+          },
+          'user-guid',
+          cstar,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('fails loudly when groups are saved without a CSTAR context to verify them against', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          cstarGroupIdsTo: [groupA],
+        }),
+      ).rejects.toThrow(InternalServerErrorException)
 
       expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
     })

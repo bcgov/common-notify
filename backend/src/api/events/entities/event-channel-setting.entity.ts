@@ -96,6 +96,26 @@ export class EventChannelSetting {
   bcc: string | null
 
   /**
+   * Comma-separated CSTAR group IDs whose members are addressed in the To field. EMAIL only;
+   * NULL on SMS rows. Only the IDs are stored - members and their email addresses are resolved
+   * from CSTAR at send time.
+   */
+  @Column({ name: 'cstar_group_ids_to', type: 'varchar', length: 10000, nullable: true })
+  cstarGroupIdsTo: string | null
+
+  /**
+   * Comma-separated CSTAR group IDs addressed in the CC field. EMAIL only; NULL on SMS rows.
+   */
+  @Column({ name: 'cstar_group_ids_cc', type: 'varchar', length: 10000, nullable: true })
+  cstarGroupIdsCc: string | null
+
+  /**
+   * Comma-separated CSTAR group IDs addressed in the BCC field. EMAIL only; NULL on SMS rows.
+   */
+  @Column({ name: 'cstar_group_ids_bcc', type: 'varchar', length: 10000, nullable: true })
+  cstarGroupIdsBcc: string | null
+
+  /**
    * False when the email uses the tenant's default header, true when it uses headerLogoId and
    * headerTitle. EMAIL only; always false on SMS rows.
    */

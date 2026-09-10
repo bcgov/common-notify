@@ -773,6 +773,25 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/events/cstar-groups (frontend variant - the tenant's CSTAR groups)
+  # Backs the group picker on an event's Email Notification tab: the browser cannot call
+  # CSTAR directly, so the backend proxies the lookup for the tenant in the request header.
+  # Declared explicitly rather than relying on the by-id route below, whose regex also
+  # matches this literal segment.
+  - name: ${ROUTE_PREFIX}events-frontend-cstar-groups
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/events/cstar-groups
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/events/:eventId (frontend variant - get by id, update)
   # Regex matching a single path segment, same convention as the auth tenant
   # roles route. Update is a POST, matching the templates controller.
@@ -1567,6 +1586,13 @@ plugins:
     tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend
+    config: *jwtConfig
+
+  # Events Frontend - CSTAR Groups
+  - name: jwt-keycloak
+    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    enabled: true
+    route: ${ROUTE_PREFIX}events-frontend-cstar-groups
     config: *jwtConfig
 
   # Events Frontend - Get by ID, Update

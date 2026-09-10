@@ -15,6 +15,7 @@ import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-set
 import { UpdateSmsChannelSettingDto } from './schemas/update-sms-channel-setting.dto'
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
+import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -22,6 +23,7 @@ import { normalizeRecipient } from '../safelist/safelist.util'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -35,6 +37,18 @@ const MAX_RECIPIENTS_KEY = 'event_max_recipients'
 export interface DerivedEventFilters {
   channelCodes?: string[]
   statuses?: EventStatus[]
+}
+
+/**
+ * The CSTAR tenant the caller is acting in, and the token to reach CSTAR with. Needed to check
+ * that the CSTAR group IDs an event is being pointed at actually belong to that tenant, since
+ * groups live in CSTAR and cannot be constrained by a foreign key here.
+ */
+export interface CstarRequestContext {
+  /** The CSTAR tenant ID, i.e. notify's tenant.externalId. */
+  tenantId: string
+  /** The caller's Authorization header, passed through to CSTAR. */
+  authHeader?: string
 }
 
 export const eventListQueryConfig: QueryableFieldsConfig = {
@@ -75,6 +89,7 @@ export class EventsService {
     private readonly phoneNumberService: PhoneNumberService,
     private readonly emailLogoService: EmailLogoService,
     private readonly templatesRepository: TemplatesRepository,
+    private readonly cstarApiClient: CstarApiClient,
   ) {}
 
   /**
@@ -215,6 +230,27 @@ export class EventsService {
   }
 
   /**
+   * The CSTAR groups the tenant can address a notification to, for the group picker on an
+   * event's Email settings tab. The browser cannot call CSTAR directly, so this is the
+   * lookup behind the proxying controller route.
+   *
+   * The same list is what updateEmailChannelSetting below validates saved group IDs against.
+   *
+   * @param cstar CSTAR tenant and token to look the groups up with
+   */
+  async listCstarGroups(cstar: CstarRequestContext): Promise<CstarGroupListResponseDto> {
+    const groups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+
+    return {
+      groups: groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        description: group.description ?? '',
+      })),
+    }
+  }
+
+  /**
    * Update an event's EMAIL channel settings (Email Notification tab)
    *
    * Creates the channel setting row the first time the tab is saved, so an event only gains an
@@ -226,12 +262,14 @@ export class EventsService {
    * @param eventId The event ID
    * @param updateDto Email channel settings, replacing what is stored
    * @param userId User updating the settings (for audit trail)
+   * @param cstar CSTAR tenant and token, required only when the settings name CSTAR groups
    */
   async updateEmailChannelSetting(
     tenantId: string,
     eventId: string,
     updateDto: UpdateEmailChannelSettingDto,
     userId: string = 'system',
+    cstar?: CstarRequestContext,
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
     const senderEmail = updateDto.senderEmail?.trim() || null
@@ -239,6 +277,9 @@ export class EventsService {
     const to = this.normalizeEmailList(updateDto.to)
     const cc = this.normalizeEmailList(updateDto.cc)
     const bcc = this.normalizeEmailList(updateDto.bcc)
+    const cstarGroupIdsTo = this.normalizeGroupIdList(updateDto.cstarGroupIdsTo)
+    const cstarGroupIdsCc = this.normalizeGroupIdList(updateDto.cstarGroupIdsCc)
+    const cstarGroupIdsBcc = this.normalizeGroupIdList(updateDto.cstarGroupIdsBcc)
     // When useCustomHeader is false the header columns stay null and inherit from tenant_settings
     // at render time, so a tenant default title added there later needs no change here.
     const useCustomHeader = updateDto.useCustomHeader ?? false
@@ -262,6 +303,11 @@ export class EventsService {
       }
     }
 
+    await this.assertCstarGroupsBelongToTenant(
+      [cstarGroupIdsTo, cstarGroupIdsCc, cstarGroupIdsBcc],
+      cstar,
+    )
+
     if (templateId) {
       await this.assertTemplateIsUsable(tenantId, templateId, NotificationChannel.EMAIL)
     }
@@ -280,7 +326,10 @@ export class EventsService {
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
-    if (updateDto.active && (!senderEmail || !to || !templateId)) {
+    // A CSTAR group in the To field is a recipient in its own right, so either it or a typed-in
+    // address satisfies the recipient requirement. CC/BCC groups do not count, matching cc/bcc
+    // addresses.
+    if (updateDto.active && (!senderEmail || (!to && !cstarGroupIdsTo) || !templateId)) {
       throw new BadRequestException(
         'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
       )
@@ -292,6 +341,9 @@ export class EventsService {
     setting.to = to
     setting.cc = cc
     setting.bcc = bcc
+    setting.cstarGroupIdsTo = cstarGroupIdsTo
+    setting.cstarGroupIdsCc = cstarGroupIdsCc
+    setting.cstarGroupIdsBcc = cstarGroupIdsBcc
     setting.useCustomHeader = useCustomHeader
     setting.headerLogoId = headerLogoId
     setting.headerTitle = headerTitle
@@ -558,6 +610,9 @@ export class EventsService {
             to: this.splitRecipientList(emailSetting.to),
             cc: this.splitRecipientList(emailSetting.cc),
             bcc: this.splitRecipientList(emailSetting.bcc),
+            cstarGroupIdsTo: this.splitRecipientList(emailSetting.cstarGroupIdsTo),
+            cstarGroupIdsCc: this.splitRecipientList(emailSetting.cstarGroupIdsCc),
+            cstarGroupIdsBcc: this.splitRecipientList(emailSetting.cstarGroupIdsBcc),
             useCustomHeader: emailSetting.useCustomHeader,
             headerLogoId: emailSetting.headerLogoId,
             headerTitle: emailSetting.headerTitle,
@@ -625,6 +680,60 @@ export class EventsService {
       .filter((address): address is string => !!address)
 
     return normalized.length > 0 ? normalized.join(',') : null
+  }
+
+  /**
+   * Normalizes a list of CSTAR group IDs into the comma-separated form stored in the
+   * cstar_group_ids_* columns, lowercasing and dropping blanks and duplicates - one group
+   * selected twice should be mailed once. Returns null when nothing is left, matching
+   * chk_event_channel_setting_cstar_group_ids_to/cc/bcc (never an empty string).
+   */
+  private normalizeGroupIdList(groupIds?: string[]): string | null {
+    if (!groupIds?.length) return null
+
+    const normalized = [
+      ...new Set(groupIds.map((groupId) => groupId.trim().toLowerCase()).filter(Boolean)),
+    ]
+
+    return normalized.length > 0 ? normalized.join(',') : null
+  }
+
+  /**
+   * Reject CSTAR group IDs that are not the tenant's own.
+   *
+   * Groups belong to CSTAR, so no foreign key can enforce this - the tenant's group list has to
+   * be fetched and the submitted IDs checked against it.
+   *
+   * @param groupIdLists The normalized to/cc/bcc group ID values, any of which may be null
+   * @param cstar CSTAR tenant and token to check against
+   */
+  private async assertCstarGroupsBelongToTenant(
+    groupIdLists: (string | null)[],
+    cstar?: CstarRequestContext,
+  ): Promise<void> {
+    const submitted = new Set(groupIdLists.flatMap((value) => this.splitRecipientList(value)))
+
+    if (submitted.size === 0) {
+      return
+    }
+
+    // Only reachable if a caller passes group IDs without the CSTAR context to verify them
+    // against, which is a wiring fault rather than anything the request did wrong.
+    if (!cstar?.tenantId) {
+      throw new InternalServerErrorException(
+        'CSTAR tenant context is required to save CSTAR group recipients',
+      )
+    }
+
+    const groups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    const available = new Set(groups.map((group) => group.id.toLowerCase()))
+    const unknownGroups = [...submitted].filter((groupId) => !available.has(groupId))
+
+    if (unknownGroups.length > 0) {
+      throw new BadRequestException(
+        `Unknown CSTAR group(s) for this tenant: ${unknownGroups.join(', ')}`,
+      )
+    }
   }
 
   /**

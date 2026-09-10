@@ -31,6 +31,12 @@ export interface EventEmailSettings {
   to: string[]
   cc: string[]
   bcc: string[]
+  /** CSTAR groups addressed in the To field; their members are resolved at send time. */
+  cstarGroupIdsTo: string[]
+  /** CSTAR groups addressed in the CC field. */
+  cstarGroupIdsCc: string[]
+  /** CSTAR groups addressed in the BCC field. */
+  cstarGroupIdsBcc: string[]
   /** False when the email uses the tenant's default header. */
   useCustomHeader: boolean
   /** Approved logo shown in the custom header; null when there is none. */

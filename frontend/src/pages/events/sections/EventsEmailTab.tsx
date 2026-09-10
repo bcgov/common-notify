@@ -17,10 +17,14 @@ import {
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import EventsCstarGroups from '../components/EventsCstarGroups'
+import type { CstarGroupSelections } from '../components/EventsCstarGroups'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
 import { getTemplates, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import cstarApi from '@/api/cstar.api'
+import type { CstarGroup } from '@/api/cstar.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
@@ -36,7 +40,7 @@ const HEADER_CUSTOM_ID = 'custom'
 // Sentinel for the "No logo" entry in the logo select; saved as a null headerLogoId.
 const NO_LOGO_ID = 'no-logo'
 
-// Subscription service and CSTAR group recipients are not implemented yet.
+// Subscription service recipients are not implemented yet.
 const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
 const CSTAR_GROUPS_ID = 'cstar-groups'
 const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
@@ -48,6 +52,7 @@ export type EmailSettingsValues = {
   to: string[]
   cc: string[]
   bcc: string[]
+  cstarGroups: CstarGroupSelections
   useCustomHeader: boolean
   headerLogoId: string | null
   headerTitle: string
@@ -109,9 +114,23 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     cc: values.cc,
     bcc: values.bcc,
   })
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>(
-    values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
-  )
+  const [cstarGroups, setCstarGroups] = useState<CstarGroupSelections>(values.cstarGroups)
+  // The tenant's groups, for labelling the selections; the event itself only stores their IDs.
+  const [availableGroups, setAvailableGroups] = useState<CstarGroup[]>([])
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>(() => {
+    const selected: string[] = []
+    if (
+      values.cstarGroups.to.length ||
+      values.cstarGroups.cc.length ||
+      values.cstarGroups.bcc.length
+    ) {
+      selected.push(CSTAR_GROUPS_ID)
+    }
+    if (values.to.length || values.cc.length || values.bcc.length) {
+      selected.push(ADDITIONAL_RECIPIENTS_ID)
+    }
+    return selected
+  })
   const [saving, setSaving] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
@@ -146,6 +165,25 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
       .then((response) => {
         if (active) {
           setTemplates(response.data)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // The tenant's CSTAR groups back the group picker. Failures are not surfaced for the same
+  // reason the template list's aren't: the rest of the tab is still usable without them.
+  useEffect(() => {
+    let active = true
+
+    cstarApi
+      .fetchTenantGroups()
+      .then((groups) => {
+        if (active) {
+          setAvailableGroups(groups)
         }
       })
       .catch(() => {})
@@ -212,11 +250,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Malformed input is rejected whatever the channel's state; the required-but-empty fields
   // below only have to be complete while it is active, matching what the backend enforces.
   const hasValidationError = Boolean(senderEmailFormatError) || recipientsHaveError
-  // "Additional recipient(s)" is only a complete choice once it has a To address, so an empty
-  // To counts as no recipient selected and reports the same error under the checkbox group.
+  // "Additional recipient(s)" and "CSTAR Group(s)" are each only a complete choice once they
+  // have something in their To field, so an empty To counts as that option not being selected
+  // and reports the same error under the checkbox group.
   const recipientSelectionError =
     selectedRecipients.length === 0 ||
-    (selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && recipients.to.length === 0)
+    (selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && recipients.to.length === 0) ||
+    (selectedRecipients.includes(CSTAR_GROUPS_ID) && cstarGroups.to.length === 0)
       ? 'Please select at least one recipient.'
       : ''
   const templateError = selectedTemplateId ? '' : 'Please select a template.'
@@ -293,6 +333,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         to: recipients.to,
         cc: recipients.cc,
         bcc: recipients.bcc,
+        // Unticking "CSTAR Group(s)" clears the saved groups, the same way unticking a
+        // To/CC/BCC box clears its addresses.
+        cstarGroups: selectedRecipients.includes(CSTAR_GROUPS_ID)
+          ? cstarGroups
+          : { to: [], cc: [], bcc: [] },
         useCustomHeader,
         // "No logo" is a real choice, so it saves as no logo rather than as the tenant default.
         headerLogoId:
@@ -424,11 +469,21 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             <Checkbox value={SUBSCRIPTION_SERVICE_ID} isDisabled>
               Subscription Service
             </Checkbox>
-            <Checkbox value={CSTAR_GROUPS_ID} isDisabled>
-              CSTAR Group(s)
-            </Checkbox>
+            <Checkbox value={CSTAR_GROUPS_ID}>CSTAR Group(s)</Checkbox>
             <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
           </CheckboxGroup>
+
+          {selectedRecipients.includes(CSTAR_GROUPS_ID) && (
+            <EventsCstarGroups
+              values={cstarGroups}
+              groups={availableGroups}
+              onChange={(value) => {
+                setCstarGroups(value)
+                setSettingsChanged(true)
+              }}
+              isDisabled={areFieldsDisabled}
+            />
+          )}
 
           {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
             <EventsAdditionalRecipients

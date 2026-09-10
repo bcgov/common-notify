@@ -19,8 +19,8 @@ import {
  *
  * `active` is included here because this is the only path that switches the channel on - the
  * tab's toggle is local until the settings are applied. When it is true the submitted fields
- * must be complete (sender email, at least one "to" recipient, and template), matching
- * chk_event_channel_setting_active_complete.
+ * must be complete (sender email, template, and at least one "to" recipient - either a typed-in
+ * address or a CSTAR group), matching chk_event_channel_setting_active_complete.
  */
 export class UpdateEmailChannelSettingDto {
   /**
@@ -74,6 +74,35 @@ export class UpdateEmailChannelSettingDto {
   @IsArray()
   @IsEmail({}, { each: true })
   bcc?: string[]
+
+  /**
+   * CSTAR groups whose members are addressed in the To field. Only the group IDs are saved;
+   * their members' email addresses are resolved from CSTAR at send time. Every ID must belong
+   * to the event's tenant.
+   * @example ["3a3fafee-d41b-4fbe-92df-62dbebf0f73a"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  cstarGroupIdsTo?: string[]
+
+  /**
+   * CSTAR groups whose members are addressed in the CC field.
+   * @example ["8f01087b-edfe-4957-97c4-f0aece2bc514"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  cstarGroupIdsCc?: string[]
+
+  /**
+   * CSTAR groups whose members are addressed in the BCC field.
+   * @example ["02630496-ac01-407b-84f6-d542c8f4cc8c"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  cstarGroupIdsBcc?: string[]
 
   /**
    * Whether the email uses a custom header rather than the tenant's default one. Omitted means
