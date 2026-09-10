@@ -14,6 +14,10 @@ qualifier holding TEST.
 | PR `<n>` | `notify-test-notify-pr-<n>` | same as DEV, at `/pr-<n>` | same as DEV, at `/pr-<n>` |
 | TEST | `notify-test-notify-test` | `notify-test.test.api.gov.bc.ca` | `notify-test-test-api-gov-bc-ca.test.api.gov.bc.ca` |
 
+Two `gwa` quirks apply to every command below. `publish-gateway` ignores `--gateway`, so
+run `gwa config set gateway notify-test` first. And input paths are resolved against the
+current directory even when absolute, so pass a relative path.
+
 Generate with `GATEWAY_INSTANCE=test` in front of the usual commands, e.g.
 `GATEWAY_INSTANCE=test api-gateway/scripts/generate-gateway-config.sh test`. CI publishes
 with `api-gateway/scripts/publish-test-instance.sh`.
@@ -34,9 +38,10 @@ Each step depends on the one before it.
    confirm it would delete only the sandbox services:
 
    ```bash
+   gwa config set gateway notify-test
    printf "_format_version: '3.0'\nservices: []\n" > /tmp/empty-kong.yaml
-   gwa publish-gateway /tmp/empty-kong.yaml \
-     --host api-gov-bc-ca.test.api.gov.bc.ca --gateway notify-test --dry-run
+   (cd /tmp && gwa publish-gateway empty-kong.yaml \
+     --host api-gov-bc-ca.test.api.gov.bc.ca --dry-run)
    ```
 
    Then run it again without `--dry-run`.

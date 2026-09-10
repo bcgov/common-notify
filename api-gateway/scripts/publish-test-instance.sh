@@ -39,8 +39,14 @@ fi
 # would send later production publishes to the test instance.
 gwa login --host "$HOST" --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
+# publish-gateway ignores --gateway and reads the gateway from ~/.gwa-config.yaml, failing
+# with "No gateway has been set" without this. On a laptop it also changes the default
+# gateway; with the default host still api.gov.bc.ca, a stray command then fails rather
+# than reaching the wrong gateway.
+gwa config set gateway "$GATEWAY"
+
 # A qualified publish is a full reconcile of that qualifier: whatever the file omits is deleted.
-ARGS=(publish-gateway "$FILE" --host "$HOST" --gateway "$GATEWAY" --qualifier "$QUALIFIER")
+ARGS=(publish-gateway "$FILE" --host "$HOST" --qualifier "$QUALIFIER")
 if [ -n "$DRY_RUN" ]; then
   ARGS+=("$DRY_RUN")
 fi
