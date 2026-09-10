@@ -9,7 +9,12 @@ metadata:
 spec:
   strategy:
     type: {{ .Values.frontend.deploymentStrategy }}
-  {{- if not .Values.frontend.autoscaling.enabled }}
+  {{- /*
+    Must match hpa.yaml's condition exactly — see the note in the backend
+    deployment. Gating on frontend.autoscaling.enabled alone left the shipped
+    defaults with no HPA and no replicas field, so Kubernetes defaulted to 1.
+  */}}
+  {{- if not (and .Values.global.autoscaling .Values.frontend.autoscaling.enabled) }}
   replicas: {{ .Values.frontend.replicaCount }}
   {{- end }}
   selector:
