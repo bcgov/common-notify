@@ -120,6 +120,18 @@
   gap: 8px;
 }
 
+// DS default is a white square, override this to give the rounded blue tags
+// from the design
+.events__cstar-groups {
+  .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag {
+    border-radius: var(--layout-borderRadius-Circular, 9999px);
+  }
+
+  .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag.blue:not([data-disabled]) {
+    background-color: var(--theme-blue-20, #d8eafd);
+  }
+}
+
 // Read-only preview of the selected template, custom div.
 .events__template-preview {
   display: flex;

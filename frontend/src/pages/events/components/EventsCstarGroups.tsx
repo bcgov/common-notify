@@ -94,7 +94,11 @@ const EventsCstarGroups: FC<EventsCstarGroupsProps> = ({
   }
 
   return (
-    <div className="events__additional-recipients" role="group" aria-label="CSTAR groups">
+    <div
+      className="events__additional-recipients events__cstar-groups"
+      role="group"
+      aria-label="CSTAR groups"
+    >
       <span className="events__field-label">CSTAR Groups (required)</span>
 
       {GROUP_FIELDS.map(({ id, label }) => {
