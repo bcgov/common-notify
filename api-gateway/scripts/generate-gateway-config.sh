@@ -30,7 +30,18 @@ generate_env_config() {
   local env=$1
   local release=$2
 
-  local ENV_FILE="${SCRIPT_DIR}/config/${env}.env"
+  # GATEWAY_INSTANCE=test reads the same stages from config/test-instance/, the APS
+  # test-instance gateway that DEV, TEST and PRs publish to. Unset, this is the
+  # production-instance gateway, unchanged.
+  local CONFIG_DIR="${SCRIPT_DIR}/config"
+  if [ "${GATEWAY_INSTANCE:-prod}" = "test" ]; then
+    CONFIG_DIR="${SCRIPT_DIR}/config/test-instance"
+  fi
+  local ENV_FILE="${CONFIG_DIR}/${env}.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: no '${env}' stage for gateway instance '${GATEWAY_INSTANCE:-prod}' (${ENV_FILE})"
+    exit 1
+  fi
   local TEMPLATE_FILE="${SCRIPT_DIR}/templates/routes.yaml"
   local OUTPUT_FILE="${SCRIPT_DIR}/generated/gw-routes-${env}.yaml"
 
