@@ -759,7 +759,7 @@ routes:
   # Frontend-only: events are configured by tenant users through the UI, so there
   # is no service-token variant.
   - name: ${ROUTE_PREFIX}events-frontend
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -777,7 +777,7 @@ routes:
   # Regex matching a single path segment, same convention as the auth tenant
   # roles route. Update is a POST, matching the templates controller.
   - name: ${ROUTE_PREFIX}events-frontend-by-id
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -795,7 +795,7 @@ routes:
   # Declared explicitly rather than relying on the by-id route's prefix match, same
   # convention as the auth tenant roles route.
   - name: ${ROUTE_PREFIX}events-frontend-email-channel
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -810,7 +810,7 @@ routes:
 
   # /api/v1/frontend/events/:eventId/channels/email/deactivate (frontend variant - switch email channel off)
   - name: ${ROUTE_PREFIX}events-frontend-email-channel-deactivate
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -825,7 +825,7 @@ routes:
 
   # /api/v1/frontend/events/:eventId/channels/sms (frontend variant - sms tab settings)
   - name: ${ROUTE_PREFIX}events-frontend-sms-channel
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -840,7 +840,7 @@ routes:
 
   # /api/v1/frontend/events/:eventId/channels/sms/deactivate (frontend variant - switch sms channel off)
   - name: ${ROUTE_PREFIX}events-frontend-sms-channel-deactivate
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -1607,44 +1607,46 @@ plugins:
 
   # Events Frontend - List and Create
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend
     config: *jwtConfig
 
   # Events Frontend - Get by ID, Update
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend-by-id
     config: *jwtConfig
 
   # Events Frontend - Email Channel Settings
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend-email-channel
     config: *jwtConfig
 
   # Events Frontend - Email Channel Deactivate
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend-email-channel-deactivate
     config: *jwtConfig
 
   # Events Frontend - SMS Channel Settings
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend-sms-channel
     config: *jwtConfig
 
   # Events Frontend - SMS Channel Deactivate
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}events-frontend-sms-channel-deactivate
+    config: *jwtConfig
+
   # API Keys Frontend (list, issue) - Frontend Token
   - name: jwt-keycloak
     tags: [${CONFIG_TAG}]
