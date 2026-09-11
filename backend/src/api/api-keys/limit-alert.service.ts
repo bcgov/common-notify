@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
@@ -14,6 +14,7 @@ import {
 import { RecordedUsageResult } from './api-key-usage.service'
 import { evaluateLimitAlerts } from './limit-alert.evaluator'
 import type { LimitAlertToFire } from './limit-alert.evaluator'
+import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
 
 export interface ProcessLimitAlertUsageInput {
   apiKeyConsumerId: string
@@ -54,8 +55,13 @@ export class LimitAlertService {
   /**
    * Evaluate supplied post-increment DAY/YEAR counts and atomically claim new alerts.
    *
-   * Alert configuration is not guaranteed to exist for every limit row. A missing
-   * configuration row is resolved as alerts disabled; no threshold is invented.
+   * Limits are tenant-wide: the counts are the tenant's totals, each channel is measured against
+   * the lowest limit and threshold across the tenant's API keys, and claims are recorded against
+   * the tenant's earliest-bound key so a tenant gets one alert per period and level no matter
+   * which of its keys crosses it.
+   *
+   * Alert configuration is not guaranteed to exist for every limit row. A channel with no
+   * enabled configuration row is resolved as alerts disabled; no threshold is invented.
    */
   async evaluateAndClaim(input: ProcessLimitAlertUsageInput): Promise<ClaimedLimitAlert[]> {
     if (!input.apiKeyConsumerId || input.usageResults.length === 0) return []
@@ -78,25 +84,33 @@ export class LimitAlertService {
       return []
     }
 
+    const tenantConsumers = await this.apiKeyConsumerRepository.find({
+      where: { tenantId: consumer.tenantId },
+      order: { createdAt: 'ASC' },
+    })
+    const tenantConsumerIds =
+      tenantConsumers.length > 0 ? tenantConsumers.map(({ id }) => id) : [consumer.id]
+
     const usageByChannel = this.groupUsageByChannel(input.usageResults)
     const claimed: ClaimedLimitAlert[] = []
 
     for (const [channelCode, usage] of usageByChannel) {
-      const [limit, alertConfig] = await Promise.all([
-        this.apiKeyLimitRepository.findOne({
-          where: { apiKeyConsumerId: input.apiKeyConsumerId, channelCode },
-        }),
-        this.apiKeyLimitAlertRepository.findOne({
-          where: { apiKeyConsumerId: input.apiKeyConsumerId, channelCode },
-        }),
+      const where = { apiKeyConsumerId: In(tenantConsumerIds), channelCode }
+      const [limits, alertConfigs] = await Promise.all([
+        this.apiKeyLimitRepository.find({ where }),
+        this.apiKeyLimitAlertRepository.find({ where }),
       ])
+      const limit = lowestLimitsByChannel(limits).get(channelCode)
+      const warnThresholdPercent = lowestThresholdsByChannel(
+        alertConfigs.filter((alertConfig) => alertConfig.alertsEnabled),
+      ).get(channelCode)
 
-      if (!limit || !alertConfig?.alertsEnabled) continue
+      if (!limit || warnThresholdPercent === undefined) continue
 
       const candidates = evaluateLimitAlerts({
         channelCode,
-        alertsEnabled: alertConfig.alertsEnabled,
-        warnThresholdPercent: alertConfig.warnThresholdPercent,
+        alertsEnabled: true,
+        warnThresholdPercent,
         dailyLimit: limit.dailyLimit,
         annualLimit: limit.annualLimit,
         dayUsage: usage.get(UsagePeriodType.DAY)?.sentCount,
@@ -109,7 +123,7 @@ export class LimitAlertService {
             ? usage.get(UsagePeriodType.DAY)
             : usage.get(UsagePeriodType.YEAR)
         const periodStart = usageResult!.periodStart
-        const claim = await this.claim(input.apiKeyConsumerId, candidate, periodStart)
+        const claim = await this.claim(tenantConsumerIds[0], candidate, periodStart)
         if (!claim) continue
 
         claimed.push({
