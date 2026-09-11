@@ -94,6 +94,7 @@ export async function bootstrap() {
           'maintenance console and integration with subscription services. ' +
           'CHES and GC Notify interfaces are supported for legacy applications. ' +
           'Defaults are configured through an administrative UI.',
+        '',
         'Your API key identifies who the messages are sent for - a program, a project, an ' +
           'application, a team. Notify calls that a tenant, and it decides which templates, ' +
           'sender addresses and send limits apply. A key belongs to exactly one tenant.',
