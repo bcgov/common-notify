@@ -13,7 +13,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiOkResponse,
-  ApiBearerAuth,
   ApiQuery,
   ApiParam,
   ApiResponse,
@@ -22,17 +21,16 @@ import {
 import { NotificationService } from './notification.service'
 import { NotificationRequestDetailService } from './notification-request-detail.service'
 import { PaginatedNotificationResponse } from './schemas/paginated-response'
-import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
-import { Roles } from '../../common/decorators/roles.decorator'
-import { SsoRole as SsoRoleEnum } from '../../enum/sso-role.enum'
+import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 
 @ApiTags('Notification status')
 @ApiSecurity('api-key')
 @Controller('notification_request')
-@UseGuards(NotifyFrontendRoleGuard)
-@ApiBearerAuth()
+// Published API, not a frontend one: tenant integrations call it with their API key through
+// the gateway. The Notify UI reads the same data from NotificationFrontendController.
+@UseGuards(NotifyServiceGuard)
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
@@ -43,7 +41,6 @@ export class NotificationController {
 
   @Version('1')
   @Get()
-  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'List notification requests',
     description:
@@ -88,7 +85,6 @@ export class NotificationController {
 
   @Version('1')
   @Get('request_details')
-  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'List delivery records',
     description:
@@ -112,7 +108,6 @@ export class NotificationController {
       ],
     },
   })
-  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_ADMIN role.' })
   findAllDeliveries(@Req() req: Request) {
     const tenant = (req as any).tenant as Tenant
     return this.notificationRequestDetailService.findAllByTenantId(tenant.id)
@@ -120,7 +115,6 @@ export class NotificationController {
 
   @Version('1')
   @Get(':id/request_details')
-  @Roles(SsoRoleEnum.NOTIFY_ADMIN)
   @ApiOperation({
     summary: 'Get delivery records for one notification',
     description:
@@ -159,7 +153,6 @@ export class NotificationController {
       ],
     },
   })
-  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_ADMIN role.' })
   @ApiResponse({ status: 404, description: 'No such notification for this tenant.' })
   findDeliveries(@Req() req: Request, @Param('id') id: string) {
     const tenant = (req as any).tenant as Tenant

@@ -238,6 +238,257 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
   })
 })
 
+// ---------------------------------------------------------------------------
+// APS Directory API Mock — Credential Issuer
+//
+// The real Credential Issuer API (/ds/api/v3/gateways/{id}/consumers) is only
+// deployed on the APS *test* instance, and the Notify environment published there
+// is client-credentials rather than an api-key flow. Neither can issue a key that
+// works against our gateway, so there is nowhere real to point local development at.
+//
+// This mock stands in for it, backed by the Kong running in docker-compose: it
+// creates the same artefacts the real API does — a consumer whose username is a
+// {environmentAppId}-{applicationAppId} clientId, plus a key-auth credential — so
+// the resulting key actually authenticates against local routes.
+//
+// The point is that the backend then exercises ApsCredentialIssuerClient, the class
+// that runs in production: token fetch and caching, the refresh-and-retry on 401,
+// the request body shape, and the 400/403/409 error mapping. Responses and status
+// codes below mirror the real API deliberately.
+//
+// Caveat worth remembering: a mock agrees with our own reading of the contract by
+// construction. It raises confidence in our code, not in our reading of APS.
+// ---------------------------------------------------------------------------
+
+const KONG_ADMIN_URL = process.env.KONG_ADMIN_URL || 'http://kong:8001'
+const GATEWAY_ID = process.env.APS_GATEWAY_ID || 'gw-local'
+const ENVIRONMENT_APP_ID = process.env.APS_ENVIRONMENT_APP_ID || 'LOCAL001'
+// Matches the published flow on the real gw-fe8c5 environments.
+const ENVIRONMENT_FLOW = 'kong-api-key-only'
+
+/**
+ * Verify a token this server issued.
+ *
+ * Real signature checking rather than "is a header present", so the client's token
+ * handling is genuinely under test — an expired or forged token produces the same
+ * 401 the real API would, which is what drives the refresh-and-retry path.
+ */
+function verifyBearer(req) {
+  const header = req.headers.authorization
+  if (!header || !header.startsWith('Bearer ')) {
+    return { ok: false, status: 401, code: 'credentials_required', message: 'No authorization token was found' }
+  }
+
+  const parts = header.slice('Bearer '.length).trim().split('.')
+  if (parts.length !== 3) {
+    return { ok: false, status: 401, code: 'invalid_token', message: 'Malformed token' }
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+  } catch {
+    return { ok: false, status: 401, code: 'invalid_token', message: 'Malformed token payload' }
+  }
+
+  const secret = jwtSecrets[payload.azp]
+  if (!secret) {
+    return { ok: false, status: 401, code: 'invalid_token', message: 'Unknown client' }
+  }
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(`${parts[0]}.${parts[1]}`)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+
+  if (expected !== parts[2]) {
+    return { ok: false, status: 401, code: 'invalid_token', message: 'Signature verification failed' }
+  }
+  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    return { ok: false, status: 401, code: 'invalid_token', message: 'Token expired' }
+  }
+
+  return { ok: true, clientId: payload.azp }
+}
+
+/** Reject anything that isn't a validly signed token from this server. */
+app.use('/ds/api/v3', (req, res, next) => {
+  const result = verifyBearer(req)
+  if (!result.ok) {
+    console.log(`[aps-mock] ${req.method} ${req.path} -> ${result.status} ${result.code}`)
+    return res.status(result.status).json({ code: result.code, message: result.message })
+  }
+  next()
+})
+
+async function kong(method, path, body) {
+  const response = await fetch(`${KONG_ADMIN_URL}${path}`, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const text = await response.text()
+  let data = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text
+  }
+  return { status: response.status, data }
+}
+
+/**
+ * GET /ds/api/v3/gateways/:gatewayId/products
+ *
+ * Mirrors the lookup that supplies APS_ENVIRONMENT_APP_ID, so the setup steps in
+ * docs/api-key-self-service.md can be walked through locally.
+ */
+app.get('/ds/api/v3/gateways/:gatewayId/products', (req, res) => {
+  // Scoped like the issue route below. Without this the mock is more permissive than the
+  // real API in exactly the dimension that has already cost time twice: a wrong
+  // APS_GATEWAY_ID would look fine here and fail only later, against real APS.
+  if (req.params.gatewayId !== GATEWAY_ID) {
+    return res.status(403).json({
+      code: 'permission_denied',
+      message: `Missing required scope: ${req.params.gatewayId}:Namespace.Manage`,
+    })
+  }
+
+  res.json([
+    {
+      name: 'Notify API',
+      environments: [
+        { name: 'dev', flow: ENVIRONMENT_FLOW, appId: ENVIRONMENT_APP_ID, active: true },
+      ],
+    },
+  ])
+})
+
+/**
+ * POST /ds/api/v3/gateways/:gatewayId/consumers — issue a credential.
+ *
+ * Creates a Kong consumer named for the clientId plus a key-auth credential, and
+ * returns the APS-shaped response. 201 on success.
+ */
+app.post('/ds/api/v3/gateways/:gatewayId/consumers', async (req, res) => {
+  const { gatewayId } = req.params
+  const { environmentAppId, application, labels } = req.body || {}
+
+  // The real API scopes the service account per gateway, so a wrong APS_GATEWAY_ID
+  // surfaces as a scope failure rather than a confusing 404.
+  if (gatewayId !== GATEWAY_ID) {
+    return res.status(403).json({
+      code: 'permission_denied',
+      message: `Missing required scope: ${gatewayId}:CredentialIssuer.Generate`,
+    })
+  }
+  if (environmentAppId !== ENVIRONMENT_APP_ID) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: `Unknown environmentAppId "${environmentAppId}" (this gateway has "${ENVIRONMENT_APP_ID}")`,
+    })
+  }
+  if (!application || (!application.name && !application.appId)) {
+    return res.status(400).json({
+      code: 'bad_request',
+      message: 'application.name is required when creating a new Application',
+    })
+  }
+
+  // Reuse the caller's Application id when given one, otherwise mint a short opaque
+  // id the way APS does — the readable part comes from the Application name.
+  const applicationAppId =
+    application.appId ||
+    `${String(application.name).replace(/[^A-Za-z0-9]/g, '').slice(0, 20)}${crypto
+      .randomBytes(3)
+      .toString('hex')
+      .toUpperCase()}`
+  const clientId = `${environmentAppId}-${applicationAppId}`
+
+  try {
+    const existing = await kong('GET', `/consumers/${encodeURIComponent(clientId)}`)
+    if (existing.status === 200) {
+      // "A duplicate issue request for the same Application and Environment fails."
+      return res.status(409).json({
+        code: 'conflict',
+        message: 'A credential already exists for this Application and Environment',
+      })
+    }
+
+    const created = await kong('POST', '/consumers', {
+      username: clientId,
+      custom_id: clientId,
+      tags: Object.entries(labels || {}).map(([k, v]) => `${k}:${v}`),
+    })
+    if (created.status >= 400) {
+      console.error('[aps-mock] Kong consumer creation failed:', created.status, created.data)
+      return res.status(502).json({ code: 'upstream_error', message: 'Kong rejected the consumer' })
+    }
+
+    const credential = await kong('POST', `/consumers/${encodeURIComponent(clientId)}/key-auth`, {})
+    if (credential.status >= 400) {
+      console.error('[aps-mock] Kong key-auth creation failed:', credential.status, credential.data)
+      return res.status(502).json({ code: 'upstream_error', message: 'Kong rejected the credential' })
+    }
+
+    console.log(`[aps-mock] issued ${clientId} (kong credential ${credential.data.id})`)
+    res.status(201).json({ flow: ENVIRONMENT_FLOW, clientId, apiKey: credential.data.key })
+  } catch (error) {
+    console.error('[aps-mock] issue failed:', error)
+    res.status(502).json({ code: 'upstream_error', message: 'Could not reach the local Kong Admin API' })
+  }
+})
+
+/**
+ * PUT /ds/api/v3/gateways/:gatewayId/consumers/:clientId?action=regenerate
+ *
+ * Kong has no rotate operation, so every existing key on the consumer is dropped and
+ * a fresh one minted — same net effect as the real regenerate: clientId survives, the
+ * value does not.
+ */
+app.put('/ds/api/v3/gateways/:gatewayId/consumers/:clientId', async (req, res) => {
+  const { gatewayId, clientId } = req.params
+
+  if (gatewayId !== GATEWAY_ID) {
+    return res.status(403).json({
+      code: 'permission_denied',
+      message: `Missing required scope: ${gatewayId}:CredentialIssuer.Generate`,
+    })
+  }
+  if (req.query.action !== 'regenerate') {
+    return res
+      .status(400)
+      .json({ code: 'bad_request', message: 'action must be `regenerate`' })
+  }
+
+  try {
+    const consumer = await kong('GET', `/consumers/${encodeURIComponent(clientId)}`)
+    if (consumer.status === 404) {
+      return res.status(404).json({ code: 'not_found', message: 'No such consumer' })
+    }
+
+    const existing = await kong('GET', `/consumers/${encodeURIComponent(clientId)}/key-auth`)
+    for (const key of existing.data?.data || []) {
+      await kong('DELETE', `/consumers/${encodeURIComponent(clientId)}/key-auth/${key.id}`)
+    }
+
+    const credential = await kong('POST', `/consumers/${encodeURIComponent(clientId)}/key-auth`, {})
+    if (credential.status >= 400) {
+      console.error('[aps-mock] Kong key-auth creation failed:', credential.status, credential.data)
+      return res.status(502).json({ code: 'upstream_error', message: 'Kong rejected the credential' })
+    }
+
+    console.log(`[aps-mock] regenerated ${clientId} (kong credential ${credential.data.id})`)
+    res.status(200).json({ flow: ENVIRONMENT_FLOW, clientId, apiKey: credential.data.key })
+  } catch (error) {
+    console.error('[aps-mock] regenerate failed:', error)
+    res.status(502).json({ code: 'upstream_error', message: 'Could not reach the local Kong Admin API' })
+  }
+})
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err)
@@ -260,6 +511,14 @@ app.listen(PORT, () => {
   console.log(
     `   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles`,
   )
+  console.log('')
+  console.log('APS Directory API Mock (Credential Issuer) — backed by Kong at ' + KONG_ADMIN_URL)
+  console.log(`   GET  http://localhost:${PORT}/ds/api/v3/gateways/${GATEWAY_ID}/products`)
+  console.log(`   POST http://localhost:${PORT}/ds/api/v3/gateways/${GATEWAY_ID}/consumers`)
+  console.log(
+    `   PUT  http://localhost:${PORT}/ds/api/v3/gateways/${GATEWAY_ID}/consumers/:clientId?action=regenerate`,
+  )
+  console.log(`   gateway=${GATEWAY_ID}  environmentAppId=${ENVIRONMENT_APP_ID}  flow=${ENVIRONMENT_FLOW}`)
   console.log('')
   console.log('Test credentials (from kong-seed.sh):')
   console.log('  - LOCAL001-ABC123: LOCAL001-SECRET-ABC123XYZ789')

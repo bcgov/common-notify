@@ -348,7 +348,7 @@ describe('BulkNotifications', () => {
     await chooseTemplate()
 
     expect(
-      await screen.findByText("This template can't be used for a bulk send."),
+      await screen.findByText("This template can't be used for a batch send."),
     ).toBeInTheDocument()
     expect(screen.getByText(/recommendations, moose/)).toBeInTheDocument()
     // No upload control is offered, and nothing can be sent.

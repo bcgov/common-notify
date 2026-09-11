@@ -92,7 +92,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
     <NotificationPreviewModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Bulk Notifications Preview"
+      title="Batch Send Preview"
       variables={variables}
       variablesIntro="These values come from your CSV file."
       stepper={{

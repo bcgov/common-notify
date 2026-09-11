@@ -153,7 +153,7 @@ const BulkNotifications: FC = () => {
     downloadCsv(csvFilenameFor(selectedTemplate.name), buildSampleCsv(placeholders))
     showSuccessToast(
       'Sample CSV downloaded.',
-      'Complete the file and upload it to continue with the bulk send.',
+      'Complete the file and upload it to continue with the batch send.',
     )
   }
 
@@ -199,12 +199,12 @@ const BulkNotifications: FC = () => {
 
   return (
     <div className="page bulk-notifications">
-      <PageHeading title="Bulk Notifications" />
+      <PageHeading title="Batch Send" />
 
       {!canSend && (
         <p className="bulk-notifications__notice">
-          Sending bulk notifications needs the Template Editor or Tenant Administrator role. You can
-          still download a sample CSV for a template.
+          Sending a batch needs the Template Editor or Tenant Administrator role. You can still
+          download a sample CSV for a template.
         </p>
       )}
 
@@ -249,7 +249,7 @@ const BulkNotifications: FC = () => {
       {selectedTemplate && unsupported.length > 0 && (
         <InlineAlert
           variant="warning"
-          title="This template can't be used for a bulk send."
+          title="This template can't be used for a batch send."
           description={`It repeats a list (${unsupported.join(', ')}). A spreadsheet row holds one value per column, so it cannot supply a list of items. Pick a template without repeated sections, or send this one through the API.`}
         />
       )}
