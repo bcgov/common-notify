@@ -139,10 +139,10 @@ describe('ApiKeyIssuanceService', () => {
       expect(call.aclGroups).toEqual(['notify-api'])
     })
 
-    it('seeds the same default limits a bound key gets', async () => {
+    it('seeds limits from the tenant the same way a bound key does', async () => {
       await issue()
 
-      expect(apiKeysService.ensureDefaults).toHaveBeenCalledWith('binding-uuid')
+      expect(apiKeysService.ensureDefaults).toHaveBeenCalledWith('binding-uuid', 'tenant-uuid')
     })
 
     it('records the credential identifier when the issuer knows it', async () => {

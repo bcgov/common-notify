@@ -127,25 +127,25 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /settings/i })).not.toBeInTheDocument()
   })
 
-  it('shows the bulk notifications link when the bulk notifications flag is on', () => {
+  it('shows the batch send link when the bulk notifications flag is on', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'], { bulk_notifications: true })
 
-    expect(screen.getByRole('link', { name: /bulk notifications/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /batch send/i })).toHaveAttribute(
       'href',
       '/bulk-notifications',
     )
   })
 
-  it('hides the bulk notifications link when the bulk notifications flag is off', () => {
+  it('hides the batch send link when the bulk notifications flag is off', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
 
-    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /batch send/i })).not.toBeInTheDocument()
   })
 
-  it('hides the bulk notifications link from users with no CSTAR role', () => {
+  it('hides the batch send link from users with no CSTAR role', () => {
     renderSidebar(null, [], { bulk_notifications: true })
 
-    expect(screen.queryByRole('link', { name: /bulk notifications/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /batch send/i })).not.toBeInTheDocument()
   })
 
   it('does not render admin link when user is not an admin', () => {

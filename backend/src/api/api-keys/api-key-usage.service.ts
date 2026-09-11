@@ -5,6 +5,7 @@ import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
 import { ApiKeyUsage } from './entities/api-key-usage.entity'
+import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
@@ -31,10 +32,9 @@ export interface RecordedUsageResult {
  * Reads notification limits and usage for a tenant and lets an operations admin
  * update the alert threshold.
  *
- * Limits and usage are stored per (API key, channel). A tenant may have more than one
- * API key bound, so values are aggregated per channel across the tenant's keys:
- * limits are summed, usage is summed, and the threshold reported is the most
- * conservative (minimum) configured across keys.
+ * Limits apply to the tenant as a whole but are stored per (API key, channel), and a tenant may
+ * have several keys bound. Per channel, usage is summed across the tenant's keys and measured
+ * against the lowest limit and threshold configured on any of them (see tenant-limits.ts).
  */
 @Injectable()
 export class ApiKeyUsageService {
@@ -105,34 +105,15 @@ export class ApiKeyUsageService {
     // Alert thresholds live in api_key_limit_alert, most-conservative (minimum) across keys.
     const thresholdByChannel = await this.getThresholdsByChannel(consumerIds)
 
-    // Aggregate limits per channel across keys.
-    const channelMap = new Map<string, ChannelUsageDto>()
-    for (const limit of limits) {
-      const existing = channelMap.get(limit.channelCode)
-      if (!existing) {
-        channelMap.set(limit.channelCode, {
-          channel: limit.channelCode,
+    const channels = Array.from(lowestLimitsByChannel(limits))
+      .map(([channel, limit]): ChannelUsageDto => {
+        const usage = usageByChannel.get(channel)
+        return {
+          channel,
           rateLimitPerMinute: limit.rateLimitPerMinute,
           dailyLimit: limit.dailyLimit,
           annualLimit: limit.annualLimit,
-          warnThresholdPercent:
-            thresholdByChannel.get(limit.channelCode) ?? DEFAULT_WARN_THRESHOLD_PERCENT,
-          usedThisMinute: 0,
-          usedToday: 0,
-          usedThisYear: 0,
-        })
-      } else {
-        existing.rateLimitPerMinute += limit.rateLimitPerMinute
-        existing.dailyLimit += limit.dailyLimit
-        existing.annualLimit += limit.annualLimit
-      }
-    }
-
-    const channels = Array.from(channelMap.values())
-      .map((channel) => {
-        const usage = usageByChannel.get(channel.channel)
-        return {
-          ...channel,
+          warnThresholdPercent: thresholdByChannel.get(channel) ?? DEFAULT_WARN_THRESHOLD_PERCENT,
           usedThisMinute: usage?.minute ?? 0,
           usedToday: usage?.day ?? 0,
           usedThisYear: usage?.year ?? 0,
@@ -151,17 +132,7 @@ export class ApiKeyUsageService {
     const alerts = await this.apiKeyLimitAlertRepository.find({
       where: { apiKeyConsumerId: In(consumerIds) },
     })
-    const map = new Map<string, number>()
-    for (const alert of alerts) {
-      const current = map.get(alert.channelCode)
-      map.set(
-        alert.channelCode,
-        current === undefined
-          ? alert.warnThresholdPercent
-          : Math.min(current, alert.warnThresholdPercent),
-      )
-    }
-    return map
+    return lowestThresholdsByChannel(alerts)
   }
 
   /**
@@ -314,7 +285,7 @@ export class ApiKeyUsageService {
     if (tenantIds.length === 0) return []
     const fiscalYearStart = await this.getFiscalYearStart()
 
-    // Limits per (tenant, channel), summed across the tenant's keys.
+    // Limits per (tenant, channel): the lowest configured across the tenant's keys.
     const limitRows = await this.apiKeyLimitRepository
       .createQueryBuilder('l')
       .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
@@ -327,9 +298,9 @@ export class ApiKeyUsageService {
       .select('t.id', 'tenantId')
       .addSelect('t.name', 'tenantName')
       .addSelect('l.channel_code', 'channelCode')
-      .addSelect('SUM(l.rate_limit_per_minute)', 'rateLimitPerMinute')
-      .addSelect('SUM(l.daily_limit)', 'dailyLimit')
-      .addSelect('SUM(l.annual_limit)', 'annualLimit')
+      .addSelect('MIN(l.rate_limit_per_minute)', 'rateLimitPerMinute')
+      .addSelect('MIN(l.daily_limit)', 'dailyLimit')
+      .addSelect('MIN(l.annual_limit)', 'annualLimit')
       .addSelect('MIN(a.warn_threshold_percent)', 'warnThresholdPercent')
       .where('t.id IN (:...tenantIds)', { tenantIds })
       .groupBy('t.id')
@@ -421,7 +392,8 @@ export class ApiKeyUsageService {
    *   DAY    -> date_trunc('day', now())
    *   YEAR   -> the global fiscal-year start
    *
-   * Returns the post-increment counts for the DAY and YEAR buckets.
+   * Returns the tenant's post-increment totals for the DAY and YEAR buckets - summed across all
+   * of its API keys, because the limits these are alerted against are tenant-wide.
    */
   async recordUsage(
     apiKeyConsumerId: string,
@@ -449,7 +421,7 @@ export class ApiKeyUsageService {
       [apiKeyConsumerId, channel, count, fiscalYearStart],
     )
 
-    return (
+    const buckets = (
       rows as Array<{
         period_type_code: UsagePeriodType
         period_start: Date | string
@@ -472,14 +444,44 @@ export class ApiKeyUsageService {
         periodStart: new Date(row.period_start),
         sentCount: Number(row.sent_count),
       }))
+    if (buckets.length === 0) return []
+
+    // Read after the upsert commits, so the totals include this send and any concurrent ones.
+    const totals = (await this.apiKeyUsageRepository.query(
+      `
+      SELECT u.period_type_code, SUM(u.sent_count) AS sent_count
+      FROM notify.api_key_usage u
+      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
+      WHERE c.tenant_id = (SELECT tenant_id FROM notify.api_key_consumer WHERE id = $1)
+        AND u.channel_code = $2
+        AND (
+          (u.period_type_code = '${UsagePeriodType.DAY}' AND u.period_start = $3) OR
+          (u.period_type_code = '${UsagePeriodType.YEAR}' AND u.period_start = $4)
+        )
+      GROUP BY u.period_type_code
+      `,
+      [
+        apiKeyConsumerId,
+        channel,
+        buckets.find((b) => b.periodTypeCode === UsagePeriodType.DAY)?.periodStart ?? null,
+        buckets.find((b) => b.periodTypeCode === UsagePeriodType.YEAR)?.periodStart ?? null,
+      ],
+    )) as Array<{ period_type_code: UsagePeriodType; sent_count: string }>
+
+    return buckets.map((bucket) => {
+      const total = totals.find((row) => row.period_type_code === bucket.periodTypeCode)
+      return total ? { ...bucket, sentCount: Number(total.sent_count) } : bucket
+    })
   }
 
   /**
-   * Enforce daily and annual limits before accepting a send. Throws HTTP 429 if any channel
-   * in the request would exceed its limit for this API key (used + count > limit); the whole
-   * request is rejected. Per-minute rate limiting is handled at the gateway, not here.
+   * Enforce the tenant's daily and annual limits before accepting a send. Usage is summed across
+   * every API key bound to the sending key's tenant and checked against the lowest limit on any
+   * of them. Throws HTTP 429 if any channel in the request would exceed its limit
+   * (used + count > limit); the whole request is rejected. Per-minute rate limiting is handled
+   * at the gateway, not here.
    *
-   * Fail-open when a channel has no configured limit row (nothing to enforce against).
+   * Fail-open when the key is not bound to a tenant or a channel has no configured limit row.
    *
    * Note: this is a check-then-act against the counters, so under heavy concurrency a small
    * overshoot is possible. Acceptable for now; can be made atomic later if needed.
@@ -492,10 +494,13 @@ export class ApiKeyUsageService {
     const channels = entries.filter((e) => e.count > 0).map((e) => e.channel)
     if (channels.length === 0) return
 
+    const consumerIds = await this.getTenantConsumerIds(apiKeyConsumerId)
+    if (consumerIds.length === 0) return
+
     const limits = await this.apiKeyLimitRepository.find({
-      where: { apiKeyConsumerId, channelCode: In(channels) },
+      where: { apiKeyConsumerId: In(consumerIds), channelCode: In(channels) },
     })
-    const limitByChannel = new Map(limits.map((limit) => [limit.channelCode, limit]))
+    const limitByChannel = lowestLimitsByChannel(limits)
 
     const fiscalYearStart = await this.getFiscalYearStart()
 
@@ -504,7 +509,7 @@ export class ApiKeyUsageService {
       .select('u.channel_code', 'channelCode')
       .addSelect('u.period_type_code', 'periodTypeCode')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where('u.api_key_consumer_id = :apiKeyConsumerId', { apiKeyConsumerId })
+      .where('u.api_key_consumer_id IN (:...consumerIds)', { consumerIds })
       .andWhere('u.channel_code IN (:...channels)', { channels })
       .andWhere(
         `(
@@ -591,6 +596,15 @@ export class ApiKeyUsageService {
       select: { id: true },
     })
     return consumers.map((consumer) => consumer.id)
+  }
+
+  /** Every API key bound to the same tenant as the given key, the key itself included. */
+  private async getTenantConsumerIds(apiKeyConsumerId: string): Promise<string[]> {
+    const consumer = await this.apiKeyConsumerRepository.findOne({
+      where: { id: apiKeyConsumerId },
+      select: { id: true, tenantId: true },
+    })
+    return consumer ? this.getConsumerIds(consumer.tenantId) : []
   }
 
   /**

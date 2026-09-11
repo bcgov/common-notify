@@ -85,20 +85,25 @@ export async function bootstrap() {
     .setTitle('Notify API')
     .setDescription(
       [
-        'Notify sends email and SMS for your application. You post a message - or the id of a ' +
-          'template Notify already holds - and Notify renders it, delivers it, retries when a ' +
-          'provider fails, and records what happened to each recipient.',
-        '',
+        'Multi-tenanted unified notification API which covers everything from  simple single-channel sends ' +
+          'to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides ' +
+          'comprehensive defaults through the use of configurable event-types, which free calling applications ' +
+          'from the burden of managing recipients, content, channels and subscriptions - however, defaults can ' +
+          'be overridden or augmented by the message payload at any time if required. ' +
+          'Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends, ' +
+          'maintenance console and integration with subscription services. ' +
+          'CHES and GC Notify interfaces are supported for legacy applications. ' +
+          'Defaults are configured through an administrative UI.',
         'Your API key identifies who the messages are sent for - a program, a project, an ' +
           'application, a team. Notify calls that a tenant, and it decides which templates, ' +
           'sender addresses and send limits apply. A key belongs to exactly one tenant.',
         '',
         '### Getting started',
         '',
-        '1. Bind your API key to your tenant with `POST /api/v1/service/api-key/bind`. Once, ' +
-          'before your first send.',
-        '2. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
-        '3. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
+        '1. Go to CSTAR and create your tenant.',
+        '2. Log into Notify and navigate to the settings page to generate an API key.',
+        '3. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
+        '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
         '',
         '### Authentication',

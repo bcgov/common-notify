@@ -182,8 +182,9 @@ export class ApiKeyIssuanceService {
       throw error
     }
 
-    // Same per-channel limits and alert thresholds a bound key gets.
-    await this.apiKeysService.ensureDefaults(binding.id)
+    // Copies the limits and thresholds of any key the tenant already has, so cutting over
+    // from a legacy bound key keeps whatever an admin set.
+    await this.apiKeysService.ensureDefaults(binding.id, tenant.id)
 
     this.logger.log(
       `Issued API key ${credential.clientId} for tenant "${tenant.name}" (${tenant.id}) ` +
