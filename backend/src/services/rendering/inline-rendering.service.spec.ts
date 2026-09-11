@@ -465,6 +465,46 @@ describe('InlineRenderingService', () => {
       })
     })
 
+    it('should pass arrays through to the legacy GC Notify renderer, which renders them as lists', async () => {
+      const content: NotifyContent = {
+        body: 'Items: ((items))',
+        renderer: 'legacy_gc_notify',
+      }
+
+      mockRenderer.renderEmail.mockResolvedValue({
+        subject: 'Notification',
+        body: 'Items: \n\n* a\n* b',
+      })
+
+      await service.renderEmail(content, { items: ['a', 'b'] })
+
+      expect(mockRenderer.renderEmail).toHaveBeenCalledWith({
+        template: expect.any(Object),
+        personalisation: { items: ['a', 'b'] },
+        defaultSubject: 'Notification',
+      })
+    })
+
+    it('should still convert arrays to JSON strings for the other engines', async () => {
+      const content: NotifyContent = {
+        body: 'Items: {{items}}',
+        renderer: 'handlebars',
+      }
+
+      mockRenderer.renderEmail.mockResolvedValue({
+        subject: 'Notification',
+        body: 'Items: ["a","b"]',
+      })
+
+      await service.renderEmail(content, { items: ['a', 'b'] })
+
+      expect(mockRenderer.renderEmail).toHaveBeenCalledWith({
+        template: expect.any(Object),
+        personalisation: { items: '["a","b"]' },
+        defaultSubject: 'Notification',
+      })
+    })
+
     it('should convert objects to JSON strings', async () => {
       const content: NotifyContent = {
         body: 'Data: {{data}}',

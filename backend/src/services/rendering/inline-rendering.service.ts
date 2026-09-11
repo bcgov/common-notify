@@ -42,7 +42,7 @@ export class InlineRenderingService {
     }
 
     // Convert params to strings (template renderers expect string values)
-    const stringParams = this.normalizeParams(params)
+    const stringParams = this.normalizeParams(params, content.renderer)
 
     return renderer.renderEmail({
       template: inlineTemplate,
@@ -77,7 +77,7 @@ export class InlineRenderingService {
     }
 
     // Convert params to strings (template renderers expect string values)
-    const stringParams = this.normalizeParams(params)
+    const stringParams = this.normalizeParams(params, content.renderer)
 
     return renderer.renderSms({
       template: inlineTemplate,
@@ -102,13 +102,21 @@ export class InlineRenderingService {
   /**
    * Normalize params by converting all values to strings
    * Template engines work with string values for interpolation
+   *
+   * The legacy GC Notify engine is the exception: it renders an array as a list, so arrays are
+   * passed through to it rather than stringified. The other engines keep today's behaviour.
    */
-  private normalizeParams(params: Record<string, unknown>): Record<string, string> {
-    const normalized: Record<string, string> = {}
+  private normalizeParams(
+    params: Record<string, unknown>,
+    renderer?: NotifyContent['renderer'],
+  ): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(params)) {
       if (value === null || value === undefined) {
         normalized[key] = ''
       } else if (typeof value === 'string') {
+        normalized[key] = value
+      } else if (Array.isArray(value) && renderer === 'legacy_gc_notify') {
         normalized[key] = value
       } else if (typeof value === 'object') {
         normalized[key] = JSON.stringify(value)
