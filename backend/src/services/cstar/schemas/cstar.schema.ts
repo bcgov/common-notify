@@ -87,3 +87,45 @@ export class CstarTenantsResponseDto {
     tenants: CstarTenantDto[]
   }
 }
+
+/**
+ * A CSTAR group within a tenant, as returned by GET /v1/tenants/{tenantId}/groups
+ */
+export class CstarGroupDto {
+  @ApiProperty({ description: 'Unique identifier for the group', format: 'uuid' })
+  id: string
+
+  @ApiProperty({ description: 'Group name' })
+  name: string
+
+  @ApiProperty({ description: 'Group description', nullable: true })
+  description?: string | null
+}
+
+/**
+ * Response from CSTAR API for a tenant's groups
+ */
+export class CstarGroupsResponseDto {
+  @ApiProperty({ type: [CstarGroupDto], description: 'Array of groups belonging to the tenant' })
+  data: {
+    groups: CstarGroupDto[]
+  }
+}
+
+/**
+ * Response from CSTAR API for a tenant's users, optionally filtered to a set of groups.
+ *
+ * The email address lives on the nested SSO user. Both levels are optional here because a
+ * tenant user can be present without a resolvable SSO user, and the SSO user's email is
+ * itself nullable in CSTAR.
+ */
+export class CstarTenantUsersResponseDto {
+  @ApiProperty({ description: 'The tenant users matching the request' })
+  data: {
+    users?: Array<{
+      ssoUser?: {
+        email?: string | null
+      } | null
+    }>
+  }
+}

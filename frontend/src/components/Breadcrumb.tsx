@@ -3,7 +3,7 @@ import type { FC } from 'react'
 
 export type BreadcrumbItem = {
   label: string
-  to?: '/dashboard' | '/templates' | '/'
+  to?: '/dashboard' | '/templates' | '/events' | '/'
 }
 
 export type BreadcrumbProps = {
@@ -27,10 +27,12 @@ const Breadcrumb: FC<BreadcrumbProps> = ({ items }) => (
               <span className="breadcrumb__current" aria-current="page">
                 {item.label}
               </span>
-            ) : (
-              <Link className="breadcrumb__link" to={item.to!}>
+            ) : item.to ? (
+              <Link className="breadcrumb__link" to={item.to}>
                 {item.label}
               </Link>
+            ) : (
+              <span className="breadcrumb__link">{item.label}</span>
             )}
           </li>
         )

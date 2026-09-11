@@ -49,6 +49,9 @@ interface NotificationPreviewModalProps {
   /** Right pane: the message as it will be delivered. */
   from?: string
   to?: string
+  /** Only the event email settings carry these; the other previews send to a single recipient. */
+  cc?: string
+  bcc?: string
   subject?: string
   /** Rendered HTML body. When absent, `bodyText` is shown as plain text instead. */
   bodyHtml?: string
@@ -82,6 +85,8 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   stepper,
   from,
   to,
+  cc,
+  bcc,
   subject,
   bodyHtml,
   bodyText,
@@ -195,7 +200,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
             </div>
 
             <div className="notification-preview__output-pane">
-              {(from || to || subject) && (
+              {(from || to || cc || bcc || subject) && (
                 <dl className="notification-preview__envelope">
                   {from && (
                     <div className="notification-preview__envelope-row">
@@ -207,6 +212,18 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                     <div className="notification-preview__envelope-row">
                       <dt>To:</dt>
                       <dd>{to}</dd>
+                    </div>
+                  )}
+                  {cc && (
+                    <div className="notification-preview__envelope-row">
+                      <dt>Cc:</dt>
+                      <dd>{cc}</dd>
+                    </div>
+                  )}
+                  {bcc && (
+                    <div className="notification-preview__envelope-row">
+                      <dt>Bcc:</dt>
+                      <dd>{bcc}</dd>
                     </div>
                   )}
                   {subject && (

@@ -1,0 +1,25 @@
+@import '../variables.scss';
+
+// Sticky rather than fixed: `.layout-content` (the scrolling region beside the sidebar)
+// is what the bar pins against, so it lines up with that column without having to know
+// how wide the sidebar currently is. It rides at the bottom of that region for as long
+// as its container is on screen, so it must be the last element inside that container.
+.sticky-bar {
+  position: sticky;
+  // `.layout-content` reserves $spacing-xl of padding beneath the page, and a stuck
+  // element is held against that region's *content* box, so `bottom: 0` parks the bar one
+  // padding's height clear of the window and leaves the page showing through underneath.
+  // The offset covers that band while the bar is stuck; the matching negative margin below
+  // covers it again once the bar reaches the end of its form and stops sticking.
+  bottom: -$spacing-xl;
+  z-index: 1;
+  display: flex;
+  gap: $spacing-md;
+  // Full bleed, from the sidebar to the right edge of the window: `.page` insets its
+  // content by $layout-gutter on each side, so the bar cancels that inset and re-applies
+  // it as padding, keeping its buttons lined up with the content above.
+  margin: 0 (-$layout-gutter) (-$spacing-xl);
+  padding: $spacing-md $layout-gutter $spacing-lg;
+  background: $white;
+  border-top: 1px solid $border-default;
+}
