@@ -64,7 +64,7 @@ test.describe('Notifications API E2E Tests', () => {
       await context.dispose()
     })
 
-    test('should return 200 with authenticated request', async () => {
+    test('should reject a user JWT: this endpoint takes an API key through the gateway', async () => {
       const context = await request.newContext({
         extraHTTPHeaders: {
           Authorization: `Bearer ${JWT_TOKEN}`,
@@ -73,33 +73,9 @@ test.describe('Notifications API E2E Tests', () => {
 
       const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notification_request`)
 
-      expect(response.status()).toBe(200)
-      const body = await response.json()
-      expect(Array.isArray(body)).toBe(true)
-      await context.dispose()
-    })
-
-    test('should return an array of notification requests', async () => {
-      const context = await request.newContext({
-        extraHTTPHeaders: {
-          Authorization: `Bearer ${JWT_TOKEN}`,
-        },
-      })
-
-      const response = await context.get(`${API_BASE_URL}/${API_VERSION}/notification_request`)
-
-      expect(response.status()).toBe(200)
-      const body = await response.json()
-      expect(Array.isArray(body)).toBe(true)
-
-      // If notifications exist, verify the shape of each item
-      if (body.length > 0) {
-        const notification = body[0]
-        expect(notification).toHaveProperty('id')
-        expect(notification).toHaveProperty('tenantId')
-        expect(notification).toHaveProperty('status')
-        expect(notification).toHaveProperty('createdAt')
-      }
+      // The key itself cannot be exercised here: these tests call the backend directly, and the
+      // credential headers NotifyServiceGuard reads are only ever set by Kong's key-auth plugin.
+      expect(response.status()).toBe(401)
       await context.dispose()
     })
   })

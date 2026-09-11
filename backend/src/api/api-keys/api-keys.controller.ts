@@ -4,19 +4,43 @@ import {
   Body,
   Req,
   Version,
+  UseGuards,
   UnauthorizedException,
+  NotFoundException,
   HttpCode,
   HttpStatus,
   Logger,
 } from '@nestjs/common'
 import { ApiBody, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
-import { UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
 import { BindApiKeyDto } from './schemas/bind-api-key.dto'
 import { JwtOrLoadtestBindGuard } from '../../common/guards/jwt-or-loadtest-bind.guard'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
+/**
+ * Manual API key binding — the onboarding path for environments that cannot issue keys.
+ *
+ * A tenant requests a key in the API Services Portal, then POSTs here with that key and a
+ * user JWT to tie the credential to their CSTAR tenant. Every later request resolves by
+ * credential identifier (see resolve-api-key-consumer.ts).
+ *
+ * This is the PROD path, and it is deliberately still here. Issuing a key from the Notify
+ * UI needs the APS Credential Issuer API, which exists only on the APS test instance; the
+ * production gateway returns 404 for it. So PR, DEV and TEST issue keys from the UI, and
+ * PROD keeps binding them by hand until that API ships there.
+ *
+ * The two paths are mutually exclusive, keyed off the same switch as the UI: where
+ * `api_key_self_service` is enabled this endpoint 404s, so an environment never offers two
+ * ways to onboard and the flag alone decides which one is live.
+ *
+ * The exception is the load-test self-bind, which stays available wherever
+ * LOADTEST_AUTOBIND_ENABLED is set regardless of the flag: the k6 run in an ephemeral PR
+ * environment has no user to authenticate as, and binds only to a fixed throwaway tenant.
+ * That flag is forced off in any `-test` or `-prod` namespace (see configuration.ts).
+ */
 @ApiTags('API keys')
 @ApiSecurity('api-key')
 @Controller('service/api-key')
@@ -26,24 +50,9 @@ export class ApiKeysController {
   constructor(
     private readonly apiKeysService: ApiKeysService,
     private readonly configService: ConfigService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
-  /**
-   * Bind an API key to a CSTAR tenant.
-   *
-   * This endpoint must be called through the API gateway so that Kong's key-auth
-   * plugin validates the API key and forwards the x-credential-identifier header.
-   * The caller must also supply a valid user JWT in the Authorization header so
-   * the backend can verify CSTAR tenant membership.
-   *
-   * Request requirements:
-   *   - X-API-KEY header: the API key being bound (consumed/validated by Kong)
-   *   - Authorization: Bearer <jwt>: the user's SSO JWT (validated by backend)
-   *   - Body: { cstarTenantId: "<guid>" }
-   *
-   * Kong forwards x-credential-identifier and x-consumer-id headers after validating
-   * the API key. These are used as the stable binding keys — never the raw key value.
-   */
   @Version('1')
   @Post('bind')
   @UseGuards(JwtOrLoadtestBindGuard)
@@ -55,7 +64,9 @@ export class ApiKeysController {
       'request made with that key is scoped to it. Do this once, before your first send.\n\n' +
       'The call must go through the API gateway (Kong validates the key) and must also carry a ' +
       'user SSO JWT in `Authorization`, because the backend checks that the user is a member of ' +
-      'the tenant being claimed. A key can be bound to exactly one tenant.',
+      'the tenant being claimed. A key can be bound to exactly one tenant.\n\n' +
+      'Not available in environments where API keys are issued from the Notify UI instead; ' +
+      'there this route returns 404 and the Settings screen is the way to get a key.',
   })
   @ApiBody({
     type: BindApiKeyDto,
@@ -93,10 +104,18 @@ export class ApiKeysController {
     const idirUserGuid = jwtUser?.idir_user_guid
 
     // Load-test-only path (PR dev): no user JWT, self-bind to a throwaway tenant.
+    // Checked before the feature flag: a PR environment has self-service enabled and still
+    // needs this to run its load test.
     if (this.configService.get<boolean>('loadtest.autobindEnabled') && !idirUserGuid) {
       this.logger.warn(`[LOADTEST] Auto-binding credential ${credentialIdentifier} (no JWT)`)
       await this.apiKeysService.autoBindApiKeyForLoadTest(credentialIdentifier, consumerId)
       return { message: 'API key auto-bound to load-test tenant' }
+    }
+
+    // Where the UI issues keys, manual binding is not an onboarding route. Behave as though
+    // it does not exist rather than advertising a disabled endpoint to anyone probing.
+    if (await this.featureFlagService.isEnabled(FeatureFlagCode.API_KEY_SELF_SERVICE)) {
+      throw new NotFoundException('Cannot POST /api/v1/service/api-key/bind')
     }
 
     if (!idirUserGuid) {
