@@ -45,6 +45,7 @@ const mockNotificationPubSubService = {
 
 const createMockQueryBuilder = () => ({
   leftJoinAndSelect: vi.fn().mockReturnThis(),
+  addSelect: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   andWhere: vi.fn().mockReturnThis(),
   addOrderBy: vi.fn().mockReturnThis(),
@@ -240,6 +241,22 @@ describe('NotificationService', () => {
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(2, 'notification.status', 'ASC')
       expect(queryBuilder.skip).toHaveBeenCalledWith(5)
       expect(queryBuilder.take).toHaveBeenCalledWith(5)
+    })
+
+    it('should sort the Sent Date column on the selected sent_date expression', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
+
+      const queryBuilder = createMockQueryBuilder()
+      mockRepository.createQueryBuilder.mockReturnValue(queryBuilder)
+      queryBuilder.getManyAndCount.mockResolvedValue([[], 0])
+
+      await service.findAll('cstar-external-id', { page: 1, limit: 10, sort: '-delayedSendTime' })
+
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        'COALESCE(notification.delayed_send_time, notification.created_at)',
+        'sent_date',
+      )
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('sent_date', 'DESC')
     })
 
     it('should return empty data when tenant is not found', async () => {
