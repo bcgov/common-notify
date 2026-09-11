@@ -151,6 +151,11 @@
   // Scrolls on its own, independently of the nav beside it.
   min-height: 0;
   overflow-y: auto;
+  // Absolutely positioned descendants are only clipped by this column if it is their
+  // containing block. Without this, the visually-hidden inputs the design system puts
+  // inside every Radio and Checkbox resolve against the viewport instead, and any that
+  // sit below the fold give the window a second scrollbar of its own.
+  position: relative;
   // No side gutters here: the 64px inset on each side belongs to `.page`
   // ($page-gutter), so it applies once and pages cannot double it up.
   // 56px separates the header from the page content below it.

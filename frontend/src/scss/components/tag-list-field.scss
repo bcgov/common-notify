@@ -1,0 +1,63 @@
+// Wraps the tags and the input so they read as a single field.
+.tag-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+
+  &:focus-within {
+    border-color: var(--surface-color-border-active);
+  }
+
+  // The DS tags default to the near-white info surface; the design calls for the
+  // light blue fill instead. The disabled state keeps its own grey.
+  .bcds-react-aria-Tag.blue:not([data-disabled]) {
+    background-color: var(--theme-blue-20, #d8eafd);
+  }
+
+  // The DS TextArea brings its own bordered container; strip it (including its own
+  // invalid-state border) so the input blends into this container's border instead
+  // of nesting one inside the other.
+  .bcds-react-aria-TextArea--Container,
+  .bcds-react-aria-TextArea[data-invalid] > .bcds-react-aria-TextArea--Container {
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+
+  .bcds-react-aria-TextArea--Input {
+    resize: vertical;
+  }
+
+  // Hidden in favor of the visible .tag-list-field__error rendered below this container;
+  // kept in the DOM so the DS still wires up its aria-describedby link to the input.
+  .bcds-react-aria-TextArea--Error {
+    display: none;
+  }
+}
+
+.tag-list-field--disabled {
+  background: var(--surface-color-forms-disabled);
+}
+
+.tag-list-field--invalid {
+  border-color: var(--support-border-color-danger);
+}
+
+// Mirrors the DS's own .bcds-react-aria-TextArea--Error styling, rendered outside the
+// bordered container instead of inside it.
+.tag-list-field__error {
+  display: flex;
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-danger);
+
+  svg {
+    padding-right: var(--layout-padding-xsmall);
+    color: var(--icons-color-danger);
+    width: var(--icons-size-medium);
+    height: var(--icons-size-medium);
+  }
+}
