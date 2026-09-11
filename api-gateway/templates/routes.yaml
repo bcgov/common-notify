@@ -1021,6 +1021,11 @@ plugins:
       consumer_match_claim: azp
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-frontend
+    config: *jwtConfig
   - name: key-auth
     tags: [${CONFIG_TAG}]
     protocols: [http, https]
