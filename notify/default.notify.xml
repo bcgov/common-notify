@@ -7,7 +7,7 @@
             <child column="api_key_consumer_id" foreignKey="fk_api_key_limit_alert_log_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_limit_alert_log"/>
             <child column="api_key_consumer_id" foreignKey="fk_api_key_usage_consumer" implied="false" onDeleteCascade="true" schema="notify" table="api_key_usage"/>
          </column>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="credential_identifier" nullable="false" remarks="" size="512" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="credential_identifier" nullable="true" remarks="Kong per-key credential ID from the x-credential-identifier header. NULL until the first authenticated request for self-issued keys." size="512" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="consumer_id" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
             <parent column="id" foreignKey="fk_api_key_consumer_tenant" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
@@ -15,16 +15,32 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="bound_by_idir_guid" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="" size="29" type="timestamp" typeCode="93"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="updated_at" nullable="false" remarks="" size="29" type="timestamp" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="client_id" nullable="true" remarks="Gateway consumer clientId, {environmentAppId}-{applicationAppId}. Matched against the consumer username Kong forwards." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="application_app_id" nullable="true" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="notes" nullable="true" remarks="" size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'bind'::character varying" digits="0" id="10" name="issued_via" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="11" name="issued_at" nullable="true" remarks="" size="29" type="timestamp" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="12" name="last_regenerated_at" nullable="true" remarks="" size="29" type="timestamp" typeCode="93"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="pk_api_key_consumer" unique="true">
             <column ascending="true" name="id"/>
          </index>
+         <index name="idx_api_key_consumer_client_id" unique="false">
+            <column ascending="true" name="client_id"/>
+         </index>
          <index name="idx_api_key_consumer_tenant_id" unique="false">
             <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="uq_api_key_consumer_client_id" unique="true">
+            <column ascending="true" name="client_id"/>
          </index>
          <index name="uq_api_key_consumer_credential" unique="true">
             <column ascending="true" name="credential_identifier"/>
          </index>
+         <index name="uq_api_key_consumer_one_self_service_per_tenant" unique="true">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <checkConstraint constraint="((credential_identifier IS NOT NULL) OR (client_id IS NOT NULL))" name="ck_api_key_consumer_identifier"/>
       </table>
       <table name="api_key_limit" remarks="Configured numeric notification limits per (API key, channel). Populated once when an API key is linked to a tenant during onboarding." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>

@@ -922,6 +922,11 @@
                                         <td>chk_tenant_settings_safelist_max</td>
                                         <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
                                     </tr>
+                                    <tr>
+                                        <td><a href='tables/api_key_consumer.html'>api_key_consumer</a></td>
+                                        <td>ck_api_key_consumer_identifier</td>
+                                        <td>((credential_identifier IS NOT NULL) OR (client_id IS NOT NULL))</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>

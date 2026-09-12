@@ -531,20 +531,20 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_tenant_settings_custom_header</td>
-                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_tenant_settings_safelist_max</td>
                                     <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_tenant_settings_default_sender_email</td>
+                                    <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
                                 </tr>
                                 <tr>
                                     <td>chk_tenant_settings_reply_to_email</td>
                                     <td>((reply_to_email IS NULL) OR ((reply_to_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
                                 </tr>
                                 <tr>
-                                    <td>chk_tenant_settings_default_sender_email</td>
-                                    <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
+                                    <td>chk_tenant_settings_custom_header</td>
+                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
                                 </tr>
                                 </tbody>
                             </table>
