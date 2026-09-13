@@ -133,7 +133,7 @@ routes:
     request_buffering: true
     response_buffering: true
   - name: ${ROUTE_PREFIX}notify-simple-frontend-sms
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
+    tags: [${CONFIG_TAG}]
     hosts:
       - ${GATEWAY_HOSTNAME}
     paths:
@@ -1035,12 +1035,14 @@ plugins:
       consumer_match_claim_custom_id: true
       consumer_match_ignore_not_found: true
   - name: jwt-keycloak
-    tags: [ns.${GATEWAY_ID}.${ENVIRONMENT}]
-    enabled: true
-    route: ${ROUTE_PREFIX}notify-simple-frontend-sms
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-frontend
+    config: *jwtConfig
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-frontend-sms
     config: *jwtConfig
   - name: key-auth
     tags: [${CONFIG_TAG}]
