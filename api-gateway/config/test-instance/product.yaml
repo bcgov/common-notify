@@ -1,0 +1,46 @@
+# Product for the APS test-instance gateway (notify-test). Applied by hand, as the
+# production-instance Product is:
+#
+#   gwa config set gateway notify-test
+#   gwa apply --input api-gateway/config/test-instance/product.yaml \
+#     --host api-gov-bc-ca.test.api.gov.bc.ca
+#
+# Do not rename anything here. APS matches the Product by name and each Environment by name
+# within it, and an Environment's appId is what APS_ENVIRONMENT_APP_ID holds; a rename makes
+# a new Product or Environment with a new appId. That is why the title still says "sandbox".
+#
+# Lists only the permanent services, as on the production instance. PR services come and go
+# with every PR and would otherwise need this re-applied on each open and close.
+#
+# Apply only after CI has published both services: APS rejects a reference to a service
+# that does not exist yet.
+---
+kind: DraftDataset
+name: notify-test-dataset
+title: Notify API (credential issuer sandbox)
+organization: ministry-of-citizens-services
+organizationUnit: devops-and-cloud-services
+notes: |
+  BC Notify's DEV and TEST environments on the APS test instance, where the Credential
+  Issuer API lets Notify issue API keys from its own UI.
+tags: [notify, sandbox]
+license_title: Access Only
+security_class: PUBLIC
+record_publish_date: '2026-01-01'
+---
+kind: Product
+name: Notify API (credential issuer sandbox)
+dataset: notify-test-dataset
+environments:
+  # Existing Environment. Its appId (8C3427AB) is what DEV and PR backends already use.
+  - name: dev
+    active: false
+    approval: false
+    flow: kong-api-key-acl
+    services: [notify-test-notify-dev]
+  # New. APS assigns its appId on first apply; TEST's APS_ENVIRONMENT_APP_ID is that value.
+  - name: test
+    active: false
+    approval: false
+    flow: kong-api-key-acl
+    services: [notify-test-notify-test]

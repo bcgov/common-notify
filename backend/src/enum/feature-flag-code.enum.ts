@@ -22,4 +22,9 @@ export enum FeatureFlagCode {
   // Non-production guardrail: when enabled, every tenant in the environment can only send to
   // recipients on its own safelist. Enabled in PR/DEV/TEST, off in PROD.
   RECIPIENT_SAFELIST = 'recipient_safelist',
+  // Self-service API key issuing on the Settings screen. An environment switch, not a
+  // per-tenant feature: issuing calls the APS Credential Issuer API, which exists only on
+  // the APS test instance. Enabled in PR/DEV/TEST, off in PROD, where tenants still bind a
+  // key requested through the API Services Portal.
+  API_KEY_SELF_SERVICE = 'api_key_self_service',
 }

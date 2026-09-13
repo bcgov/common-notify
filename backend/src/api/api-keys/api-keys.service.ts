@@ -6,16 +6,17 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
+import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 
 /**
- * Default notification limits applied per channel when an API key is first bound.
+ * Default notification limits applied per channel when a tenant's first API key is bound.
  * Mirrors the seed values in migration V40.
  */
 const DEFAULT_LIMITS: Array<{
@@ -57,60 +58,10 @@ export class ApiKeysService {
     private readonly apiKeyLimitAlertRepository: Repository<ApiKeyLimitAlert>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    // Used by bindApiKey to confirm the caller belongs to the tenant they are claiming.
     private readonly cstarApiClient: CstarApiClient,
   ) {}
 
-  /**
-   * Ensure an API key has its default per-channel limit rows AND alert configuration.
-   * Idempotent: existing rows are left untouched (ON CONFLICT DO NOTHING), so re-binding
-   * never clobbers customized limits or thresholds.
-   */
-  private async ensureDefaults(apiKeyConsumerId: string): Promise<void> {
-    await this.apiKeyLimitRepository
-      .createQueryBuilder()
-      .insert()
-      .into(ApiKeyLimit)
-      .values(
-        DEFAULT_LIMITS.map((limit) => ({
-          ...limit,
-          apiKeyConsumerId,
-          createdBy: 'system',
-          updatedBy: 'system',
-        })),
-      )
-      .orIgnore()
-      .execute()
-
-    await this.apiKeyLimitAlertRepository
-      .createQueryBuilder()
-      .insert()
-      .into(ApiKeyLimitAlert)
-      .values(
-        ALERT_CHANNELS.map((channelCode) => ({
-          apiKeyConsumerId,
-          channelCode,
-          warnThresholdPercent: DEFAULT_WARN_THRESHOLD_PERCENT,
-          createdBy: 'system',
-          updatedBy: 'system',
-        })),
-      )
-      .orIgnore()
-      .execute()
-  }
-
-  /**
-   * Bind an API key to a CSTAR tenant.
-   *
-   * Verifies that the requesting user (identified by their JWT) is a member of the
-   * given CSTAR tenant, then stores a mapping from the Kong credential identifier
-   * to the Notify tenant. Idempotent if the key is already bound to the same tenant.
-   *
-   * @param credentialIdentifier - Kong per-key ID from x-credential-identifier header
-   * @param consumerId - Kong consumer UUID from x-consumer-id header (stored for audit)
-   * @param cstarTenantId - CSTAR tenant GUID from request body
-   * @param idirUserGuid - Caller's IDIR user GUID from JWT payload
-   * @param authHeader - Raw Authorization header to forward to CSTAR for membership check
-   */
   async bindApiKey(params: {
     credentialIdentifier: string
     consumerId: string
@@ -154,7 +105,7 @@ export class ApiKeysService {
           `API key ${credentialIdentifier} is already bound to tenant ${tenant.id} — idempotent`,
         )
         // Self-heal: ensure default limits and alert config exist even if a previous bind missed them.
-        await this.ensureDefaults(existing.id)
+        await this.ensureDefaults(existing.id, tenant.id)
         return existing
       }
       this.logger.warn(
@@ -176,13 +127,74 @@ export class ApiKeysService {
 
     const saved = await this.apiKeyConsumerRepository.save(mapping)
 
-    // Seed default per-channel limits and alert config for the newly onboarded API key.
-    await this.ensureDefaults(saved.id)
+    // Seed per-channel limits and alert config for the newly onboarded API key.
+    await this.ensureDefaults(saved.id, tenant.id)
 
     this.logger.log(
-      `API key ${credentialIdentifier} bound to tenant "${tenant.name}" (${tenant.id}) by user ${idirUserGuid} with default limits`,
+      `API key ${credentialIdentifier} bound to tenant "${tenant.name}" (${tenant.id}) by user ${idirUserGuid}`,
     )
     return saved
+  }
+
+  /**
+   * Ensure an API key has its per-channel limit rows AND alert configuration.
+   *
+   * Limits are tenant-wide and the lowest across a tenant's keys is enforced, so a key joining
+   * a tenant that already has keys copies their limits and thresholds. Seeding it with the
+   * defaults instead would quietly override any limit an admin had set on the tenant.
+   *
+   * Idempotent: existing rows are left untouched (ON CONFLICT DO NOTHING), so re-binding
+   * never clobbers customized limits or thresholds.
+   *
+   * Public because ApiKeyIssuanceService seeds self-issued keys the same way — a key must
+   * land on the tenant's limits regardless of how it was created.
+   */
+  async ensureDefaults(apiKeyConsumerId: string, tenantId: string): Promise<void> {
+    const siblingIds = (await this.apiKeyConsumerRepository.find({ where: { tenantId } }))
+      .map(({ id }) => id)
+      .filter((id) => id !== apiKeyConsumerId)
+
+    const [siblingLimits, siblingAlerts]: [ApiKeyLimit[], ApiKeyLimitAlert[]] =
+      siblingIds.length > 0
+        ? await Promise.all([
+            this.apiKeyLimitRepository.find({ where: { apiKeyConsumerId: In(siblingIds) } }),
+            this.apiKeyLimitAlertRepository.find({ where: { apiKeyConsumerId: In(siblingIds) } }),
+          ])
+        : [[], []]
+    const tenantLimits = lowestLimitsByChannel(siblingLimits)
+    const tenantThresholds = lowestThresholdsByChannel(siblingAlerts)
+
+    await this.apiKeyLimitRepository
+      .createQueryBuilder()
+      .insert()
+      .into(ApiKeyLimit)
+      .values(
+        DEFAULT_LIMITS.map((limit) => ({
+          ...limit,
+          ...tenantLimits.get(limit.channelCode),
+          apiKeyConsumerId,
+          createdBy: 'system',
+          updatedBy: 'system',
+        })),
+      )
+      .orIgnore()
+      .execute()
+
+    await this.apiKeyLimitAlertRepository
+      .createQueryBuilder()
+      .insert()
+      .into(ApiKeyLimitAlert)
+      .values(
+        ALERT_CHANNELS.map((channelCode) => ({
+          apiKeyConsumerId,
+          channelCode,
+          warnThresholdPercent: tenantThresholds.get(channelCode) ?? DEFAULT_WARN_THRESHOLD_PERCENT,
+          createdBy: 'system',
+          updatedBy: 'system',
+        })),
+      )
+      .orIgnore()
+      .execute()
   }
 
   /**

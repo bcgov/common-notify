@@ -17,7 +17,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiQuery,
-  ApiHeader,
+  ApiSecurity,
   ApiExtraModels,
 } from '@nestjs/swagger'
 import * as express from 'express'
@@ -49,6 +49,9 @@ interface GcNotifyRequest extends express.Request {
 }
 
 @ApiTags('GC Notify')
+// A security scheme, not @ApiHeader: OpenAPI ignores header parameters named
+// Authorization, so Swagger UI would never send the key.
+@ApiSecurity('gc-notify-api-key')
 @ApiExtraModels(EmailContent, SmsContent, FileAttachment)
 @UseGuards(GcNotifyServiceGuard)
 @UseFilters(GcNotifyExceptionFilter)
@@ -67,12 +70,6 @@ export class GcNotifyController {
     description:
       'GC Notify-compatible listing of notifications sent by this tenant. Response shape matches ' +
       'GC Notify so an existing integration works unchanged.',
-  })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiQuery({ name: 'template_type', required: false, enum: ['sms', 'email'] })
   @ApiQuery({
@@ -134,12 +131,6 @@ export class GcNotifyController {
       '`template_id`, `personalisation`) and delivers through Notify. Returns the GC Notify ' +
       'response shape, so a migrating integration only changes its base URL and key.',
   })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
-  })
   @ApiResponse({
     status: 201,
     description: 'Email notification created successfully',
@@ -170,12 +161,6 @@ export class GcNotifyController {
       'GC Notify-compatible SMS send, taking `phone_number`, `template_id` and ' +
       '`personalisation`. Requires the sms_notifications feature flag for the tenant.',
   })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
-  })
   @ApiResponse({
     status: 201,
     description: 'SMS notification created successfully',
@@ -202,12 +187,6 @@ export class GcNotifyController {
       'GC Notify-compatible bulk send: one template applied to many recipients, supplied as rows ' +
       'where the first row is the header. Accepted as a single request and delivered ' +
       'asynchronously.',
-  })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 201,
@@ -241,12 +220,6 @@ export class GcNotifyController {
       'GC Notify-compatible status lookup for one notification, using the id returned when it ' +
       'was accepted.',
   })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
-  })
   @ApiResponse({
     status: 200,
     description: 'Notification retrieved successfully',
@@ -274,12 +247,6 @@ export class GcNotifyController {
       '`template_id` on the send endpoints.',
   })
   @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
-  })
   @ApiResponse({
     status: 200,
     description: 'Successfully retrieved templates',
@@ -300,12 +267,6 @@ export class GcNotifyController {
   @ApiOperation({
     summary: 'Get a template',
     description: 'GC Notify-compatible lookup of one template, including its subject and body.',
-  })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
   })
   @ApiResponse({
     status: 200,

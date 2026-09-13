@@ -73,6 +73,28 @@ spec:
                 name: {{.Release.Name}}-backend
             - secretRef:
                 name: app-api-secrets
+            # Per-release overrides, layered last so its keys win. envFrom entries are
+            # applied in order and a later duplicate key replaces an earlier one, so this
+            # secret only needs the handful of keys being changed — everything else falls
+            # through to app-api-secrets above.
+            #
+            # Exists so a single PR environment can be repointed (at a different APS
+            # instance, say) without a chart change, a redeploy, or disturbing the other
+            # releases that share the namespace secret. Not created by this chart: Helm
+            # would reconcile it back on the next upgrade and silently discard manual
+            # edits. Create it by hand and delete it when finished:
+            #
+            #   oc create secret generic {{ .Release.Name }}-overrides --from-literal=KEY=value
+            #   oc delete secret {{ .Release.Name }}-overrides
+            #
+            # pr-close.yml removes it automatically when a PR is closed. Optional, so a
+            # release without one deploys exactly as before.
+            #
+            # Worth knowing in a long-lived environment: an override here is invisible in
+            # git. Prefer values.yaml or app-api-secrets for anything meant to persist.
+            - secretRef:
+                name: {{ .Release.Name }}-overrides
+                optional: true
           env:
             - name: LOG_LEVEL
               value: info

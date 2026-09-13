@@ -70,6 +70,10 @@ jobs:
     name: Apply DEV Gateway Config
     needs: [import]
     runs-on: ubuntu-24.04
+    env:
+      # Published to the APS test-instance gateway (see
+      # api-gateway/config/test-instance/README.md). PROD stays on gw-fe8c5.
+      GATEWAY_INSTANCE: test
     concurrency:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
@@ -78,7 +82,7 @@ jobs:
       - name: Generate DEV gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
-          # Generate DEV's routes standalone (tagged ns.gw-fe8c5.dev). TEST/PROD are published
+          # Generate DEV's routes standalone (tagged ns.notify-test.dev). TEST/PROD are published
           # independently under their own qualifiers in the jobs below and are not affected.
           api-gateway/scripts/generate-gateway-for-stage.sh dev
 
@@ -115,37 +119,19 @@ jobs:
           mv api-gateway/generated/gw-dev-with-prs.yaml api-gateway/generated/gw-active-services.yaml
           echo "✅ Combined DEV + ${OPEN_PRS} PR route(s)"
 
-      # NOTE: DEV now uses `gwa publish-gateway --qualifier dev` (same pattern as TEST/PROD).
-      # The gwservice-to-kong.py converter sets strip_path: false to preserve path-based routing.
-      # Using --qualifier dev properly reconciles the dev environment (create/update/delete services),
-      # avoiding 409 conflicts when services already exist.
       - name: Publish DEV gateway config (with open PRs)
         env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+          GWA_ACCT_TEST_INSTANCE: ${{ secrets.GWA_ACCT_TEST_INSTANCE }}
         run: |
           # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
           python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
           python3 api-gateway/scripts/gwservice-to-kong.py \
             api-gateway/generated/gw-active-services.yaml > api-gateway/generated/gw-kong-dev.yaml
-          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.2.0/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
-          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
-          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
-          # Publish the dev qualifier as a partial set. --qualifier scopes the reconcile so
-          # TEST/PROD (other qualifiers) are left untouched.
-          echo "Publishing DEV gateway config (qualifier=dev, including open PRs)…"
-          set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-dev.yaml --qualifier dev 2>&1)
-          STATUS=$?
-          set -e
-          echo "$OUT"
-          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
-            echo "::error::gwa publish-gateway failed for qualifier=dev"
-            exit 1
-          fi
+          # --qualifier dev scopes the reconcile, so the other qualifier on this gateway is untouched.
+          echo "Publishing DEV gateway config (qualifier=dev)…"
+          bash api-gateway/scripts/publish-test-instance.sh api-gateway/generated/gw-kong-dev.yaml dev
 
   deploy-dev:
     name: Deploy (DEV)
@@ -165,6 +151,10 @@ jobs:
     name: Apply TEST Gateway Config
     needs: [deploy-dev]
     runs-on: ubuntu-24.04
+    env:
+      # Published to the APS test-instance gateway (see
+      # api-gateway/config/test-instance/README.md). PROD stays on gw-fe8c5.
+      GATEWAY_INSTANCE: test
     environment: TEST  # Requires approval if TEST environment protection is enabled
     concurrency:
       group: gateway-config-apply
@@ -174,35 +164,21 @@ jobs:
       - name: Generate TEST gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-config.sh
-          # Generate TEST routes only — single qualifier ns.gw-fe8c5.test -> gw-routes-test.yaml
+          # Generate TEST routes only — single qualifier ns.notify-test.test -> gw-routes-test.yaml
           api-gateway/scripts/generate-gateway-config.sh test
       - name: Publish TEST gateway config
         env:
-          GWA_ACCT: ${{ secrets.GWA_ACCT }}
+          GWA_ACCT_TEST_INSTANCE: ${{ secrets.GWA_ACCT_TEST_INSTANCE }}
         run: |
           # Convert kind:GatewayService -> raw Kong config (nested plugins, strip_path:false)
           python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
           python3 api-gateway/scripts/gwservice-to-kong.py \
             api-gateway/generated/gw-routes-test.yaml > api-gateway/generated/gw-kong-test.yaml
-          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.0.7/gwa_Linux_x86_64.tgz | tar -xz
+          curl -L https://github.com/bcgov/gwa-cli/releases/download/v3.2.0/gwa_Linux_x86_64.tgz | tar -xz
           sudo mv gwa /usr/local/bin/
-          CLIENT_ID=$(echo "$GWA_ACCT" | jq -r '.client_id')
-          CLIENT_SECRET=$(echo "$GWA_ACCT" | jq -r '.client_secret')
-          gwa login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-          gwa config set gateway gw-fe8c5
-          # Publish the test qualifier as a partial set. --qualifier scopes the reconcile so
-          # DEV/PROD (other qualifiers) are left untouched.
+          # --qualifier test scopes the reconcile, so the other qualifier on this gateway is untouched.
           echo "Publishing TEST gateway config (qualifier=test)…"
-          set +e
-          OUT=$(gwa publish-gateway api-gateway/generated/gw-kong-test.yaml --qualifier test 2>&1)
-          STATUS=$?
-          set -e
-          echo "$OUT"
-          # gwa can exit 0 even when the publish is rejected — fail on non-zero exit or rejection markers.
-          if [ "$STATUS" -ne 0 ] || echo "$OUT" | grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed"; then
-            echo "::error::gwa publish-gateway failed for qualifier=test"
-            exit 1
-          fi
+          bash api-gateway/scripts/publish-test-instance.sh api-gateway/generated/gw-kong-test.yaml test
 
   deploy-test:
     name: Deploy (TEST)

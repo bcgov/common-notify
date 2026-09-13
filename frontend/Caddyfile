@@ -19,11 +19,13 @@
 		`
 	}
 
-	# Proxy requests to API Gateway (Kong).
+	# Proxy requests to API Gateway (Kong): the Notify API under /api, and the GC
+	# Notify-compatible API under /gcnotify, which has no /api prefix (see backend/src/app.ts).
 	# On PR deploys GATEWAY_PATH_PREFIX is "/pr-<n>" so requests are proxied to the
-	# PR-specific Kong route (/pr-<n>/api/*). It is empty on dev/test/prod, which
+	# PR-specific Kong routes (/pr-<n>/api/*, /pr-<n>/gcnotify/*). It is empty on dev/test/prod, which
 	# makes the rewrite an identity no-op. {uri} preserves the query string.
-	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
+	@gateway path /api* /gcnotify/*
+	reverse_proxy @gateway {$VITE_API_GATEWAY_NOTIFY_URL} {
 		rewrite {$GATEWAY_PATH_PREFIX:}{uri}
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
@@ -52,6 +54,7 @@ window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	file_server
 	@spa_router {
 		not path /api*
+		not path /gcnotify/*
 		not path /api-docs*
 		not path /static/config.js
 		file {
