@@ -128,7 +128,7 @@ const Sidebar: FC = () => {
             (item.label === 'Home' && hasTenantRole) ||
             (item.label === 'Dashboard' && hasTenantRole) ||
             (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Bulk Notifications' && canBulkNotify) ||
+            (item.label === 'Batch Send' && canBulkNotify) ||
             (item.label === 'Usage & Limits' && showUsage) ||
             (item.label === 'Settings' && hasTenantRole)
 
