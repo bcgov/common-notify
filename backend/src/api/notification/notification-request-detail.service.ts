@@ -1,7 +1,7 @@
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindOptionsWhere, Not, Repository } from 'typeorm'
+import { FindOptionsWhere, In, Not, Repository } from 'typeorm'
 import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -35,6 +35,12 @@ export const notificationRequestDetailListQueryConfig: QueryableFieldsConfig = {
   },
   defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
 }
+
+/**
+ * Rows a retry must never disturb: 'sent' has already reached the recipient, and 'blocked' was
+ * refused deliberately. Resetting either back to pending re-sends to that address.
+ */
+const RETRY_PRESERVED_STATUSES = ['sent', 'blocked']
 
 @Injectable()
 export class NotificationRequestDetailService {
@@ -230,20 +236,50 @@ export class NotificationRequestDetailService {
   /**
    * Update the status of all detail records for a notification request.
    */
-  async updateStatus(notificationRequestId: string, status: string): Promise<void> {
-    await this.detailRepository.update({ notificationRequestId }, { status, updatedBy: 'system' })
+  async updateStatus(
+    notificationRequestId: string,
+    status: string,
+    options: { preserveCompleted?: boolean } = {},
+  ): Promise<void> {
+    // preserveCompleted is what a redelivered job must pass. Without it the SENDING transition
+    // rewrites every row - including the ones resetForRetry just protected - and the retry sends
+    // to an already-delivered recipient a second time.
+    const where: FindOptionsWhere<NotificationRequestDetail> = options.preserveCompleted
+      ? { notificationRequestId, status: Not(In(RETRY_PRESERVED_STATUSES)) }
+      : { notificationRequestId }
+
+    await this.detailRepository.update(where, { status, updatedBy: 'system' })
+  }
+
+  /**
+   * Addresses already delivered for this request, so a redelivered job can skip them.
+   *
+   * Preserving the row is not enough on its own - the send list comes from the job payload, not
+   * from these rows, so a retry re-sends unless it is filtered against this set.
+   */
+  async findSentAddresses(
+    notificationRequestId: string,
+    batchId?: string | null,
+  ): Promise<Set<string>> {
+    const rows = await this.detailRepository.find({
+      where: { notificationRequestId, status: 'sent', ...(batchId ? { batchId } : {}) },
+      select: { recipientAddress: true },
+    })
+
+    return new Set(rows.map((row) => row.recipientAddress))
   }
 
   /**
    * Increment attempt_count and reset status to pending before a retry attempt.
    */
   async resetForRetry(notificationRequestId: string): Promise<void> {
-    // Only rows that have not been delivered. Resetting a sent row to pending would have the
-    // retry send to that recipient a second time - which is the whole reason a partial failure
-    // must not fail the job.
+    // Only rows that have not been delivered and were not refused. Resetting a sent row to
+    // pending would have the retry send to that recipient a second time - which is the whole
+    // reason a partial failure must not fail the job - and resetting a blocked row would send to
+    // an address that was deliberately refused.
     const retryable: FindOptionsWhere<NotificationRequestDetail> = {
       notificationRequestId,
-      status: Not('sent'),
+      status: Not(In(RETRY_PRESERVED_STATUSES)),
     }
     await this.detailRepository.increment(retryable, 'attemptCount', 1)
     await this.detailRepository.update(retryable, {

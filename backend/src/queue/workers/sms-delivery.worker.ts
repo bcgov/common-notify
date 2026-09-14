@@ -123,8 +123,14 @@ export class SmsDeliveryWorker {
           )
         }
 
-        if ((job.attemptsMade ?? 0) > 0) {
+        // A redelivered job (a stalled worker, a rolling deploy) must not send again to anyone a
+        // previous attempt already reached. resetForRetry keeps their rows; this filters them out
+        // of the send list, which comes from the payload rather than from those rows.
+        const isRetry = (job.attemptsMade ?? 0) > 0
+        let alreadySent = new Set<string>()
+        if (isRetry) {
           await requestDetailService.resetForRetry(notifyId)
+          alreadySent = await requestDetailService.findSentAddresses(notifyId)
         }
 
         let resolvedPayload = payload
@@ -207,8 +213,35 @@ export class SmsDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
+          preserveCompleted: true,
+        })
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
+
+        if (alreadySent.size > 0) {
+          const remaining = resolvedPayload.recipients.to.filter(
+            (recipient: string) => !alreadySent.has(recipient),
+          )
+
+          if (remaining.length === 0) {
+            logger.log(
+              `[${notifyId}] Every recipient was delivered on an earlier attempt; nothing to re-send`,
+            )
+            await notificationService.update(notifyId, tenantId, {
+              status: NotificationStatus.COMPLETED,
+              updatedBy: 'system',
+            })
+            return { success: true, notifyId }
+          }
+
+          logger.log(
+            `[${notifyId}] Skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+          )
+          resolvedPayload = {
+            ...resolvedPayload,
+            recipients: { ...resolvedPayload.recipients, to: remaining },
+          }
+        }
 
         // Send SMS using the injected adapter
         const result = await SmsDeliveryWorker.sendSmsViaAdapter(
@@ -404,10 +437,23 @@ export class SmsDeliveryWorker {
       `[${notifyId}] Processing SMS merge batch ${batchId}: ${recipients.length} recipient(s)`,
     )
 
+    // The merge branch returns before the retry handling above, so a redelivered batch filters
+    // here instead. Addresses delivered by an earlier attempt keep their rows and are skipped.
+    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
+    const pending = alreadySent.size
+      ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
+      : recipients
+
+    if (alreadySent.size > 0) {
+      logger.log(
+        `[${notifyId}] Batch ${batchId}: skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+      )
+    }
+
     let sent = 0
     let failed = 0
 
-    for (const recipient of recipients) {
+    for (const recipient of pending) {
       try {
         // Per-recipient params take precedence over the global ones.
         const mergedParams = { ...(params || {}), ...recipient.params }
