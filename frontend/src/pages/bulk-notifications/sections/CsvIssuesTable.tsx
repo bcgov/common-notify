@@ -104,6 +104,8 @@ const CsvIssuesTable: FC<Props> = ({ issues }) => {
         sortOrder={sort.order}
         onSort={(key, order) => setSort({ key: key as keyof IssueRow & string, order })}
         size="sm"
+        // The Issue cell is a title over its fix, so rows are taller than one line.
+        multiline
       />
     </>
   )
