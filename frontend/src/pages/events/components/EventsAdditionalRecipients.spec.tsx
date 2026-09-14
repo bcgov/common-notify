@@ -100,18 +100,20 @@ describe('EventsAdditionalRecipients', () => {
       expect(screen.queryByRole('row', { name: 'alice@gov.bc.ca' })).not.toBeInTheDocument()
     })
 
-    it('keeps an unchecked field empty when it is checked back on', async () => {
+    it('restores what was typed when an unchecked field is checked back on', async () => {
       const onChange = vi.fn()
       render(<Harness initial={{ to: ['alice@gov.bc.ca'], cc: [], bcc: [] }} onChange={onChange} />)
 
       await userEvent.click(screen.getByRole('checkbox', { name: 'To' }))
+      // Unchecking reports an empty list, so nothing is saved for the field...
+      expect(onChange).toHaveBeenLastCalledWith({ to: [], cc: [], bcc: [] })
+
       await userEvent.click(screen.getByRole('checkbox', { name: 'To' }))
 
-      // Unchecking reports an empty list, which comes back in as the field's new value, so the
-      // addresses are gone rather than restored.
-      expect(onChange).toHaveBeenLastCalledWith({ to: [], cc: [], bcc: [] })
+      // ...but the addresses are still there to be sent again once it is checked back on.
       expect(field('To')).toBeInTheDocument()
-      expect(screen.queryByRole('row', { name: 'alice@gov.bc.ca' })).not.toBeInTheDocument()
+      expect(screen.getByRole('row', { name: 'alice@gov.bc.ca' })).toBeInTheDocument()
+      expect(onChange).toHaveBeenLastCalledWith({ to: ['alice@gov.bc.ca'], cc: [], bcc: [] })
     })
 
     it('names the malformed addresses the parent rejected, per field', () => {

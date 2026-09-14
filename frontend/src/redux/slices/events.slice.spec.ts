@@ -174,7 +174,10 @@ describe('eventsSlice', () => {
     it("drops the previous tenant's events, query and filters", () => {
       const loaded = reducer(
         reducer(
-          reducer(reducer(initial, setSearch('permit')), setFilter({ field: 'status', values: ['ACTIVE'] })),
+          reducer(
+            reducer(initial, setSearch('permit')),
+            setFilter({ field: 'status', values: ['ACTIVE'] }),
+          ),
           fetchEvents.pending('req-1', undefined),
         ),
         page([event('a')]),
