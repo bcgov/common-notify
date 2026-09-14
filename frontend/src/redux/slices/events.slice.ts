@@ -73,11 +73,19 @@ export const eventsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchEvents.pending, (state) => {
+      // Events belong to a tenant, so switching tenants drops this one's rows, search term,
+      // page and filters. Marked as loading rather than empty, so the table does not flash its
+      // "No events found" message before the new tenant's fetch lands. Same as templates.slice.
+      .addCase(selectTenant, () => ({ ...initialState, isLoading: true }))
+      .addCase(fetchEvents.pending, (state, action) => {
         state.isLoading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchEvents.fulfilled, (state, action) => {
+        // A slower fetch for the previous tenant (or an earlier search) must not overwrite the
+        // results of the one that replaced it.
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.items = action.payload.data
         state.count = action.payload.count
         state.page = action.payload.page
@@ -87,6 +95,7 @@ export const eventsSlice = createSlice({
         state.hasLoaded = true
       })
       .addCase(fetchEvents.rejected, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.isLoading = false
         state.error = action.payload ?? 'Failed to load events'
       })

@@ -70,14 +70,19 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   // No-ops per field while its addresses are unchanged, so this doesn't fight the user's own
   // edits (which flow out via onChange and back in as an already-equal `values`) or clobber the
   // `enabled` flag, which `values` doesn't carry.
+  //
+  // An unchecked field is left alone entirely: exportAddresses reports it as empty, so adopting
+  // that would erase what the user typed and hand them a blank field on checking it back on.
   if (values !== prevValues) {
     setPrevValues(values)
     setFields(
       RECIPIENT_FIELDS.reduce(
         (acc, { id }) => {
-          acc[id] = sameAddresses(fields[id].addresses, values[id])
-            ? fields[id]
-            : { ...fields[id], addresses: values[id] }
+          const keepTyped = !fields[id].enabled && values[id].length === 0
+          acc[id] =
+            keepTyped || sameAddresses(fields[id].addresses, values[id])
+              ? fields[id]
+              : { ...fields[id], addresses: values[id] }
           return acc
         },
         {} as Record<RecipientFieldId, RecipientField>,

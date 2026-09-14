@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import reducer, { setFilter, setLimit, setPage, setSearch, setSort } from './events.slice'
+import { selectTenant } from './tenant.slice'
 import { fetchEvents } from '../thunks/events.thunks'
 import { EventStatus } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
@@ -134,11 +135,62 @@ describe('eventsSlice', () => {
 
     it('falls back to a generic message when the rejection carries none', () => {
       const failed = reducer(
-        initial,
+        reducer(initial, fetchEvents.pending('req-1', undefined)),
         fetchEvents.rejected(new Error('network'), 'req-1', undefined),
       )
 
       expect(failed.error).toBe('Failed to load events')
+    })
+
+    it('ignores a response for a request it is no longer awaiting', () => {
+      // A slow fetch for the previous tenant landing after a newer one started.
+      const awaitingSecond = reducer(
+        reducer(initial, fetchEvents.pending('req-1', undefined)),
+        fetchEvents.pending('req-2', undefined),
+      )
+
+      const withStaleResponse = reducer(awaitingSecond, page([event('from-the-old-tenant')]))
+
+      expect(withStaleResponse.items).toEqual([])
+      expect(withStaleResponse.isLoading).toBe(true)
+    })
+
+    it('ignores a rejection for a request it is no longer awaiting', () => {
+      const awaitingSecond = reducer(
+        reducer(initial, fetchEvents.pending('req-1', undefined)),
+        fetchEvents.pending('req-2', undefined),
+      )
+
+      const withStaleRejection = reducer(
+        awaitingSecond,
+        fetchEvents.rejected(null, 'req-1', undefined, 'Old tenant failed'),
+      )
+
+      expect(withStaleRejection.error).toBeNull()
+    })
+  })
+
+  describe('tenant changes', () => {
+    it("drops the previous tenant's events, query and filters", () => {
+      const loaded = reducer(
+        reducer(
+          reducer(reducer(initial, setSearch('permit')), setFilter({ field: 'status', values: ['ACTIVE'] })),
+          fetchEvents.pending('req-1', undefined),
+        ),
+        page([event('a')]),
+      )
+      expect(loaded.items).toHaveLength(1)
+
+      const switched = reducer(loaded, { type: selectTenant.type, payload: undefined })
+
+      // Loading rather than empty, so the table does not flash "No events found" in between.
+      expect(switched).toMatchObject({
+        items: [],
+        search: '',
+        filters: {},
+        hasLoaded: false,
+        isLoading: true,
+      })
     })
   })
 })

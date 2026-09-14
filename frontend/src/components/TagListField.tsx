@@ -51,7 +51,14 @@ const TagListField: FC<TagListFieldProps> = ({
     // Everything before the final delimiter is complete; what follows is still being typed.
     const parts = text.split(/[\s,;]+/)
     const next = parts.pop() ?? ''
-    onChange(withValues(values, parts))
+
+    // Only when something was actually committed. Reporting the unchanged list on every
+    // keystroke tells the form it has pending edits while a half-typed address sits in the
+    // draft, which is enough to enable Save.
+    if (parts.length > 0) {
+      onChange(withValues(values, parts))
+    }
+
     setDraft(next)
   }
 
