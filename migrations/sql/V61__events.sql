@@ -1,4 +1,4 @@
--- V55: Events.
+-- V61: Events.
 --
 -- An event is a named, reusable notification definition owned by a tenant. It is configured
 -- through three UI tabs, which map onto three tables:
@@ -8,7 +8,7 @@
 --   Email settings tab -> notify.event_channel_setting (channel_code = 'EMAIL')
 --                         active flag, sender email address, template, recipients.
 --   SMS settings tab   -> notify.event_channel_setting (channel_code = 'SMS')
---                         active flag, from number (from the V47 pool), template, recipients.
+--                         active flag, from number (from the V60 pool), template, recipients.
 --
 -- Recipients for both tabs live directly on notify.event_channel_setting as to/cc/bcc columns:
 -- comma-separated, normalized values (lowercased/trimmed emails for EMAIL, E.164 phone numbers
@@ -181,7 +181,7 @@ CREATE TABLE
     )
   );
 
--- Deliberately NOT unique: a tenant holds a single number (V47) and every one of its SMS events
+-- Deliberately NOT unique: a tenant holds a single number (V60) and every one of its SMS events
 -- sends from it. This index backs the release guard's "is anything still using this number?"
 -- lookup and the admin view of which events a number serves.
 CREATE INDEX idx_event_channel_setting_number ON notify.event_channel_setting (from_phone_number_id)
@@ -223,7 +223,7 @@ COMMENT ON COLUMN notify.event_channel_setting.template_id IS 'Template used to 
 
 COMMENT ON COLUMN notify.event_channel_setting.sender_email IS 'From address for EMAIL sends. NULL on SMS rows. Format checked here, ownership verified by the application against the mail provider.';
 
-COMMENT ON COLUMN notify.event_channel_setting.from_phone_number_id IS 'Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant''s single allocated number (V47), shared by all of that tenant''s SMS events, so this is not unique.';
+COMMENT ON COLUMN notify.event_channel_setting.from_phone_number_id IS 'Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant''s single allocated number (V60), shared by all of that tenant''s SMS events, so this is not unique.';
 
 COMMENT ON COLUMN notify.event_channel_setting."to" IS 'Comma-separated, normalized recipients for this channel: lowercased/trimmed email addresses for EMAIL rows, E.164 phone numbers for SMS rows. Required once active = TRUE.';
 

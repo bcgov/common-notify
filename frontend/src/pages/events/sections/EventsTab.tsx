@@ -52,6 +52,7 @@ const EventsTab: FC<EventsTabProps> = ({ values, onSave, isDisabled = false }) =
         label="Event name"
         value={name}
         onChange={setName}
+        maxLength={200}
         size="small"
         isDisabled={saving || isDisabled}
         isRequired
@@ -61,6 +62,7 @@ const EventsTab: FC<EventsTabProps> = ({ values, onSave, isDisabled = false }) =
         label="Event description"
         value={description}
         onChange={setDescription}
+        maxLength={1000}
         isDisabled={saving || isDisabled}
         isRequired
       />

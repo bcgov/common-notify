@@ -43,7 +43,6 @@ const columns: TableColumn<EventResponse>[] = [
     filterOptions: [
       { label: 'Email', value: 'EMAIL' },
       { label: 'SMS', value: 'SMS' },
-      { label: 'MsgApp', value: 'MSGAPP' },
     ],
     render: (_, row) => <ChannelBadge channels={row.channelCodes ?? []} />,
   },
@@ -123,7 +122,7 @@ const Events: FC = () => {
     <div className="page">
       <PageHeading title="Notification Events" />
 
-      <div className="events-page__search">
+      <div className="page__toolbar">
         <SearchField
           value={searchInput}
           onChange={setSearchInput}

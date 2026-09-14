@@ -32,7 +32,8 @@ export interface TagListFieldProps {
  * into a text area and committed as tags.
  *
  * bcds has no tag input, so this is a TagGroup and a TextArea sharing one bordered container.
- * Values are delimited by whitespace: typing a space or newline commits what came before it as a tag.
+ * Values are delimited by whitespace, commas or semicolons, so typing one of those - or pasting a
+ * comma-separated list copied out of a mail client - commits what came before it as a tag.
  */
 const TagListField: FC<TagListFieldProps> = ({
   values,
@@ -47,8 +48,8 @@ const TagListField: FC<TagListFieldProps> = ({
   const [draft, setDraft] = useState('')
 
   function handleDraftChange(text: string) {
-    // Everything before the final space is complete; what follows is still being typed.
-    const parts = text.split(/\s+/)
+    // Everything before the final delimiter is complete; what follows is still being typed.
+    const parts = text.split(/[\s,;]+/)
     const next = parts.pop() ?? ''
     onChange(withValues(values, parts))
     setDraft(next)

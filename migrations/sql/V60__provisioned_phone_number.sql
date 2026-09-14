@@ -1,4 +1,4 @@
--- V54: Pool of provisioned SMS phone numbers.
+-- V60: Pool of provisioned SMS phone numbers.
 --
 -- Numbers are provisioned centrally (by the platform team / SMS provider) into a pool. A row is:
 --   available  - tenant_id IS NULL, free for any tenant to claim.
@@ -10,7 +10,7 @@
 -- configures sends from it, and the tab shows it rather than a choice. Per-event numbers are not
 -- supported.
 --
--- Releasing a number back to the pool is an sso.notify_admin action, guarded in V54 so it can
+-- Releasing a number back to the pool is an sso.notify_admin action, guarded in V61 so it can
 -- only happen while the tenant has no event with SMS enabled. A number always travels through
 -- the pool between holders - see notify.check_phone_number_allocation() below.
 --
@@ -32,7 +32,10 @@ CREATE TABLE
     updated_by VARCHAR(200),
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT pk_provisioned_phone_number PRIMARY KEY (id),
-    CONSTRAINT fk_provisioned_phone_number_tenant FOREIGN KEY (tenant_id) REFERENCES notify.tenant (id) ON DELETE SET NULL,
+    -- RESTRICT, not SET NULL: clearing tenant_id alone would leave allocated_at set and violate
+    -- chk_provisioned_phone_number_allocation below, so the delete would fail anyway. Release the
+    -- number back to the pool first (which also runs V61's release guard).
+    CONSTRAINT fk_provisioned_phone_number_tenant FOREIGN KEY (tenant_id) REFERENCES notify.tenant (id) ON DELETE RESTRICT,
     CONSTRAINT chk_provisioned_phone_number_e164 CHECK (phone_number ~ '^\+[1-9][0-9]{1,14}$'),
     -- allocated_at is set exactly when the number is allocated to a tenant.
     CONSTRAINT chk_provisioned_phone_number_allocation CHECK (
@@ -78,7 +81,7 @@ COMMENT ON COLUMN notify.provisioned_phone_number.display_name IS 'Optional huma
 
 COMMENT ON COLUMN notify.provisioned_phone_number.provider IS 'Informational name of the provider the number was provisioned from (e.g. twilio, gc_notify). Free text until a provider code table exists.';
 
-COMMENT ON COLUMN notify.provisioned_phone_number.tenant_id IS 'Tenant the number is allocated to. NULL means the number is unallocated and offered in the pool picker. At most one live number per tenant, and a number can only move NULL <-> tenant, never tenant -> tenant. Set to NULL if the tenant is deleted, returning the number to the pool.';
+COMMENT ON COLUMN notify.provisioned_phone_number.tenant_id IS 'Tenant the number is allocated to. NULL means the number is unallocated and offered in the pool picker. At most one live number per tenant, and a number can only move NULL <-> tenant, never tenant -> tenant. A tenant holding a number cannot be hard deleted; release the number back to the pool first.';
 
 COMMENT ON COLUMN notify.provisioned_phone_number.allocated_at IS 'Timestamp with timezone when the number was allocated to the current tenant. NULL while unallocated.';
 
@@ -98,7 +101,7 @@ COMMENT ON COLUMN notify.provisioned_phone_number.is_deleted IS 'Soft delete fla
 -- Tenants claim numbers themselves from the available pool, so the only allocation the UI can
 -- ever perform is NULL -> tenant. Handing a number straight from one tenant to another would
 -- take it out from under the first tenant with no release step and no admin involvement, so it
--- is rejected here: a number must be released back to the pool (which V48's trigger only permits
+-- is rejected here: a number must be released back to the pool (which V61's trigger only permits
 -- when no event has SMS enabled) before another tenant can claim it.
 --
 -- Note for the claim path: allocation races between two tenants picking the same pool number are
@@ -123,14 +126,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION notify.check_phone_number_allocation () IS 'Rejects moving a provisioned phone number directly from one tenant to another. A number must be released back to the pool (tenant_id NULL) before another tenant can claim it, so the release guard in V48 always gets a chance to run.';
+COMMENT ON FUNCTION notify.check_phone_number_allocation () IS 'Rejects moving a provisioned phone number directly from one tenant to another. A number must be released back to the pool (tenant_id NULL) before another tenant can claim it, so the release guard in V61 always gets a chance to run.';
 
 CREATE TRIGGER trg_provisioned_phone_number_allocation BEFORE
 UPDATE ON notify.provisioned_phone_number FOR EACH ROW
 EXECUTE FUNCTION notify.check_phone_number_allocation ();
 
 -- ---------------------------------------------------------------------------
--- Audit history (same shape and trigger function as recipient_safelist, V45)
+-- Audit history (same shape and trigger function as recipient_safelist, V50)
 -- ---------------------------------------------------------------------------
 -- Allocation and release are administrative actions against a shared, finite resource, so every
 -- change of hands is recorded. Releasing a number back to the pool is an UPDATE setting

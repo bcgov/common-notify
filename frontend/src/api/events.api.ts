@@ -160,6 +160,10 @@ export async function createEvent(data: CreateEventData): Promise<EventResponse>
         status: STATUS_CODES.Conflict,
       })
     }
+    // The backend's message names the specific field that failed, so surface it as-is.
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
+    }
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to create events')
     }
@@ -201,6 +205,10 @@ export async function updateEvent(
       throw Object.assign(new Error('An event with this name already exists'), {
         status: STATUS_CODES.Conflict,
       })
+    }
+    // The backend's message names the specific field that failed, so surface it as-is.
+    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
+      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
     }
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to update this event')

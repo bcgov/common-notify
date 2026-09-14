@@ -105,7 +105,7 @@ export class EventsFrontendController {
   })
   @ApiOkResponse({ type: PaginatedEventResponse })
   async listEvents(
-    @Req() req: Request,
+    @Req() req: express.Request,
     @Query() query: EventListQueryDto,
   ): Promise<PaginatedEventResponse> {
     const tenant = this.getTenant(req)
@@ -128,7 +128,7 @@ export class EventsFrontendController {
   @ApiOperation({ summary: 'Get a single event' })
   @ApiOkResponse({ type: EventResponseDto })
   async getEvent(
-    @Req() req: Request,
+    @Req() req: express.Request,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
   ): Promise<EventResponseDto> {
     const tenant = this.getTenant(req)
@@ -252,7 +252,7 @@ export class EventsFrontendController {
     return this.eventsService.deactivateSmsChannel(tenant.id, eventId, user)
   }
 
-  private getTenant(req: Request | express.Request): Tenant {
+  private getTenant(req: express.Request): Tenant {
     return (req as any).tenant as Tenant
   }
 

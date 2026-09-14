@@ -102,9 +102,11 @@ export class EventsService {
     }
 
     if (derived.channelCodes?.length) {
-      const subQuery = this.channelSettingSubQuery('channelFilter').andWhere(
-        'channelFilter.channelCode IN (:...filterChannelCodes)',
-      )
+      // Only switched-on channels, matching the channelCodes toResponseDto returns - otherwise
+      // filtering by a channel turns up events whose Channel badge does not show it.
+      const subQuery = this.channelSettingSubQuery('channelFilter')
+        .andWhere('channelFilter.active = true')
+        .andWhere('channelFilter.channelCode IN (:...filterChannelCodes)')
       queryBuilder.andWhere(`EXISTS (${subQuery.getQuery()})`, {
         filterChannelCodes: derived.channelCodes,
       })

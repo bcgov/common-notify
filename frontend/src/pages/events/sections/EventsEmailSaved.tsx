@@ -128,6 +128,9 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
           <ToggleButton id="sms" size="medium">
             SMS Notification
           </ToggleButton>
+          <ToggleButton id="third-party" size="medium">
+            Third-party Notification
+          </ToggleButton>
         </ToggleButtonGroup>
       </div>
 
@@ -180,8 +183,9 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
               <Button variant="secondary" type="button" onPress={() => openTab('email')}>
                 Edit settings
               </Button>
-              {/* The test notification screen isn't built yet, so this only marks where it goes. */}
-              <Button variant="primary" type="button">
+              {/* The test notification screen isn't built yet, so this marks where it goes and
+                  stays disabled until there is something to navigate to. */}
+              <Button variant="primary" type="button" isDisabled>
                 Continue to test notification
               </Button>
             </StickyBar>

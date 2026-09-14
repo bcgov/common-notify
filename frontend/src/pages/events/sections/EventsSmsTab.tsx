@@ -238,7 +238,6 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
           aria-label="Activate channel"
           isSelected={channelActive}
           onChange={handleSwitchChange}
-          // isDisabled={isFormDisabled}
           isDisabled // disable for now as SMS designs are no longer ready for dev
         >
           {channelActive ? 'On' : 'Off'}

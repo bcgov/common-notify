@@ -1,10 +1,6 @@
 @import '../variables.scss';
 
 // Events list page
-.events-page__search {
-  margin-bottom: 24px;
-}
-
 .events-page__description {
   display: inline-block;
   max-width: 100%;
@@ -14,9 +10,8 @@
   vertical-align: middle;
 }
 
-// Create / edit event pages. The page frame (heading, gutters, centred
-// column) comes from `.page .page--narrow` in page.scss; everything below is
-// specific to the event form.
+// Create / edit event pages. The page frame (heading, gutters, block spacing)
+// comes from `.page` in page.scss; everything below is specific to the event form.
 .events__tabs {
   .bcds-react-aria-ToggleButtonGroup {
     width: fit-content;
@@ -30,8 +25,8 @@
   }
 }
 
-// Spans the centred column from `.page--narrow > *`; the form inside is what
-// carries the narrower field width, so it starts flush with the heading above.
+// Spans the page column; the form inside is what carries the narrower field
+// width, so it starts flush with the heading above.
 .events__section {
   display: flex;
   flex-direction: column;

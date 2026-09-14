@@ -1,4 +1,4 @@
--- V56: Configuration that turns the V54/V55 event feature on.
+-- V62: Configuration that turns the V60/V61 event feature on.
 --
 --   1. configuration 'event_max_recipients' - global cap on manually entered recipients per
 --                                             event channel.
