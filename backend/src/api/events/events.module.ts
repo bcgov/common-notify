@@ -4,12 +4,14 @@ import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { EmailLogoModule } from '../email-logo/email-logo.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { TemplatesModule } from '../templates/templates.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
+import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { EventsFrontendController } from './events-frontend.controller'
 import { EventsService } from './events.service'
@@ -19,6 +21,7 @@ import { EventsService } from './events.service'
     TypeOrmModule.forFeature([
       NotifyEvent,
       EventChannelSetting,
+      EventChannelRecipient,
       ProvisionedPhoneNumber,
       NotifyConfiguration,
     ]),
@@ -26,6 +29,9 @@ import { EventsService } from './events.service'
     CstarModule,
     FeatureFlagModule,
     EmailLogoModule,
+    // For TemplatesRepository: an event's template must belong to the same tenant, be active,
+    // and match the channel it is selected for.
+    TemplatesModule,
   ],
   controllers: [EventsFrontendController],
   providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard, PhoneNumberService],

@@ -25,6 +25,52 @@ function extractErrorMessage(responseData: ApiErrorBody, fallback: string): stri
   return fallback
 }
 
+/** What to say for each way a call can fail. Only the statuses a call can return need a message. */
+type EventApiMessages = {
+  /** Prefix for anything unrecognised, e.g. "Failed to fetch events". */
+  action: string
+  notFound?: string
+  conflict?: string
+  unauthorized: string
+  forbidden: string
+}
+
+/**
+ * Maps a failed request to the error the pages surface.
+ *
+ * A 400 always carries the backend's own message rather than a generic one: it names the field
+ * or the rule that failed - an unsupported sender domain, a template from another tenant, too
+ * many recipients - which is what the user needs to fix.
+ */
+function toEventApiError(error: unknown, messages: EventApiMessages): Error {
+  const axiosError = error as AxiosError
+  const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
+  const status = axiosError.response?.status
+
+  if (status === STATUS_CODES.NotFound && messages.notFound) {
+    return new Error(messages.notFound)
+  }
+  if (status === STATUS_CODES.Conflict && messages.conflict) {
+    return Object.assign(new Error(messages.conflict), { status: STATUS_CODES.Conflict })
+  }
+  if (status === STATUS_CODES.BadRequest) {
+    return new Error(extractErrorMessage(responseData, 'Validation failed'))
+  }
+  if (status === STATUS_CODES.Unauthorized) {
+    return new Error(messages.unauthorized)
+  }
+  if (status === STATUS_CODES.Forbidden) {
+    return new Error(messages.forbidden)
+  }
+
+  return new Error(
+    `${messages.action}: ${extractErrorMessage(
+      responseData,
+      error instanceof Error ? error.message : 'Unknown error',
+    )}`,
+  )
+}
+
 export enum EventStatus {
   ACTIVE = 'ACTIVE',
   DRAFT = 'DRAFT',
@@ -96,21 +142,11 @@ export async function getEvents(
     const params = generateApiParameters(`/api/v1/frontend/events?${qs.toString()}`)
     return await get<PaginatedEventResponse>(params)
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to view events')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to view events')
-    }
-
-    throw new Error(
-      `Failed to fetch events: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to fetch events',
+      unauthorized: 'You are not authorized to view events',
+      forbidden: 'You do not have permission to view events',
+    })
   }
 }
 
@@ -126,18 +162,12 @@ export async function getEventById(eventId: string): Promise<EventResponse> {
     const params = generateApiParameters(`/api/v1/frontend/events/${eventId}`)
     return await get<EventResponse>(params)
   } catch (error) {
-    const axiosError = error as AxiosError
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to view this event')
-    }
-
-    throw new Error(
-      `Failed to fetch event: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to fetch event',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to view this event',
+      forbidden: 'You do not have permission to view this event',
+    })
   }
 }
 
@@ -158,30 +188,12 @@ export async function createEvent(data: CreateEventData): Promise<EventResponse>
     const params = generateApiParameters('/api/v1/frontend/events')
     return await post<EventResponse>({ ...params, data })
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.Conflict) {
-      throw Object.assign(new Error('An event with this name already exists'), {
-        status: STATUS_CODES.Conflict,
-      })
-    }
-    // The backend's message names the specific field that failed, so surface it as-is.
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to create events')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to create events')
-    }
-
-    throw new Error(
-      `Failed to create event: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to create event',
+      conflict: 'An event with this name already exists',
+      unauthorized: 'You are not authorized to create events',
+      forbidden: 'You do not have permission to create events',
+    })
   }
 }
 
@@ -201,33 +213,13 @@ export async function updateEvent(
     const params = generateApiParameters(`/api/v1/frontend/events/${eventId}`)
     return await post<EventResponse>({ ...params, data: updateData })
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Conflict) {
-      throw Object.assign(new Error('An event with this name already exists'), {
-        status: STATUS_CODES.Conflict,
-      })
-    }
-    // The backend's message names the specific field that failed, so surface it as-is.
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to update event: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to update event',
+      notFound: 'Event not found',
+      conflict: 'An event with this name already exists',
+      unauthorized: 'You are not authorized to update this event',
+      forbidden: 'You do not have permission to update this event',
+    })
   }
 }
 
@@ -239,7 +231,7 @@ export type EventEmailSettingsUpdate = EventEmailSettings
  * Replaces the stored settings, so the tab must send every field it owns. Includes `active`:
  * this is the only path that switches the channel on, since activating requires the settings
  * being saved alongside it to be complete. Turning the channel off immediately goes through
- * updateEventEmailActive instead.
+ * deactivateEventEmailChannel instead.
  *
  * @param eventId Event ID
  * @param settings Email channel settings
@@ -254,29 +246,12 @@ export async function updateEventEmailSettings(
     const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/email`)
     return await post<EventResponse>({ ...params, data: settings })
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    // The backend rejects activating a channel that is not fully configured, or an invalid
-    // recipient value; either way, its message names the specific problem, so surface it as-is.
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to update email settings: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to update email settings',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to update this event',
+      forbidden: 'You do not have permission to update this event',
+    })
   }
 }
 
@@ -297,24 +272,12 @@ export async function deactivateEventEmailChannel(eventId: string): Promise<Even
     )
     return await post<EventResponse>(params)
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to deactivate the channel: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to deactivate the channel',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to update this event',
+      forbidden: 'You do not have permission to update this event',
+    })
   }
 }
 
@@ -326,7 +289,7 @@ export type EventSmsSettingsUpdate = EventSmsSettings
  * Replaces the stored settings, so the tab must send every field it owns. Includes `active`:
  * this is the only path that switches the channel on, since activating requires the settings
  * being saved alongside it to be complete. Turning the channel off immediately goes through
- * updateEventSmsActive instead.
+ * deactivateEventSmsChannel instead.
  *
  * @param eventId Event ID
  * @param settings SMS channel settings
@@ -341,29 +304,12 @@ export async function updateEventSmsSettings(
     const params = generateApiParameters(`/api/v1/frontend/events/${eventId}/channels/sms`)
     return await post<EventResponse>({ ...params, data: settings })
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    // The backend rejects activating a channel that is not fully configured, or an invalid
-    // recipient value; either way, its message names the specific problem, so surface it as-is.
-    if (axiosError.response?.status === STATUS_CODES.BadRequest) {
-      throw new Error(extractErrorMessage(responseData, 'Validation failed'))
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to update SMS settings: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to update SMS settings',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to update this event',
+      forbidden: 'You do not have permission to update this event',
+    })
   }
 }
 
@@ -384,23 +330,11 @@ export async function deactivateEventSmsChannel(eventId: string): Promise<EventR
     )
     return await post<EventResponse>(params)
   } catch (error) {
-    const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
-
-    if (axiosError.response?.status === STATUS_CODES.NotFound) {
-      throw new Error('Event not found')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-      throw new Error('You are not authorized to update this event')
-    }
-    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-      throw new Error('You do not have permission to update this event')
-    }
-
-    throw new Error(
-      `Failed to deactivate the channel: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw toEventApiError(error, {
+      action: 'Failed to deactivate the channel',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to update this event',
+      forbidden: 'You do not have permission to update this event',
+    })
   }
 }

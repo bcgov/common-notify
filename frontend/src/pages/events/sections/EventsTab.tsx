@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import { Button, TextArea, TextField } from '@bcgov/design-system-react-components'
+import PageSubHeading from '@/components/PageSubHeading'
 import StickyBar from '@/components/StickyBar'
 
 export type EventSettingsValues = {
@@ -46,7 +47,7 @@ const EventsTab: FC<EventsTabProps> = ({ values, onSave, isDisabled = false }) =
 
   return (
     <form className="events__form" onSubmit={handleSubmit}>
-      <h2 className="events__section-heading">Event Settings</h2>
+      <PageSubHeading title="Event Settings" />
 
       <TextField
         label="Event name"

@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
-  AlertDialog,
   Button,
   Checkbox,
   CheckboxGroup,
-  Modal,
   Radio,
   RadioGroup,
   Select,
@@ -17,10 +15,12 @@ import {
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
-import { getTemplates, NotificationChannel } from '@/api/templates.api'
-import type { TemplateResponse } from '@/api/templates.api'
+import { NotificationChannel } from '@/api/templates.api'
+import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
@@ -28,7 +28,8 @@ const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
 
 // Tenant default_sender_email stores only the local part (before @gov.bc.ca); matches the
-// suffix shown on the Settings > Email tab.
+// suffix shown on the Settings > Email tab. The backend holds an event's sender to this same
+// domain (events.senderEmailDomain), so entering anything else is rejected there too.
 const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
 const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
@@ -63,6 +64,16 @@ const EMAIL_PATTERN =
 
 function isValidEmail(value: string): boolean {
   return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
+}
+
+/** Empty string when the address is usable as a sender; otherwise why it isn't. */
+function senderEmailProblem(value: string): string {
+  if (value === '') return ''
+  if (!isValidEmail(value)) return 'Enter a valid sender email address.'
+  if (value.toLowerCase().split('@').pop() !== SENDER_EMAIL_DOMAIN) {
+    return `The sender email address must be an @${SENDER_EMAIL_DOMAIN} address.`
+  }
+  return ''
 }
 
 type EventsEmailTabProps = {
@@ -113,10 +124,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
   )
   const [saving, setSaving] = useState(false)
-  const [deactivating, setDeactivating] = useState(false)
-  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [templates, setTemplates] = useState<TemplateResponse[]>([])
+  const templates = useChannelTemplates(NotificationChannel.EMAIL)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
@@ -140,23 +149,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Same for the header title: clearing it is a deliberate choice (a custom header with no title),
   // so the tenant name must not be written back over an emptied field.
   const headerTitleTouched = useRef(false)
-
-  // Failures are not surfaced since the form is still usable without the template list loaded.
-  useEffect(() => {
-    let active = true
-
-    getTemplates(1, 100, undefined, 'name', [`channelCode:eq:${NotificationChannel.EMAIL}`])
-      .then((response) => {
-        if (active) {
-          setTemplates(response.data)
-        }
-      })
-      .catch(() => {})
-
-    return () => {
-      active = false
-    }
-  }, [])
+  const { isConfirmOpen, isDeactivating, requestDeactivate, cancelDeactivate, confirmDeactivate } =
+    useChannelDeactivation({
+      channelLabel: 'Email',
+      onDeactivate,
+      onActiveChange: setChannelActive,
+    })
 
   // The tenant default loads asynchronously and can arrive after this tab has already mounted;
   // backfill it once it does, but only while the field is still untouched and unsaved.
@@ -197,10 +195,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const previewTitle = headerMode === HEADER_CUSTOM_ID ? headerTitle : ''
 
   const trimmedSenderEmail = senderEmail.trim()
-  const senderEmailFormatError =
-    trimmedSenderEmail !== '' && !isValidEmail(trimmedSenderEmail)
-      ? 'Enter a valid sender email address.'
-      : ''
+  const senderEmailFormatError = senderEmailProblem(trimmedSenderEmail)
   const senderEmailError =
     trimmedSenderEmail === '' ? 'Sender email address cannot be empty.' : senderEmailFormatError
   const invalidRecipients: RecipientAddresses = {
@@ -229,7 +224,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const displayedSenderEmailError = validationAttempted ? senderEmailError : ''
   const displayedRecipientSelectionError = validationAttempted ? recipientSelectionError : ''
   const displayedTemplateError = validationAttempted ? templateError : ''
-  const isFormDisabled = isDisabled || saving || deactivating
+  const isFormDisabled = isDisabled || saving || isDeactivating
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
@@ -250,26 +245,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     if (next) {
       setChannelActive(true)
     } else {
-      setConfirmDeactivateOpen(true)
-    }
-  }
-
-  async function handleConfirmDeactivate() {
-    setConfirmDeactivateOpen(false)
-    setChannelActive(false)
-    setDeactivating(true)
-    try {
-      await onDeactivate()
-      showSuccessToast(
-        'Email channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
-      )
-    } catch (error) {
-      setChannelActive(true)
-      showErrorToast(
-        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setDeactivating(false)
+      requestDeactivate()
     }
   }
 
@@ -329,44 +305,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         </Switch>
       </div>
 
-      <Modal
-        isOpen={confirmDeactivateOpen}
-        isDismissable={!deactivating}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDeactivateOpen(false)
-        }}
-      >
-        <AlertDialog
-          variant="confirmation"
-          isIconHidden
-          title="Deactivate this channel?"
-          // AlertDialog renders `title` as a plain div rather than a <Heading slot="title">, so
-          // the underlying Dialog needs an explicit label.
-          aria-label="Deactivate this channel?"
-          buttons={
-            <>
-              <Button
-                variant="tertiary"
-                onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={deactivating}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="secondary"
-                danger
-                onPress={handleConfirmDeactivate}
-                isDisabled={deactivating}
-              >
-                Deactivate
-              </Button>
-            </>
-          }
-        >
-          This will stop notifications from being sent through this channel. Your settings will be
-          saved and can be reactivated at any time.
-        </AlertDialog>
-      </Modal>
+      <ConfirmDeactivateDialog
+        isOpen={isConfirmOpen}
+        isBusy={isDeactivating}
+        onCancel={cancelDeactivate}
+        onConfirm={confirmDeactivate}
+      />
 
       {showFields && (
         <>

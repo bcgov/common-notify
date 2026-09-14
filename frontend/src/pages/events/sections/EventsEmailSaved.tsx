@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  Button,
-  Callout,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@bcgov/design-system-react-components'
+import { Button, Callout } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
-import type { EventTab } from '../EditEvent'
+import EventTabs from '../components/EventTabs'
+import type { EventTab } from '../components/EventTabs'
 import { getEventById } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
@@ -117,34 +113,7 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
       />
 
       {/* This page only covers the email channel; the other tabs go back to the event itself. */}
-      <div className="events__tabs">
-        <ToggleButtonGroup
-          size="medium"
-          orientation="horizontal"
-          selectionMode="single"
-          selectedKeys={['email']}
-          onSelectionChange={(keys) => {
-            const [key] = [...keys]
-            if (key && key !== 'email') {
-              openTab(key as EventTab)
-            }
-          }}
-          disallowEmptySelection
-        >
-          <ToggleButton id="settings" size="medium">
-            Event Settings
-          </ToggleButton>
-          <ToggleButton id="email" size="medium">
-            Email Notification
-          </ToggleButton>
-          <ToggleButton id="sms" size="medium">
-            SMS Notification
-          </ToggleButton>
-          <ToggleButton id="third-party" size="medium">
-            Third-party Notification
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </div>
+      <EventTabs selected="email" onSelect={openTab} />
 
       <section className="events__section">
         {loadError ? (

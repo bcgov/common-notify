@@ -16,13 +16,15 @@ import { EventChannelSetting } from './event-channel-setting.entity'
  * Event entity
  *
  * A tenant-owned, named notification definition, configured through the Event settings tab.
- * Per-channel configuration, including recipients, lives in EventChannelSetting.
+ * Per-channel configuration lives in EventChannelSetting, and its recipients in
+ * EventChannelRecipient.
  *
  * Named NotifyEvent rather than Event to avoid shadowing the global DOM Event type,
- * matching the NotifyUser / NotifyConfiguration convention.
+ * matching the NotifyUser / NotifyConfiguration convention. The table is notification_event,
+ * which is also what the UI calls these.
  */
-@Entity('event')
-@Index('idx_event_tenant', ['tenantId'])
+@Entity('notification_event')
+@Index('idx_notification_event_tenant', ['tenantId'])
 export class NotifyEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string

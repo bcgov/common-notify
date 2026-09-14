@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { Checkbox } from '@bcgov/design-system-react-components'
 import TagListField from '@/components/TagListField'
+import { sameAddresses } from '@/utils/recipients'
 
 export type RecipientFieldId = 'to' | 'cc' | 'bcc'
 export type RecipientAddresses = Record<RecipientFieldId, string[]>
@@ -26,10 +27,6 @@ function buildInitialFields(values: RecipientAddresses): Record<RecipientFieldId
     }),
     {} as Record<RecipientFieldId, RecipientField>,
   )
-}
-
-function sameAddresses(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((address, index) => address === b[index])
 }
 
 /** Addresses to report to the parent: only for fields the user has checked on. */

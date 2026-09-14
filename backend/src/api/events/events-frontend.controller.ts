@@ -21,6 +21,7 @@ import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { EventStatus } from '../../enum/event-status.enum'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { EventsService, eventListQueryConfig } from './events.service'
@@ -33,6 +34,9 @@ import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { parseListQuery } from '../../common/query/list-query.parser'
+
+/** The channels an event can be configured for, and so the only values its filter accepts. */
+const EVENT_CHANNEL_CODES = [NotificationChannel.EMAIL, NotificationChannel.SMS]
 
 /**
  * Frontend Events API Controller
@@ -291,7 +295,17 @@ export class EventsFrontendController {
       }
 
       if (field === 'channelCodes') {
-        derived.channelCodes = [...(derived.channelCodes ?? []), ...values]
+        // Upper-cased and checked against the channels an event can carry, the way the status
+        // values below are checked: the service compares these exactly, so an unknown or
+        // lower-case code would otherwise return an empty page rather than saying why.
+        const channelCodes = values.map((value) => {
+          const channelCode = value.toUpperCase()
+          if (!EVENT_CHANNEL_CODES.includes(channelCode as NotificationChannel)) {
+            throw new BadRequestException(`Invalid channel code: '${value}'`)
+          }
+          return channelCode
+        })
+        derived.channelCodes = [...(derived.channelCodes ?? []), ...channelCodes]
         continue
       }
 

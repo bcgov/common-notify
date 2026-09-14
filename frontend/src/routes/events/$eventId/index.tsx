@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import EditEvent from '@/pages/events/EditEvent'
-import type { EventTab } from '@/pages/events/EditEvent'
+import type { EventTab } from '@/pages/events/components/EventTabs'
 
 const EVENT_TABS: string[] = ['settings', 'email', 'sms', 'third-party']
 

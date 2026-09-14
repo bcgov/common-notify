@@ -1,20 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
-import {
-  AlertDialog,
-  Button,
-  Modal,
-  Select,
-  Switch,
-  TextArea,
-  TextField,
-} from '@bcgov/design-system-react-components'
+import { Button, Select, Switch, TextArea, TextField } from '@bcgov/design-system-react-components'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import StickyBar from '@/components/StickyBar'
-import { getTemplates, NotificationChannel } from '@/api/templates.api'
-import type { TemplateResponse } from '@/api/templates.api'
+import { NotificationChannel } from '@/api/templates.api'
+import { useChannelTemplates } from '@/hooks/useChannelTemplates'
+import { sameAddresses } from '@/utils/recipients'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 const SENDER_PHONE_HELP =
@@ -37,10 +32,6 @@ export type SmsSettingsValues = {
 // the backend requires a complete set of settings alongside it. Turning it off is the one thing
 // that saves on its own, via onDeactivate.
 export type SmsApplyValues = SmsSettingsValues
-
-function sameAddresses(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((address, index) => address === b[index])
-}
 
 // Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
 // a number accepted here is accepted by the backend's IsNormalizablePhoneNumber validator too.
@@ -114,12 +105,16 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
     values.to.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
   )
   const [saving, setSaving] = useState(false)
-  const [deactivating, setDeactivating] = useState(false)
-  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false)
-  const [templates, setTemplates] = useState<TemplateResponse[]>([])
+  const templates = useChannelTemplates(NotificationChannel.SMS)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(
     values.templateId ?? undefined,
   )
+  const { isConfirmOpen, isDeactivating, requestDeactivate, cancelDeactivate, confirmDeactivate } =
+    useChannelDeactivation({
+      channelLabel: 'SMS',
+      onDeactivate,
+      onActiveChange: setChannelActive,
+    })
 
   // The backend normalizes recipients (e.g. phone numbers to E.164) on save, and EditEvent
   // passes the saved result back down as `values`. Re-sync so that's reflected immediately
@@ -128,23 +123,6 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
   useEffect(() => {
     setRecipients((prev) => (sameAddresses(prev.to, values.to) ? prev : { ...prev, to: values.to }))
   }, [values.to])
-
-  // Failures are not surfaced since the form is still usable without the template list loaded.
-  useEffect(() => {
-    let active = true
-
-    getTemplates(1, 100, undefined, 'name', [`channelCode:eq:${NotificationChannel.SMS}`])
-      .then((response) => {
-        if (active) {
-          setTemplates(response.data)
-        }
-      })
-      .catch(() => {})
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
@@ -166,7 +144,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
     (selectedTemplateId ?? null) !== values.templateId ||
     recipientsChanged ||
     channelActive !== values.active
-  const isFormDisabled = isDisabled || saving || deactivating
+  const isFormDisabled = isDisabled || saving || isDeactivating
   // Nothing below the toggle is editable while the channel is disabled
   // settings can still be applied so the off state itself is persisted.
   const areFieldsDisabled = isFormDisabled || !channelActive
@@ -182,26 +160,7 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
     if (next) {
       setChannelActive(true)
     } else {
-      setConfirmDeactivateOpen(true)
-    }
-  }
-
-  async function handleConfirmDeactivate() {
-    setConfirmDeactivateOpen(false)
-    setChannelActive(false)
-    setDeactivating(true)
-    try {
-      await onDeactivate()
-      showSuccessToast(
-        'SMS channel deactivated: This channel is no longer active and will not send notifications. Your settings are saved and can be reactivated at any time.',
-      )
-    } catch (error) {
-      setChannelActive(true)
-      showErrorToast(
-        `Unable to update channel: ${error instanceof Error ? error.message : 'Something went wrong.'}`,
-      )
-    } finally {
-      setDeactivating(false)
+      requestDeactivate()
     }
   }
 
@@ -244,44 +203,12 @@ const EventsSmsTab: FC<EventsSmsTabProps> = ({
         </Switch>
       </div>
 
-      <Modal
-        isOpen={confirmDeactivateOpen}
-        isDismissable={!deactivating}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDeactivateOpen(false)
-        }}
-      >
-        <AlertDialog
-          variant="confirmation"
-          isIconHidden
-          title="Deactivate this channel?"
-          // AlertDialog renders `title` as a plain div rather than a <Heading slot="title">, so
-          // the underlying Dialog needs an explicit label.
-          aria-label="Deactivate this channel?"
-          buttons={
-            <>
-              <Button
-                variant="tertiary"
-                onPress={() => setConfirmDeactivateOpen(false)}
-                isDisabled={deactivating}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="secondary"
-                danger
-                onPress={handleConfirmDeactivate}
-                isDisabled={deactivating}
-              >
-                Deactivate
-              </Button>
-            </>
-          }
-        >
-          This will stop notifications from being sent through this channel. Your settings will be
-          saved and can be reactivated at any time.
-        </AlertDialog>
-      </Modal>
+      <ConfirmDeactivateDialog
+        isOpen={isConfirmOpen}
+        isBusy={isDeactivating}
+        onCancel={cancelDeactivate}
+        onConfirm={confirmDeactivate}
+      />
 
       {showFields && (
         <>

@@ -5,10 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import type { EntityManager } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
+import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
@@ -16,10 +19,12 @@ import { UpdateSmsChannelSettingDto } from './schemas/update-sms-channel-setting
 import { EventResponseDto } from './schemas/event-response.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { EventStatus } from '../../enum/event-status.enum'
+import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { normalizeRecipient } from '../safelist/safelist.util'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { TemplatesRepository } from '../templates/templates.repository'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
@@ -32,6 +37,12 @@ import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/
 export interface DerivedEventFilters {
   channelCodes?: string[]
   statuses?: EventStatus[]
+}
+
+/** A recipient as the tab submitted it, normalized and ready to store. */
+interface DesiredRecipient {
+  kind: EventRecipientKind
+  address: string
 }
 
 export const eventListQueryConfig: QueryableFieldsConfig = {
@@ -67,6 +78,9 @@ const PG_UNIQUE_VIOLATION = '23505'
 const MAX_RECIPIENTS_KEY = 'event_max_recipients'
 const DEFAULT_MAX_RECIPIENTS = 100
 
+/** Fallback for events.senderEmailDomain, matching the domain the Settings tab appends. */
+const DEFAULT_SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
+
 @Injectable()
 export class EventsService {
   private readonly logger = new Logger(EventsService.name)
@@ -80,6 +94,8 @@ export class EventsService {
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     private readonly phoneNumberService: PhoneNumberService,
     private readonly emailLogoService: EmailLogoService,
+    private readonly templatesRepository: TemplatesRepository,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -102,6 +118,7 @@ export class EventsService {
         'channelSetting',
         'channelSetting.isDeleted = false',
       )
+      .leftJoinAndSelect('channelSetting.recipients', 'recipient', 'recipient.isDeleted = false')
       .where('event.tenantId = :tenantId', { tenantId })
       .andWhere('event.isDeleted = false')
 
@@ -244,9 +261,11 @@ export class EventsService {
     const event = await this.findEvent(tenantId, eventId)
     const senderEmail = updateDto.senderEmail?.trim() || null
     const templateId = updateDto.templateId ?? null
-    const to = this.normalizeEmailList(updateDto.to)
-    const cc = this.normalizeEmailList(updateDto.cc)
-    const bcc = this.normalizeEmailList(updateDto.bcc)
+    const recipients = [
+      ...this.toRecipients(EventRecipientKind.TO, this.normalizeEmailAddresses(updateDto.to)),
+      ...this.toRecipients(EventRecipientKind.CC, this.normalizeEmailAddresses(updateDto.cc)),
+      ...this.toRecipients(EventRecipientKind.BCC, this.normalizeEmailAddresses(updateDto.bcc)),
+    ]
     // When useCustomHeader is false the header columns stay null and inherit from tenant_settings
     // at render time, so a tenant default title added there later needs no change here.
     const useCustomHeader = updateDto.useCustomHeader ?? false
@@ -262,19 +281,17 @@ export class EventsService {
       }
     }
 
-    // "to"/cc/bcc share one VARCHAR(10000) each, and an unbounded list would fail the insert
-    // rather than the request, so the cap is checked before anything is written.
-    await this.assertWithinRecipientCap(
-      'email',
-      this.countRecipients(to) + this.countRecipients(cc) + this.countRecipients(bcc),
-    )
+    this.assertPermittedSenderDomain(senderEmail)
+    await this.assertTemplateUsable(tenantId, templateId, NotificationChannel.EMAIL)
+    await this.assertWithinRecipientCap('email', recipients.length)
 
     const setting = this.findOrCreateEmailSetting(event, userId)
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
-    // with it to be complete. An inactive channel can be saved half-filled.
-    if (updateDto.active && (!senderEmail || !to || !templateId)) {
+    // with it to be complete. The recipient half is only enforced here, since the constraint
+    // cannot see the recipient table. An inactive channel can be saved half-filled.
+    if (updateDto.active && (!senderEmail || !this.hasToRecipient(recipients) || !templateId)) {
       throw new BadRequestException(
         'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
       )
@@ -283,16 +300,13 @@ export class EventsService {
     setting.active = updateDto.active
     setting.senderEmail = senderEmail
     setting.templateId = templateId
-    setting.to = to
-    setting.cc = cc
-    setting.bcc = bcc
     setting.useCustomHeader = useCustomHeader
     setting.headerLogoId = headerLogoId
     setting.headerTitle = headerTitle
     setting.isDeleted = false
     setting.updatedBy = userId
 
-    await this.channelSettingRepository.save(setting)
+    await this.saveWithRecipients(setting, recipients, userId)
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)
@@ -316,38 +330,7 @@ export class EventsService {
     eventId: string,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
-    const event = await this.findEvent(tenantId, eventId)
-    const setting = this.findEmailSetting(event)
-
-    if (!setting) {
-      return this.toResponseDto(event)
-    }
-
-    setting.active = false
-    setting.updatedBy = userId
-
-    await this.channelSettingRepository.save(setting)
-
-    return this.getEvent(tenantId, eventId)
-  }
-
-  /**
-   * The event's live EMAIL channel setting, or a new unsaved one to populate.
-   *
-   * uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
-   * (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
-   */
-  private findOrCreateEmailSetting(event: NotifyEvent, userId: string): EventChannelSetting {
-    return (
-      (event.channelSettings ?? []).find(
-        (existing) => existing.channelCode === NotificationChannel.EMAIL,
-      ) ??
-      this.channelSettingRepository.create({
-        eventId: event.id,
-        channelCode: NotificationChannel.EMAIL,
-        createdBy: userId,
-      })
-    )
+    return this.deactivateChannel(tenantId, eventId, NotificationChannel.EMAIL, userId)
   }
 
   /**
@@ -375,16 +358,24 @@ export class EventsService {
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
     const templateId = updateDto.templateId ?? null
-    const to = this.normalizePhoneList(updateDto.to)
+    // SMS has no cc/bcc - chk_event_channel_recipient_sms_kind rejects anything but TO.
+    const recipients = this.toRecipients(
+      EventRecipientKind.TO,
+      this.normalizePhoneNumbers(updateDto.to),
+    )
 
-    await this.assertWithinRecipientCap('SMS', this.countRecipients(to))
+    await this.assertTemplateUsable(tenantId, templateId, NotificationChannel.SMS)
+    await this.assertWithinRecipientCap('SMS', recipients.length)
 
     const setting = this.findOrCreateSmsSetting(event, userId)
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
-    if (updateDto.active && (!to || !templateId || !setting.fromPhoneNumberId)) {
+    if (
+      updateDto.active &&
+      (!this.hasToRecipient(recipients) || !templateId || !setting.fromPhoneNumberId)
+    ) {
       throw new BadRequestException(
         'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
       )
@@ -392,11 +383,10 @@ export class EventsService {
 
     setting.active = updateDto.active
     setting.templateId = templateId
-    setting.to = to
     setting.isDeleted = false
     setting.updatedBy = userId
 
-    await this.channelSettingRepository.save(setting)
+    await this.saveWithRecipients(setting, recipients, userId)
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)
@@ -420,8 +410,20 @@ export class EventsService {
     eventId: string,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
+    return this.deactivateChannel(tenantId, eventId, NotificationChannel.SMS, userId)
+  }
+
+  /**
+   * Switch one of an event's channels off, leaving the rest of its settings in place.
+   */
+  private async deactivateChannel(
+    tenantId: string,
+    eventId: string,
+    channelCode: NotificationChannel,
+    userId: string,
+  ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
-    const setting = this.findSmsSetting(event)
+    const setting = this.findSetting(event, channelCode)
 
     if (!setting) {
       return this.toResponseDto(event)
@@ -436,31 +438,117 @@ export class EventsService {
   }
 
   /**
-   * The event's live SMS channel setting, or a new unsaved one to populate.
+   * The event's live channel setting for a channel, or a new unsaved one to populate.
    *
    * uq_event_channel_setting is not partial, so a soft-deleted row still occupies the
    * (event, channel) slot. Reuse and revive it rather than inserting a duplicate.
    */
-  private findOrCreateSmsSetting(event: NotifyEvent, userId: string): EventChannelSetting {
+  private findOrCreateSetting(
+    event: NotifyEvent,
+    channelCode: NotificationChannel,
+    userId: string,
+  ): EventChannelSetting {
     return (
-      (event.channelSettings ?? []).find(
-        (existing) => existing.channelCode === NotificationChannel.SMS,
-      ) ??
+      (event.channelSettings ?? []).find((existing) => existing.channelCode === channelCode) ??
       this.channelSettingRepository.create({
         eventId: event.id,
-        channelCode: NotificationChannel.SMS,
+        channelCode,
         createdBy: userId,
       })
     )
   }
 
+  private findOrCreateEmailSetting(event: NotifyEvent, userId: string): EventChannelSetting {
+    return this.findOrCreateSetting(event, NotificationChannel.EMAIL, userId)
+  }
+
+  private findOrCreateSmsSetting(event: NotifyEvent, userId: string): EventChannelSetting {
+    return this.findOrCreateSetting(event, NotificationChannel.SMS, userId)
+  }
+
   /**
-   * Load an event with its channel settings, or throw
+   * Persist a channel setting and the recipients saved alongside it, as one transaction: a
+   * half-written save would leave the channel pointing at the wrong set of people.
+   */
+  private async saveWithRecipients(
+    setting: EventChannelSetting,
+    recipients: DesiredRecipient[],
+    userId: string,
+  ): Promise<void> {
+    await this.eventRepository.manager.transaction(async (manager) => {
+      const saved = await manager.save(EventChannelSetting, setting)
+      await this.syncRecipients(manager, saved, recipients, userId)
+    })
+  }
+
+  /**
+   * Bring a channel's stored recipients in line with what the tab submitted.
+   *
+   * Removals are soft deletes rather than deletes, so event_channel_recipient_history keeps who
+   * was taken off an event. A removed address that comes back revives its own row instead of
+   * inserting a second one: uq_event_channel_recipient_active only covers live rows, so two
+   * rows for one address would collide the moment both were live.
+   */
+  private async syncRecipients(
+    manager: EntityManager,
+    setting: EventChannelSetting,
+    desired: DesiredRecipient[],
+    userId: string,
+  ): Promise<void> {
+    const existing = await manager.find(EventChannelRecipient, {
+      where: { channelSettingId: setting.id },
+    })
+    const identity = (kind: EventRecipientKind, address: string) => `${kind}:${address}`
+    const desiredKeys = new Set(
+      desired.map((recipient) => identity(recipient.kind, recipient.address)),
+    )
+    const changed: EventChannelRecipient[] = []
+
+    for (const row of existing) {
+      if (!row.isDeleted && !desiredKeys.has(identity(row.kind, row.address))) {
+        row.isDeleted = true
+        row.updatedBy = userId
+        changed.push(row)
+      }
+    }
+
+    for (const recipient of desired) {
+      const row = existing.find(
+        (candidate) =>
+          identity(candidate.kind, candidate.address) ===
+          identity(recipient.kind, recipient.address),
+      )
+
+      if (!row) {
+        changed.push(
+          manager.create(EventChannelRecipient, {
+            channelSettingId: setting.id,
+            channelCode: setting.channelCode,
+            kind: recipient.kind,
+            address: recipient.address,
+            createdBy: userId,
+            updatedBy: userId,
+          }),
+        )
+      } else if (row.isDeleted) {
+        row.isDeleted = false
+        row.updatedBy = userId
+        changed.push(row)
+      }
+    }
+
+    if (changed.length > 0) {
+      await manager.save(EventChannelRecipient, changed)
+    }
+  }
+
+  /**
+   * Load an event with its channel settings and their recipients, or throw
    */
   private async findEvent(tenantId: string, eventId: string): Promise<NotifyEvent> {
     const event = await this.eventRepository.findOne({
       where: { id: eventId, tenantId, isDeleted: false },
-      relations: ['channelSettings'],
+      relations: ['channelSettings', 'channelSettings.recipients'],
     })
 
     if (!event) {
@@ -474,7 +562,7 @@ export class EventsService {
    * Save an event, turning a lost race for its name into the same 409 the pre-check raises.
    *
    * The findByName check cannot hold the rule on its own: two concurrent creates both pass it,
-   * and uq_event_tenant_name is what actually rejects the second one.
+   * and uq_notification_event_tenant_name is what actually rejects the second one.
    */
   private async saveUniquelyNamed(event: NotifyEvent, name: string): Promise<NotifyEvent> {
     try {
@@ -489,7 +577,7 @@ export class EventsService {
 
   /**
    * Find a live event by name, matching the database's case-insensitive uniqueness rule
-   * (uq_event_tenant_name)
+   * (uq_notification_event_tenant_name)
    */
   private findByName(tenantId: string, name: string): Promise<NotifyEvent | null> {
     return this.eventRepository
@@ -522,8 +610,8 @@ export class EventsService {
     const activeChannelCodes = settings
       .filter((setting) => setting.active)
       .map((setting) => setting.channelCode)
-    const emailSetting = this.findEmailSetting(event)
-    const smsSetting = this.findSmsSetting(event)
+    const emailSetting = this.findSetting(event, NotificationChannel.EMAIL)
+    const smsSetting = this.findSetting(event, NotificationChannel.SMS)
 
     return {
       id: event.id,
@@ -536,9 +624,9 @@ export class EventsService {
             active: emailSetting.active,
             senderEmail: emailSetting.senderEmail,
             templateId: emailSetting.templateId,
-            to: this.splitRecipientList(emailSetting.to),
-            cc: this.splitRecipientList(emailSetting.cc),
-            bcc: this.splitRecipientList(emailSetting.bcc),
+            to: this.addressesOfKind(emailSetting, EventRecipientKind.TO),
+            cc: this.addressesOfKind(emailSetting, EventRecipientKind.CC),
+            bcc: this.addressesOfKind(emailSetting, EventRecipientKind.BCC),
             useCustomHeader: emailSetting.useCustomHeader,
             headerLogoId: emailSetting.headerLogoId,
             headerTitle: emailSetting.headerTitle,
@@ -548,7 +636,7 @@ export class EventsService {
         ? {
             active: smsSetting.active,
             templateId: smsSetting.templateId,
-            to: this.splitRecipientList(smsSetting.to),
+            to: this.addressesOfKind(smsSetting, EventRecipientKind.TO),
           }
         : null,
       createdAt: event.createdAt,
@@ -557,73 +645,123 @@ export class EventsService {
   }
 
   /**
-   * The event's live EMAIL channel setting, if it has one
+   * The event's live channel setting for a channel, if it has one
    */
-  private findEmailSetting(event: NotifyEvent): EventChannelSetting | undefined {
+  private findSetting(
+    event: NotifyEvent,
+    channelCode: NotificationChannel,
+  ): EventChannelSetting | undefined {
     return (event.channelSettings ?? []).find(
-      (setting) => setting.channelCode === NotificationChannel.EMAIL && !setting.isDeleted,
+      (setting) => setting.channelCode === channelCode && !setting.isDeleted,
     )
   }
 
   /**
-   * The event's live SMS channel setting, if it has one
+   * A channel's live recipient addresses for one list (to/cc/bcc)
    */
-  private findSmsSetting(event: NotifyEvent): EventChannelSetting | undefined {
-    return (event.channelSettings ?? []).find(
-      (setting) => setting.channelCode === NotificationChannel.SMS && !setting.isDeleted,
-    )
+  private addressesOfKind(setting: EventChannelSetting, kind: EventRecipientKind): string[] {
+    return (setting.recipients ?? [])
+      .filter((recipient) => !recipient.isDeleted && recipient.kind === kind)
+      .map((recipient) => recipient.address)
+  }
+
+  /** Pairs each address with the list it belongs to. */
+  private toRecipients(kind: EventRecipientKind, addresses: string[]): DesiredRecipient[] {
+    return addresses.map((address) => ({ kind, address }))
+  }
+
+  private hasToRecipient(recipients: DesiredRecipient[]): boolean {
+    return recipients.some((recipient) => recipient.kind === EventRecipientKind.TO)
   }
 
   /**
-   * Normalizes a list of recipient addresses into the comma-separated form stored in
-   * to/cc/bcc, dropping blanks. Returns null when nothing is left, matching
-   * chk_event_channel_setting_to/cc/bcc (never an empty string).
+   * Normalizes email addresses to the stored form (lowercased/trimmed), dropping blanks.
+   *
+   * Deduplicated the way HasUniqueNormalizedPhoneNumbers rejects duplicate SMS numbers: two
+   * spellings of one address must not turn into two sends. The database holds the same rule
+   * through uq_event_channel_recipient_active; this keeps it a clean save rather than a 409.
    */
-  private normalizeEmailList(addresses?: string[]): string | null {
-    if (!addresses?.length) return null
+  private normalizeEmailAddresses(addresses?: string[]): string[] {
+    if (!addresses?.length) return []
 
-    // Deduplicated after normalizing, the way HasUniqueNormalizedPhoneNumbers rejects duplicate
-    // SMS numbers: two spellings of one address must not turn into two sends.
-    const normalized = [
+    return [
       ...new Set(
         addresses
           .map((address) => normalizeRecipient(NotificationChannel.EMAIL, address))
           .filter((address): address is string => !!address),
       ),
     ]
-
-    return normalized.length > 0 ? normalized.join(',') : null
   }
 
   /**
-   * Normalizes a list of recipient phone numbers to E.164 (default region CA) via
-   * PhoneNumberService, dropping blanks and numbers that don't parse. The DTO's
-   * IsNormalizablePhoneNumber validator already rejects bad numbers before this runs, so
-   * unparseable entries aren't expected here - this mirrors normalizeEmailList's defensive
-   * filtering rather than assuming that. HasUniqueNormalizedPhoneNumbers already rejects
-   * duplicate numbers before this runs too, so no dedup step is needed here. Returns null when
-   * nothing is left, matching chk_event_channel_setting_to (never an empty string).
+   * Normalizes phone numbers to E.164 (default region CA) via PhoneNumberService, dropping
+   * blanks and numbers that don't parse. The DTO's IsNormalizablePhoneNumber validator already
+   * rejects bad numbers before this runs, so unparseable entries aren't expected here - this
+   * mirrors normalizeEmailAddresses' defensive filtering rather than assuming that.
    */
-  private normalizePhoneList(addresses?: string[]): string | null {
-    if (!addresses?.length) return null
+  private normalizePhoneNumbers(addresses?: string[]): string[] {
+    if (!addresses?.length) return []
 
-    const normalized = addresses
-      .map((address) => this.phoneNumberService.normalize(address))
-      .filter((address): address is string => !!address)
-
-    return normalized.length > 0 ? normalized.join(',') : null
+    return [
+      ...new Set(
+        addresses
+          .map((address) => this.phoneNumberService.normalize(address))
+          .filter((address): address is string => !!address),
+      ),
+    ]
   }
 
   /**
-   * Splits a stored comma-separated to/cc/bcc value back into a list for the API response.
+   * Rejects a template the event is not entitled to use.
+   *
+   * findById already restricts to the tenant's own active templates, so this covers a template
+   * belonging to another tenant and one that has been deleted or superseded; the channel check
+   * covers selecting an SMS template for the email tab or the reverse. Without this the only
+   * thing standing between a save and rendering another tenant's content is the UI's own
+   * template list.
    */
-  private splitRecipientList(value: string | null): string[] {
-    return value ? value.split(',') : []
+  private async assertTemplateUsable(
+    tenantId: string,
+    templateId: string | null,
+    channelCode: NotificationChannel,
+  ): Promise<void> {
+    if (!templateId) return
+
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+
+    if (!template) {
+      throw new BadRequestException(
+        'templateId must reference an active template belonging to this tenant',
+      )
+    }
+
+    if (template.channelCode !== channelCode) {
+      throw new BadRequestException(
+        `Template "${template.name}" is a ${template.channelCode} template and cannot be used for the ${channelCode} channel`,
+      )
+    }
   }
 
-  /** How many recipients a normalized, comma-separated to/cc/bcc value holds. */
-  private countRecipients(value: string | null): number {
-    return value ? value.split(',').length : 0
+  /**
+   * Rejects a sender address outside the permitted sending domain.
+   *
+   * Tenant settings only accept a local part and append this domain, so an event's own sender
+   * is held to the same rule rather than being free text - otherwise any template editor could
+   * configure an event to send as an address the service has no claim to.
+   */
+  private assertPermittedSenderDomain(senderEmail: string | null): void {
+    if (!senderEmail) return
+
+    const domain = this.senderEmailDomain
+
+    if (senderEmail.toLowerCase().split('@').pop() !== domain.toLowerCase()) {
+      throw new BadRequestException(`The sender email address must be an @${domain} address`)
+    }
+  }
+
+  /** Configured sending domain, falling back to the one the Settings tab appends. */
+  private get senderEmailDomain(): string {
+    return this.configService.get<string>('events.senderEmailDomain') || DEFAULT_SENDER_EMAIL_DOMAIN
   }
 
   /**

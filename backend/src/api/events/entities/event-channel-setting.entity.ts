@@ -3,6 +3,7 @@ import {
   Column,
   PrimaryGeneratedColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -11,6 +12,7 @@ import {
 } from 'typeorm'
 import type { Relation } from 'typeorm'
 import { NotifyEvent } from './event.entity'
+import { EventChannelRecipient } from './event-channel-recipient.entity'
 import { ProvisionedPhoneNumber } from './provisioned-phone-number.entity'
 import { Template } from '../../templates/entities/template.entity'
 import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
@@ -20,7 +22,8 @@ import { NotificationChannelCode } from '../../notification/entities/notificatio
  *
  * One row per (event, channel), backing the Email settings and SMS settings tabs.
  * Channel-specific columns are constrained in the database so EMAIL rows carry
- * sender_email and SMS rows carry from_phone_number_id.
+ * sender_email and SMS rows carry from_phone_number_id. Recipients are rows in
+ * EventChannelRecipient.
  */
 @Entity('event_channel_setting')
 @Index('idx_event_channel_setting_event', ['eventId'])
@@ -77,23 +80,12 @@ export class EventChannelSetting {
   fromPhoneNumber: ProvisionedPhoneNumber | null
 
   /**
-   * Comma-separated, normalized recipients for this channel: lowercased/trimmed emails for
-   * EMAIL rows, E.164 phone numbers for SMS rows. Required once active is true.
+   * Manually entered recipients for this channel. EMAIL rows can carry TO/CC/BCC; SMS rows are
+   * TO only. At least one TO recipient is required before the channel can be switched on -
+   * enforced by EventsService, since a CHECK cannot see another table.
    */
-  @Column({ name: 'to', type: 'varchar', length: 10000, nullable: true })
-  to: string | null
-
-  /**
-   * Comma-separated, normalized CC email addresses. EMAIL only; NULL on SMS rows.
-   */
-  @Column({ type: 'varchar', length: 10000, nullable: true })
-  cc: string | null
-
-  /**
-   * Comma-separated, normalized BCC email addresses. EMAIL only; NULL on SMS rows.
-   */
-  @Column({ type: 'varchar', length: 10000, nullable: true })
-  bcc: string | null
+  @OneToMany(() => EventChannelRecipient, (recipient) => recipient.channelSetting)
+  recipients: EventChannelRecipient[]
 
   /**
    * False when the email uses the tenant's default header, true when it uses headerLogoId and

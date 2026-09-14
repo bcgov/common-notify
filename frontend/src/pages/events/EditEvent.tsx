@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
+import EventTabs from './components/EventTabs'
+import type { EventTab } from './components/EventTabs'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab from './sections/EventsEmailTab'
@@ -24,8 +25,6 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
-
-export type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
 
 interface EditEventProps {
   eventId: string
@@ -150,34 +149,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
         ]}
       />
 
-      <div className="events__tabs">
-        <ToggleButtonGroup
-          size="medium"
-          orientation="horizontal"
-          selectionMode="single"
-          selectedKeys={[selectedTab]}
-          onSelectionChange={(keys) => {
-            const [key] = [...keys]
-            if (key) {
-              setSelectedTab(key as EventTab)
-            }
-          }}
-          disallowEmptySelection
-        >
-          <ToggleButton id="settings" size="medium">
-            Event Settings
-          </ToggleButton>
-          <ToggleButton id="email" size="medium">
-            Email Notification
-          </ToggleButton>
-          <ToggleButton id="sms" size="medium">
-            SMS Notification
-          </ToggleButton>
-          <ToggleButton id="third-party" size="medium">
-            Third-party Notification
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </div>
+      <EventTabs selected={selectedTab} onSelect={setSelectedTab} />
 
       <section className="events__section">
         {loadError ? (

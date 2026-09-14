@@ -32,7 +32,7 @@ const columns: TableColumn<EventResponse>[] = [
     label: 'Notification Event',
     sortable: true,
     render: (_, row) => (
-      <Link to="/events/$eventId" params={{ eventId: row.id }} style={{ color: 'black' }}>
+      <Link to="/events/$eventId" params={{ eventId: row.id }} className="data-table__cell-link">
         {row.name}
       </Link>
     ),
