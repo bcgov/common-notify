@@ -55,6 +55,7 @@ export class UpdateEmailChannelSettingDto {
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
+  @MaxLength(320, { each: true })
   to?: string[]
 
   /**
@@ -64,6 +65,7 @@ export class UpdateEmailChannelSettingDto {
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
+  @MaxLength(320, { each: true })
   cc?: string[]
 
   /**
@@ -73,6 +75,7 @@ export class UpdateEmailChannelSettingDto {
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
+  @MaxLength(320, { each: true })
   bcc?: string[]
 
   /**

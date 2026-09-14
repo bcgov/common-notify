@@ -31,27 +31,39 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
+  const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // The header below is previewed from the tenant's logo, the same as on the email tab.
+  // The header below is previewed from the tenant's logo, the same as on the email tab. Both
+  // thunks return early without a selected tenant, so they wait for one and re-run when it
+  // changes.
   useEffect(() => {
+    if (!selectedTenantId) return
+
     dispatch(fetchSettings())
     dispatch(fetchApprovedEmailLogos())
-  }, [dispatch])
+  }, [dispatch, selectedTenantId])
 
   // The page is landed on directly after a save and on a refresh, so it fetches the event
-  // itself rather than being handed the settings it shows.
+  // itself rather than being handed the settings it shows. Tenant-scoped, the same way the
+  // edit page is.
   useEffect(() => {
+    if (!selectedTenantId) return
+
     let active = true
 
     getEventById(eventId)
       .then((loaded) => {
-        if (active) setEvent(loaded)
+        if (active) {
+          setEvent(loaded)
+          setLoadError(null)
+        }
       })
       .catch((error) => {
         if (active) {
+          setEvent(null)
           setLoadError(error instanceof Error ? error.message : 'Failed to load event')
         }
       })
@@ -59,7 +71,7 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
     return () => {
       active = false
     }
-  }, [eventId])
+  }, [eventId, selectedTenantId])
 
   const emailSettings = event?.emailSettings ?? null
   const templateId = emailSettings?.templateId ?? null

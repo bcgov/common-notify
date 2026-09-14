@@ -2,18 +2,24 @@ import type { AxiosError } from 'axios'
 import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedEventResponse } from '@/interfaces/PaginatedNotificationResponse'
 
+/** The error body the backend returns: Nest's own shape, plus ValidationExceptionFilter's. */
+interface ApiErrorBody {
+  message?: string | string[]
+  errors?: string[]
+}
+
 /**
  * ValidationExceptionFilter always sets `message` to the generic 'Validation failed' but
  * includes the real per-field detail in `errors` - prefer that when present.
  */
-function extractErrorMessage(responseData: any, fallback: string): string {
-  if (Array.isArray(responseData?.errors) && responseData.errors.length > 0) {
+function extractErrorMessage(responseData: ApiErrorBody, fallback: string): string {
+  if (Array.isArray(responseData.errors) && responseData.errors.length > 0) {
     return responseData.errors.join('; ')
   }
-  if (Array.isArray(responseData?.message)) {
+  if (Array.isArray(responseData.message)) {
     return responseData.message.join(', ')
   }
-  if (typeof responseData?.message === 'string') {
+  if (typeof responseData.message === 'string') {
     return responseData.message
   }
   return fallback
@@ -91,7 +97,7 @@ export async function getEvents(
     return await get<PaginatedEventResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to view events')
@@ -153,7 +159,7 @@ export async function createEvent(data: CreateEventData): Promise<EventResponse>
     return await post<EventResponse>({ ...params, data })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.Conflict) {
       throw Object.assign(new Error('An event with this name already exists'), {
@@ -196,7 +202,7 @@ export async function updateEvent(
     return await post<EventResponse>({ ...params, data: updateData })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
@@ -249,7 +255,7 @@ export async function updateEventEmailSettings(
     return await post<EventResponse>({ ...params, data: settings })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
@@ -292,7 +298,7 @@ export async function deactivateEventEmailChannel(eventId: string): Promise<Even
     return await post<EventResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
@@ -336,7 +342,7 @@ export async function updateEventSmsSettings(
     return await post<EventResponse>({ ...params, data: settings })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')
@@ -379,7 +385,7 @@ export async function deactivateEventSmsChannel(eventId: string): Promise<EventR
     return await post<EventResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
+    const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Event not found')

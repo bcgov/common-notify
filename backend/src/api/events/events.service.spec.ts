@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { EventsService } from './events.service'
 import { NotifyEvent } from './entities/event.entity'
@@ -9,6 +9,7 @@ import { EventStatus } from '../../enum/event-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 
 describe('EventsService', () => {
   let service: EventsService
@@ -29,10 +30,23 @@ describe('EventsService', () => {
       isDeleted: false,
     }) as NotifyEvent
 
+  /** findByName runs through a query builder; every call resolves through this one chain. */
+  const mockQueryBuilder = {
+    where: vi.fn().mockReturnThis(),
+    andWhere: vi.fn().mockReturnThis(),
+    getOne: vi.fn(),
+  }
+
   const mockEventRepository = {
     findOne: vi.fn(),
     create: vi.fn(),
     save: vi.fn(),
+    createQueryBuilder: vi.fn(() => mockQueryBuilder),
+  }
+
+  /** Unset by default, so getMaxRecipients falls back to its built-in 100. */
+  const mockConfigurationRepository = {
+    findOne: vi.fn(),
   }
 
   const mockChannelSettingRepository = {
@@ -55,11 +69,89 @@ describe('EventsService', () => {
           useValue: mockChannelSettingRepository,
         },
         { provide: EmailLogoService, useValue: mockEmailLogoService },
+        {
+          provide: getRepositoryToken(NotifyConfiguration),
+          useValue: mockConfigurationRepository,
+        },
       ],
     }).compile()
 
     service = module.get<EventsService>(EventsService)
     vi.clearAllMocks()
+  })
+
+  describe('createEvent', () => {
+    it('rejects a name already taken by another live event', async () => {
+      mockQueryBuilder.getOne.mockResolvedValueOnce(buildEvent())
+
+      await expect(
+        service.createEvent(tenantId, { name: 'Graduates Outcome Survey' }),
+      ).rejects.toThrow(ConflictException)
+      expect(mockEventRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('maps a lost race on uq_event_tenant_name to the same conflict', async () => {
+      // Both callers pass the name check; the unique index is what rejects the second insert.
+      mockQueryBuilder.getOne.mockResolvedValueOnce(null)
+      mockEventRepository.create.mockReturnValueOnce({ tenantId, name: 'Survey' })
+      mockEventRepository.save.mockRejectedValueOnce(
+        Object.assign(new Error('duplicate key value violates unique constraint'), {
+          code: '23505',
+        }),
+      )
+
+      await expect(service.createEvent(tenantId, { name: 'Survey' })).rejects.toThrow(
+        ConflictException,
+      )
+    })
+
+    it('propagates a save failure that is not a unique violation', async () => {
+      mockQueryBuilder.getOne.mockResolvedValueOnce(null)
+      mockEventRepository.create.mockReturnValueOnce({ tenantId, name: 'Survey' })
+      mockEventRepository.save.mockRejectedValueOnce(new Error('connection terminated'))
+
+      await expect(service.createEvent(tenantId, { name: 'Survey' })).rejects.toThrow(
+        'connection terminated',
+      )
+    })
+  })
+
+  describe('recipient cap', () => {
+    it('rejects an email save with more recipients than the configured cap', async () => {
+      mockEventRepository.findOne.mockResolvedValueOnce(buildEvent())
+      mockConfigurationRepository.findOne.mockResolvedValueOnce({ config: { value: 2 } })
+
+      await expect(
+        service.updateEmailChannelSetting(tenantId, eventId, {
+          active: false,
+          senderEmail: null,
+          templateId: null,
+          to: ['alice@example.com', 'bob@example.com'],
+          cc: ['carol@example.com'],
+        }),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockChannelSettingRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('counts addresses after de-duplication, so one address twice is one recipient', async () => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent())
+      mockConfigurationRepository.findOne.mockResolvedValueOnce({ config: { value: 1 } })
+      mockChannelSettingRepository.create.mockReturnValueOnce({
+        eventId,
+        channelCode: NotificationChannel.EMAIL,
+      } as EventChannelSetting)
+
+      await service.updateEmailChannelSetting(tenantId, eventId, {
+        active: false,
+        senderEmail: null,
+        templateId: null,
+        to: ['alice@example.com', 'ALICE@example.com'],
+      })
+
+      expect(mockChannelSettingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'alice@example.com' }),
+      )
+    })
   })
 
   describe('updateEmailChannelSetting', () => {

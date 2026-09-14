@@ -12,6 +12,7 @@ import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { ChannelBadge } from '@/components/ChannelBadge'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import '@/scss/components/events.scss'
 
@@ -89,6 +90,7 @@ const Events: FC = () => {
     filters,
     isLoading,
     hasLoaded,
+    error,
   } = useAppSelector((state) => state.events)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
@@ -100,14 +102,27 @@ const Events: FC = () => {
     }
   }, [page, limit, search, sortBy, sortOrder, filters, selectedTenant, dispatch])
 
+  // The thunk turns a failed load into slice state rather than throwing, so the page is what
+  // surfaces it - otherwise the table just shows its empty message.
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error)
+    }
+  }, [error])
+
   function handleSearch() {
-    dispatch(setSearch(searchInput))
-    dispatch(fetchEvents())
+    // A changed term refetches through the effect above. Searching the same term again is the
+    // retry path (after a failed load), so that is the only case that dispatches directly -
+    // doing both would fire two requests for every search.
+    if (searchInput === search) {
+      dispatch(fetchEvents())
+    } else {
+      dispatch(setSearch(searchInput))
+    }
   }
 
   function handleLimitChange(newLimit: number) {
     dispatch(setLimit(newLimit))
-    dispatch(fetchEvents())
   }
 
   function handleSort(key: string, order: 'asc' | 'desc' | null) {

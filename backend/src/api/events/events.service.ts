@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -19,6 +20,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { normalizeRecipient } from '../safelist/safelist.util'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -58,13 +60,24 @@ export const eventListQueryConfig: QueryableFieldsConfig = {
   defaultSort: [{ field: 'updatedAt', direction: 'DESC' }],
 }
 
+/** Postgres unique-violation SQLSTATE. */
+const PG_UNIQUE_VIOLATION = '23505'
+
+/** Global cap on manually entered recipients per channel, seeded by V62. */
+const MAX_RECIPIENTS_KEY = 'event_max_recipients'
+const DEFAULT_MAX_RECIPIENTS = 100
+
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name)
+
   constructor(
     @InjectRepository(NotifyEvent)
     private readonly eventRepository: Repository<NotifyEvent>,
     @InjectRepository(EventChannelSetting)
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
+    @InjectRepository(NotifyConfiguration)
+    private readonly configurationRepository: Repository<NotifyConfiguration>,
     private readonly phoneNumberService: PhoneNumberService,
     private readonly emailLogoService: EmailLogoService,
   ) {}
@@ -163,7 +176,7 @@ export class EventsService {
       throw new ConflictException(`Event name "${name}" already exists`)
     }
 
-    const event = await this.eventRepository.save(
+    const event = await this.saveUniquelyNamed(
       this.eventRepository.create({
         tenantId,
         name,
@@ -171,6 +184,7 @@ export class EventsService {
         createdBy: userId,
         updatedBy: userId,
       }),
+      name,
     )
 
     return this.toResponseDto(event)
@@ -203,7 +217,7 @@ export class EventsService {
     event.description = updateDto.description ?? event.description
     event.updatedBy = userId
 
-    const updated = await this.eventRepository.save(event)
+    const updated = await this.saveUniquelyNamed(event, event.name)
 
     return this.toResponseDto(updated)
   }
@@ -247,6 +261,13 @@ export class EventsService {
         )
       }
     }
+
+    // "to"/cc/bcc share one VARCHAR(10000) each, and an unbounded list would fail the insert
+    // rather than the request, so the cap is checked before anything is written.
+    await this.assertWithinRecipientCap(
+      'email',
+      this.countRecipients(to) + this.countRecipients(cc) + this.countRecipients(bcc),
+    )
 
     const setting = this.findOrCreateEmailSetting(event, userId)
 
@@ -356,6 +377,8 @@ export class EventsService {
     const templateId = updateDto.templateId ?? null
     const to = this.normalizePhoneList(updateDto.to)
 
+    await this.assertWithinRecipientCap('SMS', this.countRecipients(to))
+
     const setting = this.findOrCreateSmsSetting(event, userId)
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
@@ -445,6 +468,23 @@ export class EventsService {
     }
 
     return event
+  }
+
+  /**
+   * Save an event, turning a lost race for its name into the same 409 the pre-check raises.
+   *
+   * The findByName check cannot hold the rule on its own: two concurrent creates both pass it,
+   * and uq_event_tenant_name is what actually rejects the second one.
+   */
+  private async saveUniquelyNamed(event: NotifyEvent, name: string): Promise<NotifyEvent> {
+    try {
+      return await this.eventRepository.save(event)
+    } catch (error) {
+      if ((error as { code?: string })?.code === PG_UNIQUE_VIOLATION) {
+        throw new ConflictException(`Event name "${name}" already exists`)
+      }
+      throw error
+    }
   }
 
   /**
@@ -542,9 +582,15 @@ export class EventsService {
   private normalizeEmailList(addresses?: string[]): string | null {
     if (!addresses?.length) return null
 
-    const normalized = addresses
-      .map((address) => normalizeRecipient(NotificationChannel.EMAIL, address))
-      .filter((address): address is string => !!address)
+    // Deduplicated after normalizing, the way HasUniqueNormalizedPhoneNumbers rejects duplicate
+    // SMS numbers: two spellings of one address must not turn into two sends.
+    const normalized = [
+      ...new Set(
+        addresses
+          .map((address) => normalizeRecipient(NotificationChannel.EMAIL, address))
+          .filter((address): address is string => !!address),
+      ),
+    ]
 
     return normalized.length > 0 ? normalized.join(',') : null
   }
@@ -573,5 +619,43 @@ export class EventsService {
    */
   private splitRecipientList(value: string | null): string[] {
     return value ? value.split(',') : []
+  }
+
+  /** How many recipients a normalized, comma-separated to/cc/bcc value holds. */
+  private countRecipients(value: string | null): number {
+    return value ? value.split(',').length : 0
+  }
+
+  /**
+   * Rejects a save that would store more recipients than the configured cap allows.
+   */
+  private async assertWithinRecipientCap(channel: string, count: number): Promise<void> {
+    const maxRecipients = await this.getMaxRecipients()
+
+    if (count > maxRecipients) {
+      throw new BadRequestException(
+        `The ${channel} channel accepts at most ${maxRecipients} recipients; this save has ${count}.`,
+      )
+    }
+  }
+
+  /**
+   * Global recipient cap from notify.configuration, seeded by V62. Same shape as the safelist's
+   * getMaxEntries: an unreadable or nonsensical value falls back to the default rather than
+   * failing the save.
+   */
+  private async getMaxRecipients(): Promise<number> {
+    try {
+      const row = await this.configurationRepository.findOne({ where: { key: MAX_RECIPIENTS_KEY } })
+      const value = Number(row?.config?.value)
+      return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_RECIPIENTS
+    } catch (error) {
+      this.logger.warn(
+        `Failed to read ${MAX_RECIPIENTS_KEY} configuration, using default ${DEFAULT_MAX_RECIPIENTS}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+      return DEFAULT_MAX_RECIPIENTS
+    }
   }
 }

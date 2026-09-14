@@ -41,30 +41,45 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
+  const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [selectedTab, setSelectedTab] = useState<EventTab>(initialTab)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   // Placeholder only, for the email tab's sender field and custom header. Failures are not
-  // surfaced here since the page's own load state doesn't depend on either.
+  // surfaced here since the page's own load state doesn't depend on either. Both thunks return
+  // early without a selected tenant, so they wait for one - on a refresh the tenant arrives
+  // after this page has mounted - and re-run when it changes.
   useEffect(() => {
+    if (!selectedTenantId) return
+
     dispatch(fetchSettings())
     dispatch(fetchApprovedEmailLogos())
-  }, [dispatch])
+  }, [dispatch, selectedTenantId])
 
   // The page owns the single event fetch, so the title, breadcrumb and every tab read
   // from one request and switching tabs re-fetches nothing. The route keys this component by
   // eventId, so a fresh mount (and fresh useState(null)) is what resets event/loadError between
-  // events - this effect only needs to fetch.
+  // events.
+  //
+  // Events are tenant-scoped, so this waits for a selected tenant and re-runs when it changes.
+  // Switching tenants re-fetches: the event is replaced on success, and dropped on failure so
+  // the other tenant's event does not stay on screen behind the error.
   useEffect(() => {
+    if (!selectedTenantId) return
+
     let active = true
 
     getEventById(eventId)
       .then((loaded) => {
-        if (active) setEvent(loaded)
+        if (active) {
+          setEvent(loaded)
+          setLoadError(null)
+        }
       })
       .catch((error) => {
         if (active) {
+          setEvent(null)
           setLoadError(error instanceof Error ? error.message : 'Failed to load event')
         }
       })
@@ -72,7 +87,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
     return () => {
       active = false
     }
-  }, [eventId])
+  }, [eventId, selectedTenantId])
 
   async function handleSave(values: EventSettingsValues) {
     try {

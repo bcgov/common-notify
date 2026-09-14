@@ -137,6 +137,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Once the field has been edited it is the user's, including when they empty it - the tenant
   // default must not be reapplied on top of a deliberately cleared field.
   const senderEmailTouched = useRef(false)
+  // Same for the header title: clearing it is a deliberate choice (a custom header with no title),
+  // so the tenant name must not be written back over an emptied field.
+  const headerTitleTouched = useRef(false)
 
   // Failures are not surfaced since the form is still usable without the template list loaded.
   useEffect(() => {
@@ -172,7 +175,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   }, [headerLogoId, tenantEmailLogoId, values.useCustomHeader])
 
   useEffect(() => {
-    if (!values.useCustomHeader && !headerTitle && tenantName) {
+    if (!headerTitleTouched.current && !values.useCustomHeader && !headerTitle && tenantName) {
       setHeaderTitle(tenantName)
     }
   }, [headerTitle, tenantName, values.useCustomHeader])
@@ -510,6 +513,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
                 label="Header title"
                 value={headerTitle}
                 onChange={(value) => {
+                  headerTitleTouched.current = true
                   setHeaderTitle(value)
                   setSettingsChanged(true)
                 }}
