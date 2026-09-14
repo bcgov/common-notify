@@ -2,6 +2,8 @@ import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import type { EventResponse } from '@/api/events.api'
 import { fetchEvents } from '../thunks/events.thunks'
+import { selectTenant } from './tenant.slice'
+import { isStaleResponse } from '../utils/latestRequest'
 
 interface EventsState {
   items: EventResponse[]
@@ -16,6 +18,8 @@ interface EventsState {
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
+  /** Request id of the fetch currently being awaited; see utils/latestRequest. */
+  currentRequestId: string | null
 }
 
 const initialState: EventsState = {
@@ -31,6 +35,7 @@ const initialState: EventsState = {
   isLoading: false,
   hasLoaded: false,
   error: null,
+  currentRequestId: null,
 }
 
 export const eventsSlice = createSlice({
