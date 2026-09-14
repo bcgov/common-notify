@@ -212,7 +212,7 @@ const BulkNotifications: FC = () => {
 
   return (
     <div className="page bulk-notifications">
-      <PageHeading title="Batch Send" />
+      <PageHeading title="Send Batch Notification" />
 
       {!canSend && (
         <p className="bulk-notifications__notice">

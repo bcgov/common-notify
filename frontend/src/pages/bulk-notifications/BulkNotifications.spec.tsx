@@ -481,6 +481,23 @@ describe('BulkNotifications', () => {
     expect(rowNumbers()).toEqual(['4', '3', '2'])
   })
 
+  it('states each issue as a title with the fix beneath it', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nbad-one,parking,Alice'),
+    )
+
+    await screen.findByText('1 item requires attention.')
+
+    expect(screen.getByText('Invalid format')).toBeInTheDocument()
+    expect(
+      screen.getByText('Use a single @ with a domain after it, like name@example.com.'),
+    ).toBeInTheDocument()
+  })
+
   it('renames the recipient column to the one the API expects when sending', async () => {
     renderPage()
     await chooseTemplate()

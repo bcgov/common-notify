@@ -35,6 +35,9 @@ export const MAX_REPORTED_ISSUES = 100
 
 /**
  * A problem with one cell, shown in the results table as Row / Column / Value found / Issue.
+ *
+ * The issue is split in two: `title` names the problem, `detail` says how to fix it. Both are
+ * shown, the title above the detail, so keep the detail to a sentence - it sits in a table cell.
  */
 export interface RowIssue {
   /** Row number as the spreadsheet shows it: the header is row 1, so the first recipient is row 2. */
@@ -42,7 +45,10 @@ export interface RowIssue {
   column: string
   /** The offending cell, or undefined when it was empty. */
   value?: string
-  issue: string
+  /** Short label naming the problem. */
+  title: string
+  /** One sentence on how to fix it, shown under the title. */
+  detail: string
 }
 
 /**
@@ -249,13 +255,28 @@ export function validateCsv(
       const name = headers[column]
 
       if (!value) {
-        rowIssues.push({ row: rowNumber, column: name, issue: 'Missing or invalid value' })
+        rowIssues.push({
+          row: rowNumber,
+          column: name,
+          title: 'Missing or invalid value',
+          detail: `The '${name}' column is empty. Fill it in, or delete the row.`,
+        })
         continue
       }
 
       if (column === recipientIndex) {
         if (!isValidRecipient(value, channel)) {
-          rowIssues.push({ row: rowNumber, column: name, value, issue: 'Invalid format' })
+          rowIssues.push({
+            row: rowNumber,
+            column: name,
+            value,
+            title: 'Invalid format',
+            // The offending value is already in its own column, so the detail is the fix alone.
+            detail:
+              channel === 'sms'
+                ? 'Use a 10-digit number, or a country code after a plus sign, like +12505550199.'
+                : 'Use a single @ with a domain after it, like name@example.com.',
+          })
           continue
         }
 
@@ -266,7 +287,8 @@ export function validateCsv(
             row: rowNumber,
             column: name,
             value,
-            issue: `Duplicate of row ${firstSeen}`,
+            title: `Duplicate of row ${firstSeen}`,
+            detail: `This recipient was already listed on row ${firstSeen}. Remove one of the rows.`,
           })
         } else {
           firstSeenAt.set(normalised, rowNumber)

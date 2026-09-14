@@ -43,7 +43,7 @@ const navItems = [
     icon: <FolderOutlinedIcon />,
   },
   {
-    label: 'Batch Send',
+    label: 'Send Batch Notification',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
   },
@@ -124,13 +124,15 @@ const Sidebar: FC = () => {
       {/* Top nav */}
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
+          // Keyed on the route, not the label: a label is copy and gets reworded, and keying
+          // visibility on it means a rename silently hides the link.
           const shouldShow =
-            (item.label === 'Home' && hasTenantRole) ||
-            (item.label === 'Dashboard' && hasTenantRole) ||
-            (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Batch Send' && canBulkNotify) ||
-            (item.label === 'Usage & Limits' && showUsage) ||
-            (item.label === 'Settings' && hasTenantRole)
+            (item.to === '/' && hasTenantRole) ||
+            (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/templates' && hasTenantRole) ||
+            (item.to === '/bulk-notifications' && canBulkNotify) ||
+            (item.to === '/usage' && showUsage) ||
+            (item.to === '/settings' && hasTenantRole)
 
           return shouldShow ? (
             <Link

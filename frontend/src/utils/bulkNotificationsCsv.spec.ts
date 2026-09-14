@@ -123,9 +123,15 @@ describe('validateCsv row-level problems', () => {
   it('reports an empty cell with a dash for the value, as the table renders it', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [['alice@gov.bc.ca', '']] }
 
-    expect(validateCsv(parsed, placeholders, 'email').rowIssues).toEqual([
-      { row: 2, column: 'firstName', issue: 'Missing or invalid value' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 2,
+      column: 'firstName',
+      title: 'Missing or invalid value',
+    })
+    expect(issue.value).toBeUndefined()
+    expect(issue.detail).toContain("The 'firstName' column is empty")
   })
 
   it('reports a malformed address with the value it found', () => {
@@ -138,9 +144,16 @@ describe('validateCsv row-level problems', () => {
     }
 
     // Row 1 is the header, so Lisa is row 3 to the person editing the file.
-    expect(validateCsv(parsed, placeholders, 'email').rowIssues).toEqual([
-      { row: 3, column: 'email', value: 'lisa.thompson@govbcca', issue: 'Invalid format' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 3,
+      column: 'email',
+      value: 'lisa.thompson@govbcca',
+      title: 'Invalid format',
+    })
+    // The detail is what tells someone how to fix it, so it names the shape expected.
+    expect(issue.detail).toContain('name@example.com')
   })
 
   it('reports a duplicate against the row it first appeared on', () => {
@@ -152,9 +165,24 @@ describe('validateCsv row-level problems', () => {
       ],
     }
 
-    expect(validateCsv(parsed, placeholders, 'email').rowIssues).toEqual([
-      { row: 3, column: 'email', value: 'ALICE@gov.bc.ca', issue: 'Duplicate of row 2' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 3,
+      column: 'email',
+      value: 'ALICE@gov.bc.ca',
+      title: 'Duplicate of row 2',
+    })
+    expect(issue.detail).toContain('already listed on row 2')
+  })
+
+  it('explains an invalid phone number in the terms the SMS channel accepts', () => {
+    const parsed = { headers: ['phone', 'firstName'], rows: [['not-a-number', 'Alice']] }
+
+    const [issue] = validateCsv(parsed, placeholders, 'sms').rowIssues
+
+    expect(issue).toMatchObject({ row: 2, column: 'phone', title: 'Invalid format' })
+    expect(issue.detail).toContain('+12505550199')
   })
 
   it('caps how many row problems it reports', () => {

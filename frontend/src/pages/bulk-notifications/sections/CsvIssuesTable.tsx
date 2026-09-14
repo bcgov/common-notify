@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { InlineAlert } from '@bcgov/design-system-react-components'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
+import IssueMessage from '@/components/IssueMessage/IssueMessage'
 import type { RowIssue } from '@/utils/bulkNotificationsCsv'
 
 interface IssueRow extends RowIssue {
@@ -21,7 +22,15 @@ const issueColumns: TableColumn<IssueRow>[] = [
     // An empty cell reads as a dash, so a missing value is visibly missing rather than blank.
     render: (_, issue) => <span>{issue.value ?? '–'}</span>,
   },
-  { key: 'issue', label: 'Issue', width: '220px', sortable: true },
+  {
+    key: 'title',
+    label: 'Issue',
+    width: '340px',
+    sortable: true,
+    // Sorted on the title alone - the detail restates it, so sorting by the full text would
+    // group rows no differently while making the order harder to predict.
+    render: (_, issue) => <IssueMessage title={issue.title} detail={issue.detail} />,
+  },
 ]
 
 /** Sort the issue rows in place of a server round-trip - the whole list is already in memory. */
@@ -56,6 +65,8 @@ interface Props {
 /**
  * The row-level problems found in an uploaded CSV: a count the user can act on, and the sortable
  * table beneath it.
+ *
+ * Each row states the problem as a title with the fix beneath it.
  *
  * Sort order is local because it is presentation only - the page decides which rows are wrong,
  * this decides how they are read. Renders nothing when the file is clean, so the caller does not
