@@ -14,11 +14,11 @@ const placeholders = ['firstName']
 
 describe('buildSampleCsv', () => {
   it('puts the recipient column first, then the placeholders', () => {
-    expect(buildSampleCsv(['firstName', 'dueDate'])).toBe('email,firstName,dueDate')
+    expect(buildSampleCsv(['firstName', 'dueDate'], 'email')).toBe('email,firstName,dueDate')
   })
 
   it('emits only a header row, so nothing can be sent by accident', () => {
-    expect(buildSampleCsv(['firstName']).split('\n')).toHaveLength(1)
+    expect(buildSampleCsv(['firstName'], 'email').split('\n')).toHaveLength(1)
   })
 })
 
@@ -67,13 +67,13 @@ describe('validateCsv file-level problems', () => {
   it('accepts a file that matches the template', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [['alice@gov.bc.ca', 'Alice']] }
 
-    expect(validateCsv(parsed, placeholders)).toEqual({ fileIssue: null, rowIssues: [] })
+    expect(validateCsv(parsed, placeholders, 'email')).toEqual({ fileIssue: null, rowIssues: [] })
   })
 
   it('names the missing column the way the design does', () => {
     const parsed = { headers: ['email'], rows: [['alice@gov.bc.ca']] }
 
-    expect(validateCsv(parsed, placeholders).fileIssue).toBe(
+    expect(validateCsv(parsed, placeholders, 'email').fileIssue).toBe(
       "Your CSV file is missing required column called 'firstName'.",
     )
   })
@@ -81,7 +81,7 @@ describe('validateCsv file-level problems', () => {
   it('reports a missing recipient column by its UI name, not the API name', () => {
     const parsed = { headers: ['firstName'], rows: [['Alice']] }
 
-    expect(validateCsv(parsed, placeholders).fileIssue).toBe(
+    expect(validateCsv(parsed, placeholders, 'email').fileIssue).toBe(
       "Your CSV file is missing required column called 'email'.",
     )
   })
@@ -89,22 +89,24 @@ describe('validateCsv file-level problems', () => {
   it('reports a column the template does not use', () => {
     const parsed = { headers: ['email', 'firstName', 'notes'], rows: [['a@gov.bc.ca', 'A', 'x']] }
 
-    expect(validateCsv(parsed, placeholders).fileIssue).toContain("'notes'")
+    expect(validateCsv(parsed, placeholders, 'email').fileIssue).toContain("'notes'")
   })
 
   it('reports an empty file', () => {
-    expect(validateCsv({ headers: [], rows: [] }, placeholders).fileIssue).toContain('empty')
+    expect(validateCsv({ headers: [], rows: [] }, placeholders, 'email').fileIssue).toContain(
+      'empty',
+    )
   })
 
   it('reports a file with headers but no recipients', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [] }
 
-    expect(validateCsv(parsed, placeholders).fileIssue).toContain('no recipients')
+    expect(validateCsv(parsed, placeholders, 'email').fileIssue).toContain('no recipients')
   })
 
   it('reports a file over the recipient limit without listing every row', () => {
     const rows = Array.from({ length: MAX_RECIPIENTS + 1 }, (_, i) => [`p${i}@gov.bc.ca`, 'Name'])
-    const result = validateCsv({ headers: ['email', 'firstName'], rows }, placeholders)
+    const result = validateCsv({ headers: ['email', 'firstName'], rows }, placeholders, 'email')
 
     expect(result.fileIssue).toContain('The limit is')
     expect(result.rowIssues).toEqual([])
@@ -113,7 +115,7 @@ describe('validateCsv file-level problems', () => {
   it('does not report row problems while the columns are wrong', () => {
     const parsed = { headers: ['email'], rows: [['not-an-email']] }
 
-    expect(validateCsv(parsed, placeholders).rowIssues).toEqual([])
+    expect(validateCsv(parsed, placeholders, 'email').rowIssues).toEqual([])
   })
 })
 
@@ -121,9 +123,15 @@ describe('validateCsv row-level problems', () => {
   it('reports an empty cell with a dash for the value, as the table renders it', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [['alice@gov.bc.ca', '']] }
 
-    expect(validateCsv(parsed, placeholders).rowIssues).toEqual([
-      { row: 2, column: 'firstName', issue: 'Missing or invalid value' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 2,
+      column: 'firstName',
+      title: 'Missing or invalid value',
+    })
+    expect(issue.value).toBeUndefined()
+    expect(issue.detail).toContain("The 'firstName' column is empty")
   })
 
   it('reports a malformed address with the value it found', () => {
@@ -136,9 +144,16 @@ describe('validateCsv row-level problems', () => {
     }
 
     // Row 1 is the header, so Lisa is row 3 to the person editing the file.
-    expect(validateCsv(parsed, placeholders).rowIssues).toEqual([
-      { row: 3, column: 'email', value: 'lisa.thompson@govbcca', issue: 'Invalid format' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 3,
+      column: 'email',
+      value: 'lisa.thompson@govbcca',
+      title: 'Invalid format',
+    })
+    // The detail is what tells someone how to fix it, so it names the shape expected.
+    expect(issue.detail).toContain('name@example.com')
   })
 
   it('reports a duplicate against the row it first appeared on', () => {
@@ -150,16 +165,32 @@ describe('validateCsv row-level problems', () => {
       ],
     }
 
-    expect(validateCsv(parsed, placeholders).rowIssues).toEqual([
-      { row: 3, column: 'email', value: 'ALICE@gov.bc.ca', issue: 'Duplicate of row 2' },
-    ])
+    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+
+    expect(issue).toMatchObject({
+      row: 3,
+      column: 'email',
+      value: 'ALICE@gov.bc.ca',
+      title: 'Duplicate of row 2',
+    })
+    expect(issue.detail).toContain('already listed on row 2')
+  })
+
+  it('explains an invalid phone number in the terms the SMS channel accepts', () => {
+    const parsed = { headers: ['phone', 'firstName'], rows: [['not-a-number', 'Alice']] }
+
+    const [issue] = validateCsv(parsed, placeholders, 'sms').rowIssues
+
+    expect(issue).toMatchObject({ row: 2, column: 'phone', title: 'Invalid format' })
+    expect(issue.detail).toContain('+12505550199')
   })
 
   it('caps how many row problems it reports', () => {
     const rows = Array.from({ length: 500 }, () => ['not-an-email', 'Name'])
 
     expect(
-      validateCsv({ headers: ['email', 'firstName'], rows }, placeholders).rowIssues.length,
+      validateCsv({ headers: ['email', 'firstName'], rows }, placeholders, 'email').rowIssues
+        .length,
     ).toBe(100)
   })
 })
@@ -168,7 +199,7 @@ describe('toMergeArray', () => {
   it('renames the recipient column to the one the API expects', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [['alice@gov.bc.ca', 'Alice']] }
 
-    expect(toMergeArray(parsed)).toEqual([
+    expect(toMergeArray(parsed, 'email')).toEqual([
       ['to', 'firstName'],
       ['alice@gov.bc.ca', 'Alice'],
     ])
@@ -177,7 +208,7 @@ describe('toMergeArray', () => {
   it('moves the recipient column to the front when the file lists it elsewhere', () => {
     const parsed = { headers: ['firstName', 'email'], rows: [['Alice', 'alice@gov.bc.ca']] }
 
-    expect(toMergeArray(parsed)).toEqual([
+    expect(toMergeArray(parsed, 'email')).toEqual([
       ['to', 'firstName'],
       ['alice@gov.bc.ca', 'Alice'],
     ])
@@ -191,8 +222,8 @@ describe('rowParams and rowRecipient', () => {
       rows: [['alice@gov.bc.ca', 'Alice', '2026-09-15']],
     }
 
-    expect(rowParams(parsed, 0)).toEqual({ firstName: 'Alice', dueDate: '2026-09-15' })
-    expect(rowRecipient(parsed, 0)).toBe('alice@gov.bc.ca')
+    expect(rowParams(parsed, 0, 'email')).toEqual({ firstName: 'Alice', dueDate: '2026-09-15' })
+    expect(rowRecipient(parsed, 0, 'email')).toBe('alice@gov.bc.ca')
   })
 
   it('nests a dotted column so the preview renders {{alert.id}}', () => {
@@ -201,7 +232,7 @@ describe('rowParams and rowRecipient', () => {
       rows: [['alice@gov.bc.ca', 'A-1', 'High', 'Alice']],
     }
 
-    expect(rowParams(parsed, 0)).toEqual({
+    expect(rowParams(parsed, 0, 'email')).toEqual({
       alert: { id: 'A-1', severity: 'High' },
       recipient: { firstName: 'Alice' },
     })
@@ -210,7 +241,7 @@ describe('rowParams and rowRecipient', () => {
   it('supplies the root key the personalisation check looks for', () => {
     const parsed = { headers: ['email', 'alert.id'], rows: [['alice@gov.bc.ca', 'A-1']] }
 
-    expect(Object.prototype.hasOwnProperty.call(rowParams(parsed, 0), 'alert')).toBe(true)
+    expect(Object.prototype.hasOwnProperty.call(rowParams(parsed, 0, 'email'), 'alert')).toBe(true)
   })
 
   it('ignores a column that would write through the prototype chain', () => {
@@ -219,14 +250,14 @@ describe('rowParams and rowRecipient', () => {
       rows: [['alice@gov.bc.ca', 'yes', 'Alice']],
     }
 
-    expect(rowParams(parsed, 0)).toEqual({ firstName: 'Alice' })
+    expect(rowParams(parsed, 0, 'email')).toEqual({ firstName: 'Alice' })
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })
 
   it('finds the address wherever the recipient column sits', () => {
     const parsed = { headers: ['firstName', 'email'], rows: [['Alice', 'alice@gov.bc.ca']] }
 
-    expect(rowRecipient(parsed, 0)).toBe('alice@gov.bc.ca')
-    expect(rowParams(parsed, 0)).toEqual({ firstName: 'Alice' })
+    expect(rowRecipient(parsed, 0, 'email')).toBe('alice@gov.bc.ca')
+    expect(rowParams(parsed, 0, 'email')).toEqual({ firstName: 'Alice' })
   })
 })

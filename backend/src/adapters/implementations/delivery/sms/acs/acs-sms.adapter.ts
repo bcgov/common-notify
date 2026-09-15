@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { SmsClient } from '@azure/communication-sms'
-import { ISmsTransport, SendSmsOptions, SendSmsResult } from '../../../../interfaces'
+import {
+  ISmsTransport,
+  SendSmsOptions,
+  SendSmsResult,
+  SmsRecipientResult,
+} from '../../../../interfaces'
 
 @Injectable()
 export class AcsSmsTransport implements ISmsTransport {
@@ -54,39 +59,57 @@ export class AcsSmsTransport implements ISmsTransport {
       return {
         messageId: `dev-acs-${Date.now()}`,
         providerResponse: 'logged',
+        results: toNumbers.map((to) => ({ to, success: true, messageId: `dev-acs-${Date.now()}` })),
       }
     }
 
-    const results = await this.client.send({
-      from: resolvedFrom,
-      to: toNumbers,
-      message: body,
-    })
+    const results = await this.client.send(
+      {
+        from: resolvedFrom,
+        to: toNumbers,
+        message: body,
+      },
+      {
+        // ACS only emits SMSDeliveryReportReceived events when this is set at send time, so it has
+        // to be on now for those reports to exist later. Nothing consumes them yet: acceptance by
+        // ACS is not delivery, and a number pending regulatory approval is accepted and then
+        // dropped by the carrier with no signal back to us.
+        enableDeliveryReport: true,
+        // Comes back on the delivery report, so it can be matched to our notification.
+        tag: opts.tag,
+      },
+    )
 
-    const failedResults = results.filter((result) => result.successful === false)
-    if (failedResults.length > 0) {
+    // ACS reports each recipient separately, so report them onward rather than collapsing the
+    // send into one success or failure. Throwing on a partial failure used to fail the whole job,
+    // and the queue's retry then re-sent to recipients who had already received the message.
+    const recipientResults: SmsRecipientResult[] = results.map((result) => ({
+      to: result.to,
+      success: result.successful === true,
+      messageId: result.successful ? result.messageId : undefined,
+      error: result.successful
+        ? undefined
+        : (result.errorMessage ?? `ACS returned HTTP ${result.httpStatusCode}`),
+    }))
+
+    const failed = recipientResults.filter((result) => !result.success)
+    if (failed.length > 0) {
       this.logger.error(
-        `ACS send failures: ${JSON.stringify(
-          failedResults.map((result) => ({
-            to: result.to,
-            errorMessage: result.errorMessage,
-            httpStatusCode: result.httpStatusCode,
-          })),
-        )}`,
+        `ACS send failures: ${JSON.stringify(failed.map(({ to, error }) => ({ to, error })))}`,
       )
-
-      // KNOWN LIMITATION: on partial recipient failure, this throws to fail the whole
-      // job, which causes Bull to retry the entire batch — including recipients who
-      // already succeeded. This can duplicate-send SMS to already-delivered recipients.
-      // Fixing this requires per-recipient retry granularity (ISmsTransport contract
-      // change + SmsDeliveryWorker retry logic), tracked separately — do not enable
-      // ACS for real tenant traffic until that follow-up ticket lands.
-      throw new Error(`ACS send failed for ${failedResults.length} of ${results.length} recipients`)
     }
 
+    // Every recipient failing is systemic - a bad credential, a disabled number - and worth a
+    // retry of the whole job. A partial failure is not: the successes must not be repeated.
+    if (failed.length === recipientResults.length && recipientResults.length > 0) {
+      throw new Error(`ACS send failed for all ${recipientResults.length} recipient(s)`)
+    }
+
+    const succeeded = recipientResults.filter((result) => result.success)
     return {
-      messageId: results[0]?.messageId,
-      providerResponse: `sent to ${results.length} recipient(s)`,
+      messageId: succeeded[0]?.messageId,
+      providerResponse: `sent to ${succeeded.length} of ${recipientResults.length} recipient(s)`,
+      results: recipientResults,
     }
   }
 }

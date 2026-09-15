@@ -5,12 +5,17 @@ import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
 import { NotifySmsRecipients } from './notify-sms-recipients'
+import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyContent } from './notify-content'
 
 @ValidateTemplateOrRenderer()
 export class NotifySmsChannel {
-  @ApiProperty({ type: NotifySmsRecipients, description: 'SMS recipients' })
+  @ApiProperty({
+    type: NotifySmsRecipients,
+    description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send',
+  })
   @ValidateNested()
+  @ValidateRecipientsOrMerge()
   @Type(() => NotifySmsRecipients)
   recipients: NotifySmsRecipients
 
