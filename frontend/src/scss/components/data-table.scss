@@ -465,3 +465,10 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     vertical-align: top;
   }
 }
+
+// The name cell of a table whose rows link to a detail page. Link-blue on every row reads as
+// noise when the whole column is links, so these take the body text colour and keep the
+// underline on hover/focus as the affordance. Used by the templates and events tables.
+.data-table__cell-link {
+  color: $dark-text;
+}

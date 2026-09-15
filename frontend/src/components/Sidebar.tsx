@@ -7,6 +7,7 @@ import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
@@ -137,6 +138,7 @@ const Sidebar: FC = () => {
           const shouldShow =
             (item.to === '/' && hasTenantRole) ||
             (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/events' && hasTenantRole && eventsEnabled) ||
             (item.to === '/templates' && hasTenantRole) ||
             (item.to === '/bulk-notifications' && canBulkNotify) ||
             (item.to === '/usage' && showUsage) ||
