@@ -44,9 +44,9 @@ const PG_UNIQUE_VIOLATION = '23505'
 export class ApiKeyIssuanceService {
   private readonly logger = new Logger(ApiKeyIssuanceService.name)
 
-  /** Shared ACL group every issued credential joins. See configuration.ts. */
-  private get aclGroup(): string {
-    return this.configService.get<string>('aps.aclGroup') || 'notify-api'
+  /** Shared ACL group every issued credential joins, or undefined. See configuration.ts. */
+  private get aclGroup(): string | undefined {
+    return this.configService.get<string>('aps.aclGroup') || undefined
   }
 
   /** Which deployed environment issued a credential. See configuration.ts. */
@@ -101,17 +101,19 @@ export class ApiKeyIssuanceService {
     const credential = await this.credentialIssuer.issue({
       applicationName,
       applicationDescription: `Notify API key for tenant ${tenant.name}`,
-      // Kong forwards ACL groups to the upstream as X-Consumer-Groups, so this is what
-      // puts the tenant's CSTAR id into a request header — the one supported way to
-      // identify a tenant without a database lookup. APS's own spec example does the
-      // same thing. Ignored on a kong-api-key-only environment (no ACL plugin), so it
-      // is harmless to send there and active once the environment moves to -acl.
+      // Only when APS_ACL_GROUP is set. Every gw-fe8c5 Environment is kong-api-key-only
+      // and no generated route carries an acl plugin, so groups would authorize nothing
+      // and whether the gateway accepts a control its flow does not support is untested.
+      // Nothing reads X-Consumer-Groups either — tenants resolve by credential
+      // identifier (see resolve-api-key-consumer.ts).
       //
-      // The shared group is what the gateway's acl plugin actually allows. The tenant's
-      // own group is never in that allow-list — it does not need to be, because Kong
-      // reports every group the consumer belongs to, not just the one that matched.
-      // That is what keeps the allow-list static while tenants stay dynamic.
-      aclGroups: [this.aclGroup, tenant.externalId].filter(Boolean) as string[],
+      // Once set, the shared group is what an acl plugin's allow-list would name. The
+      // tenant's own group never needs to be in that list, because Kong reports every
+      // group the consumer belongs to, not just the one that matched — which is what
+      // would keep the allow-list static while tenants stay dynamic.
+      ...(this.aclGroup
+        ? { aclGroups: [this.aclGroup, tenant.externalId].filter(Boolean) as string[] }
+        : {}),
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
