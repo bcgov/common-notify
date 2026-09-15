@@ -27,6 +27,10 @@ generate_env_config() {
   local release=$2
 
   local ENV_FILE="${SCRIPT_DIR}/config/${env}.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: no '${env}' stage (${ENV_FILE})"
+    exit 1
+  fi
   local TEMPLATE_FILE="${SCRIPT_DIR}/templates/routes.yaml"
   local OUTPUT_FILE="${SCRIPT_DIR}/generated/gw-routes-${env}.yaml"
 

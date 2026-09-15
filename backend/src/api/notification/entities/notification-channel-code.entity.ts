@@ -25,4 +25,11 @@ export class NotificationChannelCode {
 
   @Column({ type: 'int', default: 999 })
   sort_order: number
+
+  /**
+   * POSIX pattern a recipient address must match for this channel, in the normalized form that
+   * is stored. Applied to event recipients by a database trigger; null means unchecked.
+   */
+  @Column({ name: 'recipient_pattern', type: 'varchar', length: 500, nullable: true })
+  recipientPattern: string | null
 }
