@@ -111,7 +111,8 @@ export async function bootstrap() {
         '',
         'Every request goes through the API gateway and carries your key in the `X-API-KEY` ' +
           'header. There is no tenant identifier to send - the key already says who you are. ' +
-          'The gateway also rate-limits per key.',
+          'The gateway also rate-limits per key. The GC Notify-compatible endpoints instead take ' +
+          'the key the way GC Notify does: `Authorization: ApiKey-v1 {api-key}`.',
         '',
         '### Sending is asynchronous',
         '',
@@ -128,6 +129,7 @@ export async function bootstrap() {
       ].join('\n'),
     )
     .setVersion('1.0')
+    .addBearerAuth()
     .addApiKey(
       {
         type: 'apiKey',
@@ -136,6 +138,16 @@ export async function bootstrap() {
         description: 'API key issued for the gateway and bound to your tenant.',
       },
       'api-key',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'Authorization',
+        in: 'header',
+        description:
+          'GC Notify-compatible endpoints only. Enter `ApiKey-v1 {api-key}`, prefix included.',
+      },
+      'gc-notify-api-key',
     )
     .addTag('Send', 'Submit a notification for delivery')
     .addTag('Notification status', 'Find out what happened to a notification')
