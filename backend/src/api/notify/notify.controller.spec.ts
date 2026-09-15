@@ -710,6 +710,27 @@ describe('Notify Controllers', () => {
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       })
 
+      it('hands the email shorthand params to validation under the channel, not top level', async () => {
+        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // Everything the caller sent lands under email — so validateBusinessRules sees no
+        // top-level params and must read the channel's own params to resolve placeholders.
+        const templateId = '12345678-1234-4234-8234-123456789012'
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send({
+            recipients: { to: ['test@example.com'] },
+            content: { templateId },
+            params: { firstName: 'Alice' },
+          })
+          .expect(202)
+
+        const [, validatedPayload] =
+          mockNotificationService.validateBusinessRules.mock.calls.at(-1)!
+        expect(validatedPayload.params).toBeUndefined()
+        expect(validatedPayload.email.params).toEqual({ firstName: 'Alice' })
+      })
+
       it('should return a clear DTO error when attachment content is missing', async () => {
         await request(app.getHttpServer())
           .post('/api/v1/notifysimple')
