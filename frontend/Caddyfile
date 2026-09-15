@@ -42,12 +42,11 @@ window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE="{$VITE_MAX_NOTIFICATION_RESULTS_P
 window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	}
 
-	# Serve API documentation (OpenAPI/Swagger)
-	handle_path /api-docs* {
-		root * /srv/api-docs
-		encode zstd gzip
-		file_server browse
-	}
+	# Nest generates the API spec from the controllers and serves it at
+	# /api/docs, which the gateway proxy above forwards to Kong. These keep
+	# links to the older /api-docs path working.
+	redir /api-docs /api/docs permanent
+	redir /api-docs/* /api/docs permanent
 
 	root * /srv
 	encode zstd gzip
@@ -55,7 +54,6 @@ window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
 	@spa_router {
 		not path /api*
 		not path /gcnotify/*
-		not path /api-docs*
 		not path /static/config.js
 		file {
 			try_files {path} /index.html
