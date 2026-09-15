@@ -15,7 +15,7 @@ function renderModal(overrides: Partial<Parameters<typeof NotificationPreviewMod
     <NotificationPreviewModal
       isOpen
       onClose={onClose}
-      title="Bulk Notifications Preview"
+      title="Batch Send Preview"
       variables={variables}
       variablesIntro="These values come from your CSV file."
       bodyText="Hello Molly"
@@ -29,7 +29,7 @@ describe('NotificationPreviewModal', () => {
   it('renders nothing while closed', () => {
     renderModal({ isOpen: false })
 
-    expect(screen.queryByText('Bulk Notifications Preview')).not.toBeInTheDocument()
+    expect(screen.queryByText('Batch Send Preview')).not.toBeInTheDocument()
   })
 
   it('shows the values the body was rendered from', () => {

@@ -28,6 +28,10 @@ const notificationListQueryConfig: QueryableFieldsConfig = {
     createdAt: 'notification.createdAt',
     updatedAt: 'notification.updatedAt',
     status: 'notification.status',
+    // The Sent Date column renders delayedSendTime ?? createdAt, so it has to sort on the same
+    // COALESCE. It is selected as sent_date in findAll: TypeORM rewrites a paginated join query
+    // into a distinct subquery, and only a column path or a select alias survives that rewrite.
+    delayedSendTime: 'sent_date',
   },
   filterableFields: {
     status: {
@@ -378,6 +382,8 @@ export class NotificationService {
       .createQueryBuilder('notification')
       .leftJoinAndSelect('notification.tenant', 'tenant')
       .leftJoinAndSelect('notification.statusCode', 'statusCode')
+      // Backs the delayedSendTime sort; see notificationListQueryConfig.
+      .addSelect('COALESCE(notification.delayed_send_time, notification.created_at)', 'sent_date')
       .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('notification.isInternal = :isInternal', { isInternal: false })
 
