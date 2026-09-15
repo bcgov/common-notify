@@ -38,8 +38,11 @@ describe('ApiKeyIssuanceService', () => {
     regenerate: ReturnType<typeof vi.fn>
   }
   let apiKeysService: { ensureDefaults: ReturnType<typeof vi.fn> }
+  let aclGroupConfig: string | undefined
 
   beforeEach(async () => {
+    aclGroupConfig = 'notify-api'
+
     repository = {
       count: vi.fn().mockResolvedValue(0),
       find: vi.fn().mockResolvedValue([]),
@@ -67,7 +70,7 @@ describe('ApiKeyIssuanceService', () => {
           provide: ConfigService,
           useValue: {
             get: vi.fn((key: string) => {
-              if (key === 'aps.aclGroup') return 'notify-api'
+              if (key === 'aps.aclGroup') return aclGroupConfig
               if (key === 'releaseName') return 'common-notify-dev'
               return 'ENV123'
             }),
@@ -89,10 +92,9 @@ describe('ApiKeyIssuanceService', () => {
         // Carries the CSTAR guid so the Consumers page is searchable by it, and a
         // discriminator because a repeated name is permanently unusable.
         applicationName: expect.stringMatching(/^notify-tenant-a-cstar-guid-[0-9a-f]{6}$/),
-        // Kong forwards ACL groups as X-Consumer-Groups — the one supported way to get
-        // the tenant into a request header. The shared group is what the gateway's acl
-        // plugin allows; the tenant's own group is never in that allow-list and does not
-        // need to be, since Kong reports every group the consumer belongs to.
+        // Sent only because APS_ACL_GROUP is set here. The shared group is what an acl
+        // plugin's allow-list would name; the tenant's own group is never in that list
+        // and does not need to be, since Kong reports every group a consumer belongs to.
         aclGroups: ['notify-api', 'cstar-guid'],
         applicationDescription: 'Notify API key for tenant Tenant A',
         labels: {
@@ -134,9 +136,22 @@ describe('ApiKeyIssuanceService', () => {
       expect(call.labels).not.toHaveProperty('cstar-tenant-id')
       expect(call.labels['notify-tenant']).toBe('tenant-a')
       // The shared group is still sent. Dropping it for a tenant with no CSTAR id would
-      // leave the key outside the acl plugin's allow-list, so every request it made
+      // leave the key outside an acl plugin's allow-list, so every request it made
       // would 403 — the load-test tenant is exactly such a tenant.
       expect(call.aclGroups).toEqual(['notify-api'])
+    })
+
+    it('sends no ACL controls at all when APS_ACL_GROUP is unset', async () => {
+      // The default, and what every gw-fe8c5 Environment needs: they are all
+      // kong-api-key-only, so a control the flow does not support is a risk taken for
+      // groups that would authorize nothing. Absent, not empty — an empty array would
+      // still put a `controls` object on the request.
+      aclGroupConfig = undefined
+
+      await issue()
+
+      const call = credentialIssuer.issue.mock.calls[0][0]
+      expect(call).not.toHaveProperty('aclGroups')
     })
 
     it('seeds limits from the tenant the same way a bound key does', async () => {
