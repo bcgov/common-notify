@@ -75,6 +75,7 @@ function setState(safelist: Record<string, unknown> = {}) {
       maxEntries: 50,
       loading: false,
       saving: false,
+      hasLoaded: true,
       error: undefined,
       ...safelist,
     },
@@ -184,5 +185,41 @@ describe('SafelistSection', () => {
     render(<SafelistSection />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to load the safelist')
+  })
+
+  it('says nothing about enforcement until the list has loaded', () => {
+    // `enforced` defaults to false, so an enforcing environment would otherwise be announced as
+    // unenforced for as long as the first request is in flight.
+    setState({ hasLoaded: false, loading: true, enforced: false })
+
+    render(<SafelistSection />)
+
+    expect(screen.queryByText(/does not enforce the safelist/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/loading safelist/i)).toBeInTheDocument()
+  })
+
+  it('reports a failed load without claiming the environment is unenforced', () => {
+    // What a user without the tenant role sees: the request 403s and never loads.
+    setState({
+      hasLoaded: false,
+      loading: false,
+      enforced: false,
+      error: 'You do not have permission to access this resource',
+    })
+
+    render(<SafelistSection />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('You do not have permission')
+    expect(screen.queryByText(/does not enforce the safelist/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/only sends to safelisted recipients/i)).not.toBeInTheDocument()
+  })
+
+  it('still shows the list when an add fails after a successful load', () => {
+    setState({ entries: [entry()], error: 'Already on the safelist' })
+
+    render(<SafelistSection />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Already on the safelist')
+    expect(screen.getByTestId('entry-count')).toHaveTextContent('1')
   })
 })
