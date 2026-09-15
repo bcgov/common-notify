@@ -501,6 +501,7 @@ export class NotificationService {
     const validateChannelTemplate = async (
       templateId: string,
       expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
+      channelParams?: Record<string, unknown>,
     ): Promise<void> => {
       try {
         const template = await this.templatesRepository.findById(tenantId, templateId)
@@ -513,7 +514,15 @@ export class NotificationService {
             `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
           )
         } else if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
-          await this.templatesService.renderTemplateContent(template as any, request.params ?? {})
+          // Channel params override request params, matching the delivery workers. The
+          // /notifysimple/email and /notifysimple/sms shorthands post a bare channel object, so
+          // everything the caller sent — params included — arrives under the channel and there is
+          // no top-level params at all; reading only request.params reports every placeholder as
+          // missing and rejects the send before it is ever queued.
+          await this.templatesService.renderTemplateContent(template as any, {
+            ...request.params,
+            ...channelParams,
+          })
         }
       } catch (error) {
         if (error instanceof BadRequestException) {
@@ -529,9 +538,11 @@ export class NotificationService {
     const smsTemplateId = request.sms?.content?.templateId
     const msgAppTemplateId = request.msgApp?.content?.templateId
 
-    if (emailTemplateId) await validateChannelTemplate(emailTemplateId, 'EMAIL')
-    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS')
-    if (msgAppTemplateId) await validateChannelTemplate(msgAppTemplateId, 'MSGAPP')
+    if (emailTemplateId)
+      await validateChannelTemplate(emailTemplateId, 'EMAIL', request.email?.params)
+    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS', request.sms?.params)
+    if (msgAppTemplateId)
+      await validateChannelTemplate(msgAppTemplateId, 'MSGAPP', request.msgApp?.params)
 
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.to?.length ?? 0
