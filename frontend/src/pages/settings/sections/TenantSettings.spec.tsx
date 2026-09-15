@@ -24,11 +24,6 @@ vi.mock('./ApiKeyField', () => ({
   default: () => <div data-testid="api-key-field" />,
 }))
 
-let apiKeySelfServiceEnabled = true
-vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
-  useFeatureFlag: () => apiKeySelfServiceEnabled,
-}))
-
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),
@@ -81,24 +76,15 @@ function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN
 
 const saveButton = () => screen.getByRole('button', { name: 'Save tenant settings' })
 
-describe('API key self-service gate', () => {
-  it('shows the API key field when the feature flag is on', () => {
-    apiKeySelfServiceEnabled = true
+describe('API key field', () => {
+  it('renders for every environment — all of them issue through gw-fe8c5', () => {
     renderWithRoles()
     expect(screen.getByTestId('api-key-field')).toBeInTheDocument()
-  })
-
-  it('hides the API key field when the feature flag is off', () => {
-    // PROD: the gateway there has no Credential Issuer API, so issuing would fail.
-    apiKeySelfServiceEnabled = false
-    renderWithRoles()
-    expect(screen.queryByTestId('api-key-field')).not.toBeInTheDocument()
   })
 })
 
 describe('TenantSettings section', () => {
   beforeEach(() => {
-    apiKeySelfServiceEnabled = true
     vi.clearAllMocks()
     dispatchMock.mockImplementation((action) => ({
       unwrap: () =>

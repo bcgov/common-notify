@@ -11,8 +11,8 @@ export type ApsInstance = 'local-mock' | 'aps-test' | 'aps-prod' | 'unknown'
  *
  * The three deployments in play:
  *   - the mock in .devcontainer/oauth2-mock-server.js
- *   - the APS test instance, where the Credential Issuer API currently lives
- *   - the APS production instance, which hosts gw-fe8c5
+ *   - the APS test instance
+ *   - the APS production instance, which hosts gw-fe8c5 for every environment
  */
 export function classifyApsHost(url: string | undefined): ApsInstance {
   if (!url) return 'unknown'
