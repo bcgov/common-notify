@@ -66,6 +66,14 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Notification events
+    events: {
+      // The only domain an event may send from. Tenant settings store a local part and append
+      // this same domain (see the Settings > Email tab), so an event's own sender address is
+      // held to it too rather than being free text.
+      senderEmailDomain: process.env.EVENT_SENDER_EMAIL_DOMAIN || 'gov.bc.ca',
+    },
+
     // Kong Admin API (for API key management)
     kong: {
       adminUrl: process.env.KONG_ADMIN_URL,
@@ -92,14 +100,13 @@ export default () => {
       // requires the scope to be requested explicitly.
       scope: process.env.APS_TOKEN_SCOPE,
       timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
-      // Group every issued credential joins, in addition to the tenant's CSTAR id.
-      // The gateway's acl plugin allows this one group, which is what lets a single
-      // static allow-list authorize an unbounded set of tenants: the tenant's own
-      // group rides along in X-Consumer-Groups without ever needing to be enumerated.
-      //
-      // MUST match ACL_GROUP in api-gateway/config/*.env. A mismatch is a 403 on every
-      // request, so change both together.
-      aclGroup: process.env.APS_ACL_GROUP || 'notify-api',
+      // Shared ACL group every issued credential joins, alongside the tenant's own
+      // CSTAR id. Unset by default, and unset means no ACL controls are sent at all:
+      // gw-fe8c5's Environments are kong-api-key-only and the generated routes carry no
+      // acl plugin, so the groups would authorize nothing and only risk the gateway
+      // rejecting a control its flow does not support. Set this when an Environment
+      // moves to the kong-api-key-acl flow and the routes gain an allow-list.
+      aclGroup: process.env.APS_ACL_GROUP,
     },
 
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
