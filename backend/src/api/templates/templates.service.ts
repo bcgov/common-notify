@@ -354,7 +354,13 @@ export class TemplatesService {
         ? Object.fromEntries(
             Object.entries(normalizedPersonalisation).map(([key, value]) => [
               key,
-              value !== null && value !== undefined ? String(value) : '',
+              // An array is a list value the legacy renderer formats itself, so it is passed
+              // through; String(["a","b"]) would flatten it to "a,b".
+              Array.isArray(value)
+                ? value
+                : value !== null && value !== undefined
+                  ? String(value)
+                  : '',
             ]),
           )
         : normalizedPersonalisation

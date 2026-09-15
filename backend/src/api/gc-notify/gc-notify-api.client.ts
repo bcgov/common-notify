@@ -96,9 +96,12 @@ export class GcNotifyApiClient {
   }
 
   private mapPersonalisation(
-    personalisation?: Record<string, string | FileAttachment>,
+    personalisation?: Record<string, string | string[] | FileAttachment>,
   ):
-    | Record<string, string | { file: string; filename: string; sending_method: 'attach' | 'link' }>
+    | Record<
+        string,
+        string | string[] | { file: string; filename: string; sending_method: 'attach' | 'link' }
+      >
     | undefined {
     if (!personalisation || Object.keys(personalisation).length === 0) {
       return undefined
@@ -106,10 +109,13 @@ export class GcNotifyApiClient {
 
     const result: Record<
       string,
-      string | { file: string; filename: string; sending_method: 'attach' | 'link' }
+      string | string[] | { file: string; filename: string; sending_method: 'attach' | 'link' }
     > = {}
     for (const [key, value] of Object.entries(personalisation)) {
       if (typeof value === 'string') {
+        result[key] = value
+      } else if (Array.isArray(value)) {
+        // A list value. GC Notify renders these itself, so it is forwarded untouched.
         result[key] = value
       } else {
         result[key] = {

@@ -348,6 +348,23 @@ describe('TemplatesService', () => {
       expect(result.body).toBe('Status: ')
     })
 
+    it('should pass Legacy GC Notify list values through as arrays, not "a,b" strings', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Order ((items))',
+        body: 'Your order contains:\n\n((items))',
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        items: ['apples', 'pears', 'plums'],
+      })
+
+      // Bullets in the body, an inline sentence in the subject. String(["a","b"]) would have
+      // flattened both to "apples,pears,plums".
+      expect(result.body).toBe('Your order contains:\n\n\n\n* apples\n* pears\n* plums')
+      expect(result.subject).toBe('Order apples, pears and plums')
+    })
+
     it('should throw a clean error when personalisation is null and placeholders are required', async () => {
       const template: Template = {
         ...mockTemplate,
