@@ -66,6 +66,14 @@ export default () => {
       baseUrl: process.env.GC_NOTIFY_BASE_URL,
     },
 
+    // Notification events
+    events: {
+      // The only domain an event may send from. Tenant settings store a local part and append
+      // this same domain (see the Settings > Email tab), so an event's own sender address is
+      // held to it too rather than being free text.
+      senderEmailDomain: process.env.EVENT_SENDER_EMAIL_DOMAIN || 'gov.bc.ca',
+    },
+
     // Kong Admin API (for API key management)
     kong: {
       adminUrl: process.env.KONG_ADMIN_URL,

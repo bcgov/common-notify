@@ -38,6 +38,11 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
+    label: 'Notification Events',
+    to: '/events',
+    icon: <WorkspacesOutlinedIcon />,
+  },
+  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
@@ -80,10 +85,13 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
   const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
+  // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
+  const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)

@@ -8,6 +8,7 @@ export enum FeatureFlagCode {
   SMS_NOTIFICATIONS = 'sms_notifications',
   SSE_NOTIFICATIONS = 'sse_notifications',
   DASHBOARD = 'dashboard',
+  EVENTS = 'events',
   // Endpoint-level execution routing for GC Notify-compatible routes: when enabled
   // (per tenant), the operation executes internally via our own Notify pipeline
   // instead of passing through to the real GC Notify API.

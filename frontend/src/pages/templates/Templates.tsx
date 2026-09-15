@@ -22,7 +22,7 @@ const columns: TableColumn<TemplateResponse>[] = [
       <Link
         to={`/template-edit/$templateId`}
         params={{ templateId: row.id }}
-        style={{ color: 'black' }}
+        className="data-table__cell-link"
       >
         {row.name}
       </Link>
