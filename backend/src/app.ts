@@ -85,7 +85,7 @@ export async function bootstrap() {
     .setTitle('Notify API')
     .setDescription(
       [
-        'Multi-tenanted unified notification API which covers everything from  simple single-channel sends ' +
+        'Multi-tenanted unified notification API which covers everything from simple single-channel sends ' +
           'to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides ' +
           'comprehensive defaults through the use of configurable event-types, which free calling applications ' +
           'from the burden of managing recipients, content, channels and subscriptions - however, defaults can ' +
