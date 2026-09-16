@@ -3,6 +3,7 @@ import {
   parseCsv,
   readFileWithProgress,
   validateCsv,
+  type BulkChannel,
   type ParsedCsv,
   type RowIssue,
 } from '@/utils/bulkNotificationsCsv'
@@ -32,9 +33,10 @@ export interface CsvUpload {
  *
  * `placeholders` are the columns the template requires; they come from the API rather than from
  * parsing the template in the browser, so a file is always checked against what the server will
- * actually ask for.
+ * actually ask for. `channel` decides what the recipient column is called and how its values are
+ * checked - an email address or a phone number.
  */
-export function useCsvUpload(placeholders: string[]): CsvUpload {
+export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvUpload {
   const [file, setFile] = useState<File | null>(null)
   const [readProgress, setReadProgress] = useState<number | null>(null)
   const [parsed, setParsed] = useState<ParsedCsv | null>(null)
@@ -69,6 +71,7 @@ export function useCsvUpload(placeholders: string[]): CsvUpload {
       const { fileIssue: nextFileIssue, rowIssues: nextRowIssues } = validateCsv(
         nextParsed,
         placeholders,
+        channel,
       )
 
       if (nextFileIssue) {
