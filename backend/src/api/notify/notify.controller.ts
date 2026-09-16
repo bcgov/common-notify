@@ -210,8 +210,40 @@ export class NotifySimpleController {
           },
         },
       },
+      template: {
+        summary: 'From a stored template, with placeholder values',
+        description:
+          'The template supplies the subject and body, so no inline `content` is sent - give a ' +
+          '`templateId` or inline content, never both. Each `{{placeholder}}` in the template is ' +
+          'filled from the matching key in `params`; a placeholder with no matching key is ' +
+          'rejected. Every recipient receives the same rendered message.',
+        value: {
+          recipients: { to: ['citizen@example.com'], cc: ['caseworker@example.com'] },
+          content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          params: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
+        },
+      },
+      templateMailMerge: {
+        summary: 'Mail merge from a stored template - a different message per row',
+        description:
+          'A stored template rendered once per recipient. The first row of `mergeArray` is the ' +
+          'header and must contain a "to" column; every other column supplies that recipient\'s ' +
+          'own value for the matching template placeholder. Top-level `params` fill placeholders ' +
+          'the header does not cover, and are overridden by a row where both supply the same key.',
+        value: {
+          recipients: {
+            mergeArray: [
+              ['to', 'firstName', 'permitNumber'],
+              ['alice@example.com', 'Alice', 'BC-2026-00417'],
+              ['bob@example.com', 'Bob', 'BC-2026-00418'],
+            ],
+          },
+          content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          params: { officeName: 'Victoria permit office' },
+        },
+      },
       mailMerge: {
-        summary: 'Mail merge - one personalised message per row',
+        summary: 'Mail merge with inline content - one personalised message per row',
         description:
           'The first row is the header and must contain a "to" column. Every other column ' +
           'becomes a template parameter for that recipient only.',
