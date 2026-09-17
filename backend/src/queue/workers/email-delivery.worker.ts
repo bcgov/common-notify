@@ -6,6 +6,7 @@ import { NotificationService } from '../../api/notification/notification.service
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
+import { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
@@ -87,6 +88,9 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
     structuredLogger?: StructuredLoggerService,
+    // Last, and optional, because the parameters above are passed positionally: a new one in the
+    // middle silently rebinds every existing call's concurrency argument.
+    tenantSettingsService?: TenantSettingsService,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
     const workerContext = EmailDeliveryWorker.name
@@ -110,6 +114,11 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
+        // The tenant's configured sender, resolved once for every recipient this job sends to.
+        // Null when unset - or when the service is absent, as it is in a test context that boots
+        // the worker without the settings module - which leaves the adapter on `ches.from`.
+        const fromAddress = (await tenantSettingsService?.getSenderAddress(tenantId)) ?? null
+
         // Mail merge batch: resolve the template once, then render + send per recipient individually.
         if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
           return await EmailDeliveryWorker.processMailMergeBatch(
@@ -124,6 +133,7 @@ export class EmailDeliveryWorker {
             emailAdapter,
             requestDetailService,
             notificationService,
+            fromAddress,
           )
         }
 
@@ -299,6 +309,7 @@ export class EmailDeliveryWorker {
           logger,
           notifyId,
           emailAdapter,
+          fromAddress,
         )
 
         logger.debug(`[${notifyId}] Email sent successfully: ${JSON.stringify(result)}`)
@@ -452,6 +463,7 @@ export class EmailDeliveryWorker {
     emailAdapter: IEmailTransport,
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
+    fromAddress: string | null,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params, recipients } = mailMergeData
     const templateId = content?.templateId
@@ -522,6 +534,7 @@ export class EmailDeliveryWorker {
           logger,
           notifyId,
           emailAdapter,
+          fromAddress,
         )
 
         await requestDetailService.markRecipientSent(
@@ -588,6 +601,7 @@ export class EmailDeliveryWorker {
     logger: Logger,
     notifyId: string,
     emailAdapter: IEmailTransport,
+    fromAddress: string | null,
   ): Promise<{ externalId: string; provider: string }> {
     const attachmentCount = Array.isArray((payload as { attachments?: unknown[] }).attachments)
       ? ((payload as { attachments?: unknown[] }).attachments?.length ?? 0)
@@ -599,7 +613,11 @@ export class EmailDeliveryWorker {
       })}`,
     )
 
-    const result = await emailAdapter.send(payload as any)
+    // Only set `from` when the tenant configured one: the adapters read their own default when
+    // the field is absent, and an explicit undefined would not be the same thing.
+    const result = await emailAdapter.send(
+      (fromAddress ? { ...payload, from: fromAddress } : payload) as any,
+    )
 
     return {
       externalId:

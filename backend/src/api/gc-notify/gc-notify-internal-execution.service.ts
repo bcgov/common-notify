@@ -10,6 +10,7 @@ import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { SafelistService } from '../safelist/safelist.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
@@ -109,6 +110,13 @@ interface MappableNotification {
 }
 
 /**
+ * A personalisation entry that feeds template rendering. An array is a list value: the legacy
+ * renderer turns it into bullets in an email body and into "a, b and c" in a subject or SMS.
+ * Items are not deeply validated, so the element type stays `unknown`.
+ */
+type TemplateParamValue = string | unknown[]
+
+/**
  * Executes GC Notify-compatible send requests against our own Notify pipeline
  * instead of passing them through to the real GC Notify API. Templates are
  * assumed to be pre-provisioned locally with the same id the GC Notify client
@@ -147,6 +155,7 @@ export class GcNotifyInternalExecutionService {
     private readonly notificationService: NotificationService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
     private readonly safelistService: SafelistService,
+    private readonly tenantSettingsService: TenantSettingsService,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
@@ -166,7 +175,10 @@ export class GcNotifyInternalExecutionService {
     )
     const { params: personalisation, files } = this.splitPersonalisation(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
-    const fromEmail = await this.resolveDefaultSender('gc_notify_default_from_email')
+    // The same address delivery will send from, so the 201 cannot report a sender the recipient
+    // never sees. gc_notify_default_from_email is not consulted: nothing in the delivery path
+    // reads it.
+    const fromEmail = await this.tenantSettingsService.resolveSenderAddress(tenantId)
     const attachments = await this.storeAttachments(files, tenantId)
     // No top-level templateId: the delivery worker has two modes — template mode
     // (re-renders at delivery time when request.templateId is set) and pre-rendered
@@ -226,7 +238,7 @@ export class GcNotifyInternalExecutionService {
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
-    const personalisation = this.toStringPersonalisation(body.personalisation)
+    const personalisation = this.toTemplateParams(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromNumber = await this.resolveDefaultSender('gc_notify_default_sms_sender')
 
@@ -296,28 +308,32 @@ export class GcNotifyInternalExecutionService {
     )
   }
 
-  private toStringPersonalisation(
+  private toTemplateParams(
     personalisation: Record<string, unknown> | undefined,
-  ): Record<string, string> {
+  ): Record<string, TemplateParamValue> {
     return this.splitPersonalisation(personalisation).params
   }
 
   /**
    * GC Notify overloads the personalisation map: each entry is either a template
-   * variable (string) or a file attachment (object). Split them - string values
-   * feed template rendering; file-valued entries become attachments. Any other
-   * non-string value is dropped rather than stringified into garbage (unchanged
-   * from the previous string-only behaviour).
+   * variable (a string, or an array the renderer writes out as a list) or a file
+   * attachment (object). Split them - variables feed template rendering; file-valued
+   * entries become attachments. Any other value is dropped rather than stringified
+   * into garbage.
+   *
+   * An array is passed through untouched rather than coerced item by item: the legacy
+   * renderer drops empty items itself, and `String(null)` here would turn one into the
+   * printable item "null".
    */
   private splitPersonalisation(personalisation: Record<string, unknown> | undefined): {
-    params: Record<string, string>
+    params: Record<string, TemplateParamValue>
     files: FileAttachment[]
   } {
-    const params: Record<string, string> = {}
+    const params: Record<string, TemplateParamValue> = {}
     const files: FileAttachment[] = []
     if (!personalisation) return { params, files }
     for (const [key, value] of Object.entries(personalisation)) {
-      if (typeof value === 'string') {
+      if (typeof value === 'string' || Array.isArray(value)) {
         params[key] = value
       } else if (this.isFileAttachment(value)) {
         files.push(value)

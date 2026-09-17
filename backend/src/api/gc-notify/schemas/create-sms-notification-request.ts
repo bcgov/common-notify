@@ -22,12 +22,14 @@ export class CreateSmsNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description: 'Values for the template placeholders.',
-    example: { appointmentTime: '09:00' },
+    description:
+      'Values for the template placeholders. A value may also be a list, which renders as ' +
+      '"a, b and c".',
+    example: { appointmentTime: '09:00', items: ['apples', 'pears'] },
   })
   @IsOptional()
   @IsObject()
-  personalisation?: Record<string, string>
+  personalisation?: Record<string, string | string[]>
 
   @ApiPropertyOptional({
     description: 'Your own identifier for this send, echoed back on status lookups.',

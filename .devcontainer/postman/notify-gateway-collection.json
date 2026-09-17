@@ -650,7 +650,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Legacy GC Notify Order Confirmation\",\n  \"description\": \"Legacy syntax with conditional fallback\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Order ((orderNumber)) Confirmation\",\n  \"body\": \"Hello ((firstName)),\\n\\nYour order has been ((status??submitted for review)).\\n\\nOrder Details:\\nNumber: ((orderNumber))\\nTotal: $((amount))\\n\\nThank you!\",\n  \"engineCode\": \"legacy_gc_notify\"\n}"
+                  "raw": "{\n  \"name\": \"Legacy GC Notify Order Confirmation\",\n  \"description\": \"Legacy syntax with a conditional fallback and a list value\",\n  \"channelCode\": \"EMAIL\",\n  \"subject\": \"Order ((orderNumber)) Confirmation\",\n  \"body\": \"Hello ((firstName)),\\n\\nYour order has been ((status??submitted for review)).\\n\\nYour order contains:\\n\\n((items))\\n\\nOrder Details:\\nNumber: ((orderNumber))\\nTotal: $((amount))\\n\\nThank you!\",\n  \"engineCode\": \"legacy_gc_notify\"\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates",
@@ -855,7 +855,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"params\": {\n    \"orderNumber\": \"ORD-12345\",\n    \"firstName\": \"John\",\n    \"status\": \"confirmed\",\n    \"amount\": \"156.99\"\n  }\n}"
+                  "raw": "{\n  \"params\": {\n    \"orderNumber\": \"ORD-12345\",\n    \"firstName\": \"John\",\n    \"status\": \"confirmed\",\n    \"amount\": \"156.99\",\n    \"items\": [\"apples\", \"pears\", \"plums\"]\n  }\n}"
                 },
                 "url": {
                   "raw": "{{gateway_url}}/api/v1/templates/ebbe1739-71bf-44ec-bb7d-f978816ab173/preview",
@@ -870,7 +870,7 @@
                     "preview"
                   ]
                 },
-                "description": "Preview a template with sample personalisation data. Renders the template without sending anything."
+                "description": "Preview a template with sample personalisation data. Renders the template without sending anything.\n\nThe `items` array is a list value: GC Notify has no list syntax, so `((items))` becomes a list purely because the caller passed an array. Expect bullets in `body` (`* apples`) and a real `<ul><li>` in `html`. Passing `\"items\": \"apples\"` instead renders the plain string, and `[]` leaves `((items))` in place."
               },
               "response": []
             },
@@ -1836,6 +1836,51 @@
               ]
             },
             "description": "Send a simple multi-channel notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Notify - Simple Send Email - Legacy GC Notify List",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{tenant-1-api-key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"recipients\": {\"to\":[\"{{recipient_email}}\"]},\n    \"content\": {\n        \"subject\": \"Your order contains ((items))\",\n        \"body\": \"Hello ((first_name)),\\n\\nYour order contains:\\n\\n((items))\\n\\nIt ships on ((ship_date)).\",\n        \"bodyType\": \"markdown\",\n        \"renderer\": \"legacy_gc_notify\",\n        \"encoding\": \"string\"\n    },\n    \"params\": {\n      \"first_name\": \"Amala\",\n      \"items\": [\"apples\", \"pears\", \"plums\"],\n      \"ship_date\": \"March 4\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/notifysimple",
+              "host": [
+                "{{gateway_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifysimple"
+              ]
+            },
+            "description": "Send an inline legacy GC Notify template whose `((items))` placeholder is given an array, showing both list forms from one request.\n\n- **Body** (markdown) gets bullets: `* apples` / `* pears` / `* plums`, delivered as `<ul><li>apples</li>...`.\n- **Subject** is a single line, so the same value renders inline: `Your order contains apples, pears and plums`.\n\n`bodyType` must be `markdown` here - with `html` the body is passed through untouched and the bullets arrive as literal `* apples` text.\n\nThings to try: `\"items\": [\"apples\"]` (no conjunction), `[\"apples\",\"pears\"]` (`apples and pears`, no comma), `[\"apples\",\"\",\"pears\"]` (empty items dropped), and `[]` or `[\"\",null]` (nothing to print, so `((items))` is left visible)."
           },
           "response": []
         },

@@ -21,8 +21,15 @@ const config = {
     window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE ||
     import.meta.env.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE ||
     '',
+  // Where "Create tenant" and "Open CSTAR" send a user with no tenancy. Set it per
+  // environment: https://connect.digital.gov.bc.ca/ in production, the test instance
+  // everywhere else. The default is the test instance on purpose — an unset production
+  // deploy then sends people somewhere harmless, where defaulting the other way would let
+  // a dev or PR environment create a real tenant.
   CSTAR_TENANT_SETUP_URL:
-    window.VITE_CSTAR_TENANT_SETUP_URL || import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || '',
+    window.VITE_CSTAR_TENANT_SETUP_URL ||
+    import.meta.env.VITE_CSTAR_TENANT_SETUP_URL ||
+    'https://test.connect.digital.gov.bc.ca/',
   // API key help links, shown beside the API key field in Tenant Settings. Both point at
   // the APS platform techdocs. Set to '' to hide a link rather than pointing it somewhere
   // provisional — ApiKeyField omits any link whose URL is empty.
