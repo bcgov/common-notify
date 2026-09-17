@@ -67,6 +67,12 @@ describe('ClamavService', () => {
       expect(result.quarantineInfo?.viruses).toHaveLength(2)
     })
 
+    it('should flag FOUND lines it cannot parse as infected without recording a name', () => {
+      const result = service['parseResponse']('stream: FOUND\nstream: Virus.AFOUND\n')
+      expect(result.isInfected).toBe(true)
+      expect(result.viruses).toEqual([])
+    })
+
     it('should include scan timestamp', () => {
       const beforeScan = new Date()
       const result = service['parseResponse']('stream: OK\n')

@@ -327,7 +327,8 @@ export class ApiKeyIssuanceService {
     const slug = tenant.slug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
+      // The collapse above leaves at most one dash at each end.
+      .replace(/^-|-$/g, '')
 
     // The CSTAR guid rather than Notify's row id, so the Consumers page is searchable by
     // the identifier other systems share. The slug rides along because a bare guid is

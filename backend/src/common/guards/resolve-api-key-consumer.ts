@@ -46,7 +46,7 @@ export function readGatewayCredentialHeaders(
 export function describeGatewayHeaders(headers: Record<string, unknown>): string {
   const injected = Object.keys(headers)
     .filter((name) => /^x-(consumer|credential|authenticated|anonymous)/i.test(name))
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((name) => `${name}=${String(headers[name])}`)
 
   return injected.length ? injected.join(' ') : '(none)'

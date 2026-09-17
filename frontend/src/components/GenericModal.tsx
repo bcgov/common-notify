@@ -28,7 +28,7 @@ interface GenericModalProps {
    * Optional callback for submit action
    * If provided, a "Submit" button will be shown
    */
-  onSubmit?: (e: React.FormEvent) => void | Promise<void>
+  onSubmit?: (e: React.SubmitEvent) => void | Promise<void>
 
   /**
    * Text for the primary submit button

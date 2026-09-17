@@ -100,67 +100,68 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
     const invalid = invalidAddresses?.to ?? []
 
     return (
-      <div
-        className="events__additional-recipients"
-        role="group"
-        aria-label="Additional recipients"
-      >
-        <span className="events__field-label">Additional recipient(s) (required)</span>
+      // Flex lives on the inner div: fieldsets have a history of ignoring display: flex.
+      <fieldset aria-label="Additional recipients">
+        <div className="events__additional-recipients">
+          <span className="events__field-label">Additional recipient(s) (required)</span>
 
-        <TagListField
-          values={fields.to.addresses}
-          onChange={(addresses) => updateField('to', { enabled: true, addresses })}
-          aria-label="Phone numbers"
-          placeholder="Enter phone number(s)"
-          isDisabled={isDisabled}
-          isInvalid={invalid.length > 0}
-          errorMessage={
-            invalid.length > 0
-              ? `Enter valid, unique phone numbers. Invalid or duplicate: ${invalid.join(', ')}`
-              : undefined
-          }
-        />
-      </div>
+          <TagListField
+            values={fields.to.addresses}
+            onChange={(addresses) => updateField('to', { enabled: true, addresses })}
+            aria-label="Phone numbers"
+            placeholder="Enter phone number(s)"
+            isDisabled={isDisabled}
+            isInvalid={invalid.length > 0}
+            errorMessage={
+              invalid.length > 0
+                ? `Enter valid, unique phone numbers. Invalid or duplicate: ${invalid.join(', ')}`
+                : undefined
+            }
+          />
+        </div>
+      </fieldset>
     )
   }
 
   return (
-    <div className="events__additional-recipients" role="group" aria-label="Additional recipients">
-      <span className="events__field-label">Additional recipient(s) (required)</span>
+    <fieldset aria-label="Additional recipients">
+      <div className="events__additional-recipients">
+        <span className="events__field-label">Additional recipient(s) (required)</span>
 
-      {RECIPIENT_FIELDS.map(({ id, label }) => {
-        const field = fields[id]
-        const invalid = invalidAddresses?.[id] ?? []
+        {RECIPIENT_FIELDS.map(({ id, label }) => {
+          const field = fields[id]
+          const invalid = invalidAddresses?.[id] ?? []
 
-        return (
-          <div className="events__recipient-group" key={id}>
-            <Checkbox
-              isSelected={field.enabled}
-              onChange={(enabled) => updateField(id, { enabled })}
-              isDisabled={isDisabled}
-            >
-              {label}
-            </Checkbox>
-
-            {field.enabled && (
-              <TagListField
-                values={field.addresses}
-                onChange={(addresses) => updateField(id, { addresses })}
-                aria-label={`${label} email addresses`}
-                placeholder="Enter email addresses"
+          return (
+            <div className="events__recipient-group" key={id}>
+              <Checkbox
+                isSelected={field.enabled}
+                onChange={(enabled) => updateField(id, { enabled })}
                 isDisabled={isDisabled}
-                isInvalid={invalid.length > 0}
-                errorMessage={
-                  invalid.length > 0
-                    ? `Enter valid email addresses. Invalid: ${invalid.join(', ')}`
-                    : undefined
-                }
-              />
-            )}
-          </div>
-        )
-      })}
-    </div>
+              >
+                {label}
+              </Checkbox>
+
+              {field.enabled && (
+                <TagListField
+                  values={field.addresses}
+                  onChange={(addresses) => updateField(id, { addresses })}
+                  aria-label={`${label} email addresses`}
+                  placeholder="Enter email addresses"
+                  isDisabled={isDisabled}
+                  isInvalid={invalid.length > 0}
+                  errorMessage={
+                    invalid.length > 0
+                      ? `Enter valid email addresses. Invalid: ${invalid.join(', ')}`
+                      : undefined
+                  }
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </fieldset>
   )
 }
 

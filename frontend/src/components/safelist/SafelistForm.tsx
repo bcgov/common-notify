@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { FC, FormEvent } from 'react'
+import type { FC, SubmitEvent } from 'react'
 import { Button, Select, TextField } from '@bcgov/design-system-react-components'
 import type { CreateSafelistEntry, SafelistChannel } from '@/interfaces/safelist.interface'
 
@@ -36,7 +36,7 @@ export const SafelistForm: FC<SafelistFormProps> = ({
   const isEmail = channelCode === 'EMAIL'
   const canSubmit = recipient.trim().length > 0 && !isSubmitting && !isFull
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) return
 

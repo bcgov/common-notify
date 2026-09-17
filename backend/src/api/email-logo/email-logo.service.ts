@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { EmailLogo } from '../tenant-settings/entities/email-logo.entity'
 import { EmailLogoRepository } from './email-logo.repository'
+import { trimChar, trimCharEnd } from '../../common/utils/trim-char'
 
 @Injectable()
 export class EmailLogoService {
@@ -19,13 +20,14 @@ export class EmailLogoService {
   }
 
   buildPublicImageUrl(id: string): string {
-    const baseUrl = this.configService.get<string>('emailLogo.publicBaseUrl')?.replace(/\/+$/, '')
+    const configuredBaseUrl = this.configService.get<string>('emailLogo.publicBaseUrl')
+    const baseUrl = configuredBaseUrl && trimCharEnd(configuredBaseUrl, '/')
     if (!baseUrl) {
       throw new InternalServerErrorException('Public API gateway base URL is not configured')
     }
 
     const configuredPrefix = this.configService.get<string>('emailLogo.publicPathPrefix') || ''
-    const pathPrefix = configuredPrefix ? `/${configuredPrefix.replace(/^\/+|\/+$/g, '')}` : ''
+    const pathPrefix = configuredPrefix ? `/${trimChar(configuredPrefix, '/')}` : ''
 
     return `${baseUrl}${pathPrefix}/logos/${encodeURIComponent(id)}/image`
   }

@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import type { FilterOption } from './DataTable'
 
 interface ColumnHeaderDropdownProps {
+  /** Content of the trigger button, e.g. an icon or filter count. */
   children: ReactNode
+  triggerLabel: string
   sortable?: boolean
   sortType?: 'text' | 'numeric' | 'date'
   sortOrder: 'asc' | 'desc' | null
@@ -16,6 +18,7 @@ interface ColumnHeaderDropdownProps {
 
 export function ColumnHeaderDropdown({
   children,
+  triggerLabel,
   sortable,
   sortType = 'text',
   sortOrder,
@@ -94,7 +97,16 @@ export function ColumnHeaderDropdown({
 
   return (
     <div ref={containerRef} className="data-table__dropdown-wrapper">
-      <div onClick={handleToggle}>{children}</div>
+      <button
+        type="button"
+        className="data-table__dropdown-btn"
+        aria-label={triggerLabel}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={handleToggle}
+      >
+        {children}
+      </button>
       {open && (
         <div className="data-table__dropdown-menu" role="menu">
           {sortable && (
@@ -119,15 +131,25 @@ export function ColumnHeaderDropdown({
           )}
           {filterOptions && filterOptions.length > 0 && (
             <div
-              className="data-table__dropdown-item data-table__dropdown-item--submenu"
-              role="menuitem"
-              aria-haspopup="true"
-              aria-expanded={submenuOpen}
+              className="data-table__submenu-anchor"
+              role="none"
               onMouseEnter={() => setSubmenuOpen(true)}
               onMouseLeave={() => setSubmenuOpen(false)}
             >
-              <span>Filter by</span>
-              <span className="data-table__submenu-arrow">›</span>
+              {/* Click opens rather than toggles: hovering has usually opened it already. */}
+              <button
+                type="button"
+                className="data-table__dropdown-item"
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={submenuOpen}
+                onClick={() => setSubmenuOpen(true)}
+              >
+                <span>Filter by</span>
+                <span className="data-table__submenu-arrow" aria-hidden="true">
+                  ›
+                </span>
+              </button>
               {submenuOpen && (
                 <div className="data-table__submenu" role="menu">
                   {filterTitle && <div className="data-table__submenu-title">{filterTitle}</div>}

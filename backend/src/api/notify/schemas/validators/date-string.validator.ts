@@ -30,7 +30,7 @@ export class IsValidDateStringConstraint implements ValidatorConstraintInterface
 
     // Validate the date can be parsed by JavaScript
     const date = new Date(value)
-    return !isNaN(date.getTime())
+    return !Number.isNaN(date.getTime())
   }
 
   defaultMessage(args: ValidationArguments): string {

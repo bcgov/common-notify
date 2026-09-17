@@ -135,10 +135,8 @@ const TenantSelectionModal: FC = () => {
                   aria-label="Select a tenant"
                   items={tenantItems}
                   placeholder="Select a tenant"
-                  selectedKey={pendingTenantId}
-                  onSelectionChange={(key) =>
-                    setPendingTenantId((key as string | null) ?? undefined)
-                  }
+                  value={pendingTenantId}
+                  onChange={(key) => setPendingTenantId((key as string | null) ?? undefined)}
                 />
               </div>
             </>

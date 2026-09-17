@@ -191,7 +191,7 @@ export class CstarApiClient {
     // Join before reading: an in-flight request exists only after a miss, so Redis has
     // nothing to offer that this promise will not deliver sooner.
     const pending = inFlight.get(key)
-    if (pending) {
+    if (pending !== undefined) {
       return pending
     }
 
@@ -203,7 +203,7 @@ export class CstarApiClient {
     // Re-check: the read is asynchronous, so two callers can both pass the check above
     // before either registers, and would each then call CSTAR.
     const started = inFlight.get(key)
-    if (started) {
+    if (started !== undefined) {
       return started
     }
 

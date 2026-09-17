@@ -150,7 +150,7 @@ export class NotificationService {
       channelCodes: ['EMAIL'],
       recipients: addresses.length > 0 ? { email: addresses } : null,
       delayedSendTime:
-        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+        delayedSendTime && !Number.isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
     }
   }
 
@@ -204,7 +204,7 @@ export class NotificationService {
       channelCodes: channels.length > 0 ? channels : null,
       recipients: Object.keys(recipients).length > 0 ? recipients : null,
       delayedSendTime:
-        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+        delayedSendTime && !Number.isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
     }
   }
 
@@ -729,7 +729,7 @@ export class NotificationService {
     } else if (scheduledTime) {
       // Validate and reschedule
       const newScheduledTime = new Date(scheduledTime)
-      if (isNaN(newScheduledTime.getTime())) {
+      if (Number.isNaN(newScheduledTime.getTime())) {
         throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
       }
 

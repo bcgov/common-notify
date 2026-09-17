@@ -21,6 +21,18 @@ export interface ScanResult {
   quarantineInfo?: QuarantineInfo // Full details for storage
 }
 
+/** Virus name from a clamd "stream: <virus_name> FOUND" line, or null if the line isn't one. */
+function parseFoundVirusName(line: string): string | null {
+  const prefix = 'stream:'
+  const suffix = 'FOUND'
+  if (!line.startsWith(prefix) || !line.endsWith(suffix)) return null
+
+  const between = line.slice(prefix.length, -suffix.length)
+  // clamd separates the name from FOUND with whitespace; "stream: XFOUND" is not a detection line.
+  if (between === between.trimEnd()) return null
+  return between.trim() || null
+}
+
 /**
  * ClamAV scanning service
  *
@@ -72,7 +84,7 @@ export class ClamavService implements OnModuleInit {
     }
 
     if (typeof value === 'string') {
-      const parsed = parseInt(value, 10)
+      const parsed = Number.parseInt(value, 10)
       if (!Number.isNaN(parsed)) {
         return parsed
       }
@@ -274,11 +286,10 @@ export class ClamavService implements OnModuleInit {
     for (const line of lines) {
       if (line.includes('FOUND')) {
         isInfected = true
-        // Extract virus name from "stream: <virus_name> FOUND"
-        const match = line.match(/^stream:\s*(.+?)\s+FOUND$/)
-        if (match) {
-          viruses.push(match[1])
-          this.logger.warn(`Malware detected in ${filename || 'buffer'}: ${match[1]}`)
+        const virusName = parseFoundVirusName(line)
+        if (virusName) {
+          viruses.push(virusName)
+          this.logger.warn(`Malware detected in ${filename || 'buffer'}: ${virusName}`)
         }
       }
     }

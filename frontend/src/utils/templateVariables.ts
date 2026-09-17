@@ -10,6 +10,37 @@ export interface DetectedVariable {
 // Matches a single identifier (e.g. firstName).
 const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
 
+// Tags are found with indexOf rather than a regex: a lazy group between optional-whitespace
+// quantifiers backtracks super-linearly on unclosed tags, and the body is user-typed.
+
+/** Contents of each `((…))` tag, taking the first `))` that closes it. */
+function* legacyTagContents(body: string): Generator<string> {
+  let open = body.indexOf('((')
+  while (open !== -1) {
+    // A tag holds at least one character, so `(())` is not a tag.
+    const close = body.indexOf('))', open + 3)
+    if (close === -1) return
+    yield body.slice(open + 2, close)
+    open = body.indexOf('((', close + 2)
+  }
+}
+
+/** Contents of each `{{…}}` or `{{{…}}}` tag. Contents never include `}`. */
+function* mustacheTagContents(body: string): Generator<string> {
+  let open = body.indexOf('{{')
+  while (open !== -1) {
+    const close = body.indexOf('}', open + 2)
+    if (close === -1) return
+    if (body.startsWith('}}', close)) {
+      const content = body.slice(open + 2, close)
+      yield content.startsWith('{') ? content.slice(1) : content
+      open = body.indexOf('{{', close + 2)
+    } else {
+      open = body.indexOf('{{', open + 1)
+    }
+  }
+}
+
 /**
  * Parse a template body and detect the variables it references, so the user can
  * supply sample values. Variables used in a conditional (e.g. handlebars
@@ -33,12 +64,9 @@ export function detectVariables(body: string, engine: TemplateEngine): DetectedV
     //   ((var))            plain interpolation -> free-text value
     //   ((var??content))   conditional: `content` shows when `var` is truthy,
     //                      so `var` is a boolean toggle. The content may span
-    //                      multiple lines and contain parentheses, so match
-    //                      lazily up to the closing `))` with the dotAll flag.
-    const re = /\(\(\s*([\s\S]+?)\s*\)\)/g
-    let match: RegExpExecArray | null
-    while ((match = re.exec(body)) !== null) {
-      const inner = match[1]
+    //                      multiple lines and contain parentheses, so each
+    //                      tag runs up to the first `))` after it opens.
+    for (const inner of legacyTagContents(body)) {
       const condIndex = inner.indexOf('??')
       if (condIndex !== -1) {
         const name = inner.slice(0, condIndex).trim()
@@ -51,10 +79,8 @@ export function detectVariables(body: string, engine: TemplateEngine): DetectedV
   }
 
   // Handlebars / Mustache / MJML syntax: {{ var }} and {{{ var }}}
-  const re = /\{\{\{?\s*([^}]+?)\s*\}?\}\}/g
-  let match: RegExpExecArray | null
-  while ((match = re.exec(body)) !== null) {
-    const inner = match[1].trim()
+  for (const tag of mustacheTagContents(body)) {
+    const inner = tag.trim()
     if (!inner) continue
 
     const lead = inner[0]

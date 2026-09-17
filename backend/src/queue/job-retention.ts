@@ -19,12 +19,12 @@ export interface JobRetention {
 }
 
 export const COMPLETED_JOB_RETENTION: JobRetention = {
-  age: parseInt(process.env.QUEUE_COMPLETED_RETENTION_SECONDS || '3600', 10),
-  count: parseInt(process.env.QUEUE_COMPLETED_RETENTION_COUNT || '1000', 10),
+  age: Number.parseInt(process.env.QUEUE_COMPLETED_RETENTION_SECONDS || '3600', 10),
+  count: Number.parseInt(process.env.QUEUE_COMPLETED_RETENTION_COUNT || '1000', 10),
 }
 
 /** Failed jobs are kept longer because they are read when diagnosing a delivery problem. */
 export const FAILED_JOB_RETENTION: JobRetention = {
-  age: parseInt(process.env.QUEUE_FAILED_RETENTION_SECONDS || '604800', 10),
-  count: parseInt(process.env.QUEUE_FAILED_RETENTION_COUNT || '1000', 10),
+  age: Number.parseInt(process.env.QUEUE_FAILED_RETENTION_SECONDS || '604800', 10),
+  count: Number.parseInt(process.env.QUEUE_FAILED_RETENTION_COUNT || '1000', 10),
 }

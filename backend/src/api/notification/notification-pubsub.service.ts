@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 import { Observable, Subject } from 'rxjs'
@@ -16,7 +16,7 @@ import { attachRedisErrorLogging } from '../../common/redis/redis-error.util'
  * A separate publisher connection sends updates from any pod.
  */
 @Injectable()
-export class NotificationPubSubService implements OnModuleDestroy {
+export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationPubSubService.name)
   private readonly subscriber: Redis
   private readonly publisher: Redis
@@ -38,7 +38,10 @@ export class NotificationPubSubService implements OnModuleDestroy {
     this.publisher = new Redis(options)
     attachRedisErrorLogging(this.subscriber, `${NotificationPubSubService.name}[subscriber]`)
     attachRedisErrorLogging(this.publisher, `${NotificationPubSubService.name}[publisher]`)
+  }
 
+  // psubscribe is async, so it runs as a lifecycle hook rather than inside the constructor.
+  onModuleInit(): void {
     // Subscribe to all notification:changed events
     this.subscriber.psubscribe('notification:changed:*', (err) => {
       if (err) this.logger.error('Failed to subscribe to notification changes', err)

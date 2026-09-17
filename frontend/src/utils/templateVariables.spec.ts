@@ -29,6 +29,29 @@ describe('detectVariables', () => {
     ])
   })
 
+  it('reads triple-stash tags and skips unclosed or broken ones', () => {
+    expect(
+      detectVariables('{{{ rawHtml }}} {{ broken}here}} {{ unclosed', TemplateEngine.HANDLEBARS),
+    ).toEqual([{ name: 'rawHtml', type: 'text' }])
+  })
+
+  it('takes a legacy tag up to its first closing parens and skips an unclosed one', () => {
+    expect(
+      detectVariables('((show??a (b) c)) (( spaced )) ((unclosed', TemplateEngine.LEGACY_GC_NOTIFY),
+    ).toEqual([
+      { name: 'show', type: 'boolean' },
+      { name: 'spaced', type: 'text' },
+    ])
+  })
+
+  it('scans a long run of unclosed tags without stalling', () => {
+    const body = '(('.repeat(50_000) + '{{ '.repeat(50_000)
+    const started = performance.now()
+    detectVariables(body, TemplateEngine.LEGACY_GC_NOTIFY)
+    detectVariables(body, TemplateEngine.HANDLEBARS)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
   it('detects Mustache sections and inverted sections as booleans', () => {
     expect(
       detectVariables(

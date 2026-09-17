@@ -71,7 +71,7 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
   async retryPendingNotifications(): Promise<void> {
     this.logger.debug('Running pending notification retry job...')
 
-    const lockTtlMs = parseInt(process.env.PENDING_RETRY_LOCK_TTL || '60000', 10)
+    const lockTtlMs = Number.parseInt(process.env.PENDING_RETRY_LOCK_TTL || '60000', 10)
     if (!(await this.acquireSweepLock(lockTtlMs))) {
       this.logger.debug('Another pod holds the pending notification sweep lock, skipping')
       return
@@ -86,7 +86,7 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
 
   private async sweep(): Promise<void> {
     try {
-      const batchSize = parseInt(process.env.PENDING_RETRY_BATCH_SIZE || '100', 10)
+      const batchSize = Number.parseInt(process.env.PENDING_RETRY_BATCH_SIZE || '100', 10)
 
       // Oldest first, so a backlog drains in arrival order across passes rather than the
       // same head of the table being re-read while later rows starve.
@@ -206,7 +206,7 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
    * Runs retryPendingNotifications every 30 seconds
    */
   onApplicationBootstrap(): void {
-    const retryIntervalMs = parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10)
+    const retryIntervalMs = Number.parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10)
     this.logger.log(`Starting pending notification retry job (interval: ${retryIntervalMs}ms)`)
 
     // Run immediately on startup

@@ -10,7 +10,7 @@ export default () => {
 
   return {
     // Application
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: Number.parseInt(process.env.PORT || '3000', 10),
     environment: process.env.NODE_ENV || 'development',
     // Helm release name — common-notify-dev, common-notify-test, common-notify-<pr>. The
     // only value that tells the deployed environments apart: NODE_ENV is 'production'
@@ -32,9 +32,9 @@ export default () => {
     // Redis & Job Queues
     redis: {
       host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD,
-      db: parseInt(process.env.REDIS_DB || '0', 10),
+      db: Number.parseInt(process.env.REDIS_DB || '0', 10),
     },
 
     // System defaults (used when sender store or provider override not set)
@@ -99,7 +99,7 @@ export default () => {
       // which already carry CredentialIssuer.Generate. Set it only if the realm
       // requires the scope to be requested explicitly.
       scope: process.env.APS_TOKEN_SCOPE,
-      timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
+      timeoutMs: Number.parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
       // Shared ACL group every issued credential joins, alongside the tenant's own
       // CSTAR id. Unset by default, and unset means no ACL controls are sent at all:
       // gw-fe8c5's Environments are kong-api-key-only and the generated routes carry no
@@ -121,7 +121,10 @@ export default () => {
       // from a tenant keeps access for at most this long. Entries live in Redis
       // (CstarCacheStore), shared across pods and deletable ahead of expiry. Set to 0 to
       // disable caching; concurrent identical requests are still coalesced into one call.
-      userTenantsCacheTtlMs: parseInt(process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000', 10),
+      userTenantsCacheTtlMs: Number.parseInt(
+        process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000',
+        10,
+      ),
     },
 
     // Twilio SMS Service
@@ -178,28 +181,31 @@ export default () => {
     // ClamAV
     clamav: {
       host: process.env.CLAMAV_HOST || 'localhost',
-      port: parseInt(process.env.CLAMAV_PORT || '3310', 10),
-      timeout: parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
+      port: Number.parseInt(process.env.CLAMAV_PORT || '3310', 10),
+      timeout: Number.parseInt(process.env.CLAMAV_TIMEOUT || '30000', 10),
       enabled: process.env.CLAMAV_ENABLED !== 'false',
       failClosed: process.env.CLAMAV_FAIL_CLOSED === 'true',
     },
 
     // Job Queue Worker Configuration
     queue: {
-      ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
+      ingestionWorkerConcurrency: Number.parseInt(
+        process.env.INGESTION_WORKER_CONCURRENCY || '1',
+        10,
+      ),
       // Number of recipients per mail merge delivery batch
-      batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
-      emailDeliveryWorkerConcurrency: parseInt(
+      batchSize: Number.parseInt(process.env.BATCH_SIZE || '100', 10),
+      emailDeliveryWorkerConcurrency: Number.parseInt(
         process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',
         10,
       ),
-      smsDeliveryWorkerConcurrency: parseInt(
+      smsDeliveryWorkerConcurrency: Number.parseInt(
         process.env.SMS_DELIVERY_WORKER_CONCURRENCY || '2',
         10,
       ),
-      jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
-      jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
-      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
+      jobRetries: Number.parseInt(process.env.JOB_RETRIES || '3', 10),
+      jobBackoffDelay: Number.parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      pendingRetryInterval: Number.parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
 
     // Encryption

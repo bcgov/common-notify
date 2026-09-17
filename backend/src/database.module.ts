@@ -36,7 +36,7 @@ import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.en
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
 const dbPassword = process.env.POSTGRES_PASSWORD || 'default'
-const dbPort = parseInt(process.env.POSTGRES_PORT || '5432', 10)
+const dbPort = Number.parseInt(process.env.POSTGRES_PORT || '5432', 10)
 const dbName = process.env.POSTGRES_DATABASE || 'postgres'
 const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
 

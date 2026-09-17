@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useId, useState, useMemo } from 'react'
 import type { FC } from 'react'
 import { Button, Form, Select, TextField } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -19,6 +19,7 @@ const TestNotificationForm: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const templates = useAppSelector((state) => state.templates.items)
 
+  const recipientInputId = useId()
   const [showCc, setShowCc] = useState(false)
   const [showBcc, setShowBcc] = useState(false)
 
@@ -38,7 +39,7 @@ const TestNotificationForm: FC = () => {
     [templates],
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     // TODO: Implement test notification send logic
   }
@@ -63,12 +64,14 @@ const TestNotificationForm: FC = () => {
         />
         <TextField label="Notification Title" style={{ width: '100%' }} />
         <div>
-          <label className="test-notification-form__recipient-label">Recipient(s)</label>
+          <label htmlFor={recipientInputId} className="test-notification-form__recipient-label">
+            Recipient(s)
+          </label>
           <div className="test-notification-form__recipient-row">
             <input
+              id={recipientInputId}
               type="text"
               placeholder="Type an email address"
-              aria-label="Recipient email address"
               className="test-notification-form__recipient-input"
             />
             <button

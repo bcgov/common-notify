@@ -240,7 +240,7 @@
     background: #fbfbfb;
     color: $dark-text;
     // A note can be a long vault path; wrap rather than stretch the table.
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 }
 

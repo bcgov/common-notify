@@ -86,7 +86,8 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       }
     }
 
-    const match = message.match(/^([^\s]+)\s+(.+)$/)
+    // The message group starts on a non-space so it can't compete with \s+ for whitespace.
+    const match = /^(\S+)\s+(\S.*)$/.exec(message)
     if (match) {
       return {
         field: match[1],

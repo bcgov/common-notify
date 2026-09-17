@@ -158,7 +158,7 @@ $preview-gutter: $spacing-xl * 1.5;
 
   dd {
     margin: 0;
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -185,7 +185,7 @@ $preview-gutter: $spacing-xl * 1.5;
   background: $white;
   font-family: inherit;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .notification-preview__error {
