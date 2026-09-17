@@ -17,6 +17,7 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
+import { toGcNotifyEmailHtml, toGcNotifySubject } from '../../services/rendering/gc-notify-markdown'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -175,6 +176,7 @@ export class GcNotifyInternalExecutionService {
     )
     const { params: personalisation, files } = this.splitPersonalisation(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
+    const content = this.renderGcNotifyEmailContent(rendered)
     // The same address delivery will send from, so the 201 cannot report a sender the recipient
     // never sees. gc_notify_default_from_email is not consulted: nothing in the delivery path
     // reads it.
@@ -195,12 +197,11 @@ export class GcNotifyInternalExecutionService {
         recipients: { to: [body.email_address] },
         params: personalisation,
         content: {
-          subject: rendered.subject ?? '',
-          body: rendered.body,
-          // Carry the rendered body type through to delivery. Without it the CHES
-          // adapter can't tell the body is markdown, skips markdown->HTML conversion,
-          // and ships raw markdown (## H1, **bold**, - lists) in the email.
-          bodyType: rendered.bodyType,
+          subject: content.subject,
+          body: content.deliveryBody,
+          // Already GC Notify's HTML, so delivery must pass it through rather than run the
+          // CommonMark converter over it - that would escape every tag into visible markup.
+          bodyType: 'html' as const,
         },
         ...(attachments.length > 0 && { attachments }),
         delayedSend: body.scheduled_for,
@@ -219,8 +220,8 @@ export class GcNotifyInternalExecutionService {
       reference: body.reference ?? null,
       content: {
         from_email: fromEmail,
-        body: rendered.body,
-        subject: rendered.subject ?? '',
+        body: content.responseBody,
+        subject: content.subject,
       },
       uri: `/gcnotify/v2/notifications/${notificationRecord.id}`,
       template: {
@@ -297,15 +298,40 @@ export class GcNotifyInternalExecutionService {
     template: Template,
     personalisation: Record<string, unknown>,
   ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
-    // GC Notify routes always use legacy GC Notify placeholder semantics ((key))
-    // and ((key??default)), regardless of the stored template engine.
+    // GC Notify routes always use GC Notify placeholder semantics ((key)) and ((key??content)),
+    // regardless of the stored template engine. GC_NOTIFY_NATIVE rather than LEGACY_GC_NOTIFY:
+    // the legacy engine is a public `renderer` option on the ordinary notify API and must keep
+    // its current behaviour for callers who are not talking to these routes.
     return this.templatesService.renderTemplateContent(
       {
         ...template,
-        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+        engineCode: TemplateEngine.GC_NOTIFY_NATIVE,
       },
       personalisation,
     )
+  }
+
+  /**
+   * The body and subject a GC Notify email send delivers.
+   *
+   * The body is rendered to HTML here rather than left as markdown for the CHES adapter, because
+   * the adapter renders CommonMark - which is not what GC Notify renders. Handing delivery
+   * finished HTML keeps that dialect on these routes only. Our own generated HTML, so the
+   * caller-HTML sanitiser does not apply and must not: it would strip the inline styles GC Notify
+   * puts on headings and links.
+   *
+   * The 201 response keeps the unrendered body, which is the form GC Notify reports.
+   */
+  private renderGcNotifyEmailContent(rendered: { subject?: string; body: string }): {
+    responseBody: string
+    deliveryBody: string
+    subject: string
+  } {
+    return {
+      responseBody: rendered.body,
+      deliveryBody: toGcNotifyEmailHtml(rendered.body),
+      subject: toGcNotifySubject(rendered.subject ?? ''),
+    }
   }
 
   private toTemplateParams(

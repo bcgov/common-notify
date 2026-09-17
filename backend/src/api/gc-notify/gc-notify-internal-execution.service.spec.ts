@@ -159,7 +159,7 @@ describe('GcNotifyInternalExecutionService', () => {
         expect.objectContaining({ tenantId: TENANT_ID, status: 'pending' }),
       )
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.GC_NOTIFY_NATIVE }),
         body.personalisation,
       )
 
@@ -175,7 +175,7 @@ describe('GcNotifyInternalExecutionService', () => {
       )
     })
 
-    it('carries the rendered bodyType onto the enqueued email content so markdown is converted downstream', async () => {
+    it('hands delivery GC Notify-rendered HTML rather than markdown for the CHES adapter', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'tpl-1',
         version: 1,
@@ -195,10 +195,13 @@ describe('GcNotifyInternalExecutionService', () => {
 
       await flushMicrotasks()
       const [[jobPayload]] = mockIngestionQueue.add.mock.calls
-      expect(jobPayload.request.email.content).toMatchObject({
-        body: '# Heading\n\n**Bold**',
-        bodyType: 'markdown',
-      })
+      const content = jobPayload.request.email.content
+
+      // GC Notify renders `#` as an h2, so this also pins the dialect, not just the conversion.
+      expect(content.bodyType).toBe('html')
+      expect(content.body).toContain('<h2')
+      expect(content.body).toContain('<strong>Bold</strong>')
+      expect(content.body).not.toContain('# Heading')
     })
 
     it('reports the tenant sender delivery will use, not a separate configured value', async () => {
@@ -465,7 +468,7 @@ describe('GcNotifyInternalExecutionService', () => {
         scheduled_for: undefined,
       })
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'tpl-2', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        expect.objectContaining({ id: 'tpl-2', engineCode: TemplateEngine.GC_NOTIFY_NATIVE }),
         body.personalisation,
       )
     })
@@ -535,7 +538,7 @@ describe('GcNotifyInternalExecutionService', () => {
         template: { id: 'tpl-1', version: 2, uri: '/gcnotify/v2/template/tpl-1' },
       })
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
+        expect.objectContaining({ id: 'tpl-1', engineCode: TemplateEngine.GC_NOTIFY_NATIVE }),
         { name: 'Alice' },
       )
     })
