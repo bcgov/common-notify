@@ -108,7 +108,7 @@ export class InlineRenderingService {
    */
   private normalizeParams(
     params: Record<string, unknown>,
-    renderer?: NotifyContent['renderer'],
+    renderer: NotifyContent['renderer'],
   ): Record<string, unknown> {
     const normalized: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(params)) {

@@ -13,7 +13,11 @@ import type {
  */
 type ListStyle = 'bullet' | 'inline'
 
-/** Empty items are dropped, matching GC Notify. `0` and `false` are values and are kept. */
+/**
+ * Empty items are dropped. This is a deliberate near-miss of GC Notify, whose `filter(None, ...)`
+ * also drops `0` and `false`; they are kept here, because a caller who passes a count of 0 means
+ * it to print.
+ */
 const hasContent = (item: unknown): boolean => item !== null && item !== undefined && item !== ''
 
 /**

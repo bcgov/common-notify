@@ -6,6 +6,7 @@ import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import UserService from '@/service/user-service'
+import config from '@/config'
 import { SsoRole } from '@/enum/sso-role.enum'
 import '@/scss/components/tenant-selection-modal.scss'
 
@@ -21,9 +22,6 @@ import '@/scss/components/tenant-selection-modal.scss'
  * 3. Modal closes and app loads with selected tenant context
  * 4. Fetch user's CSTAR roles for that tenant
  */
-
-const CSTAR_TENANT_SETUP_URL =
-  import.meta.env.VITE_CSTAR_TENANT_SETUP_URL || 'https://cstar-dev.apps.gold.devops.gov.bc.ca'
 
 const TenantSelectionModal: FC = () => {
   const dispatch = useAppDispatch()
@@ -73,7 +71,7 @@ const TenantSelectionModal: FC = () => {
   }
 
   const handleTenantSetupRedirect = () => {
-    window.location.href = CSTAR_TENANT_SETUP_URL
+    window.location.href = config.CSTAR_TENANT_SETUP_URL
   }
 
   const isZeroTenantState = tenants.length === 0
