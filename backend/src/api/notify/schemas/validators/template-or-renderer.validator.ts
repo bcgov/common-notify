@@ -1,5 +1,6 @@
 import {
   registerDecorator,
+  ValidationArguments,
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -16,8 +17,10 @@ import {
  */
 @ValidatorConstraint({ name: 'validateTemplateOrRenderer', async: false })
 export class TemplateOrRendererConstraint implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
-    const channel = value as any
+  // Registered at class level, where class-validator passes the instance on `args.object` and
+  // leaves `value` undefined. The fallback keeps a directly-passed object working.
+  validate(value: unknown, args?: ValidationArguments): boolean {
+    const channel = (args?.object ?? value) as any
 
     const hasTemplateId = !!channel.content?.templateId
     const hasRenderer = !!channel.content?.renderer
@@ -42,9 +45,12 @@ export class TemplateOrRendererConstraint implements ValidatorConstraintInterfac
  * Usage: @ValidateTemplateOrRenderer()
  */
 export function ValidateTemplateOrRenderer(validationOptions?: ValidationOptions) {
-  return function (target: object) {
+  // `target` in a class decorator is the constructor itself. Registering
+  // `target.constructor` would bind the rule to `Function`, where class-validator never looks
+  // for it, and the constraint would silently never run.
+  return function (target: new (...args: any[]) => object) {
     registerDecorator({
-      target: target.constructor as any,
+      target: target as any,
       propertyName: undefined as any,
       options: validationOptions,
       constraints: [],

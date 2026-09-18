@@ -1,5 +1,6 @@
 import {
   registerDecorator,
+  ValidationArguments,
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -16,8 +17,10 @@ import { NotifySimpleRequest } from '../notify-simple-request'
  */
 @ValidatorConstraint({ name: 'isValidTemplateOrContent', async: false })
 export class TemplateOrContentConstraint implements ValidatorConstraintInterface {
-  validate(value: any): boolean {
-    const request = value as NotifySimpleRequest
+  // Registered at class level, where class-validator passes the instance on `args.object` and
+  // leaves `value` undefined. The fallback keeps a directly-passed object working.
+  validate(value: any, args?: ValidationArguments): boolean {
+    const request = (args?.object ?? value) as NotifySimpleRequest
 
     const channels = [request.email, request.sms, request.msgApp].filter(
       (channel): channel is NonNullable<typeof channel> => !!channel,
@@ -54,9 +57,12 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
  * Usage: @ValidateTemplateOrContent()
  */
 export function ValidateTemplateOrContent(validationOptions?: ValidationOptions) {
-  return function (target: object) {
+  // `target` in a class decorator is the constructor itself. Registering
+  // `target.constructor` would bind the rule to `Function`, where class-validator never looks
+  // for it, and the constraint would silently never run.
+  return function (target: new (...args: any[]) => object) {
     registerDecorator({
-      target: target.constructor as any,
+      target: target as any,
       propertyName: undefined as any,
       options: validationOptions,
       constraints: [],

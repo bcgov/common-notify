@@ -589,11 +589,27 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 422 when no channel is provided', async () => {
+      // An empty body fails DTO validation now that ValidateTemplateOrContent actually runs, so it
+      // is rejected at the pipe with a 400 rather than reaching the business-rule check. 400 for a
+      // malformed request and 422 for a business-rule failure is the split ValidationExceptionFilter
+      // already assumes.
+      it('should return 400 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      })
+
+      it('should return 422 when a well-formed request fails a business rule', async () => {
         mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
           'At least one recipient is required (email, SMS, or msgApp)',
         ])
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
+          .expect(422)
       })
 
       it('should return 202 with status "accepted" for immediate send', async () => {

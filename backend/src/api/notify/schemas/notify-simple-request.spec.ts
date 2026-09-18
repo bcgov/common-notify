@@ -13,9 +13,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -52,9 +50,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
         sms: {
           recipients: {
@@ -85,9 +81,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -142,9 +136,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -187,9 +179,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -211,9 +201,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -231,9 +219,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -304,9 +290,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -328,9 +312,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -352,9 +334,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -494,7 +474,7 @@ describe('NotifySimpleRequest', () => {
       const data = {
         sms: {
           recipients: { to: ['+16045551234'] },
-          body: 'Test SMS',
+          content: { body: 'Test SMS' },
           delayedSend: '2026-04-28T10:00:00Z',
         },
       }
