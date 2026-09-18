@@ -1,11 +1,21 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import {
+  ApiExtraModels,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiSchema,
+  getSchemaPath,
+} from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyAttachment } from './notify-attachment'
-import { NotifyEmailRecipients } from './notify-email-recipients'
+import {
+  NotifyEmailAddressRecipients,
+  NotifyEmailMergeRecipients,
+  NotifyEmailRecipients,
+} from './notify-email-recipients'
 import { NotifyContent } from './notify-content'
 
 @ApiSchema({
@@ -13,9 +23,25 @@ import { NotifyContent } from './notify-content'
     'Send by email: recipients, content (inline or a stored template), attachments and scheduling.',
 })
 @ValidateTemplateOrRenderer()
+@ApiExtraModels(NotifyEmailAddressRecipients, NotifyEmailMergeRecipients)
 export class NotifyEmailChannel {
+  // Exactly one of the two forms, which is what ValidateRecipientsOrMerge enforces at runtime.
+  // The transform target stays the combined class: class-transformer has no discriminator to pick
+  // between them, and it does not need one - the validator rejects anything that is not one shape
+  // or the other.
   @ApiProperty({
-    type: NotifyEmailRecipients,
+    // Both branches are all-optional objects, so a bare `oneOf` of the two would match *both* for
+    // any payload and fail "exactly one". The mergeArray constraints are what separate them.
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyEmailAddressRecipients) }],
+        not: { required: ['mergeArray'] },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyEmailMergeRecipients) }],
+        required: ['mergeArray'],
+      },
+    ],
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()

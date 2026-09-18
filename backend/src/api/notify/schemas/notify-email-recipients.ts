@@ -1,5 +1,5 @@
 import { IsArray, IsEmail, IsOptional, ArrayMaxSize } from 'class-validator'
-import { ApiSchema, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional, PickType } from '@nestjs/swagger'
 import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
 import { IsValidMergeArray } from './validators/merge-array.validator'
 
@@ -52,3 +52,27 @@ export class NotifyEmailRecipients {
   @IsValidMergeArray()
   mergeArray?: string[][]
 }
+
+/**
+ * The two shapes `recipients` may take, for documentation only.
+ *
+ * The runtime DTO stays `NotifyEmailRecipients` - one class, validated by ValidateRecipientsOrMerge,
+ * which enforces exactly one of these two forms. These are `PickType` projections of it rather than
+ * hand-written twins, so a field only ever has to be defined once.
+ */
+@ApiSchema({
+  description: 'Address the message directly. Mutually exclusive with a mail-merge send.',
+})
+export class NotifyEmailAddressRecipients extends PickType(NotifyEmailRecipients, [
+  'to',
+  'cc',
+  'bcc',
+] as const) {}
+
+@ApiSchema({
+  description:
+    'Mail-merge: one message per row, personalised from the row. Mutually exclusive with to/cc/bcc.',
+})
+export class NotifyEmailMergeRecipients extends PickType(NotifyEmailRecipients, [
+  'mergeArray',
+] as const) {}
