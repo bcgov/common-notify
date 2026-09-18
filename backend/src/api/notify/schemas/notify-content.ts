@@ -87,6 +87,7 @@ export class NotifyContent {
  * templateId - only subject, body and renderer are excluded there.
  */
 @ApiSchema({
+  name: 'TemplateContent',
   description: 'Render a stored template. Cannot be combined with subject, body or renderer.',
 })
 export class NotifyTemplateContent extends PickType(NotifyContent, [
@@ -96,6 +97,7 @@ export class NotifyTemplateContent extends PickType(NotifyContent, [
 ] as const) {}
 
 @ApiSchema({
+  name: 'InlineContent',
   description: 'Supply the message inline, optionally naming a renderer for the placeholders.',
 })
 export class NotifyInlineContent extends PickType(NotifyContent, [

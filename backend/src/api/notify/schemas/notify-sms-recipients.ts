@@ -68,11 +68,13 @@ export class NotifySmsRecipients {
  * runtime DTO stays NotifySmsRecipients, with ValidateRecipientsOrMerge enforcing the choice.
  */
 @ApiSchema({
+  name: 'SmsRecipients',
   description: 'Address the message directly. Mutually exclusive with a mail-merge send.',
 })
 export class NotifySmsAddressRecipients extends PickType(NotifySmsRecipients, ['to'] as const) {}
 
 @ApiSchema({
+  name: 'SmsMailMerge',
   description:
     'Mail-merge: one message per row, personalised from the row. Mutually exclusive with to.',
 })

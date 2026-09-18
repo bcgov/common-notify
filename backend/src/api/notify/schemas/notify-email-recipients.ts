@@ -63,6 +63,7 @@ export class NotifyEmailRecipients {
  * hand-written twins, so a field only ever has to be defined once.
  */
 @ApiSchema({
+  name: 'EmailRecipients',
   description: 'Address the message directly. Mutually exclusive with a mail-merge send.',
 })
 export class NotifyEmailAddressRecipients extends PickType(NotifyEmailRecipients, [
@@ -72,6 +73,7 @@ export class NotifyEmailAddressRecipients extends PickType(NotifyEmailRecipients
 ] as const) {}
 
 @ApiSchema({
+  name: 'EmailMailMerge',
   description:
     'Mail-merge: one message per row, personalised from the row. Mutually exclusive with to/cc/bcc.',
 })

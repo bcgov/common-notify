@@ -1,13 +1,8 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import {
-  ApiExtraModels,
-  ApiProperty,
-  ApiPropertyOptional,
-  ApiSchema,
-  getSchemaPath,
-} from '@nestjs/swagger'
+import { ApiExtraModels, ApiPropertyOptional, ApiSchema, getSchemaPath } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
+import { ApiOneOf, ApiOneOfOptional } from './api-one-of.decorator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
 import {
@@ -31,7 +26,7 @@ import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './not
 export class NotifySmsChannel {
   // Mirrors ValidateRecipientsOrMerge exactly - see NotifyEmailChannel for why each branch needs
   // its own required/not constraints.
-  @ApiProperty({
+  @ApiOneOf({
     oneOf: [
       {
         allOf: [{ $ref: getSchemaPath(NotifySmsAddressRecipients) }],
@@ -51,7 +46,7 @@ export class NotifySmsChannel {
   recipients: NotifySmsRecipients
 
   // Mirrors the two constraints that actually run - see NotifyEmailChannel.
-  @ApiPropertyOptional({
+  @ApiOneOfOptional({
     oneOf: [
       {
         allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],

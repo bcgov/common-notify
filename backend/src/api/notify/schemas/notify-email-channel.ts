@@ -1,13 +1,8 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import {
-  ApiExtraModels,
-  ApiProperty,
-  ApiPropertyOptional,
-  ApiSchema,
-  getSchemaPath,
-} from '@nestjs/swagger'
+import { ApiExtraModels, ApiPropertyOptional, ApiSchema, getSchemaPath } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
+import { ApiOneOf, ApiOneOfOptional } from './api-one-of.decorator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyAttachment } from './notify-attachment'
@@ -38,7 +33,7 @@ export class NotifyEmailChannel {
   // both, never neither. Both branches are all-optional objects on their own, so each carries the
   // required/not constraints that make them mutually exclusive - without those, every payload
   // matches both branches and "exactly one" can never hold.
-  @ApiProperty({
+  @ApiOneOf({
     oneOf: [
       {
         allOf: [{ $ref: getSchemaPath(NotifyEmailAddressRecipients) }],
@@ -61,7 +56,7 @@ export class NotifyEmailChannel {
   // (TemplateOrContentConstraint) and never alongside renderer (TemplateOrRendererConstraint).
   // Neither rule requires a channel to carry content at all - the request-level rule only asks that
   // *some* channel renders something - so the inline branch deliberately requires nothing.
-  @ApiPropertyOptional({
+  @ApiOneOfOptional({
     oneOf: [
       {
         allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
