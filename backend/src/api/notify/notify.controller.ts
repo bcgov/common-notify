@@ -676,6 +676,9 @@ export class NotifySimpleFrontendController {
   }
 }
 
+// Not implemented - every operation below returns 501 - so it is kept out of the published
+// spec until it does something. Remove this when the endpoints land.
+@ApiExcludeController()
 @Controller('notifyevent')
 @UseGuards(NotifyServiceGuard)
 export class NotifyEventController {

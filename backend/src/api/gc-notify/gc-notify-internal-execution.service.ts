@@ -27,6 +27,20 @@ import { Notification as GcNotification } from './schemas/notification'
 import { Template as GcTemplate } from './schemas/template'
 import { Links } from './schemas/links'
 import type { FileAttachment } from './schemas/file-attachment'
+import Papa from 'papaparse'
+import { UnprocessableEntityException } from '@nestjs/common'
+import {
+  enforceLimits,
+  handleMerge,
+  recordAcceptedUsage,
+  resolveSmsSegments,
+} from '../../common/decorators/queueable.decorator'
+import type { QueueableContext } from '../../common/decorators/queueable.decorator'
+import { PostBulkRequest } from './schemas/post-bulk-request'
+import { PostBulkResponse } from './schemas/post-bulk-response'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -162,11 +176,15 @@ export class GcNotifyInternalExecutionService {
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
+    private readonly bulkValidationService: GcNotifyBulkValidationService,
+    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly smsSegmentService: SmsSegmentService,
   ) {}
 
   async sendEmail(
     body: CreateEmailNotificationRequest,
     tenantId: string,
+    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(
@@ -208,12 +226,19 @@ export class GcNotifyInternalExecutionService {
       },
     }
 
+    // One email_address per request, so one message. Checked before the send is accepted and
+    // recorded after, the same order the @Queueable path uses.
+    const usage = [{ channel: NotificationChannel.EMAIL, count: 1 }]
+    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
+
     const notificationRecord = await this.createAndEnqueue(
       tenantId,
       notifyRequest,
       body.scheduled_for,
       requestRoute,
     )
+
+    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
 
     return {
       id: notificationRecord.id,
@@ -236,6 +261,7 @@ export class GcNotifyInternalExecutionService {
   async sendSms(
     body: CreateSmsNotificationRequest,
     tenantId: string,
+    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
@@ -256,12 +282,20 @@ export class GcNotifyInternalExecutionService {
       },
     }
 
+    // An SMS is billed per segment, not per message: a long body is concatenated and the carrier
+    // charges for each part. resolveSmsSegments fails open at 1 rather than failing the send.
+    const segments = await resolveSmsSegments(this.queueableContext(), tenantId, notifyRequest)
+    const usage = [{ channel: NotificationChannel.SMS, count: segments }]
+    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
+
     const notificationRecord = await this.createAndEnqueue(
       tenantId,
       notifyRequest,
       body.scheduled_for,
       requestRoute,
     )
+
+    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
 
     return {
       id: notificationRecord.id,
@@ -280,13 +314,169 @@ export class GcNotifyInternalExecutionService {
     }
   }
 
+  /**
+   * GC Notify-compatible bulk send.
+   *
+   * Reuses the ordinary mail-merge path rather than reimplementing it: `handleMerge` already
+   * extracts recipients, applies the safelist, counts SMS segments, creates the notification
+   * record and enqueues the ingestion fan-out. This method's job is only translation - GC Notify's
+   * request shape in, GC Notify's job shape out.
+   *
+   * The template decides the channel. GC Notify infers it from the header column, but a bulk send
+   * names a template, and a template is already email or SMS.
+   */
+  async sendBulk(
+    body: PostBulkRequest,
+    tenantId: string,
+    apiKeyConsumerId?: string,
+    requestRoute?: string,
+  ): Promise<PostBulkResponse> {
+    const template = await this.requireTemplate(tenantId, body.template_id)
+    const channel = template.channelCode as NotificationChannel
+    const rows = this.resolveBulkRows(body)
+
+    // Unconditional, as the controller did before: the validator self-selects on the header row,
+    // returning valid for an email-shaped bulk and checking E.164 for a phone-shaped one.
+    const validation = this.bulkValidationService.validateRows(rows)
+    if (!validation.valid) {
+      throw new UnprocessableEntityException({
+        errors: validation.errors.map((message) => ({
+          error: 'ValidationError',
+          message,
+        })),
+      })
+    }
+
+    const mergeArray = this.toMergeArray(rows)
+    const channelPayload = {
+      recipients: { mergeArray },
+      content: { templateId: template.id },
+      ...(body.scheduled_for && { delayedSend: body.scheduled_for }),
+    }
+    const notifyRequest = (channel === NotificationChannel.SMS
+      ? { sms: channelPayload, reference: body.reference }
+      : { email: channelPayload, reference: body.reference }) as unknown as NotifySimpleRequest
+
+    const accepted = (await handleMerge(
+      this.queueableContext(),
+      this.ingestionQueue as unknown as Bull.Queue,
+      QueueName.INGESTION,
+      tenantId,
+      notifyRequest,
+      apiKeyConsumerId,
+      requestRoute,
+      channel,
+    )) as { notifyId: string; recipientCount: number; createdAt: Date }
+
+    // created_by, api_key, service_name and sender_id are deliberately absent: GC Notify fills them
+    // from its own user and key model, and inventing values here would misreport who sent what.
+    return {
+      data: {
+        id: accepted.notifyId,
+        template: template.id,
+        job_status: 'pending',
+        notification_count: accepted.recipientCount,
+        original_file_name: body.name,
+        template_version: template.version,
+        template_type: channel === NotificationChannel.SMS ? 'sms' : 'email',
+        created_at: (accepted.createdAt ?? new Date()).toISOString(),
+        ...(body.scheduled_for && { scheduled_for: body.scheduled_for }),
+        archived: false,
+      },
+    }
+  }
+
+  /**
+   * The rows to send, from whichever form the caller used. GC Notify accepts `rows` or a raw `csv`
+   * string and the schema requires exactly one of them.
+   */
+  private resolveBulkRows(body: PostBulkRequest): string[][] {
+    if (body.rows) {
+      return body.rows
+    }
+
+    // `skipEmptyLines` because a trailing newline is normal in an uploaded file and would otherwise
+    // become a row of empty strings - a recipient with no address.
+    const parsed = Papa.parse<string[]>(body.csv ?? '', { skipEmptyLines: true })
+    if (parsed.errors.length > 0) {
+      throw new BadRequestException({
+        errors: parsed.errors.slice(0, 10).map((error) => ({
+          error: 'ValidationError',
+          message: `csv could not be parsed: ${error.message} (row ${error.row ?? 0})`,
+        })),
+      })
+    }
+    if (parsed.data.length < 2) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: 'csv must have a header row and at least one data row',
+          },
+        ],
+      })
+    }
+    return parsed.data
+  }
+
+  /**
+   * GC Notify names the recipient column `email address` or `phone number`; the merge pipeline
+   * requires it to be called `to`. Every other column is personalisation and passes through as-is.
+   */
+  private toMergeArray(rows: string[][]): string[][] {
+    const [header, ...dataRows] = rows
+    const recipientColumn = header.findIndex((column) =>
+      ['email address', 'phone number'].includes(
+        String(column ?? '')
+          .trim()
+          .toLowerCase(),
+      ),
+    )
+
+    if (recipientColumn === -1) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message:
+              'The header row must contain an "email address" or "phone number" column naming the recipient',
+          },
+        ],
+      })
+    }
+
+    const mappedHeader = header.map((column, index) => (index === recipientColumn ? 'to' : column))
+    return [mappedHeader, ...dataRows]
+  }
+
+  /**
+   * The queueable context `handleMerge` needs. `apiKeyUsageService` and `smsSegmentService` are
+   * what make a bulk send count: the first checks the key's limits before accepting and records the
+   * usage after, the second prices an SMS in billable segments rather than one per recipient.
+   *
+   * `limitAlertNotificationService` is absent, so crossing a threshold is recorded but does not
+   * send the alert email `/notifysimple` would.
+   */
+  private queueableContext(): QueueableContext {
+    return {
+      notificationService: this.notificationService,
+      attachmentValidationService: this.attachmentValidationService,
+      attachmentProcessingService: this.attachmentProcessingService,
+      safelistService: this.safelistService,
+      notificationRequestDetailService: this.notificationRequestDetailService,
+      apiKeyUsageService: this.apiKeyUsageService,
+      smsSegmentService: this.smsSegmentService,
+      queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Bull.Queue]]),
+    }
+  }
+
   private async requireTemplate(
     tenantId: string,
     templateId: string,
-    channel: NotificationChannel,
+    channel?: NotificationChannel,
   ): Promise<Template> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
-    if (!template || template.channelCode !== channel) {
+    if (!template || (channel !== undefined && template.channelCode !== channel)) {
       throw new BadRequestException({
         errors: [{ error: 'ValidationError', message: 'Template not found' }],
       })

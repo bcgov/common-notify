@@ -98,8 +98,6 @@ spec:
           env:
             - name: LOG_LEVEL
               value: info
-            - name: GC_NOTIFY_BASE_URL
-              value: https://api.notification.canada.ca
             # Which transport actually sends. Not secret - the credentials behind each one are,
             # and those come from app-api-secrets below. Without these the container falls through
             # to the defaults in configuration.ts, which is why the adapter could not previously be

@@ -19,7 +19,6 @@ import {
   ApiOperation,
   ApiOkResponse,
   ApiCreatedResponse,
-  ApiBearerAuth,
   ApiQuery,
   ApiBody,
   ApiParam,
@@ -55,10 +54,11 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
  * - POST /templates/:templateId/preview - Preview a template with sample data
  */
 @ApiTags('Templates')
+// The published spec documents the API-key surface only, so the JWT this route also accepts is
+// deliberately not advertised here - the document declares no bearer scheme to reference.
 @ApiSecurity('api-key')
 @Controller('templates')
 @UseGuards(NotifyServiceGuard)
-@ApiBearerAuth()
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name)
 

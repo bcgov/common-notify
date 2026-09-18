@@ -53,7 +53,12 @@ export interface QueueableContext {
  * own message by the carrier, so usage is attributed in segments. Falls back to 1 when the
  * service is unavailable or the body cannot be resolved — never blocks a send.
  */
-async function resolveSmsSegments(
+/**
+ * Exported alongside `handleMerge` for the GC Notify single-send routes, which build their own
+ * payload instead of going through this decorator. Sharing these keeps one definition of what a
+ * send costs and when a key is over its limit.
+ */
+export async function resolveSmsSegments(
   ctx: QueueableContext,
   tenantId: string,
   payload: ProcessedNotifySimpleRequest,
@@ -76,7 +81,7 @@ async function resolveSmsSegments(
  * Non-fatal: usage tracking must never block or fail an accepted send. Skipped when the
  * request has no bound API key (e.g. no credential on the request) or the service is absent.
  */
-async function recordAcceptedUsage(
+export async function recordAcceptedUsage(
   ctx: QueueableContext,
   apiKeyConsumerId: string | undefined,
   entries: Array<{ channel: string; count: number }>,
@@ -136,7 +141,7 @@ async function processLimitAlerts(
  * channel would exceed its limit. Unlike usage recording this is NOT swallowed — a rejected
  * request must fail. Skipped when there is no bound API key or the service is absent (fail-open).
  */
-async function enforceLimits(
+export async function enforceLimits(
   ctx: QueueableContext,
   apiKeyConsumerId: string | undefined,
   entries: Array<{ channel: string; count: number }>,
@@ -279,7 +284,15 @@ async function countMergeMessages(
  * per-batch delivery jobs (and creates the per-recipient detail rows), so this does not call
  * createPending here.
  */
-async function handleMerge(
+/**
+ * Accept a mail-merge send: extract recipients, apply the safelist, create the notification record
+ * and enqueue the ingestion job that fans out per recipient.
+ *
+ * Exported because the GC Notify bulk route reuses it. That surface builds its own
+ * `NotifySimpleRequest` rather than going through the decorator, and duplicating recipient
+ * extraction, safelist handling and segment counting there is how the two would drift apart.
+ */
+export async function handleMerge(
   ctx: QueueableContext,
   queue: Bull.Queue,
   queueName: QueueName,

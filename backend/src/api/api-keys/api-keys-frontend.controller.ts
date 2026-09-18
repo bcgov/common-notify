@@ -17,6 +17,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiResponse,
+  ApiExcludeController,
   ApiTags,
 } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -51,6 +52,9 @@ import { ApiKeySummaryDto, IssuedApiKeyDto } from './schemas/api-key-response.dt
  * There is no revoke route. Revoking is done on the API Services Portal Consumers page,
  * which is the only place that actually stops the gateway honouring the key.
  */
+// Browser surface, reached with a user JWT rather than an API key, so it is kept out of the
+// published service API the way every other frontend controller is.
+@ApiExcludeController()
 @ApiTags('api-keys')
 @Controller('frontend/api-keys')
 @UseGuards(NotifyFrontendRoleGuard)
