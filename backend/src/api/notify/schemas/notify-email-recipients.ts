@@ -38,6 +38,8 @@ export class NotifyEmailRecipients {
   bcc?: string[]
 
   @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'array', items: { type: 'string' } },
     description:
       'Mail-merge rows. First row is the header (must include a "to" column for recipient address); each following row is one recipient. Extra columns become per-recipient template params. Mutually exclusive with to/cc/bcc.',
     example: [

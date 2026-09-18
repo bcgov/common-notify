@@ -16,30 +16,39 @@ import {
   NotifyEmailMergeRecipients,
   NotifyEmailRecipients,
 } from './notify-email-recipients'
-import { NotifyContent } from './notify-content'
+import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
   description:
     'Send by email: recipients, content (inline or a stored template), attachments and scheduling.',
 })
 @ValidateTemplateOrRenderer()
-@ApiExtraModels(NotifyEmailAddressRecipients, NotifyEmailMergeRecipients)
+@ApiExtraModels(
+  NotifyEmailAddressRecipients,
+  NotifyEmailMergeRecipients,
+  NotifyTemplateContent,
+  NotifyInlineContent,
+)
 export class NotifyEmailChannel {
   // Exactly one of the two forms, which is what ValidateRecipientsOrMerge enforces at runtime.
   // The transform target stays the combined class: class-transformer has no discriminator to pick
   // between them, and it does not need one - the validator rejects anything that is not one shape
   // or the other.
+  // The published schema mirrors ValidateRecipientsOrMerge exactly: one of the two shapes, never
+  // both, never neither. Both branches are all-optional objects on their own, so each carries the
+  // required/not constraints that make them mutually exclusive - without those, every payload
+  // matches both branches and "exactly one" can never hold.
   @ApiProperty({
-    // Both branches are all-optional objects, so a bare `oneOf` of the two would match *both* for
-    // any payload and fail "exactly one". The mergeArray constraints are what separate them.
     oneOf: [
       {
         allOf: [{ $ref: getSchemaPath(NotifyEmailAddressRecipients) }],
+        anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }],
         not: { required: ['mergeArray'] },
       },
       {
         allOf: [{ $ref: getSchemaPath(NotifyEmailMergeRecipients) }],
         required: ['mergeArray'],
+        not: { anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }] },
       },
     ],
   })
@@ -48,7 +57,25 @@ export class NotifyEmailChannel {
   @Type(() => NotifyEmailRecipients)
   recipients: NotifyEmailRecipients
 
-  @ApiPropertyOptional({ type: NotifyContent })
+  // Mirrors the two constraints that actually run: templateId never alongside subject/body
+  // (TemplateOrContentConstraint) and never alongside renderer (TemplateOrRendererConstraint).
+  // Neither rule requires a channel to carry content at all - the request-level rule only asks that
+  // *some* channel renders something - so the inline branch deliberately requires nothing.
+  @ApiPropertyOptional({
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
+        required: ['templateId'],
+        not: {
+          anyOf: [{ required: ['subject'] }, { required: ['body'] }, { required: ['renderer'] }],
+        },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyInlineContent) }],
+        not: { required: ['templateId'] },
+      },
+    ],
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyContent)

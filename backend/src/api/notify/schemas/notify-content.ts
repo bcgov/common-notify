@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator'
 import { Transform } from 'class-transformer'
-import { ApiSchema, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional, PickType } from '@nestjs/swagger'
 import { sanitizeEmailHtml } from '../../../services/rendering/sanitize-email-html'
 
 @ApiSchema({
@@ -77,3 +77,31 @@ export class NotifyContent {
   @IsString()
   encoding?: string
 }
+
+/**
+ * The two shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
+ * the choice is enforced by TemplateOrContentConstraint (templateId never alongside subject/body)
+ * and TemplateOrRendererConstraint (templateId never alongside renderer).
+ *
+ * `bodyType` and `encoding` appear on both branches because nothing rejects them next to a
+ * templateId - only subject, body and renderer are excluded there.
+ */
+@ApiSchema({
+  description: 'Render a stored template. Cannot be combined with subject, body or renderer.',
+})
+export class NotifyTemplateContent extends PickType(NotifyContent, [
+  'templateId',
+  'bodyType',
+  'encoding',
+] as const) {}
+
+@ApiSchema({
+  description: 'Supply the message inline, optionally naming a renderer for the placeholders.',
+})
+export class NotifyInlineContent extends PickType(NotifyContent, [
+  'subject',
+  'body',
+  'bodyType',
+  'renderer',
+  'encoding',
+] as const) {}

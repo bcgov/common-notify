@@ -1,28 +1,70 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import {
+  ApiExtraModels,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiSchema,
+  getSchemaPath,
+} from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
-import { NotifySmsRecipients } from './notify-sms-recipients'
+import {
+  NotifySmsAddressRecipients,
+  NotifySmsMergeRecipients,
+  NotifySmsRecipients,
+} from './notify-sms-recipients'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
-import { NotifyContent } from './notify-content'
+import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
   description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
 })
 @ValidateTemplateOrRenderer()
+@ApiExtraModels(
+  NotifySmsAddressRecipients,
+  NotifySmsMergeRecipients,
+  NotifyTemplateContent,
+  NotifyInlineContent,
+)
 export class NotifySmsChannel {
+  // Mirrors ValidateRecipientsOrMerge exactly - see NotifyEmailChannel for why each branch needs
+  // its own required/not constraints.
   @ApiProperty({
-    type: NotifySmsRecipients,
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifySmsAddressRecipients) }],
+        required: ['to'],
+        not: { required: ['mergeArray'] },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifySmsMergeRecipients) }],
+        required: ['mergeArray'],
+        not: { required: ['to'] },
+      },
+    ],
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()
   @Type(() => NotifySmsRecipients)
   recipients: NotifySmsRecipients
 
+  // Mirrors the two constraints that actually run - see NotifyEmailChannel.
   @ApiPropertyOptional({
-    type: NotifyContent,
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
+        required: ['templateId'],
+        not: {
+          anyOf: [{ required: ['subject'] }, { required: ['body'] }, { required: ['renderer'] }],
+        },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyInlineContent) }],
+        not: { required: ['templateId'] },
+      },
+    ],
   })
   @IsOptional()
   @ValidateNested()
