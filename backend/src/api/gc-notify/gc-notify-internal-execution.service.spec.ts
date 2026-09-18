@@ -11,6 +11,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { SafelistService } from '../safelist/safelist.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -40,6 +41,7 @@ describe('GcNotifyInternalExecutionService', () => {
   let mockAttachmentValidationService: { validateAttachments: ReturnType<typeof vi.fn> }
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
   let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
+  let mockTenantSettingsService: { resolveSenderAddress: ReturnType<typeof vi.fn> }
 
   const TENANT_ID = 'tenant-1'
 
@@ -69,6 +71,10 @@ describe('GcNotifyInternalExecutionService', () => {
     // Nothing blocked by default: PROD does not enforce the safelist, and neither do the
     // existing expectations in this suite.
     mockSafelistService = { findBlocked: vi.fn().mockResolvedValue([]) }
+    // The response reports the address delivery will send from, resolved for this tenant.
+    mockTenantSettingsService = {
+      resolveSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -81,6 +87,7 @@ describe('GcNotifyInternalExecutionService', () => {
           useValue: mockNotificationRequestDetailService,
         },
         { provide: SafelistService, useValue: mockSafelistService },
+        { provide: TenantSettingsService, useValue: mockTenantSettingsService },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: mockConfigurationRepository },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -139,7 +146,7 @@ describe('GcNotifyInternalExecutionService', () => {
         id: 'notif-1',
         reference: 'ref-1',
         content: {
-          from_email: 'not-configured@example.com',
+          from_email: 'permits@gov.bc.ca',
           body: 'Welcome Alice',
           subject: 'Hello Alice',
         },
@@ -191,6 +198,62 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(jobPayload.request.email.content).toMatchObject({
         body: '# Heading\n\n**Bold**',
         bodyType: 'markdown',
+      })
+    })
+
+    it('reports the tenant sender delivery will use, not a separate configured value', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 3,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 's',
+        body: 'b',
+        bodyType: 'markdown',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+      mockTenantSettingsService.resolveSenderAddress.mockResolvedValue('alerts@gov.bc.ca')
+
+      const result = await service.sendEmail(body, TENANT_ID)
+
+      expect(mockTenantSettingsService.resolveSenderAddress).toHaveBeenCalledWith(TENANT_ID)
+      expect(result.content.from_email).toBe('alerts@gov.bc.ca')
+    })
+
+    it('forwards a list personalisation value to the renderer', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 3,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Your order',
+        body: 'Your order contains:\n\n* apples\n* pears',
+        bodyType: 'markdown',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      // A list value is a template variable, not an attachment: dropping it left the renderer
+      // with no value for ((items)), which fails validation as a missing placeholder.
+      await service.sendEmail(
+        {
+          email_address: 'user@example.com',
+          template_id: 'tpl-1',
+          personalisation: { first_name: 'Amala', items: ['apples', 'pears'] },
+        },
+        TENANT_ID,
+      )
+
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(expect.anything(), {
+        first_name: 'Amala',
+        items: ['apples', 'pears'],
       })
     })
   })
@@ -405,6 +468,35 @@ describe('GcNotifyInternalExecutionService', () => {
         expect.objectContaining({ id: 'tpl-2', engineCode: TemplateEngine.LEGACY_GC_NOTIFY }),
         body.personalisation,
       )
+    })
+
+    it('forwards a list personalisation value to the renderer', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-2',
+        version: 1,
+        channelCode: NotificationChannel.SMS,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        body: 'Your order contains apples and pears',
+        bodyType: 'text',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-2',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      await service.sendSms(
+        {
+          phone_number: '+15555550100',
+          template_id: 'tpl-2',
+          personalisation: { items: ['apples', 'pears'] },
+        },
+        TENANT_ID,
+      )
+
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(expect.anything(), {
+        items: ['apples', 'pears'],
+      })
     })
   })
 

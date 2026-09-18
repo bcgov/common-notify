@@ -191,6 +191,87 @@ describe('EmailDeliveryWorker', () => {
       expect(mockNotificationService.update).toHaveBeenCalledTimes(2)
     })
 
+    it("sends from the tenant's configured sender address", async () => {
+      const mockTenantSettingsService = {
+        getSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
+      }
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+        2,
+        undefined,
+        mockTenantSettingsService as any,
+      )
+
+      await processHandler({
+        data: {
+          notifyId: 'notify-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        attemptsMade: 0,
+      } as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockTenantSettingsService.getSenderAddress).toHaveBeenCalledWith('tenant-123')
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ from: 'permits@gov.bc.ca' }),
+      )
+    })
+
+    it('leaves the sender to the adapter when the tenant has not configured one', async () => {
+      const mockTenantSettingsService = {
+        getSenderAddress: vi.fn().mockResolvedValue(null),
+      }
+
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+        2,
+        undefined,
+        mockTenantSettingsService as any,
+      )
+
+      await processHandler({
+        data: {
+          notifyId: 'notify-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        attemptsMade: 0,
+      } as Bull.Job<DeliveryJobPayload>)
+
+      // Absent, not undefined: the adapter falls back to `ches.from` only when the key is missing.
+      const [sent] = mockEmailAdapter.send.mock.calls.at(-1)
+      expect(sent).not.toHaveProperty('from')
+    })
+
     it('should handle multiple recipients', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
