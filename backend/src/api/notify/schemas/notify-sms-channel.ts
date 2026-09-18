@@ -1,6 +1,6 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
@@ -8,11 +8,13 @@ import { NotifySmsRecipients } from './notify-sms-recipients'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyContent } from './notify-content'
 
+@ApiSchema({
+  description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
+})
 @ValidateTemplateOrRenderer()
 export class NotifySmsChannel {
   @ApiProperty({
     type: NotifySmsRecipients,
-    description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send',
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()
@@ -21,7 +23,6 @@ export class NotifySmsChannel {
 
   @ApiPropertyOptional({
     type: NotifyContent,
-    description: 'SMS content (body, renderer, encoding, etc.)',
   })
   @IsOptional()
   @ValidateNested()

@@ -6,7 +6,7 @@ import {
   ArrayMinSize,
   ValidationArguments,
 } from 'class-validator'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsNormalizablePhoneNumber } from './validators/normalizable-phone-number.validator'
 import { PhoneNumberService } from '../services/phone-number.service'
 import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
@@ -26,6 +26,9 @@ function e164RecipientMessage(args: ValidationArguments): string {
   return `${invalidRecipients.join(', ')} is not a valid phone number`
 }
 
+@ApiSchema({
+  description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send.',
+})
 export class NotifySmsRecipients {
   @ApiPropertyOptional({
     type: [String],

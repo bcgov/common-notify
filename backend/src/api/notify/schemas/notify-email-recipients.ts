@@ -1,8 +1,11 @@
 import { IsArray, IsEmail, IsOptional, ArrayMaxSize } from 'class-validator'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional } from '@nestjs/swagger'
 import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
 import { IsValidMergeArray } from './validators/merge-array.validator'
 
+@ApiSchema({
+  description: 'Email recipients: to/cc/bcc, or a mergeArray for a mail-merge send.',
+})
 export class NotifyEmailRecipients {
   @ApiPropertyOptional({
     type: [String],

@@ -1,6 +1,6 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
@@ -8,18 +8,21 @@ import { NotifyAttachment } from './notify-attachment'
 import { NotifyEmailRecipients } from './notify-email-recipients'
 import { NotifyContent } from './notify-content'
 
+@ApiSchema({
+  description:
+    'Send by email: recipients, content (inline or a stored template), attachments and scheduling.',
+})
 @ValidateTemplateOrRenderer()
 export class NotifyEmailChannel {
   @ApiProperty({
     type: NotifyEmailRecipients,
-    description: 'Email recipients: to/cc/bcc or a mergeArray for mail-merge',
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()
   @Type(() => NotifyEmailRecipients)
   recipients: NotifyEmailRecipients
 
-  @ApiPropertyOptional({ type: NotifyContent, description: 'Email content (subject, body, etc.)' })
+  @ApiPropertyOptional({ type: NotifyContent })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyContent)

@@ -1,8 +1,12 @@
 import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator'
 import { Transform } from 'class-transformer'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional } from '@nestjs/swagger'
 import { sanitizeEmailHtml } from '../../../services/rendering/sanitize-email-html'
 
+@ApiSchema({
+  description:
+    'Message content: either a stored template by templateId, or an inline body with a renderer. Which fields apply depends on the channel - a subject is email only.',
+})
 export class NotifyContent {
   @ApiPropertyOptional({
     format: 'uuid',

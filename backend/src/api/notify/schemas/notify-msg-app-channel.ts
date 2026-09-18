@@ -1,20 +1,21 @@
 import { IsString, IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
 import { NotifyMsgAppRecipients } from './notify-msg-app-recipients'
 import { NotifyContent } from './notify-content'
 
+@ApiSchema({ description: 'Send by messaging app.' })
 @ValidateTemplateOrRenderer()
 export class NotifyMsgAppChannel {
-  @ApiProperty({ type: NotifyMsgAppRecipients, description: 'Message app recipients' })
+  @ApiProperty({ type: NotifyMsgAppRecipients })
   @ValidateNested()
   @Type(() => NotifyMsgAppRecipients)
   recipients: NotifyMsgAppRecipients
 
-  @ApiProperty({ type: NotifyContent, description: 'Message app content' })
+  @ApiProperty({ type: NotifyContent })
   @ValidateNested()
   @Type(() => NotifyContent)
   content: NotifyContent
