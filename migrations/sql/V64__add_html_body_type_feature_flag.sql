@@ -34,7 +34,7 @@ VALUES
   (
     'html_body_type',
     'HTML Body Type',
-    'When enabled, the tenant may send `bodyType: "html"` and supply its own markup, which is delivered unchanged. When disabled, bodies must be markdown or plain text and are rendered by the service. Seeded ON to preserve existing senders; turn OFF globally once they have moved to markdown.',
+    'When enabled, the tenant may send bodyType html and supply its own markup, which is sanitised then delivered. When disabled, bodies must be markdown or text. Seeded ON to preserve existing senders; see the migration header.',
     50,
     'migration',
     'migration'
