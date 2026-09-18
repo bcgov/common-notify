@@ -49,7 +49,7 @@ spec:
               value: "true"
           command: ["/bin/sh", "-c"]
           args:
-            - /flyway/flyway info migrate repair && cp -R /flyway/assets/email-logos/. /email-logo-seed-assets/
+            - /flyway/flyway info migrate && cp -R /flyway/assets/email-logos/. /email-logo-seed-assets/
           volumeMounts:
             - name: email-logo-seed-assets
               mountPath: /email-logo-seed-assets
