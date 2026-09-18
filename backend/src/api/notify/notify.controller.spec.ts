@@ -23,7 +23,6 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -52,10 +51,6 @@ const mockAuthGuard: CanActivate = {
     request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
-}
-
-const mockChesApiClient = {
-  sendEmail: vi.fn(),
 }
 
 const mockConfigService = {
@@ -182,7 +177,6 @@ describe('Notify Controllers', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
-        { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
