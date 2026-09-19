@@ -196,6 +196,26 @@
             <column ascending="true" name="id"/>
          </index>
       </table>
+      <table name="channel_recipient_kind" remarks="Which recipient lists each notification channel supports. EMAIL carries to/cc/bcc; SMS carries to only. event_channel_recipient references this pair, so an unsupported combination cannot be stored." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="channel_code" nullable="false" remarks="Channel the pairing applies to." size="20" type="varchar" typeCode="12">
+            <child column="channel_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_recipient"/>
+            <parent column="channel_code" foreignKey="fk_channel_recipient_kind_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="kind_code" nullable="false" remarks="Recipient list the channel supports." size="3" type="varchar" typeCode="12">
+            <child column="kind" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_recipient"/>
+            <parent column="kind_code" foreignKey="fk_channel_recipient_kind_kind" implied="false" onDeleteCascade="false" schema="notify" table="event_recipient_kind_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the pairing was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the pairing was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="channel_code" sequenceNumberInPK="1"/>
+         <primaryKey column="kind_code" sequenceNumberInPK="2"/>
+         <index name="pk_channel_recipient_kind" unique="true">
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="kind_code"/>
+         </index>
+      </table>
       <table name="client_tenant_mapping" remarks="Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for this mapping record." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="client_id" nullable="false" remarks="API Gateway client ID (issued via API Portal). Not a foreign key as the API Gateway is external." size="255" type="varchar" typeCode="12"/>
@@ -247,6 +267,7 @@
       </table>
       <table name="email_logo" remarks="Email logo metadata for system-provided and tenant-provided logos." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Email logo ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
+            <child column="header_logo_id" foreignKey="fk_event_channel_setting_header_logo" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
             <child column="email_logo_id" foreignKey="fk_tenant_settings_email_logo" implied="false" onDeleteCascade="false" schema="notify" table="tenant_settings"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="name" nullable="true" remarks="Display name for the email logo." size="2147483647" type="varchar" typeCode="12"/>
@@ -294,6 +315,150 @@
          <primaryKey column="status_code" sequenceNumberInPK="1"/>
          <index name="email_logo_status_code_pkey" unique="true">
             <column ascending="true" name="status_code"/>
+         </index>
+      </table>
+      <table name="event_channel_recipient" remarks="Manually entered recipients of an event channel, one row per address. Which lists a channel may use comes from notify.channel_recipient_kind. Addresses are stored normalized, and are unique per (channel setting, kind) among non-deleted rows." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the recipient row." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="channel_setting_id" nullable="false" remarks="Channel setting this recipient belongs to. Cascade deleted with it." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel of the parent setting, held identical to it by the composite foreign key to event_channel_setting. Stored here so (channel_code, kind) can reference notify.channel_recipient_kind, which is what rejects a list the channel does not support." size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
+            <parent column="channel_code" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="kind" nullable="false" remarks="Which recipient list the address belongs to, from notify.event_recipient_kind_code. Paired with channel_code against notify.channel_recipient_kind, so SMS rows can only be TO." size="3" type="varchar" typeCode="12">
+            <parent column="kind_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="address" nullable="false" remarks="The recipient, normalized by the application before it is stored: lowercased/trimmed email address for EMAIL, E.164 phone number for SMS. Checked against notification_channel_code.recipient_pattern for the channel." size="320" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="Timestamp with timezone when the recipient was added." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="created_by" nullable="true" remarks="Identifier of the user or process that added this recipient." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="Timestamp with timezone when the recipient row was last updated. Maintained by trg_event_channel_recipient_updated_at." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this recipient." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="9" name="is_deleted" nullable="false" remarks="Soft delete flag. Removing a recipient sets this rather than deleting the row, so the history table keeps the removal." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_event_channel_recipient" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_event_channel_recipient_address" unique="false">
+            <column ascending="true" name="address"/>
+         </index>
+         <index name="idx_event_channel_recipient_setting" unique="false">
+            <column ascending="true" name="channel_setting_id"/>
+         </index>
+         <index name="uq_event_channel_recipient_active" unique="true">
+            <column ascending="true" name="channel_setting_id"/>
+            <column ascending="true" name="kind"/>
+            <column ascending="true" name="address"/>
+         </index>
+         <checkConstraint constraint="(((address)::text = btrim((address)::text)) AND (length((address)::text) &gt; 0))" name="chk_event_channel_recipient_address"/>
+      </table>
+      <table name="event_channel_recipient_history" remarks="Immutable audit log of changes to event_channel_recipient - who was added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="" size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="event_channel_recipient_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_event_channel_recipient_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_event_channel_recipient_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
+         </index>
+      </table>
+      <table name="event_channel_setting" remarks="Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. Channel-specific columns are constrained so EMAIL rows carry sender_email and header values and SMS rows carry from_phone_number_id. Recipients live in notify.event_channel_recipient." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the channel setting row." size="2147483647" type="uuid" typeCode="1111">
+            <child column="channel_setting_id" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_recipient"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="event_id" nullable="false" remarks="Event these settings belong to. Cascade deleted with the event." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_event_channel_setting_event" implied="false" onDeleteCascade="true" schema="notify" table="notification_event"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel these settings configure (EMAIL or SMS)." size="20" type="varchar" typeCode="12">
+            <child column="channel_code" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_recipient"/>
+            <parent column="channel_code" foreignKey="fk_event_channel_setting_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="3" name="active" nullable="false" remarks="Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template and the channel sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated; the matching &quot;at least one recipient&quot; rule is enforced by the application, since recipients are rows in another table." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="template_id" nullable="true" remarks="Template used to render this channel. Must be an active template belonging to the same tenant as the event and matching channel_code; enforced by the application. Templates are authored separately by CSTAR template admins - the event only selects an existing one." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_event_channel_setting_template" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="sender_email" nullable="true" remarks="From address for EMAIL sends. NULL on SMS rows. Format checked here; the permitted sending domain is enforced by the application." size="320" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="from_phone_number_id" nullable="true" remarks="Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant's single allocated number (V60), shared by all of that tenant's SMS events, so this is not unique." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_event_channel_setting_number" implied="false" onDeleteCascade="false" schema="notify" table="provisioned_phone_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="7" name="use_custom_header" nullable="false" remarks="When false the email inherits the tenant's default header from notify.tenant_settings and the header columns here stay NULL; when true the event owns its header outright, inherits nothing, and uses header_logo_id and header_title as given. EMAIL only; always false on SMS rows. Stored explicitly so a custom header with no logo and no title stays distinct from the tenant default." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="header_logo_id" nullable="true" remarks="Approved email logo shown in the custom email header. NULL means the custom header has no logo, never &quot;inherit the tenant logo&quot;. Only set when use_custom_header = TRUE." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_event_channel_setting_header_logo" implied="false" onDeleteCascade="false" schema="notify" table="email_logo"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="header_title" nullable="true" remarks="Title text shown beside the logo in the custom email header, defaulted in the UI to the tenant name. NULL means the custom header has no title, never &quot;inherit the tenant title&quot;. Only set when use_custom_header = TRUE, so a tenant-level default title added to notify.tenant_settings later applies to exactly the rows with use_custom_header = FALSE and needs no change here." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="Timestamp with timezone when the channel setting was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="created_by" nullable="true" remarks="Identifier of the user or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="12" name="updated_at" nullable="false" remarks="Timestamp with timezone when the channel setting was last updated. Maintained by trg_event_channel_setting_updated_at." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="13" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="14" name="is_deleted" nullable="false" remarks="Soft delete flag. Deleted rows release their from number back to the picker." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_event_channel_setting" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_event_channel_setting_event" unique="false">
+            <column ascending="true" name="event_id"/>
+         </index>
+         <index name="idx_event_channel_setting_header_logo" unique="false">
+            <column ascending="true" name="header_logo_id"/>
+         </index>
+         <index name="idx_event_channel_setting_number" unique="false">
+            <column ascending="true" name="from_phone_number_id"/>
+         </index>
+         <index name="idx_event_channel_setting_template" unique="false">
+            <column ascending="true" name="template_id"/>
+         </index>
+         <index name="uq_event_channel_setting" unique="true">
+            <column ascending="true" name="event_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <index name="uq_event_channel_setting_id_channel" unique="true">
+            <column ascending="true" name="id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <checkConstraint constraint="((active = false) OR ((template_id IS NOT NULL) AND ((((channel_code)::text = 'EMAIL'::text) AND (sender_email IS NOT NULL)) OR (((channel_code)::text = 'SMS'::text) AND (from_phone_number_id IS NOT NULL)))))" name="chk_event_channel_setting_active_complete"/>
+         <checkConstraint constraint="((use_custom_header = true) OR ((header_logo_id IS NULL) AND (header_title IS NULL)))" name="chk_event_channel_setting_custom_header"/>
+         <checkConstraint constraint="((header_title IS NULL) OR (btrim((header_title)::text) &lt;&gt; ''::text))" name="chk_event_channel_setting_header_title"/>
+         <checkConstraint constraint="((sender_email IS NULL) OR ((sender_email)::text ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'::text))" name="chk_event_channel_setting_sender_email"/>
+         <checkConstraint constraint="((((channel_code)::text = 'EMAIL'::text) AND (from_phone_number_id IS NULL)) OR (((channel_code)::text = 'SMS'::text) AND (sender_email IS NULL) AND (use_custom_header = false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))" name="chk_event_channel_setting_shape"/>
+      </table>
+      <table name="event_channel_setting_history" remarks="Immutable audit log of changes to event_channel_setting: activation, sender, template and header changes. Each row is a full snapshot after INSERT/UPDATE." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="" size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="event_channel_setting_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_event_channel_setting_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_event_channel_setting_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
+         </index>
+      </table>
+      <table name="event_recipient_kind_code" remarks="Code table for the recipient lists an event channel can address (to, cc, bcc)." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="kind_code" nullable="false" remarks="Recipient list code (TO, CC, BCC). Primary key." size="3" type="varchar" typeCode="12">
+            <child column="kind_code" foreignKey="fk_channel_recipient_kind_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the recipient list." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the kind code was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="User or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp when the kind code was last updated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="kind_code" sequenceNumberInPK="1"/>
+         <index name="event_recipient_kind_code_pkey" unique="true">
+            <column ascending="true" name="kind_code"/>
          </index>
       </table>
       <table name="feature_flag" remarks="Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false." schema="notify" type="TABLE">
@@ -404,6 +569,8 @@
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert"/>
             <child column="channel_code" foreignKey="fk_api_key_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="channel_code" foreignKey="fk_api_key_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
+            <child column="channel_code" foreignKey="fk_channel_recipient_kind_channel" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
+            <child column="channel_code" foreignKey="fk_event_channel_setting_channel" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
             <child column="channel" foreignKey="fk_channel_code" implied="false" onDeleteCascade="false" schema="notify" table="notification_request_detail"/>
             <child column="channel_code" foreignKey="fk_recipient_safelist_channel" implied="false" onDeleteCascade="false" schema="notify" table="recipient_safelist"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
@@ -416,12 +583,57 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="User or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="display_name" nullable="false" remarks="Sentence-case display name for UI rendering (e.g., &quot;Email&quot;, &quot;SMS&quot;). Used in dropdowns and forms." size="100" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="999" digits="0" id="7" name="sort_order" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="recipient_pattern" nullable="true" remarks="POSIX regular expression a recipient address must match for this channel, in the normalized form the application stores (lower-cased email, E.164 phone number). NULL means no format is defined, and addresses are not checked. Applied by notify.check_event_channel_recipient_address()." size="500" type="varchar" typeCode="12"/>
          <primaryKey column="channel_code" sequenceNumberInPK="1"/>
          <index name="notification_channel_code_pkey" unique="true">
             <column ascending="true" name="channel_code"/>
          </index>
          <index name="idx_notification_channel_code_description" unique="false">
             <column ascending="true" name="description"/>
+         </index>
+      </table>
+      <table name="notification_event" remarks="A tenant-owned, named notification definition. Per-channel configuration lives in notify.event_channel_setting, and its recipients in notify.event_channel_recipient." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the event." size="2147483647" type="uuid" typeCode="1111">
+            <child column="event_id" foreignKey="fk_event_channel_setting_event" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant that owns this event. Cascade deleted with the tenant." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_notification_event_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="name" nullable="false" remarks="Event name entered on the Event settings tab. Unique per tenant, case insensitive, among non-deleted events." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="description" nullable="true" remarks="Free-text description of what the event is for. Optional." size="2147483647" type="text" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="created_at" nullable="false" remarks="Timestamp with timezone when the event was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by" nullable="true" remarks="Identifier of the user or process that created this event." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="updated_at" nullable="false" remarks="Timestamp with timezone when the event was last updated. Maintained by trg_notification_event_updated_at." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this event." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="8" name="is_deleted" nullable="false" remarks="Soft delete flag. Deleted events are hidden from the UI and are never dispatched." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_notification_event" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_notification_event_tenant" unique="false">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <index name="uq_notification_event_tenant_name" unique="true">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <checkConstraint constraint="(length(btrim((name)::text)) &gt; 0)" name="chk_notification_event_name"/>
+      </table>
+      <table name="notification_event_history" remarks="Immutable audit log of changes to notification_event. Each row is a full snapshot after INSERT/UPDATE, attributed to the row's own audit user." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="" size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="" size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="notification_event_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_notification_event_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_notification_event_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
          </index>
       </table>
       <table name="notification_event_type_code" numRows="3" remarks="Code table for notification event types. Defines all valid events that can trigger notifications." schema="notify" type="TABLE">
@@ -609,6 +821,59 @@
             <column ascending="true" name="external_id"/>
          </index>
       </table>
+      <table name="provisioned_phone_number" remarks="Pool of SMS phone numbers provisioned from the SMS provider. A row with tenant_id NULL is available for allocation; a row with tenant_id set is allocated to that tenant. A tenant holds at most one live number and all of its SMS events send from it." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the provisioned number." size="2147483647" type="uuid" typeCode="1111">
+            <child column="from_phone_number_id" foreignKey="fk_event_channel_setting_number" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="phone_number" nullable="false" remarks="The number in E.164 format (e.g. +12505551234). Unique across all non-deleted rows." size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="display_name" nullable="true" remarks="Optional human-friendly label for the number (e.g. &quot;Health Alerts - Victoria&quot;). Shown in the admin UI and the from-number picker." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="provider" nullable="true" remarks="Informational name of the provider the number was provisioned from (e.g. twilio, gc_notify). Free text until a provider code table exists." size="50" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="tenant_id" nullable="true" remarks="Tenant the number is allocated to. NULL means the number is unallocated and offered in the pool picker. At most one live number per tenant, and a number can only move NULL &lt;-&gt; tenant, never tenant -&gt; tenant. A tenant holding a number cannot be hard deleted; release the number back to the pool first." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_provisioned_phone_number_tenant" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="5" name="allocated_at" nullable="true" remarks="Timestamp with timezone when the number was allocated to the current tenant. NULL while unallocated." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="Timestamp with timezone when the number was added to the pool." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="created_by" nullable="true" remarks="Identifier of the user or process that added this number." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="Timestamp with timezone when the record was last updated. Maintained by the audit trigger." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="10" name="is_deleted" nullable="false" remarks="Soft delete flag. When true the number is retired and excluded from the pool, the allocation list and the from-number picker." size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_provisioned_phone_number" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_provisioned_phone_number_available" unique="false">
+            <column ascending="true" name="phone_number"/>
+         </index>
+         <index name="uq_provisioned_phone_number_active" unique="true">
+            <column ascending="true" name="phone_number"/>
+         </index>
+         <index name="uq_provisioned_phone_number_tenant" unique="true">
+            <column ascending="true" name="tenant_id"/>
+         </index>
+         <checkConstraint constraint="(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))" name="chk_provisioned_phone_number_allocation"/>
+         <checkConstraint constraint="((phone_number)::text ~ '^\+[1-9][0-9]{1,14}$'::text)" name="chk_provisioned_phone_number_e164"/>
+      </table>
+      <table name="provisioned_phone_number_history" remarks="Immutable audit log of changes to provisioned_phone_number. Each row is a full snapshot after INSERT/UPDATE, populated by the notify.audit_history() trigger. Allocation to a tenant and release back to the pool are both UPDATE rows." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="Unique identifier for this history record." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="provisioned_phone_number.id that was changed." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="Type of operation: I=INSERT, U=UPDATE." size="1" type="bpchar" typeCode="1"/>
+         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="User who performed the operation (from app.current_user or the database user)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="Server timestamp when the operation occurred." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="Complete JSON snapshot of the row after the operation." size="2147483647" type="jsonb" typeCode="1111"/>
+         <primaryKey column="h_id" sequenceNumberInPK="1"/>
+         <index name="provisioned_phone_number_history_pkey" unique="true">
+            <column ascending="true" name="h_id"/>
+         </index>
+         <index name="idx_ppn_history_target_row" unique="false">
+            <column ascending="true" name="target_row_id"/>
+         </index>
+         <index name="idx_ppn_history_timestamp" unique="false">
+            <column ascending="false" name="operation_executed_at"/>
+         </index>
+         <index name="idx_ppn_history_user" unique="false">
+            <column ascending="true" name="operation_user"/>
+         </index>
+      </table>
       <table name="recipient_safelist" remarks="Per-tenant list of recipients that may be sent to in non-production environments, where the recipient_safelist feature flag is enabled. Equivalent to GC Notify service_safelist. Ignored in PROD, where the flag is off." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the safelist entry." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant this safelist entry belongs to. Cascade deleted with the tenant." size="2147483647" type="uuid" typeCode="1111">
@@ -664,6 +929,7 @@
       </table>
       <table name="template" remarks="Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Template ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
+            <child column="template_id" foreignKey="fk_event_channel_setting_template" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
             <child column="template_id" foreignKey="fk_template_version_template" implied="false" onDeleteCascade="true" schema="notify" table="template_version"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant ID (UUID). Identifies which tenant owns this template." size="2147483647" type="uuid" typeCode="1111"/>
@@ -780,7 +1046,9 @@
             <child column="tenant_id" foreignKey="attachment_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="attachment"/>
             <child column="tenant_id" foreignKey="client_tenant_mapping_tenant_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="client_tenant_mapping"/>
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
+            <child column="tenant_id" foreignKey="fk_notification_event_tenant" implied="false" onDeleteCascade="true" schema="notify" table="notification_event"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+            <child column="tenant_id" foreignKey="fk_provisioned_phone_number_tenant" implied="false" onDeleteCascade="false" schema="notify" table="provisioned_phone_number"/>
             <child column="tenant_id" foreignKey="fk_recipient_safelist_tenant" implied="false" onDeleteCascade="true" schema="notify" table="recipient_safelist"/>
             <child column="tenant_id" foreignKey="fk_tenant_settings_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_settings"/>
             <child column="tenant_id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
@@ -1052,6 +1320,95 @@ BEGIN
 
   -- AFTER trigger: the return value is ignored and the row is already written as supplied.
   RETURN NULL;
+END;]]></definition>
+         <parameters>
+            <parameter mode="IN"/>
+         </parameters>
+      </routine>
+      <routine dataAccess="MODIFIES" deterministic="false" name="check_event_channel_recipient_address()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
+         <comment><![CDATA[Rejects an event recipient whose address does not match notification_channel_code.recipient_pattern for its channel. Keeps the per-channel format with the channel definition rather than in a constraint that names channels.]]></comment>
+         <definition language="plpgsql"><![CDATA[DECLARE
+  v_pattern TEXT;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.address IS NOT DISTINCT FROM OLD.address
+     AND NEW.channel_code IS NOT DISTINCT FROM OLD.channel_code THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT recipient_pattern
+    INTO v_pattern
+    FROM notify.notification_channel_code
+   WHERE channel_code = NEW.channel_code;
+
+  IF v_pattern IS NOT NULL AND NEW.address !~ v_pattern THEN
+    RAISE EXCEPTION
+      'Recipient "%" is not a valid % address, or is not normalized',
+      NEW.address, NEW.channel_code
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;]]></definition>
+         <parameters>
+            <parameter mode="IN"/>
+         </parameters>
+      </routine>
+      <routine dataAccess="MODIFIES" deterministic="false" name="check_phone_number_allocation()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
+         <comment><![CDATA[Rejects moving a provisioned phone number directly from one tenant to another. A number must be released back to the pool (tenant_id NULL) before another tenant can claim it, so the release guard in V61 always gets a chance to run.]]></comment>
+         <definition language="plpgsql"><![CDATA[BEGIN
+  IF OLD.tenant_id IS NOT NULL
+     AND NEW.tenant_id IS NOT NULL
+     AND NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
+    RAISE EXCEPTION
+      'Phone number % cannot be transferred directly between tenants. Release it back to the pool first.',
+      OLD.phone_number
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  RETURN NEW;
+END;]]></definition>
+         <parameters>
+            <parameter mode="IN"/>
+         </parameters>
+      </routine>
+      <routine dataAccess="MODIFIES" deterministic="false" name="check_phone_number_release()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
+         <comment><![CDATA[Blocks releasing, re-allocating or retiring a provisioned phone number while any non-deleted event_channel_setting referencing it still has active = TRUE. When every reference is inactive, clears those references so a released number leaves no cross-tenant pointer behind.]]></comment>
+         <definition language="plpgsql"><![CDATA[DECLARE
+  v_event_name TEXT;
+BEGIN
+  -- Only guard transitions that take the number away from its current holder: a change of
+  -- tenant (including release to NULL) or a retirement.
+  IF NEW.tenant_id IS NOT DISTINCT FROM OLD.tenant_id
+     AND NOT (NEW.is_deleted AND NOT OLD.is_deleted) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT e.name
+    INTO v_event_name
+    FROM notify.event_channel_setting ecs
+    JOIN notify.notification_event e ON e.id = ecs.event_id
+   WHERE ecs.from_phone_number_id = OLD.id
+     AND ecs.is_deleted = FALSE
+     AND ecs.active = TRUE
+   LIMIT 1;
+
+  IF v_event_name IS NOT NULL THEN
+    RAISE EXCEPTION
+      'Phone number % cannot be released or retired: event "%" still has SMS enabled. Disable SMS on that event first.',
+      OLD.phone_number, v_event_name
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  -- Everything still pointing at the number is a disabled SMS tab. Detach it rather than leave a
+  -- pointer to a number that may be re-allocated to a different tenant. Safe against
+  -- chk_event_channel_setting_active_complete precisely because these rows are inactive.
+  UPDATE notify.event_channel_setting
+     SET from_phone_number_id = NULL
+   WHERE from_phone_number_id = OLD.id
+     AND is_deleted = FALSE;
+
+  RETURN NEW;
 END;]]></definition>
          <parameters>
             <parameter mode="IN"/>

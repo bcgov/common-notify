@@ -8,11 +8,13 @@ digraph "twoDegreesRelationshipsDiagram" {
   "attachment":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "client_tenant_mapping":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "feature_flag":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
+  "notification_event":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=teeodot];
   "notification_request":"status":w -> "notification_status_code":"code":e [arrowhead=none dir=back arrowtail=crowodot];
   "notification_request":"tenant_id":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "notification_request_detail":"channel":w -> "notification_channel_code":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "notification_request_detail":"notification_request_id":w -> "notification_request":"id.type":e [arrowhead=none dir=back arrowtail=crowodot];
   "notification_request_detail":"status":w -> "notification_status_code":"code":e [arrowhead=none dir=back arrowtail=crowodot];
+  "provisioned_phone_number":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=teeodot];
   "recipient_safelist":"elipses":w -> "notification_channel_code":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
   "recipient_safelist":"elipses":w -> "tenant":"id":e [arrowhead=none dir=back arrowtail=crowodot];
   "tenant":"status":w -> "tenant_status_code":"elipses":e [arrowhead=none dir=back arrowtail=crowodot];
@@ -88,11 +90,22 @@ digraph "twoDegreesRelationshipsDiagram" {
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
       <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="156" HEIGHT="16"><B>notification_channel_code</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
       <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">8 &gt;</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">2 rows</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">10 &gt;</TD></TR>
     </TABLE>>
     URL="notification_channel_code.html"
     target="_top"
     tooltip="notification_channel_code"
+  ];
+  "notification_event" [
+   label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
+      <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="109" HEIGHT="16"><B>notification_event</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
+      <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">1 &gt;</TD></TR>
+    </TABLE>>
+    URL="notification_event.html"
+    target="_top"
+    tooltip="notification_event"
   ];
   "notification_request" [
    label=<
@@ -141,6 +154,17 @@ digraph "twoDegreesRelationshipsDiagram" {
     target="_top"
     tooltip="notification_status_code"
   ];
+  "provisioned_phone_number" [
+   label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
+      <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="166" HEIGHT="16"><B>provisioned_phone_number</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
+      <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">1 &gt;</TD></TR>
+    </TABLE>>
+    URL="provisioned_phone_number.html"
+    target="_top"
+    tooltip="provisioned_phone_number"
+  ];
   "recipient_safelist" [
    label=<
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
@@ -157,7 +181,7 @@ digraph "twoDegreesRelationshipsDiagram" {
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="#ffffff">
       <TR><TD COLSPAN="3"  BGCOLOR="#f5f5f5"><TABLE BORDER="0" CELLSPACING="0"><TR><TD ALIGN="LEFT" FIXEDSIZE="TRUE" WIDTH="40" HEIGHT="16"><B>tenant</B></TD><TD ALIGN="RIGHT">[table]</TD></TR></TABLE></TD></TR>
       <TR><TD PORT="elipses" COLSPAN="3" ALIGN="LEFT">...</TD></TR>
-      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">9 &gt;</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffffff">&lt; 1</TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">  </TD><TD ALIGN="RIGHT" BGCOLOR="#ffffff">11 &gt;</TD></TR>
     </TABLE>>
     URL="tenant.html"
     target="_top"

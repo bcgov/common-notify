@@ -103,6 +103,15 @@
                                 </thead>
                                 <tbody>
                                     <tr>
+                                        <td><a href="routines/check_event_channel_recipient_a_be594e77.html">check_event_channel_recipient_address()</a></td>
+                                        <td>FUNCTION</td>
+                                        <td>plpgsql</td>
+                                        <td>false</td>
+                                        <td>trigger</td>
+                                        <td>INVOKER</td>
+                                        <td><p>Rejects an event recipient whose address does not match notification_channel_code.recipient_pattern for its channel. Keeps the per-channel format with the channel definition rather than in a constraint that names channels.</p></td>
+                                    </tr>
+                                    <tr>
                                         <td><a href="routines/uuid_ns_oid___188cf155.html">uuid_ns_oid()</a></td>
                                         <td>FUNCTION</td>
                                         <td>c</td>
@@ -110,6 +119,15 @@
                                         <td>uuid</td>
                                         <td>INVOKER</td>
                                         <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href="routines/check_phone_number_allocation___13e3564f.html">check_phone_number_allocation()</a></td>
+                                        <td>FUNCTION</td>
+                                        <td>plpgsql</td>
+                                        <td>false</td>
+                                        <td>trigger</td>
+                                        <td>INVOKER</td>
+                                        <td><p>Rejects moving a provisioned phone number directly from one tenant to another. A number must be released back to the pool (tenant_id NULL) before another tenant can claim it, so the release guard in V61 always gets a chance to run.</p></td>
                                     </tr>
                                     <tr>
                                         <td><a href="routines/set_updated_at___86fe4235.html">set_updated_at()</a></td>
@@ -137,6 +155,15 @@
                                         <td>uuid</td>
                                         <td>INVOKER</td>
                                         <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href="routines/check_phone_number_release___def0159a.html">check_phone_number_release()</a></td>
+                                        <td>FUNCTION</td>
+                                        <td>plpgsql</td>
+                                        <td>false</td>
+                                        <td>trigger</td>
+                                        <td>INVOKER</td>
+                                        <td><p>Blocks releasing, re-allocating or retiring a provisioned phone number while any non-deleted event_channel_setting referencing it still has active = TRUE. When every reference is inactive, clears those references so a released number leaves no cross-tenant pointer behind.</p></td>
                                     </tr>
                                     <tr>
                                         <td><a href="routines/uuid_ns_dns___17f46cf4.html">uuid_ns_dns()</a></td>

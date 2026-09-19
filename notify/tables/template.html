@@ -131,6 +131,11 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
+                                                <td title="event_channel_setting.template_id references template.id via fk_event_channel_setting_template"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.template_id</span></td>
+                                                <td class="constraint detail">fk_event_channel_setting_template</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
                                                 <td title="template_version.template_id references template.id via fk_template_version_template"><a href='template_version.html'>template_version</a><span class='relatedKey'>.template_id</span></td>
                                                 <td class="constraint detail">fk_template_version_template</td>
                                                 <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
@@ -515,25 +520,32 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="template.html" target="_top" title="template" alt="" coords="337,5,633,544">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,193,293,340">
-<area shape="rect" id="node3" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="21,491,278,608">
-<area shape="rect" id="node4" href="template_version.html" target="_top" title="template_version" alt="" coords="677,433,896,727">
+<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="677,5,935,269">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,235,293,381">
+<area shape="rect" id="node3" href="template.html" target="_top" title="template" alt="" coords="337,115,633,653">
+<area shape="rect" id="node4" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="21,533,278,651">
+<area shape="rect" id="node5" href="template_version.html" target="_top" title="template_version" alt="" coords="697,543,915,836">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/template.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="394,5,577,93">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,377,293,465">
-<area shape="rect" id="node3" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="371,111,599,199">
-<area shape="rect" id="node4" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="356,216,615,304">
-<area shape="rect" id="node5" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="389,321,581,409">
-<area shape="rect" id="node6" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="339,427,632,515">
-<area shape="rect" id="node7" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="377,532,593,620">
-<area shape="rect" id="node8" href="template.html" target="_top" title="template" alt="" coords="337,673,633,1212">
-<area shape="rect" id="node9" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="21,1041,278,1129">
-<area shape="rect" id="node10" href="template_version.html" target="_top" title="template_version" alt="" coords="677,681,896,769">
+<area shape="rect" id="node1" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="397,920,579,1008">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,449,293,537">
+<area shape="rect" id="node3" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="374,5,602,93">
+<area shape="rect" id="node4" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="359,111,617,199">
+<area shape="rect" id="node5" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="392,288,584,376">
+<area shape="rect" id="node6" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="683,344,947,432">
+<area shape="rect" id="node7" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="991,396,1264,484">
+<area shape="rect" id="node8" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="686,449,943,537">
+<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="375,499,601,587">
+<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="337,815,639,903">
+<area shape="rect" id="node11" href="email_logo.html" target="_top" title="email_logo" alt="" coords="406,393,570,481">
+<area shape="rect" id="node12" href="template.html" target="_top" title="template" alt="" coords="340,1025,636,1564">
+<area shape="rect" id="node15" href="template_engine_code.html" target="_top" title="template_engine_code" alt="" coords="21,1411,278,1499">
+<area shape="rect" id="node13" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="341,604,635,692">
+<area shape="rect" id="node14" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="380,709,596,797">
+<area shape="rect" id="node16" href="template_version.html" target="_top" title="template_version" alt="" coords="705,1547,924,1635">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/template.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
