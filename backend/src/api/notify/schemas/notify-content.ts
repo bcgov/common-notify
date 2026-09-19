@@ -81,20 +81,16 @@ export class NotifyContent {
 /**
  * The two shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
  * the choice is enforced by TemplateOrContentConstraint (templateId never alongside subject/body)
- * and TemplateOrRendererConstraint (templateId never alongside renderer).
+ * and TemplateOrRendererConstraint (templateId never alongside renderer, bodyType or encoding).
  *
- * `bodyType` and `encoding` appear on both branches because nothing rejects them next to a
- * templateId - only subject, body and renderer are excluded there.
+ * The template branch is templateId and nothing else: a stored template carries its own body type
+ * and renderer, and there is nothing left for the request to say about how it renders.
  */
 @ApiSchema({
   name: 'TemplateContent',
   description: 'Render a stored template. Cannot be combined with subject, body or renderer.',
 })
-export class NotifyTemplateContent extends PickType(NotifyContent, [
-  'templateId',
-  'bodyType',
-  'encoding',
-] as const) {}
+export class NotifyTemplateContent extends PickType(NotifyContent, ['templateId'] as const) {}
 
 @ApiSchema({
   name: 'InlineContent',

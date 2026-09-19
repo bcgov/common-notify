@@ -52,7 +52,13 @@ export class NotifySmsChannel {
         allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
         required: ['templateId'],
         not: {
-          anyOf: [{ required: ['subject'] }, { required: ['body'] }, { required: ['renderer'] }],
+          anyOf: [
+            { required: ['subject'] },
+            { required: ['body'] },
+            { required: ['renderer'] },
+            { required: ['bodyType'] },
+            { required: ['encoding'] },
+          ],
         },
       },
       {
