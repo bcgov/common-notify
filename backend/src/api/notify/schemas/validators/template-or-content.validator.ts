@@ -8,12 +8,14 @@ import {
 import { NotifySimpleRequest } from '../notify-simple-request'
 
 /**
- * Validator constraint for template XOR content constraint
+ * The request must render from something: at least one channel has to provide either a
+ * content.templateId or inline content. A channel carrying neither is fine on its own - only a
+ * request where no channel renders anything is rejected.
  *
- * templateId now lives inside each channel's `content`. Business rules:
- * - A channel's content must not mix a templateId with inline content (subject/body).
- * - The request must render from something: at least one channel provides either a
- *   content.templateId or inline content.
+ * Whether a templateId may sit beside inline content is a per-channel question, answered by
+ * TemplateOrRendererConstraint on the channel classes. It lives there because that one also runs
+ * for the /notifysimple/{email,sms} shorthands, which post a bare channel and never reach this
+ * request-level rule.
  */
 @ValidatorConstraint({ name: 'isValidTemplateOrContent', async: false })
 export class TemplateOrContentConstraint implements ValidatorConstraintInterface {
@@ -46,7 +48,7 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
   }
 
   defaultMessage(): string {
-    return 'Each channel must provide either content.templateId OR inline content (subject/body), but not both, and at least one channel must provide one'
+    return 'At least one channel must provide content.templateId or inline content (subject/body)'
   }
 }
 

@@ -9,10 +9,11 @@ import {
 /**
  * A stored template owns how it renders, so a request that names one must not also try to say.
  *
- * `templateId` cannot be combined with `renderer`, `bodyType` or `encoding`. The first two are
- * decided by the stored template; `encoding` is read by nothing at all. Allowing `bodyType` here
- * was actively harmful: an MJML template resolves to `html`, and a caller passing `markdown` (or
- * `text`, which normalises to `markdown`) forced compiled MJML through the markdown renderer.
+ * `templateId` cannot be combined with `subject`, `body`, `renderer`, `bodyType` or `encoding`.
+ * The content and the rendering both belong to the stored template; `encoding` is read by nothing
+ * at all. Allowing `bodyType` here was actively harmful: an MJML template resolves to `html`, and a
+ * caller passing `markdown` (or `text`, which normalises to `markdown`) forced compiled MJML through
+ * the markdown renderer.
  *
  * Applied at the channel level so it covers `/notifysimple` and the `/notifysimple/{email,sms}`
  * shorthands alike - those post a bare channel, which the request-level constraint never sees.
@@ -29,13 +30,19 @@ export class TemplateOrRendererConstraint implements ValidatorConstraintInterfac
       return true
     }
 
-    return !content.renderer && !content.bodyType && !content.encoding
+    return (
+      !content.subject &&
+      !content.body &&
+      !content.renderer &&
+      !content.bodyType &&
+      !content.encoding
+    )
   }
 
   defaultMessage(): string {
     return (
-      'content.templateId cannot be combined with renderer, bodyType or encoding - a stored ' +
-      'template defines its own rendering'
+      'content.templateId cannot be combined with subject, body, renderer, bodyType or encoding - ' +
+      'a stored template provides its own content and rendering'
     )
   }
 }

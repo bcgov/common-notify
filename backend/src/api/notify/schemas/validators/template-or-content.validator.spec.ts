@@ -1,4 +1,5 @@
 import { TemplateOrContentValidator } from './template-or-content.validator'
+import { TemplateOrRendererConstraint } from './template-or-renderer.validator'
 import { NotifySimpleRequest } from '../notify-simple-request'
 import { NotifyEmailChannel } from '../notify-email-channel'
 import { NotifySmsChannel } from '../notify-sms-channel'
@@ -69,45 +70,12 @@ describe('TemplateOrContentValidator', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('should reject an email channel whose content has both templateId and inline content', () => {
-      const request = new NotifySimpleRequest()
-      request.email = new NotifyEmailChannel()
-      request.email.recipients = {
-        to: ['test@example.com'],
-      }
-      request.email.content = {
-        templateId: TEMPLATE_ID,
-        subject: 'Test Subject',
-        body: 'Test Body',
-      }
-
-      const result = TemplateOrContentValidator.validate(request)
-      expect(result.valid).toBe(false)
-      expect(result.error).toContain('content.templateId OR inline content')
-    })
-
-    it('should reject an sms channel whose content has both templateId and a body', () => {
-      const request = new NotifySimpleRequest()
-      request.sms = new NotifySmsChannel()
-      request.sms.recipients = {
-        to: ['+16045551234'],
-      }
-      request.sms.content = {
-        templateId: TEMPLATE_ID,
-        body: 'Test SMS',
-      }
-
-      const result = TemplateOrContentValidator.validate(request)
-      expect(result.valid).toBe(false)
-      expect(result.error).toContain('content.templateId OR inline content')
-    })
-
     it('should reject request with neither templateId nor content', () => {
       const request = new NotifySimpleRequest()
 
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(false)
-      expect(result.error).toContain('content.templateId OR inline content')
+      expect(result.error).toContain('content.templateId or inline content')
     })
 
     it('should reject a channel that provides neither templateId nor inline content', () => {
@@ -147,27 +115,37 @@ describe('TemplateOrContentValidator', () => {
       const result = TemplateOrContentValidator.validate(request)
       expect(result.valid).toBe(true)
     })
+  })
 
-    it('should reject an email channel with content.templateId and a subject only', () => {
-      const request = new NotifySimpleRequest()
-      request.email = new NotifyEmailChannel()
-      request.email.recipients = { to: ['test@example.com'] }
-      request.email.content = { templateId: TEMPLATE_ID, subject: 'Test Subject' }
+  // templateId-versus-inline-content moved to the channel constraint so it also applies to
+  // /notifysimple/email and /notifysimple/sms, which post a bare channel and never reach the
+  // request-level rule above.
+  describe('channel-level exclusivity', () => {
+    const constraint = new TemplateOrRendererConstraint()
+    const check = (content?: Record<string, unknown>) =>
+      constraint.validate({ recipients: { to: ['test@example.com'] }, content })
 
-      const result = TemplateOrContentValidator.validate(request)
-      expect(result.valid).toBe(false)
-      expect(result.error).toContain('content.templateId OR inline content')
+    it('accepts a templateId on its own', () => {
+      expect(check({ templateId: TEMPLATE_ID })).toBe(true)
     })
 
-    it('should reject an email channel with content.templateId and a body only', () => {
-      const request = new NotifySimpleRequest()
-      request.email = new NotifyEmailChannel()
-      request.email.recipients = { to: ['test@example.com'] }
-      request.email.content = { templateId: TEMPLATE_ID, body: 'Test Body' }
+    it('accepts inline content on its own', () => {
+      expect(check({ subject: 'Test Subject', body: 'Test Body' })).toBe(true)
+    })
 
-      const result = TemplateOrContentValidator.validate(request)
-      expect(result.valid).toBe(false)
-      expect(result.error).toContain('content.templateId OR inline content')
+    it.each([
+      ['subject', { subject: 'Test Subject' }],
+      ['body', { body: 'Test Body' }],
+      ['subject and body', { subject: 'Test Subject', body: 'Test Body' }],
+      ['renderer', { renderer: 'handlebars' }],
+      ['bodyType', { bodyType: 'markdown' }],
+      ['encoding', { encoding: 'utf-8' }],
+    ])('rejects a templateId combined with %s', (_label, extra) => {
+      expect(check({ templateId: TEMPLATE_ID, ...extra })).toBe(false)
+    })
+
+    it('accepts a channel with no content - the request-level rule owns that', () => {
+      expect(check()).toBe(true)
     })
   })
 })
