@@ -1,4 +1,5 @@
-import { IsOptional, IsISO8601 } from 'class-validator'
+import { IsIn, IsOptional } from 'class-validator'
+import { IsValidDateString } from './validators/date-string.validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
 /**
@@ -6,10 +7,14 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
  */
 export class CancelNotificationDto {
   @ApiPropertyOptional({
+    enum: ['cancel'],
     example: 'cancel',
-    description: 'Action to perform (cancel)',
+    description:
+      'Set to `cancel` to cancel a pending notification. The only accepted value. Supply either ' +
+      'this or `scheduledTime` - a request carrying neither is rejected.',
   })
   @IsOptional()
+  @IsIn(['cancel'])
   action?: 'cancel'
 }
 
@@ -21,10 +26,12 @@ export class RescheduleNotificationDto {
     type: 'string',
     format: 'date-time',
     example: '2026-05-15T10:00:00Z',
-    description: 'New scheduled time for delivery (must be in the future)',
+    description:
+      'New time to deliver at. A timezone is required, the same as `delayedSend` - use a `Z` ' +
+      'suffix or a numeric offset such as `-07:00`.',
   })
   @IsOptional()
-  @IsISO8601()
+  @IsValidDateString()
   scheduledTime?: string
 }
 

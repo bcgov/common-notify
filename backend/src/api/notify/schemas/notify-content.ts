@@ -1,6 +1,12 @@
 import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
+import { ApiSchema, ApiPropertyOptional, PickType } from '@nestjs/swagger'
+import { sanitizeEmailHtml } from '../../../services/rendering/sanitize-email-html'
 
+@ApiSchema({
+  description:
+    'Message content: either a stored template by templateId, or an inline body with a renderer. Which fields apply depends on the channel - a subject is email only.',
+})
 export class NotifyContent {
   @ApiPropertyOptional({
     format: 'uuid',
@@ -14,11 +20,18 @@ export class NotifyContent {
 
   @ApiPropertyOptional({
     description:
-      'The message body. Placeholders are filled from `params` using the chosen renderer.',
-    example: '<p>Hello {{firstName}}, your application has been received.</p>',
+      'The message body. Placeholders are filled from `params` using the chosen renderer. ' +
+      'Markdown, not HTML - raw tags are escaped and reach the recipient as visible text.',
+    example: '# Hello {{firstName}}\n\nYour application has been received.',
   })
   @IsOptional()
   @IsString()
+  // An `html` body is the caller's own markup and is delivered as-is, so it is sanitised here, at
+  // the boundary: the stored payload, the preview and the delivered email are then all the same
+  // safe HTML. A markdown body needs none of this - markdown-it renders it with `html: false`.
+  @Transform(({ value, obj }) =>
+    obj?.bodyType === 'html' && typeof value === 'string' ? sanitizeEmailHtml(value) : value,
+  )
   body?: string
 
   @ApiPropertyOptional({
@@ -31,9 +44,15 @@ export class NotifyContent {
 
   @ApiPropertyOptional({
     enum: ['text', 'markdown', 'html'],
-    description: 'How to interpret the body: plain text, markdown converted to HTML, or raw HTML.',
-    default: 'html',
-    example: 'html',
+    description:
+      'How to interpret the body: markdown converted to HTML, or plain text. ' +
+      '`html` keeps your own markup and is gated by the `html_body_type` feature flag - ' +
+      'without it the request is rejected. An `html` body is sanitised: formatting, links, ' +
+      'images, tables and inline styles are kept, while scripts, form elements, embedded ' +
+      'frames and styles that hide content are removed. The delivered email is HTML either ' +
+      "way; the flag decides whether the markup is ours or the caller's.",
+    default: 'markdown',
+    example: 'markdown',
   })
   @IsOptional()
   @IsEnum(['text', 'markdown', 'html'])
@@ -58,3 +77,29 @@ export class NotifyContent {
   @IsString()
   encoding?: string
 }
+
+/**
+ * The two shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
+ * the choice is enforced by TemplateOrContentConstraint (templateId never alongside subject/body)
+ * and TemplateOrRendererConstraint (templateId never alongside renderer, bodyType or encoding).
+ *
+ * The template branch is templateId and nothing else: a stored template carries its own body type
+ * and renderer, and there is nothing left for the request to say about how it renders.
+ */
+@ApiSchema({
+  name: 'TemplateContent',
+  description: 'Render a stored template. Cannot be combined with subject, body or renderer.',
+})
+export class NotifyTemplateContent extends PickType(NotifyContent, ['templateId'] as const) {}
+
+@ApiSchema({
+  name: 'InlineContent',
+  description: 'Supply the message inline, optionally naming a renderer for the placeholders.',
+})
+export class NotifyInlineContent extends PickType(NotifyContent, [
+  'subject',
+  'body',
+  'bodyType',
+  'renderer',
+  'encoding',
+] as const) {}

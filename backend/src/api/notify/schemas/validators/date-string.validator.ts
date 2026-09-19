@@ -39,12 +39,17 @@ export class IsValidDateStringConstraint implements ValidatorConstraintInterface
 }
 
 /**
- * Custom decorator for flexible date string validation
- * Accepts multiple date formats including:
- * - ISO 8601: "2026-04-28T08:55:00Z"
- * - RFC 2822: "2026-04-28T08:55:00+00:00"
- * - Relaxed format with timezone: "2026-04-28 8:55:00 PST"
- * - Other standard date formats that JavaScript's Date constructor can parse
+ * Date string validation for scheduling. A timezone is mandatory - a local time is ambiguous, and
+ * guessing one would schedule the send at an hour nobody asked for.
+ *
+ * Accepted:
+ * - `Z` suffix: "2026-04-28T08:55:00Z"
+ * - numeric offset with a colon: "2026-04-28T08:55:00-07:00"
+ * - a trailing 2-4 letter abbreviation the JS Date constructor knows: "2026-04-28 08:55:00 PDT"
+ *   (PST/PDT/GMT/UTC parse; CEST does not)
+ * - RFC 2822 with a zone: "Tue, 28 Apr 2026 09:31:00 GMT"
+ *
+ * Rejected: a local time with no zone, a bare date ("2026-04-28"), and a compact offset ("-0700").
  *
  * Usage: @IsValidDateString()
  */

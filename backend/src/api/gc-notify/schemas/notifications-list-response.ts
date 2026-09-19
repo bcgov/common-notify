@@ -9,9 +9,6 @@ export class NotificationsListResponse {
   })
   notifications: Notification[]
 
-  @ApiProperty({
-    description: 'Pagination links',
-    type: Links,
-  })
+  @ApiProperty({ type: Links })
   links: Links
 }

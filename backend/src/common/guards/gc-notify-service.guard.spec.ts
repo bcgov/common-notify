@@ -17,6 +17,7 @@ type MockRequest = {
   tenantId?: string
   tenantExternalId?: string
   gcNotifyAuthHeader?: string
+  apiKeyConsumerId?: string
 }
 
 const VALID_AUTH_HEADER = 'ApiKey-v1 test-key-value'
@@ -81,9 +82,10 @@ describe('GcNotifyServiceGuard', () => {
       await expect(guard.canActivate(context)).rejects.toThrow(BadRequestException)
     })
 
-    it('should attach the validated Authorization header value to the request', async () => {
+    it('should accept a well-formed Authorization header without retaining it', async () => {
       const mockTenant = { id: 'tenant-1', name: 'Test Tenant', externalId: 'ext-1' }
       mockApiKeyConsumerRepository.findOne.mockResolvedValue({
+        id: 'consumer-1',
         credentialIdentifier: 'cred-1',
         tenantId: 'tenant-1',
         tenant: mockTenant,
@@ -97,7 +99,10 @@ describe('GcNotifyServiceGuard', () => {
       const result = await guard.canActivate(context)
 
       expect(result).toBe(true)
-      expect(request.gcNotifyAuthHeader).toBe(VALID_AUTH_HEADER)
+      // Nothing forwards upstream any more, so the value is validated and discarded.
+      expect(request.gcNotifyAuthHeader).toBeUndefined()
+      // Sends on these routes count against the key, which needs the consumer id.
+      expect(request.apiKeyConsumerId).toBe('consumer-1')
     })
   })
 

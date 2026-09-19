@@ -6,6 +6,68 @@ import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
 
 describe('NotifySimpleRequest', () => {
+  describe('scheduling fields require a timezone', () => {
+    const recipients = { to: ['test@example.com'] }
+    const scheduleErrors = async (delayedSend: string) =>
+      validate(
+        plainToInstance(NotifySimpleRequest, {
+          email: { recipients, content: { body: 'Hello' }, delayedSend },
+        }),
+      )
+
+    it.each(['2026-06-01T16:00:00Z', '2026-06-01T09:00:00-07:00', '2026-06-01 09:00:00 PDT'])(
+      'accepts %s',
+      async (value) => {
+        expect(await scheduleErrors(value)).toHaveLength(0)
+      },
+    )
+
+    it.each(['2026-06-01T16:00:00', '2026-06-01', '2026-06-01T09:00:00-0700', 'next tuesday'])(
+      'rejects %s',
+      async (value) => {
+        expect(await scheduleErrors(value)).not.toHaveLength(0)
+      },
+    )
+  })
+
+  describe('a stored template owns its own rendering', () => {
+    const TEMPLATE_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+    const recipients = { to: ['test@example.com'] }
+
+    const errorsFor = async (content: Record<string, unknown>) =>
+      validate(plainToInstance(NotifySimpleRequest, { email: { recipients, content } }))
+
+    it('accepts a templateId on its own', async () => {
+      expect(await errorsFor({ templateId: TEMPLATE_ID })).toHaveLength(0)
+    })
+
+    it.each(['renderer', 'bodyType', 'encoding'])(
+      'rejects a templateId combined with %s',
+      async (field) => {
+        const value =
+          field === 'renderer' ? 'handlebars' : field === 'bodyType' ? 'markdown' : 'utf-8'
+        expect(await errorsFor({ templateId: TEMPLATE_ID, [field]: value })).not.toHaveLength(0)
+      },
+    )
+
+    it('still allows bodyType and encoding alongside inline content', async () => {
+      const errors = await errorsFor({ body: 'Hello', bodyType: 'markdown', encoding: 'utf-8' })
+      expect(errors).toHaveLength(0)
+    })
+
+    // The channel-level rule also has to hold for /notifysimple/email, which posts a bare channel
+    // and never reaches the request-level constraint.
+    it('rejects a templateId combined with bodyType on the shorthand route', async () => {
+      const errors = await validate(
+        plainToInstance(NotifyEmailChannel, {
+          recipients,
+          content: { templateId: TEMPLATE_ID, bodyType: 'markdown' },
+        }),
+      )
+      expect(errors).not.toHaveLength(0)
+    })
+  })
+
   describe('Valid Instance Creation', () => {
     it('should create a valid instance with email channel', async () => {
       const data = {
@@ -13,9 +75,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -52,9 +112,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
         sms: {
           recipients: {
@@ -85,9 +143,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -142,9 +198,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -187,9 +241,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -211,9 +263,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -231,9 +281,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -304,9 +352,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -328,9 +374,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -352,9 +396,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -494,7 +536,7 @@ describe('NotifySimpleRequest', () => {
       const data = {
         sms: {
           recipients: { to: ['+16045551234'] },
-          body: 'Test SMS',
+          content: { body: 'Test SMS' },
           delayedSend: '2026-04-28T10:00:00Z',
         },
       }

@@ -1,6 +1,9 @@
 import { IsArray, IsString, ArrayMinSize } from 'class-validator'
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiSchema, ApiProperty } from '@nestjs/swagger'
 
+@ApiSchema({
+  description: 'Message app recipients.',
+})
 export class NotifyMsgAppRecipients {
   @ApiProperty({ type: [String], description: 'Message app recipient identifiers' })
   @IsArray()

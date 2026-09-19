@@ -1,6 +1,7 @@
 import { IsEmail, IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { FileAttachment } from './file-attachment'
+import { IsValidDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class CreateEmailNotificationRequest {
   @ApiPropertyOptional({
@@ -37,12 +38,15 @@ export class CreateEmailNotificationRequest {
   personalisation?: Record<string, string | string[] | FileAttachment>
 
   @ApiPropertyOptional({
-    description: 'Hold the message until this time instead of sending immediately.',
+    description:
+      'Hold the message until this time instead of sending immediately. A timezone is required - ' +
+      'use a `Z` suffix or a numeric offset such as `-07:00`. A local time with no zone is ' +
+      'rejected rather than guessed at.',
     format: 'date-time',
     example: '2026-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsString()
+  @IsValidDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({

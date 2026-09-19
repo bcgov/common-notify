@@ -239,6 +239,7 @@ describe('ChesEmailTransport', () => {
         to: 'user@example.com',
         subject: 'Test',
         body: '<p>Hello</p>',
+        bodyType: 'html',
       }
 
       await transport.send(options)
@@ -253,6 +254,35 @@ describe('ChesEmailTransport', () => {
         body: '<p>Hello</p>',
         bodyType: 'html',
       })
+    })
+
+    it('renders an omitted bodyType as markdown, the documented API default', async () => {
+      mockConfig()
+
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'token-123', expires_in: 300 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              messages: [{ msgId: 'msg-456', to: ['user@example.com'] }],
+              txId: 'tx-789',
+            }),
+        })
+
+      await transport.send({ to: 'user@example.com', subject: 'Test', body: '# Hello' })
+
+      const [, init] = (fetchMock.mock.calls[1] ?? []) as [string, RequestInit]
+      const emailBody = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<
+        string,
+        unknown
+      >
+
+      expect(emailBody).toMatchObject({ bodyType: 'html' })
+      expect(emailBody.body).toContain('<h1>Hello</h1>')
     })
 
     it('includes attachments in the CHES payload with preserved content type', async () => {

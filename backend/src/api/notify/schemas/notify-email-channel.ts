@@ -1,25 +1,82 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiExtraModels, ApiPropertyOptional, ApiSchema, getSchemaPath } from '@nestjs/swagger'
 import { IsValidDateString } from './validators/date-string.validator'
+import { ApiOneOf, ApiOneOfOptional } from './api-one-of.decorator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyAttachment } from './notify-attachment'
-import { NotifyEmailRecipients } from './notify-email-recipients'
-import { NotifyContent } from './notify-content'
+import {
+  NotifyEmailAddressRecipients,
+  NotifyEmailMergeRecipients,
+  NotifyEmailRecipients,
+} from './notify-email-recipients'
+import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './notify-content'
 
+@ApiSchema({
+  description:
+    'Send by email: recipients, content (inline or a stored template), attachments and scheduling.',
+})
 @ValidateTemplateOrRenderer()
+@ApiExtraModels(
+  NotifyEmailAddressRecipients,
+  NotifyEmailMergeRecipients,
+  NotifyTemplateContent,
+  NotifyInlineContent,
+)
 export class NotifyEmailChannel {
-  @ApiProperty({
-    type: NotifyEmailRecipients,
-    description: 'Email recipients: to/cc/bcc or a mergeArray for mail-merge',
+  // Exactly one of the two forms, which is what ValidateRecipientsOrMerge enforces at runtime.
+  // The transform target stays the combined class: class-transformer has no discriminator to pick
+  // between them, and it does not need one - the validator rejects anything that is not one shape
+  // or the other.
+  // The published schema mirrors ValidateRecipientsOrMerge exactly: one of the two shapes, never
+  // both, never neither. Both branches are all-optional objects on their own, so each carries the
+  // required/not constraints that make them mutually exclusive - without those, every payload
+  // matches both branches and "exactly one" can never hold.
+  @ApiOneOf({
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyEmailAddressRecipients) }],
+        anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }],
+        not: { required: ['mergeArray'] },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyEmailMergeRecipients) }],
+        required: ['mergeArray'],
+        not: { anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }] },
+      },
+    ],
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()
   @Type(() => NotifyEmailRecipients)
   recipients: NotifyEmailRecipients
 
-  @ApiPropertyOptional({ type: NotifyContent, description: 'Email content (subject, body, etc.)' })
+  // Mirrors the two constraints that actually run: templateId never alongside subject/body
+  // (TemplateOrContentConstraint) and never alongside renderer (TemplateOrRendererConstraint).
+  // Neither rule requires a channel to carry content at all - the request-level rule only asks that
+  // *some* channel renders something - so the inline branch deliberately requires nothing.
+  @ApiOneOfOptional({
+    oneOf: [
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
+        required: ['templateId'],
+        not: {
+          anyOf: [
+            { required: ['subject'] },
+            { required: ['body'] },
+            { required: ['renderer'] },
+            { required: ['bodyType'] },
+            { required: ['encoding'] },
+          ],
+        },
+      },
+      {
+        allOf: [{ $ref: getSchemaPath(NotifyInlineContent) }],
+        not: { required: ['templateId'] },
+      },
+    ],
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyContent)
@@ -34,8 +91,12 @@ export class NotifyEmailChannel {
 
   @ApiPropertyOptional({
     description:
-      'Hold the message until this time. Omit to send as soon as possible. Accepts ISO 8601 and ' +
-      'other common date formats.',
+      'Hold the message until this time. Omit to send as soon as possible. ' +
+      '**A timezone is required.** Use a `Z` suffix (`2026-06-01T16:00:00Z`), a numeric offset ' +
+      'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
+      'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
+      'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
+      'compact offset (`-0700`) are all rejected.',
     example: '2026-06-01T16:00:00Z',
   })
   @IsOptional()

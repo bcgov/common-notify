@@ -135,14 +135,16 @@ export class ChesEmailTransport implements IEmailTransport {
     let finalBody = body
     let chesBodyType: 'text' | 'html' = 'html'
 
-    if (bodyType === 'markdown') {
+    if (bodyType === 'text') {
+      chesBodyType = 'text'
+    } else if (bodyType === 'html') {
+      // The caller's own markup, gated by the html_body_type flag. Delivered unchanged.
+      chesBodyType = 'html'
+    } else {
+      // Markdown, or omitted - markdown is the documented default for an inline body. Template
+      // sends always arrive with a concrete bodyType, so an omitted one is never a template.
       // Shared with the preview endpoints so what is previewed is what is sent.
       finalBody = toEmailHtml(finalBody, 'markdown')
-      chesBodyType = 'html'
-    } else if (bodyType === 'text') {
-      chesBodyType = 'text'
-    } else {
-      // Default to html
       chesBodyType = 'html'
     }
 

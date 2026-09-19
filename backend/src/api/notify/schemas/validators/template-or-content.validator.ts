@@ -1,5 +1,6 @@
 import {
   registerDecorator,
+  ValidationArguments,
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -7,17 +8,21 @@ import {
 import { NotifySimpleRequest } from '../notify-simple-request'
 
 /**
- * Validator constraint for template XOR content constraint
+ * The request must render from something: at least one channel has to provide either a
+ * content.templateId or inline content. A channel carrying neither is fine on its own - only a
+ * request where no channel renders anything is rejected.
  *
- * templateId now lives inside each channel's `content`. Business rules:
- * - A channel's content must not mix a templateId with inline content (subject/body).
- * - The request must render from something: at least one channel provides either a
- *   content.templateId or inline content.
+ * Whether a templateId may sit beside inline content is a per-channel question, answered by
+ * TemplateOrRendererConstraint on the channel classes. It lives there because that one also runs
+ * for the /notifysimple/{email,sms} shorthands, which post a bare channel and never reach this
+ * request-level rule.
  */
 @ValidatorConstraint({ name: 'isValidTemplateOrContent', async: false })
 export class TemplateOrContentConstraint implements ValidatorConstraintInterface {
-  validate(value: any): boolean {
-    const request = value as NotifySimpleRequest
+  // Registered at class level, where class-validator passes the instance on `args.object` and
+  // leaves `value` undefined. The fallback keeps a directly-passed object working.
+  validate(value: any, args?: ValidationArguments): boolean {
+    const request = (args?.object ?? value) as NotifySimpleRequest
 
     const channels = [request.email, request.sms, request.msgApp].filter(
       (channel): channel is NonNullable<typeof channel> => !!channel,
@@ -43,7 +48,7 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
   }
 
   defaultMessage(): string {
-    return 'Each channel must provide either content.templateId OR inline content (subject/body), but not both, and at least one channel must provide one'
+    return 'At least one channel must provide content.templateId or inline content (subject/body)'
   }
 }
 
@@ -54,9 +59,12 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
  * Usage: @ValidateTemplateOrContent()
  */
 export function ValidateTemplateOrContent(validationOptions?: ValidationOptions) {
-  return function (target: object) {
+  // `target` in a class decorator is the constructor itself. Registering
+  // `target.constructor` would bind the rule to `Function`, where class-validator never looks
+  // for it, and the constraint would silently never run.
+  return function (target: new (...args: any[]) => object) {
     registerDecorator({
-      target: target.constructor as any,
+      target: target as any,
       propertyName: undefined as any,
       options: validationOptions,
       constraints: [],

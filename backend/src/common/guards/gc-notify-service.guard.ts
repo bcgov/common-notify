@@ -26,9 +26,9 @@ import {
  * Kong validates the same way it validates keys for /notifysimple today.
  *
  * Additionally validates the literal `Authorization: ApiKey-v1 {key}` header GC
- * Notify clients send (the real GC Notify auth scheme) and attaches the raw header
- * value as request.gcNotifyAuthHeader, so passthrough mode can still forward it
- * unmodified to the real GC Notify API.
+ * Notify clients send (the real GC Notify auth scheme), so a client that authenticates
+ * the way GC Notify taught it gets a clear error rather than a confusing one. The value
+ * itself is not retained: nothing forwards upstream any more.
  */
 @Injectable()
 export class GcNotifyServiceGuard implements CanActivate {
@@ -44,7 +44,7 @@ export class GcNotifyServiceGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    request.gcNotifyAuthHeader = this.requireAuthHeader(request)
+    this.requireAuthHeader(request)
 
     const credentialHeaders = readGatewayCredentialHeaders(request.headers)
     if (hasNoCredentialHeaders(credentialHeaders)) {
@@ -93,6 +93,9 @@ export class GcNotifyServiceGuard implements CanActivate {
     request.tenant = tenant
     request.tenantId = tenant.id
     request.tenantExternalId = tenant.externalId
+    // Mirrors NotifyServiceGuard: sends on these routes are counted against the key's usage and
+    // checked against its limits, which needs the consumer, not just the tenant.
+    request.apiKeyConsumerId = mapping.id
 
     this.logger.debug(`✓ GC Notify request authorized. Tenant: "${tenant.name}" (${tenant.id})`)
 
