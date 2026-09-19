@@ -6,6 +6,30 @@ import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
 
 describe('NotifySimpleRequest', () => {
+  describe('scheduling fields require a timezone', () => {
+    const recipients = { to: ['test@example.com'] }
+    const scheduleErrors = async (delayedSend: string) =>
+      validate(
+        plainToInstance(NotifySimpleRequest, {
+          email: { recipients, content: { body: 'Hello' }, delayedSend },
+        }),
+      )
+
+    it.each(['2026-06-01T16:00:00Z', '2026-06-01T09:00:00-07:00', '2026-06-01 09:00:00 PDT'])(
+      'accepts %s',
+      async (value) => {
+        expect(await scheduleErrors(value)).toHaveLength(0)
+      },
+    )
+
+    it.each(['2026-06-01T16:00:00', '2026-06-01', '2026-06-01T09:00:00-0700', 'next tuesday'])(
+      'rejects %s',
+      async (value) => {
+        expect(await scheduleErrors(value)).not.toHaveLength(0)
+      },
+    )
+  })
+
   describe('a stored template owns its own rendering', () => {
     const TEMPLATE_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
     const recipients = { to: ['test@example.com'] }
