@@ -646,8 +646,11 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
-        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+      // A past delayedSend used to be accepted and sent immediately, because the delay is computed
+      // as Math.max(0, when - now). Scheduling into the past is never what a caller meant, so it is
+      // rejected now.
+      it('should return 400 for a delayedSend in the past', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString()
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
@@ -657,11 +660,7 @@ describe('Notify Controllers', () => {
               delayedSend: pastDate,
             },
           })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Notification scheduled for delivery')
-          })
+          .expect(400)
       })
 
       it('should return 400 and not persist when attachment validation fails', async () => {

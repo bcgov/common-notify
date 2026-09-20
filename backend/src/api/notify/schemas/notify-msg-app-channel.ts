@@ -1,7 +1,7 @@
 import { IsString, IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiSchema, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsValidDateString } from './validators/date-string.validator'
+import { IsFutureDateString } from './validators/date-string.validator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
 import { NotifyMsgAppRecipients } from './notify-msg-app-recipients'
@@ -38,11 +38,11 @@ export class NotifyMsgAppChannel {
       'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
       'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
       'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
-      'compact offset (`-0700`) are all rejected.',
-    example: '2026-06-01T16:00:00Z',
+      'compact offset (`-0700`) are all rejected. A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsValidDateString()
+  @IsFutureDateString()
   delayedSend?: string
 
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })

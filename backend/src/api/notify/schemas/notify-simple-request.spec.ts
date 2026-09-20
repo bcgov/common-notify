@@ -5,6 +5,17 @@ import { NotifySimpleRequest } from './notify-simple-request'
 import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
 
+// Scheduling fixtures are computed, not hard-coded: a literal date silently becomes invalid the
+// day it passes, and delayedSend now rejects times in the past.
+const futureIso = (msAhead = 24 * 60 * 60 * 1000) => new Date(Date.now() + msAhead).toISOString()
+const futureOffset = () => futureIso().replace('Z', '+00:00')
+/** The same future instant written as a PDT (UTC-7) wall-clock time. */
+const futurePdt = () =>
+  new Date(Date.now() + 24 * 60 * 60 * 1000 - 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ') + ' PDT'
+
 describe('NotifySimpleRequest', () => {
   describe('scheduling fields require a timezone', () => {
     const recipients = { to: ['test@example.com'] }
@@ -15,12 +26,19 @@ describe('NotifySimpleRequest', () => {
         }),
       )
 
-    it.each(['2026-06-01T16:00:00Z', '2026-06-01T09:00:00-07:00', '2026-06-01 09:00:00 PDT'])(
-      'accepts %s',
-      async (value) => {
-        expect(await scheduleErrors(value)).toHaveLength(0)
-      },
-    )
+    it.each([
+      ['a Z suffix', futureIso],
+      ['a numeric offset', futureOffset],
+      ['a timezone abbreviation', futurePdt],
+    ])('accepts %s', async (_label, build) => {
+      expect(await scheduleErrors(build())).toHaveLength(0)
+    })
+
+    it('rejects a time in the past', async () => {
+      expect(
+        await scheduleErrors(new Date(Date.now() - 60 * 60_000).toISOString()),
+      ).not.toHaveLength(0)
+    })
 
     it.each(['2026-06-01T16:00:00', '2026-06-01', '2026-06-01T09:00:00-0700', 'next tuesday'])(
       'rejects %s',
@@ -457,7 +475,7 @@ describe('NotifySimpleRequest', () => {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28T10:00:00Z',
+          delayedSend: futureIso(),
         },
       }
 
@@ -465,7 +483,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00Z')
+      expect(instance.email?.delayedSend).toBeDefined()
     })
 
     it('should accept ISO 8601 date format with offset for delayedSend', async () => {
@@ -473,7 +491,7 @@ describe('NotifySimpleRequest', () => {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28T10:00:00-07:00',
+          delayedSend: futureOffset(),
         },
       }
 
@@ -481,15 +499,16 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00-07:00')
+      expect(instance.email?.delayedSend).toBeDefined()
     })
 
     it('should accept relaxed date format with timezone abbreviation', async () => {
+      const delayedSend = futurePdt()
       const data = {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28 10:00:00 PST',
+          delayedSend,
         },
       }
 
@@ -497,7 +516,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28 10:00:00 PST')
+      expect(instance.email?.delayedSend).toBe(delayedSend)
     })
 
     it('should reject date format without timezone', async () => {
@@ -537,7 +556,7 @@ describe('NotifySimpleRequest', () => {
         sms: {
           recipients: { to: ['+16045551234'] },
           content: { body: 'Test SMS' },
-          delayedSend: '2026-04-28T10:00:00Z',
+          delayedSend: futureIso(),
         },
       }
 
@@ -545,7 +564,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.sms?.delayedSend).toBe('2026-04-28T10:00:00Z')
+      expect(instance.sms?.delayedSend).toBeDefined()
     })
 
     it('should be optional field', async () => {

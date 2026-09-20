@@ -10,7 +10,7 @@ import {
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { BULK_MAX_ROWS } from '../constants'
-import { IsValidDateString } from '../../notify/schemas/validators/date-string.validator'
+import { IsFutureDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class PostBulkRequest {
   @ApiProperty({
@@ -79,11 +79,11 @@ export class PostBulkRequest {
   @ApiPropertyOptional({
     description:
       'Hold the job until this time instead of sending immediately. A timezone is required - use ' +
-      'a `Z` suffix or a numeric offset such as `-07:00`.',
-    example: '2025-06-25T15:15:00Z',
+      'a `Z` suffix or a numeric offset such as `-07:00`. A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsValidDateString()
+  @IsFutureDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({

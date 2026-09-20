@@ -64,3 +64,45 @@ export function IsValidDateString(validationOptions?: ValidationOptions) {
     })
   }
 }
+
+/**
+ * Scheduling a send into the past is never what a caller meant, but it used to be accepted: the
+ * delay is computed as `Math.max(0, when - now)`, so a stale timestamp silently sent immediately.
+ *
+ * A minute of slack is allowed because the caller's clock is not ours. A client that computes "now"
+ * and posts it should not be rejected for being a few seconds behind, and a minute is far short of
+ * any interval a scheduled send is worth expressing.
+ */
+const CLOCK_SKEW_TOLERANCE_MS = 60_000
+
+@ValidatorConstraint({ name: 'isFutureDateString', async: false })
+export class IsFutureDateStringConstraint implements ValidatorConstraintInterface {
+  private readonly dateString = new IsValidDateStringConstraint()
+
+  validate(value: unknown): boolean {
+    if (!this.dateString.validate(value)) {
+      return false
+    }
+
+    return new Date(value as string).getTime() >= Date.now() - CLOCK_SKEW_TOLERANCE_MS
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return `${args.property} must be a future date string with a timezone (for example "${new Date(
+      Date.now() + 3_600_000,
+    ).toISOString()}")`
+  }
+}
+
+/** {@link IsValidDateString}, and the time must not be in the past. */
+export function IsFutureDateString(validationOptions?: ValidationOptions) {
+  return function (target: object, propertyName: string) {
+    registerDecorator({
+      target: target.constructor,
+      propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: IsFutureDateStringConstraint,
+    })
+  }
+}
