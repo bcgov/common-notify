@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '@bcgov/design-system-react-components'
-import type { TemplateResponse } from '@/api/templates.api'
+import { deleteTemplate, getTemplateUsage, NotificationChannel } from '@/api/templates.api'
+import type { TemplateResponse, TemplateUsageEvent } from '@/api/templates.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { setPage, setLimit, setSearch, setSort, setFilter } from '@/redux/slices/templates.slice'
 import { fetchTemplates } from '@/redux/thunks/templates.thunks'
@@ -10,10 +11,12 @@ import PageHeading from '@/components/PageHeading'
 import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
+import GenericModal from '@/components/GenericModal'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/components/templates.scss'
 
-const columns: TableColumn<TemplateResponse>[] = [
+const baseColumns: TableColumn<TemplateResponse>[] = [
   {
     key: 'name',
     label: 'Template Title',
@@ -82,6 +85,10 @@ const columns: TableColumn<TemplateResponse>[] = [
   },
 ]
 
+type DeleteDialog =
+  | { kind: 'confirm'; template: TemplateResponse }
+  | { kind: 'blocked'; events: TemplateUsageEvent[] }
+
 const Templates: FC = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -100,6 +107,29 @@ const Templates: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
   const [searchInput, setSearchInput] = useState(search)
+  const [dialog, setDialog] = useState<DeleteDialog | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const columns: TableColumn<TemplateResponse>[] = [
+    ...baseColumns,
+    {
+      key: 'id',
+      label: 'Action',
+      width: '120px',
+      className: 'templates__action-cell',
+      render: (_, row) => (
+        <Button
+          variant="link"
+          size="small"
+          isDisabled={!canEdit}
+          onPress={() => handleDeleteClick(row)}
+          aria-label={`Delete ${row.name}`}
+        >
+          Delete
+        </Button>
+      ),
+    },
+  ]
 
   useEffect(() => {
     if (selectedTenant) {
@@ -123,6 +153,39 @@ const Templates: FC = () => {
 
   function handleFilter(key: string, values: string[]) {
     dispatch(setFilter({ field: key, values }))
+  }
+
+  async function handleDeleteClick(row: TemplateResponse) {
+    try {
+      const { events } = await getTemplateUsage(row.id)
+      setDialog(
+        events.length > 0 ? { kind: 'blocked', events } : { kind: 'confirm', template: row },
+      )
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to delete the template')
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (dialog?.kind !== 'confirm') return
+    const { template } = dialog
+    setIsDeleting(true)
+    try {
+      await deleteTemplate(template.id)
+      showSuccessToast(`${template.name} deleted`)
+      setDialog(null)
+      // The deleted row was the only one on this page, so staying here would show an empty
+      // table. Stepping back a page refetches through the effect above.
+      if (templates.length === 1 && page > 1) {
+        dispatch(setPage(page - 1))
+      } else {
+        dispatch(fetchTemplates())
+      }
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Failed to delete the template')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
@@ -162,6 +225,54 @@ const Templates: FC = () => {
         pageSizeOptions={[15, 30]}
         label="Notification Templates"
       />
+
+      {dialog?.kind === 'confirm' && (
+        <GenericModal
+          isOpen
+          onClose={() => setDialog(null)}
+          title="Delete template?"
+          onSubmit={handleConfirmDelete}
+          submitText="Yes, delete"
+          isSubmitLoading={isDeleting}
+        >
+          <p>
+            Are you sure you want to delete &ldquo;{dialog.template.name}&rdquo;?
+            <br />
+            {/* No last-used data exists on a template yet; the label is here for when it does. */}
+            Last used:
+            <br />
+            Deleted templates can be restored from the Archive.
+          </p>
+        </GenericModal>
+      )}
+
+      {dialog?.kind === 'blocked' && (
+        <GenericModal
+          isOpen
+          onClose={() => setDialog(null)}
+          title="Template can't be deleted"
+          cancelText="OK"
+        >
+          <p>
+            This template is currently being used in the following event(s) and cannot be deleted.
+            To delete this template, first remove it from:
+          </p>
+          <ul className="templates__usage-list">
+            {dialog.events.map((event) => (
+              <li key={`${event.id}-${event.channelCode}`}>
+                <Link
+                  to="/events/$eventId"
+                  params={{ eventId: event.id }}
+                  // The template is set on a channel tab, so link to the one it is used for.
+                  search={{ tab: event.channelCode === NotificationChannel.SMS ? 'sms' : 'email' }}
+                >
+                  {event.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </GenericModal>
+      )}
     </div>
   )
 }
