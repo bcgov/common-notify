@@ -1,6 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
@@ -89,6 +89,7 @@ describe('TemplatesService', () => {
     findById: vi.fn(),
     findByName: vi.fn(),
     findByTenantId: vi.fn(),
+    findEventsUsingTemplate: vi.fn(),
     softDelete: vi.fn(),
     createVersion: vi.fn(),
   }
@@ -948,6 +949,64 @@ describe('TemplatesService', () => {
       expect(result.subject).toBeUndefined()
       expect(result.body).toBe('Your code is 123456')
       expect(result.bodyType).toBe('markdown')
+    })
+  })
+
+  describe('deleteTemplate', () => {
+    it('should soft delete a template no event is using', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([])
+
+      await service.deleteTemplate('tenant-123', 'template-123')
+
+      expect(mockRepository.softDelete).toHaveBeenCalledWith('tenant-123', 'template-123', 'system')
+    })
+
+    it('should pass the acting user through, for the settings the template is cleared from', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([])
+
+      await service.deleteTemplate('tenant-123', 'template-123', 'user-123')
+
+      expect(mockRepository.softDelete).toHaveBeenCalledWith(
+        'tenant-123',
+        'template-123',
+        'user-123',
+      )
+    })
+
+    it('should refuse to delete a template an event still renders with', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([
+        { id: 'event-1', name: 'Air Quality 2026', channelCode: NotificationChannel.EMAIL },
+      ])
+
+      await expect(service.deleteTemplate('tenant-123', 'template-123')).rejects.toThrow(
+        ConflictException,
+      )
+      expect(mockRepository.softDelete).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getTemplateUsage', () => {
+    it('should return the events using the template', async () => {
+      const events = [
+        { id: 'event-1', name: 'Air Quality 2026', channelCode: NotificationChannel.EMAIL },
+      ]
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue(events)
+
+      await expect(service.getTemplateUsage('tenant-123', 'template-123')).resolves.toEqual({
+        events,
+      })
+    })
+
+    it('should throw when the template does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null)
+
+      await expect(service.getTemplateUsage('tenant-123', 'missing')).rejects.toThrow(
+        NotFoundException,
+      )
     })
   })
 })
