@@ -33,7 +33,7 @@ describe('EmailLogoBootstrapService', () => {
     vi.clearAllMocks()
   })
 
-  it('uploads every configured checked-in PNG under its seeded database key', async () => {
+  it('uploads all 23 approved SVG assets under their configured storage keys', async () => {
     vi.mocked(storage.head).mockResolvedValue(null)
     vi.mocked(storage.upload).mockImplementation(async (input) => ({
       storageKey: input.storageKey,
@@ -43,14 +43,16 @@ describe('EmailLogoBootstrapService', () => {
 
     await new EmailLogoBootstrapService(config, storage, clamavService).onModuleInit()
 
-    const checkedInFilenames = (await readdir(assetDirectory))
-      .filter((filename) => filename.endsWith('.png'))
-      .sort()
+    const checkedInFilenames = (await readdir(assetDirectory)).sort()
     const configuredFilenames = SYSTEM_EMAIL_LOGO_KEYS.map((storageKey) =>
       path.posix.basename(storageKey),
     ).sort()
 
+    expect(checkedInFilenames).toHaveLength(23)
+    expect(new Set(SYSTEM_EMAIL_LOGO_KEYS).size).toBe(23)
     expect(configuredFilenames).toEqual(checkedInFilenames)
+    expect(clamavService.scanBuffer).toHaveBeenCalledTimes(23)
+    expect(storage.head).toHaveBeenCalledTimes(23)
     expect(storage.upload).toHaveBeenCalledTimes(SYSTEM_EMAIL_LOGO_KEYS.length)
 
     const scanCalls = vi.mocked(clamavService.scanBuffer).mock.calls
@@ -60,10 +62,12 @@ describe('EmailLogoBootstrapService', () => {
       const [scannedContent, scannedFilename] = scanCalls[index]
       const [uploadInput] = uploadCalls[index]
 
+      expect(storageKey).toMatch(/^logos\/BC_[A-Z]+_H_RGB_pos\.svg$/)
+      expect(storage.head).toHaveBeenNthCalledWith(index + 1, storageKey)
       expect(scannedFilename).toBe(filename)
       expect(Buffer.isBuffer(scannedContent)).toBe(true)
       expect(scannedContent.byteLength).toBeGreaterThan(0)
-      expect(uploadInput).toMatchObject({ storageKey, mimeType: 'image/png' })
+      expect(uploadInput).toMatchObject({ storageKey, mimeType: 'image/svg+xml' })
       expect(uploadInput.content).toBe(scannedContent)
     }
   }, 15_000)
