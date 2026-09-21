@@ -34,6 +34,7 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
+import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TemplateListQueryDto } from './schemas/template-list-query.dto'
@@ -216,6 +217,30 @@ export class TemplatesFrontendController {
   }
 
   /**
+   * List the events that still use a template
+   * Asked before deleting, since a template an event renders with cannot be deleted
+   *
+   * @param req Request, used to resolve the authenticated tenant context
+   * @param templateId Template ID
+   * @returns The events using the template; empty when it can be deleted
+   */
+  @Version('1')
+  @Get(':templateId/usage')
+  @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  async getTemplateUsage(
+    @Req() req: Request,
+    @Param('templateId', new ParseUUIDPipe()) templateId: string,
+  ): Promise<TemplateUsageResponseDto> {
+    const tenant = await this.requireTenantContext(req)
+    return this.templatesService.getTemplateUsage(tenant.id, templateId)
+  }
+
+  /**
    * Create a new template
    *
    * @param tenant Current tenant from JWT
@@ -293,11 +318,12 @@ export class TemplatesFrontendController {
   @HttpCode(204)
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async deleteTemplate(
-    @Req() req: Request,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
     const tenant = await this.requireTenantContext(req)
-    await this.templatesService.deleteTemplate(tenant.id, templateId)
+    const user = JwtUserExtractor.extractUser(req)
+    await this.templatesService.deleteTemplate(tenant.id, templateId, user)
   }
 
   /**

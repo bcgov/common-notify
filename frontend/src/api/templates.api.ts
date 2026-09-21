@@ -1,5 +1,5 @@
 import type { AxiosError } from 'axios'
-import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { get, post, deleteMethod, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedTemplateResponse } from '@/interfaces/PaginatedNotificationResponse'
 
 export enum NotificationChannel {
@@ -302,6 +302,81 @@ export async function updateTemplate(templateId: string, updateData: Partial<Tem
 
     throw new Error(
       `Failed to update template: ${
+        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
+      }`,
+    )
+  }
+}
+
+/** An event that renders one of its live channels with a template. */
+export interface TemplateUsageEvent {
+  id: string
+  name: string
+  channelCode: NotificationChannel
+}
+
+export interface TemplateUsageResponse {
+  events: TemplateUsageEvent[]
+}
+
+/**
+ * Get the events still using a template
+ * Asked before offering to delete, since a template an event renders with cannot be deleted.
+ *
+ * @param templateId Template ID
+ * @returns The events using the template; empty when it can be deleted
+ * @throws Error if the lookup fails
+ */
+export async function getTemplateUsage(templateId: string): Promise<TemplateUsageResponse> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/templates/${templateId}/usage`)
+    return await get<TemplateUsageResponse>(params)
+  } catch (error) {
+    const axiosError = error as AxiosError
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Template not found')
+    }
+
+    throw new Error(
+      `Failed to check where this template is used: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
+    )
+  }
+}
+
+/**
+ * Delete a template
+ * Note: The backend soft-deletes, so the template stops appearing in the list but its
+ * history is kept.
+ *
+ * @param templateId Template ID
+ * @throws Error if deletion fails
+ */
+export async function deleteTemplate(templateId: string): Promise<void> {
+  try {
+    const params = generateApiParameters(`/api/v1/frontend/templates/${templateId}`)
+    await deleteMethod<void>(params)
+  } catch (error) {
+    const axiosError = error as AxiosError
+    const responseData = (axiosError.response?.data as any) || {}
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('Template not found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to delete this template')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Forbidden) {
+      throw new Error('You do not have permission to delete this template')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Conflict) {
+      throw new Error('This template is in use by an event and cannot be deleted')
+    }
+
+    throw new Error(
+      `Failed to delete template: ${
         responseData.message || (error instanceof Error ? error.message : 'Unknown error')
       }`,
     )
