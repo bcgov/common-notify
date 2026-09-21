@@ -26,3 +26,8 @@ export const SYSTEM_EMAIL_LOGO_KEYS = [
   'logos/BC_TT_H_RGB_pos.svg',
   'logos/BC_WLRS_H_RGB_pos.svg',
 ] as const
+
+// Emails show the logo at EMAIL_LOGO_DISPLAY_WIDTH and the PNG is rendered at twice that,
+// so it stays sharp on high-density screens.
+export const EMAIL_LOGO_DISPLAY_WIDTH = 200
+export const EMAIL_LOGO_PNG_WIDTH = EMAIL_LOGO_DISPLAY_WIDTH * 2

@@ -37,6 +37,7 @@
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/testing": "^11.0.6",
     "@nestjs/typeorm": "^11.0.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/markdown-it": "^14.1.2",
     "axios": "^1.17.0",
     "bull": "^4.14.1",

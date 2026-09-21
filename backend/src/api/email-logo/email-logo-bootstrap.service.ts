@@ -5,6 +5,7 @@ import * as path from 'path'
 import { ClamavService } from '../../services/clamav.service'
 import { EMAIL_LOGO_STORAGE, SYSTEM_EMAIL_LOGO_KEYS } from './email-logo.constants'
 import { EmailLogoStorage } from './email-logo-storage.interface'
+import { rasterizeEmailLogo, toEmailImageKey } from './email-logo-raster'
 
 @Injectable()
 export class EmailLogoBootstrapService implements OnModuleInit {
@@ -25,8 +26,13 @@ export class EmailLogoBootstrapService implements OnModuleInit {
     const assetDirectory = this.configService.get<string>('emailLogo.seedAssetDirectory')
 
     for (const storageKey of SYSTEM_EMAIL_LOGO_KEYS) {
-      if (await this.storage.head(storageKey)) {
-        this.logger.log(`Email logo seed object already exists; skipping "${storageKey}"`)
+      const imageKey = toEmailImageKey(storageKey)
+      const [hasSource, hasImage] = await Promise.all([
+        this.storage.head(storageKey),
+        this.storage.head(imageKey),
+      ])
+      if (hasSource && hasImage) {
+        this.logger.log(`Email logo seed objects already exist; skipping "${storageKey}"`)
         continue
       }
 
@@ -38,12 +44,23 @@ export class EmailLogoBootstrapService implements OnModuleInit {
         throw new Error(`Email logo seed file "${filename}" failed virus scan: ${viruses}`)
       }
 
-      await this.storage.upload({
-        storageKey,
-        content,
-        mimeType: 'image/svg+xml',
-      })
-      this.logger.log(`Uploaded email logo seed object "${storageKey}"`)
+      if (!hasSource) {
+        await this.storage.upload({
+          storageKey,
+          content,
+          mimeType: 'image/svg+xml',
+        })
+        this.logger.log(`Uploaded email logo seed object "${storageKey}"`)
+      }
+
+      if (!hasImage) {
+        await this.storage.upload({
+          storageKey: imageKey,
+          content: rasterizeEmailLogo(content),
+          mimeType: 'image/png',
+        })
+        this.logger.log(`Uploaded email logo image "${imageKey}"`)
+      }
     }
   }
 }

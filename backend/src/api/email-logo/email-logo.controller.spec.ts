@@ -38,7 +38,7 @@ describe('EmailLogoController', () => {
     vi.mocked(response.type).mockReturnValue(response)
   })
 
-  it('serves an approved logo using object storage content type metadata', async () => {
+  it('serves the rendered PNG of an approved SVG logo', async () => {
     const logo = {
       id: 'logo-id',
       name: 'Attorney General (AG)',
@@ -47,20 +47,17 @@ describe('EmailLogoController', () => {
       statusCode: 'APPROVED',
       isDeleted: false,
     } as EmailLogo
-    const content = Buffer.from(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg>',
-    )
+    const content = Buffer.from('png-bytes')
     vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue(logo)
-    vi.mocked(emailLogoStorage.head).mockResolvedValue({ contentType: 'image/svg+xml' })
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({ contentType: 'image/png' })
     vi.mocked(emailLogoStorage.download).mockResolvedValue(content)
 
     await controller.getImage('logo-id', response)
 
     expect(emailLogoService.findByIdIfApproved).toHaveBeenCalledWith('logo-id')
-    expect(emailLogoStorage.head).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
-    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
-    expect(response.type).toHaveBeenCalledWith('image/svg+xml')
-    expect(response.send).toHaveBeenCalledWith(content)
+    expect(emailLogoStorage.head).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos-400w.png')
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos-400w.png')
+    expect(response.type).toHaveBeenCalledWith('image/png')
     expect(vi.mocked(response.send).mock.calls[0][0]).toBe(content)
   })
 
@@ -70,15 +67,36 @@ describe('EmailLogoController', () => {
       fileKey: 'logos/BC_AG_H_RGB_pos.svg',
     } as EmailLogo)
     vi.mocked(emailLogoStorage.head).mockResolvedValue({})
-    vi.mocked(emailLogoStorage.download).mockResolvedValue(
-      Buffer.from(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg>',
-      ),
-    )
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('png-bytes'))
 
     await controller.getImage('logo-id', response)
 
-    expect(response.type).toHaveBeenCalledWith('image/svg+xml')
+    expect(response.type).toHaveBeenCalledWith('image/png')
+  })
+
+  it('serves a non-SVG logo as stored', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/custom.jpg',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({ contentType: 'image/jpeg' })
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('jpeg-bytes'))
+
+    await controller.getImage('logo-id', response)
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/custom.jpg')
+    expect(response.type).toHaveBeenCalledWith('image/jpeg')
+  })
+
+  it('returns not found when the rendered image is missing from storage', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue(null)
+
+    await expect(controller.getImage('logo-id', response)).rejects.toBeInstanceOf(NotFoundException)
+    expect(emailLogoStorage.download).not.toHaveBeenCalled()
   })
 
   it('returns not found without reading storage when the logo is unavailable', async () => {

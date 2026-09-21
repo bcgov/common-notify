@@ -54,7 +54,8 @@ describe('EmailTemplateLayoutService', () => {
       expect(result).toEqual({
         subject: rendered.subject,
         body:
-          '<img src="https://gateway.example.test/logos/logo-id/image" alt="">\n' +
+          '<img src="https://gateway.example.test/logos/logo-id/image" alt="Product logo" ' +
+          'width="200" style="height:auto">\n' +
           '<p>Hello <strong>Ada</strong></p>\n',
         bodyType: 'html',
       })

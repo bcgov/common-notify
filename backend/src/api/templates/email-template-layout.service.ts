@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
+import { EMAIL_LOGO_DISPLAY_WIDTH } from '../email-logo/email-logo.constants'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
@@ -56,7 +57,11 @@ export class EmailTemplateLayoutService {
 
     return {
       ...rendered,
-      body: `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="">\n${htmlBody}`,
+      // Outlook for Windows ignores CSS sizing, so the width attribute is what actually
+      // sizes the logo there; height:auto keeps the aspect ratio everywhere else.
+      body:
+        `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="Product logo" ` +
+        `width="${EMAIL_LOGO_DISPLAY_WIDTH}" style="height:auto">\n${htmlBody}`,
       bodyType: 'html',
     }
   }

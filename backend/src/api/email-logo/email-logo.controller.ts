@@ -4,6 +4,7 @@ import * as path from 'path'
 import { Public } from '../../common/decorators/public.decorator'
 import { EmailLogoService } from './email-logo.service'
 import { EmailLogoStorageService } from './email-logo-storage.service'
+import { toEmailImageKey } from './email-logo-raster'
 import { ApiExcludeController } from '@nestjs/swagger'
 
 // Not part of the service API; kept out of the published spec.
@@ -26,9 +27,15 @@ export class EmailLogoController {
       throw new NotFoundException('Email logo not found')
     }
 
-    const metadata = await this.emailLogoStorage.head(logo.fileKey)
-    const content = await this.emailLogoStorage.download(logo.fileKey)
-    const contentType = metadata?.contentType || this.contentTypeFromFileKey(logo.fileKey)
+    // Served as the PNG so the logo shows in mail clients that don't render SVG.
+    const imageKey = toEmailImageKey(logo.fileKey)
+    const metadata = await this.emailLogoStorage.head(imageKey)
+    if (!metadata) {
+      throw new NotFoundException('Email logo not found')
+    }
+
+    const content = await this.emailLogoStorage.download(imageKey)
+    const contentType = metadata.contentType || this.contentTypeFromFileKey(imageKey)
 
     response.type(contentType).send(content)
   }
