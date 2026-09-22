@@ -42,12 +42,27 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # Allow HTTPS for virus definition updates from BC Gov ClamAV Mirror (external traffic)
-    - ports:
+    # Virus-definition updates (freshclam), HTTPS only.
+    #
+    # An egress rule with `ports` but no `to` matches EVERY destination — the
+    # previous rules here allowed 443 and 80 to 0.0.0.0/0. ClamAV runs an inline
+    # shell and fetches definitions at runtime, so that was an unrestricted
+    # outbound path from a pod that processes untrusted uploads.
+    #
+    # Destinations now come from backend.clamav.freshclam.egress.cidrs, which must
+    # cover every mirror in backend.clamav.freshclam.mirrors. NetworkPolicy has no
+    # hostname selector, so mirrors can only be expressed as IP ranges.
+    #
+    # Port 80 is deliberately absent: every mirror is declared https://, so plain
+    # HTTP is never used and allowing it would only reopen a cleartext path out.
+    {{- with .Values.backend.clamav.freshclam }}
+    - to:
+        {{- range .egress.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
         - protocol: TCP
           port: 443
-    # Allow HTTP for virus definition updates (fallback)
-    - ports:
-        - protocol: TCP
-          port: 80
+    {{- end }}
 {{- end }}

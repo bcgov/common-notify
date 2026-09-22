@@ -42,9 +42,17 @@ spec:
             - sh
             - -c
             - |
-              # Create freshclam config with default mirrors (BC Gov mirror timing out)
+              # Mirrors come from backend.clamav.freshclam.mirrors, in preference
+              # order — freshclam tries each until one answers. Each carries an
+              # explicit https:// scheme; without one freshclam uses plain HTTP on
+              # port 80, which the egress policy no longer permits.
+              #
+              # Egress is restricted to backend.clamav.freshclam.egress.cidrs, so a
+              # mirror added here without its address range added there will hang.
               cat > /tmp/freshclam.conf <<EOF
-              DatabaseMirror database.clamav.net
+              {{- range .Values.backend.clamav.freshclam.mirrors }}
+              DatabaseMirror {{ . }}
+              {{- end }}
               DatabaseDirectory /var/lib/clamav
               LogVerbose yes
               LogTime yes

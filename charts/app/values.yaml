@@ -108,6 +108,58 @@ backend:
     timeout: 30000
     #-- fail closed when ClamAV is disabled or unavailable
     failClosed: false
+    #-- Virus-definition updates (freshclam) and the egress permitted to fetch them.
+    #--
+    #-- These two settings are a matched pair and must be changed together: the
+    #-- policy below is the ONLY egress ClamAV has, so a mirror whose address is not
+    #-- covered by `egress.cidrs` will simply hang, and the pod never becomes ready
+    #-- (the startup command blocks until a database file appears).
+    freshclam:
+      #-- Mirrors in preference order. freshclam tries each in turn, so the first is
+      #-- the normal path and the rest are fallbacks.
+      #--
+      #-- The scheme is REQUIRED and deliberate. Without one, freshclam falls back to
+      #-- plain HTTP on port 80 — which is why the old policy had to allow port 80,
+      #-- and why definition updates travelled in cleartext. Naming https:// here is
+      #-- what makes closing port 80 safe.
+      mirrors:
+        #-- BC Gov's mirror on the Silver cluster: the platform-recommended source and
+        #-- the same one .devcontainer uses. Preferred because it resolves to a single
+        #-- address, which is what allows a genuinely tight egress rule.
+        - https://clamav-mirror.apps.silver.devops.gov.bc.ca
+        #-- Public ClamAV CDN. Kept as a fallback because the BC Gov mirror has been
+        #-- unreliable before — the inline freshclam config previously carried the note
+        #-- "BC Gov mirror timing out", and it was not answering on 443 when this was
+        #-- written. Without a fallback, an outage there stops virus scanning entirely.
+        - https://database.clamav.net
+      egress:
+        #-- Destinations ClamAV may reach, as CIDRs. NetworkPolicy matches on IP only —
+        #-- there is no hostname or FQDN selector — so every mirror above needs its
+        #-- address range listed here.
+        cidrs:
+          #-- clamav-mirror.apps.silver.devops.gov.bc.ca -> the Silver cluster's
+          #-- ingress router. A single address, so this is a tight rule.
+          - 142.34.194.118/32
+          #-- database.clamav.net is fronted by Cloudflare and its addresses rotate,
+          #-- so the fallback can only be expressed as Cloudflare's published ranges
+          #-- (https://www.cloudflare.com/ips-v4). This is a broad allowance and the
+          #-- weaker half of this policy — drop these entries once the BC Gov mirror
+          #-- is confirmed reliable, and egress narrows to the /32 above.
+          - 173.245.48.0/20
+          - 103.21.244.0/22
+          - 103.22.200.0/22
+          - 103.31.4.0/22
+          - 141.101.64.0/18
+          - 108.162.192.0/18
+          - 190.93.240.0/20
+          - 188.114.96.0/20
+          - 197.234.240.0/22
+          - 198.41.128.0/17
+          - 162.158.0.0/15
+          - 104.16.0.0/13
+          - 104.24.0.0/14
+          - 172.64.0.0/13
+          - 131.0.72.0/22
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored
