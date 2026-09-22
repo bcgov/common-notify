@@ -23,7 +23,7 @@ export class TemplatesRepository {
   ) {}
 
   /**
-   * The tenant's live channel settings that point at this template, switched on or off
+   * The tenant's event channel settings associated with this template
    */
   private settingsUsingTemplate(
     manager: EntityManager,
