@@ -42,35 +42,8 @@ spec:
             - sh
             - -c
             - |
-              # Mirrors come from backend.clamav.freshclam.mirrors, in preference
-              # order — freshclam tries each until one answers. Each carries an
-              # explicit https:// scheme; without one freshclam uses plain HTTP on
-              # port 80, which the egress policy no longer permits.
-              #
-              # Egress is restricted to backend.clamav.freshclam.egress.cidrs, so a
-              # mirror added here without its address range added there will hang.
-              cat > /tmp/freshclam.conf <<EOF
-              {{- range .Values.backend.clamav.freshclam.mirrors }}
-              DatabaseMirror {{ . }}
-              {{- end }}
-              DatabaseDirectory /var/lib/clamav
-              LogVerbose yes
-              LogTime yes
-              Foreground yes
-              EOF
-
-              # Download virus databases in background
-              /usr/bin/freshclam --config-file=/tmp/freshclam.conf &
-
-              # Wait for databases to download (check for daily.cvd/cld)
-              while [ ! -f /var/lib/clamav/daily.cvd ] && [ ! -f /var/lib/clamav/daily.cld ]; do
-                echo "Waiting for virus databases to download..."
-                sleep 10
-              done
-
-              echo "Virus databases downloaded, starting clamd..."
-
-              # Create clamd config - log to file in /tmp and tail to stdout
+              # clamd's config is written FIRST so that freshclam's NotifyClamd below
+              # has a file to point at from its very first update.
               cat > /tmp/clamd.conf <<CLAMDEOF
               LogFile /tmp/clamd.log
               LogFileMaxSize 10M
@@ -84,6 +57,50 @@ spec:
               MaxConnectionQueueLength 30
               StreamMaxLength 100M
               CLAMDEOF
+
+              # Mirrors come from backend.clamav.freshclam.mirrors, in preference
+              # order — freshclam tries each until one answers. Each carries an
+              # explicit https:// scheme; without one freshclam uses plain HTTP on
+              # port 80, which the egress policy no longer permits.
+              #
+              # Egress is restricted to backend.clamav.freshclam.egress.cidrs, so a
+              # mirror added here without its address range added there will hang.
+              #
+              # Checks + NotifyClamd are what keep definitions current. Without them
+              # freshclam updated once at startup and exited, and because
+              # /var/lib/clamav is an emptyDir the signatures then froze at the pod's
+              # creation date for the life of the pod (months, in practice).
+              cat > /tmp/freshclam.conf <<EOF
+              {{- range .Values.backend.clamav.freshclam.mirrors }}
+              DatabaseMirror {{ . }}
+              {{- end }}
+              DatabaseDirectory /var/lib/clamav
+              LogVerbose yes
+              LogTime yes
+              Foreground yes
+              Checks {{ .Values.backend.clamav.freshclam.checksPerDay }}
+              NotifyClamd /tmp/clamd.conf
+              EOF
+
+              # One blocking update first, so clamd never starts against an empty
+              # database directory. Failure here is not fatal: the wait loop below
+              # keeps trying via the daemon rather than crashing the container.
+              echo "Fetching initial virus databases..."
+              /usr/bin/freshclam --config-file=/tmp/freshclam.conf --no-warnings || \
+                echo "Initial freshclam run failed; the daemon will keep retrying."
+
+              # Then run freshclam as a DAEMON for the life of the pod. --daemon is the
+              # difference between updating once and honouring Checks above; clamd is
+              # told to reload via NotifyClamd whenever an update lands.
+              /usr/bin/freshclam --config-file=/tmp/freshclam.conf --daemon &
+
+              # Wait for databases to be present (check for daily.cvd/cld)
+              while [ ! -f /var/lib/clamav/daily.cvd ] && [ ! -f /var/lib/clamav/daily.cld ]; do
+                echo "Waiting for virus databases to download..."
+                sleep 10
+              done
+
+              echo "Virus databases present, starting clamd..."
 
               # Start clamd with custom config and tail logs to stdout
               /usr/sbin/clamd --foreground=yes --config-file=/tmp/clamd.conf &

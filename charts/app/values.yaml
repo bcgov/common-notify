@@ -123,43 +123,61 @@ backend:
       #-- and why definition updates travelled in cleartext. Naming https:// here is
       #-- what makes closing port 80 safe.
       mirrors:
-        #-- BC Gov's mirror on the Silver cluster: the platform-recommended source and
-        #-- the same one .devcontainer uses. Preferred because it resolves to a single
-        #-- address, which is what allows a genuinely tight egress rule.
+        #-- BC Gov's mirror on the Silver cluster: the platform-recommended source
+        #-- (bcgov/clamav defaults to it) and the same one .devcontainer uses.
+        #--
+        #-- Verified from inside f6bc3f-dev on 2026-09-22: TLS valid, full
+        #-- main/daily/bytecode download, signatures verified, and it served daily
+        #-- v28131 dated that morning — fresher than what the pods were running.
+        #-- The old "BC Gov mirror timing out" note appears to have described the
+        #-- view from outside the cluster; in-cluster it answers fine.
+        #--
+        #-- Single address, which is what makes the tight egress rule below possible.
         - https://clamav-mirror.apps.silver.devops.gov.bc.ca
-        #-- Public ClamAV CDN. Kept as a fallback because the BC Gov mirror has been
-        #-- unreliable before — the inline freshclam config previously carried the note
-        #-- "BC Gov mirror timing out", and it was not answering on 443 when this was
-        #-- written. Without a fallback, an outage there stops virus scanning entirely.
-        - https://database.clamav.net
+        #-- FALLBACK (disabled). Re-enable this line AND the Cloudflare ranges under
+        #-- egress.cidrs together if the BC Gov mirror has an outage — freshclam tries
+        #-- mirrors in order, so this one is only used when the first fails.
+        #-- Left off by default because database.clamav.net sits behind Cloudflare
+        #-- with rotating addresses, so permitting it means allowing Cloudflare's 15
+        #-- published ranges — a large fraction of the internet, which would defeat
+        #-- most of the point of restricting egress at all.
+        # - https://database.clamav.net
       egress:
         #-- Destinations ClamAV may reach, as CIDRs. NetworkPolicy matches on IP only —
         #-- there is no hostname or FQDN selector — so every mirror above needs its
-        #-- address range listed here.
+        #-- address range listed here, and a mirror without one will hang.
         cidrs:
           #-- clamav-mirror.apps.silver.devops.gov.bc.ca -> the Silver cluster's
-          #-- ingress router. A single address, so this is a tight rule.
+          #-- ingress router (confirmed by DNS from inside the cluster).
           - 142.34.194.118/32
-          #-- database.clamav.net is fronted by Cloudflare and its addresses rotate,
-          #-- so the fallback can only be expressed as Cloudflare's published ranges
-          #-- (https://www.cloudflare.com/ips-v4). This is a broad allowance and the
-          #-- weaker half of this policy — drop these entries once the BC Gov mirror
-          #-- is confirmed reliable, and egress narrows to the /32 above.
-          - 173.245.48.0/20
-          - 103.21.244.0/22
-          - 103.22.200.0/22
-          - 103.31.4.0/22
-          - 141.101.64.0/18
-          - 108.162.192.0/18
-          - 190.93.240.0/20
-          - 188.114.96.0/20
-          - 197.234.240.0/22
-          - 198.41.128.0/17
-          - 162.158.0.0/15
-          - 104.16.0.0/13
-          - 104.24.0.0/14
-          - 172.64.0.0/13
-          - 131.0.72.0/22
+          #-- Cloudflare's published ranges (https://www.cloudflare.com/ips-v4),
+          #-- needed ONLY if the database.clamav.net fallback above is re-enabled.
+          # - 173.245.48.0/20
+          # - 103.21.244.0/22
+          # - 103.22.200.0/22
+          # - 103.31.4.0/22
+          # - 141.101.64.0/18
+          # - 108.162.192.0/18
+          # - 190.93.240.0/20
+          # - 188.114.96.0/20
+          # - 197.234.240.0/22
+          # - 198.41.128.0/17
+          # - 162.158.0.0/15
+          # - 104.16.0.0/13
+          # - 104.24.0.0/14
+          # - 172.64.0.0/13
+          # - 131.0.72.0/22
+      #-- Database checks per day, passed to freshclam as `Checks`.
+      #--
+      #-- This is not cosmetic. freshclam was previously started without --daemon, so
+      #-- it performed ONE update at container start and exited. Since /var/lib/clamav
+      #-- is an emptyDir and these pods run for months, definitions froze at the pod's
+      #-- creation date: on 2026-09-22 dev was 92 days stale, test 104, and prod 106 —
+      #-- prod was scanning uploads against signatures from 08 Jun 2026.
+      #--
+      #-- 24 = hourly. ClamAV publishes daily.cvd several times a day and asks that
+      #-- clients check no more than 24 times daily.
+      checksPerDay: 24
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored
