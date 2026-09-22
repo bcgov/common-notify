@@ -315,11 +315,12 @@ export class TemplatesController {
   @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
   @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async deleteTemplate(
-    @Req() req: Request,
+    @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
   ): Promise<void> {
     const tenant = (req as any).tenant as Tenant
-    await this.templatesService.deleteTemplate(tenant.id, templateId)
+    const user = JwtUserExtractor.extractUser(req)
+    await this.templatesService.deleteTemplate(tenant.id, templateId, user)
   }
 
   /**

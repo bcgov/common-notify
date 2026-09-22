@@ -210,3 +210,19 @@
 .bcds-react-aria-Radio[data-selected][data-disabled]:before {
   border: 5px solid #d8d8d8;
 }
+
+// custom padding for bcds button in templates table
+.templates__action-cell .bcds-react-aria-Button.small {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+// Events that still use a template, listed when it cannot be deleted.
+.templates__usage-list {
+  margin: 0;
+  padding-left: 1.25rem;
+
+  a {
+    font-weight: 700;
+  }
+}
