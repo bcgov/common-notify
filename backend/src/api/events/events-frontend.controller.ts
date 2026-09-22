@@ -34,6 +34,7 @@ import { EventResponseDto } from './schemas/event-response.dto'
 import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { parseListQuery } from '../../common/query/list-query.parser'
+import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 
 /** The channels an event can be configured for, and so the only values its filter accepts. */
 const EVENT_CHANNEL_CODES = [NotificationChannel.EMAIL, NotificationChannel.SMS]
@@ -116,6 +117,27 @@ export class EventsFrontendController {
     const { filter, derived } = this.splitDerivedFilters(query.filter)
     const parsedQuery = parseListQuery({ ...query, filter }, eventListQueryConfig)
     return this.eventsService.listEvents(tenant.id, parsedQuery, query.search, derived)
+  }
+
+  /**
+   * List the CSTAR groups belonging to the authenticated tenant
+   */
+  @Version('1')
+  @Get('cstar-groups')
+  @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: "List the authenticated tenant's CSTAR groups" })
+  @ApiOkResponse({ type: CstarGroupListResponseDto })
+  async listCstarGroups(@Req() req: express.Request): Promise<CstarGroupListResponseDto> {
+    const tenant = this.getTenant(req)
+    return this.eventsService.listCstarGroups({
+      tenantId: tenant.externalId,
+      authHeader: req.headers.authorization,
+    })
   }
 
   /**

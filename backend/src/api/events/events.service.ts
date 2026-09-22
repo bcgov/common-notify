@@ -28,6 +28,8 @@ import { TemplatesRepository } from '../templates/templates.repository'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 
 /**
  * Filters on values derived from an event's channel settings rather than stored on the event.
@@ -43,6 +45,18 @@ export interface DerivedEventFilters {
 interface DesiredRecipient {
   kind: EventRecipientKind
   address: string
+}
+
+/**
+ * The CSTAR tenant the caller is acting in, and the token to reach CSTAR with. Needed to check
+ * that the CSTAR group IDs an event is being pointed at actually belong to that tenant, since
+ * groups live in CSTAR and cannot be constrained by a foreign key here.
+ */
+export interface CstarRequestContext {
+  /** The CSTAR tenant ID, i.e. notify's tenant.externalId. */
+  tenantId: string
+  /** The caller's Authorization header, passed through to CSTAR. */
+  authHeader?: string
 }
 
 export const eventListQueryConfig: QueryableFieldsConfig = {
@@ -96,6 +110,7 @@ export class EventsService {
     private readonly emailLogoService: EmailLogoService,
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
+    private readonly cstarApiClient: CstarApiClient,
   ) {}
 
   /**
@@ -237,6 +252,27 @@ export class EventsService {
     const updated = await this.saveUniquelyNamed(event, event.name)
 
     return this.toResponseDto(updated)
+  }
+
+  /**
+   * The CSTAR groups the tenant can address a notification to, for the group picker on an
+   * event's Email settings tab. The browser cannot call CSTAR directly, so this is the
+   * lookup behind the proxying controller route.
+   *
+   * The same list is what updateEmailChannelSetting below validates saved group IDs against.
+   *
+   * @param cstar CSTAR tenant and token to look the groups up with
+   */
+  async listCstarGroups(cstar: CstarRequestContext): Promise<CstarGroupListResponseDto> {
+    const groups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+
+    return {
+      groups: groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        description: group.description ?? '',
+      })),
+    }
   }
 
   /**
