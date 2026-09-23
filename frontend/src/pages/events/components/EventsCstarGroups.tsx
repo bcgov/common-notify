@@ -76,7 +76,13 @@ const EventsCstarGroups: FC<EventsCstarGroupsProps> = ({
 }) => {
   const [fields, setFields] = useState(() => buildInitialFields(values))
 
-  const groupItems = groups.map((group) => ({ id: group.id, label: group.name }))
+  // `color` is forwarded to the tag the Select shows for each selection; without it the tags come
+  // out as the design system's plain white squares rather than the design's blue rounded ones.
+  const groupItems = groups.map((group) => ({
+    id: group.id,
+    label: group.name,
+    color: 'blue' as const,
+  }))
 
   function updateField(id: CstarGroupFieldId, changes: Partial<GroupField>) {
     const updated = { ...fields[id], ...changes }
