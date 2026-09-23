@@ -8,6 +8,12 @@ export interface GatewayCredentialHeaders {
   consumerUsername?: string
   consumerCustomId?: string
   consumerId?: string
+  /**
+   * ACL groups the consumer belongs to. Kong joins them with `, `. One is the product
+   * environment's appId; the tenant's CSTAR id is there too once its consumer has been
+   * granted it.
+   */
+  consumerGroups?: string[]
 }
 
 /**
@@ -29,16 +35,30 @@ export function readGatewayCredentialHeaders(
     consumerUsername: read('x-consumer-username'),
     consumerCustomId: read('x-consumer-custom-id'),
     consumerId: read('x-consumer-id'),
+    consumerGroups: parseConsumerGroups(read('x-consumer-groups')),
   }
+}
+
+/**
+ * Split the ACL groups header.
+ *
+ * Kong emits `, ` between groups, but splitting on the comma alone and trimming costs
+ * nothing and does not depend on that staying true. The header is present but empty for
+ * a consumer in no groups.
+ */
+export function parseConsumerGroups(value: string | undefined): string[] {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((group) => group.trim())
+    .filter(Boolean)
 }
 
 /**
  * Every header the gateway injected, for logging.
  *
- * Deliberately reads the raw headers rather than the parsed shape above: the point is to
- * see what the gateway *actually* sent, including anything we do not yet consume —
- * `x-consumer-groups` in particular, which is where a tenant identifier would arrive if
- * the environment is on a `kong-api-key-acl` flow.
+ * Reads the raw headers rather than the parsed shape above, so the line shows what the
+ * gateway actually sent — including anything we do not consume.
  *
  * Nothing here is secret. Kong sets these after it has already validated the key, and
  * none of them is the key itself.
@@ -60,14 +80,23 @@ export function hasNoCredentialHeaders(headers: GatewayCredentialHeaders): boole
 /**
  * Resolve the tenant binding for a gateway-authenticated request.
  *
- * Two lookups, because the two ways of creating a binding know different things:
+ * The binding is needed on every request regardless of what the headers say: notification
+ * usage and limits hang off `api_key_consumer`, so knowing the tenant is not enough.
+ * What the tenant's ACL group buys is a safe way to find a binding whose stored
+ * credential identifier is wrong or missing.
  *
- *  1. `x-credential-identifier` → `credential_identifier`. The fast path, and the
- *     only path for keys bound through POST /api/v1/service/api-key/bind.
- *  2. `x-consumer-username` / `x-consumer-custom-id` → `client_id`. Keys Notify
- *     issued itself have no credential identifier on file: the APS Credential Issuer
- *     API returns the clientId but not Kong's per-credential ID. On a hit here the
- *     credential identifier is backfilled so every later request takes path 1.
+ *  1. `x-credential-identifier` → `credential_identifier`. The fast path, and where
+ *     virtually every request lands.
+ *  2. `x-consumer-username` / `x-consumer-custom-id` → `client_id`, narrowed to the
+ *     tenant named by `x-consumer-groups`. Catches a key Notify has never seen used, and
+ *     a key regenerated on the Portal — that mints a new Kong credential, leaving the
+ *     stored identifier pointing at one that no longer exists.
+ *  3. The same clientId match with no tenant to narrow it, restricted to bindings that
+ *     have never been used. For consumers issued before ACL groups existed, which
+ *     forward no tenant to match on. `clientId` is openly displayed — in the Notify UI
+ *     and on the Portal Consumers page — so accepting it unqualified for the life of a
+ *     key is a wider door than it needs to be; the restriction closes that path for a
+ *     binding permanently once it has resolved once.
  *
  * A key revoked on the API Services Portal is rejected by the gateway and never gets
  * this far, so there is no revoked state to filter on here.
@@ -80,7 +109,7 @@ export async function resolveApiKeyConsumer(
   logger: Logger,
   rawHeaders?: Record<string, unknown>,
 ): Promise<ApiKeyConsumer | null> {
-  const { credentialIdentifier, consumerUsername, consumerCustomId, consumerId } = headers
+  const { credentialIdentifier, consumerUsername, consumerCustomId, consumerGroups } = headers
 
   if (rawHeaders) {
     logger.debug(`Gateway headers: ${describeGatewayHeaders(rawHeaders)}`)
@@ -101,13 +130,18 @@ export async function resolveApiKeyConsumer(
     return null
   }
 
-  // Restricted to bindings that have never been used. That is the only case this
-  // fallback exists for, and narrowing it matters: clientId is low-entropy and openly
-  // displayed — in the Notify UI and on the Portal Consumers page — whereas Kong's
-  // credential id is an unguessable UUID. Kong overwrites these headers, so forging one
-  // requires already being inside the cluster network, but leaving a guessable
-  // identifier accepted for the life of every key is a needlessly wide door. Once the
-  // credential id is backfilled below, this path closes for that binding permanently.
+  const tenantGuids = consumerGroups ?? []
+  if (tenantGuids.length > 0) {
+    const byTenantAndClientId = await repository.findOne({
+      where: { clientId: In(clientIds), tenant: { externalId: In(tenantGuids) } },
+      relations: ['tenant'],
+    })
+    if (byTenantAndClientId) {
+      await backfillCredentialIdentifier(repository, byTenantAndClientId, headers, logger)
+      return byTenantAndClientId
+    }
+  }
+
   const byClientId = await repository.findOne({
     where: { clientId: In(clientIds), credentialIdentifier: IsNull() },
     relations: ['tenant'],
@@ -116,30 +150,14 @@ export async function resolveApiKeyConsumer(
     return null
   }
 
-  // Logged at info, not debug: this fires once per key, and it is the request that
-  // proves which headers the gateway actually sends. Deployed environments run at info,
-  // so without this the evidence would only exist on a developer's laptop.
-  if (rawHeaders) {
-    logger.log(
-      `First authenticated request for API key ${byClientId.clientId}. ` +
-        `Gateway headers: ${describeGatewayHeaders(rawHeaders)}`,
-    )
-  }
-
-  await backfillCredentialIdentifier(
-    repository,
-    byClientId,
-    credentialIdentifier,
-    consumerId,
-    logger,
-  )
+  await backfillCredentialIdentifier(repository, byClientId, headers, logger)
 
   return byClientId
 }
 
 /**
  * Record the credential identifier the gateway just revealed, so subsequent requests
- * resolve on the indexed unique column instead of the clientId fallback.
+ * resolve on the indexed unique column instead of a clientId match.
  *
  * Best-effort by design: this is a cache warm-up, and failing it must not fail a
  * request that has already authenticated. The realistic failure is the unique
@@ -149,10 +167,10 @@ export async function resolveApiKeyConsumer(
 async function backfillCredentialIdentifier(
   repository: Repository<ApiKeyConsumer>,
   binding: ApiKeyConsumer,
-  credentialIdentifier: string | undefined,
-  consumerId: string | undefined,
+  headers: GatewayCredentialHeaders,
   logger: Logger,
 ): Promise<void> {
+  const { credentialIdentifier, consumerId } = headers
   const patch: Partial<ApiKeyConsumer> = {}
 
   if (credentialIdentifier && binding.credentialIdentifier !== credentialIdentifier) {
