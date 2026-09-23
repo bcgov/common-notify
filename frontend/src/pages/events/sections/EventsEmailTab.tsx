@@ -13,9 +13,11 @@ import {
   TooltipTrigger,
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
+import { useBlocker } from '@tanstack/react-router'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
@@ -93,6 +95,11 @@ type EventsEmailTabProps = {
   tenantEmailLogoId?: string | null
   /** Selected tenant's name, used as the default header title. */
   tenantName?: string | null
+  /**
+   * Reports whether there are edits that a save has not persisted yet. The tab bar above is not
+   * routing, so the blocker below cannot see it - the page owns that guard and needs to be told.
+   */
+  onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void
 }
 
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
@@ -105,6 +112,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   approvedLogos = [],
   tenantEmailLogoId,
   tenantName,
+  onUnsavedChangesChange,
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
@@ -238,6 +246,22 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const activeChanged = channelActive !== values.active
   const isSaveDisabled =
     isFormDisabled || (!settingsChanged && !activeChanged) || recipientsHaveError
+  const hasUnsavedChanges = settingsChanged || activeChanged
+
+  // A save of its own navigates on to the saved-settings page, and `saving` is still true while
+  // that happens, so the blocker stands down for it rather than asking about changes it is in
+  // the middle of persisting.
+  const blocker = useBlocker({
+    shouldBlockFn: () => hasUnsavedChanges && !saving,
+    // A refresh or a closed tab can't be answered with this dialog, so those fall back to the
+    // browser's own prompt - and only while there is something to lose.
+    enableBeforeUnload: () => hasUnsavedChanges,
+    withResolver: true,
+  })
+
+  useEffect(() => {
+    onUnsavedChangesChange?.(hasUnsavedChanges)
+  }, [hasUnsavedChanges, onUnsavedChangesChange])
 
   // Turning the channel on only unlocks the fields - it isn't persisted until the settings it
   // depends on are applied. Turning it off takes effect immediately, so it asks first.
@@ -315,6 +339,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         onCancel={cancelDeactivate}
         onConfirm={confirmDeactivate}
       />
+
+      {blocker.status === 'blocked' && (
+        <UnsavedChangesDialog onLeave={blocker.proceed} onStay={blocker.reset} />
+      )}
 
       {showFields && (
         <>

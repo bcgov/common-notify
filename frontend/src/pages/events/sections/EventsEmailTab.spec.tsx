@@ -10,6 +10,24 @@ import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
 const getTemplatesMock = vi.fn()
 
+// The tab registers a route blocker for unsaved changes. The mock keeps hold of the options it
+// was given, so the tests can ask the same question the router would, and drives the resolver
+// the dialog is rendered from.
+let blockerOptions: {
+  shouldBlockFn: () => boolean
+  enableBeforeUnload: () => boolean
+} | null = null
+let blockerStatus: 'idle' | 'blocked' = 'idle'
+const proceedMock = vi.fn()
+const resetMock = vi.fn()
+
+vi.mock('@tanstack/react-router', () => ({
+  useBlocker: (options: { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean }) => {
+    blockerOptions = options
+    return { status: blockerStatus, proceed: proceedMock, reset: resetMock }
+  },
+}))
+
 vi.mock('@/api/templates.api', async () => {
   const actual = await vi.importActual<typeof TemplatesApi>('@/api/templates.api')
   return {
@@ -110,6 +128,8 @@ async function chooseTemplate(name = 'Permit renewal') {
 describe('EventsEmailTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    blockerOptions = null
+    blockerStatus = 'idle'
     getTemplatesMock.mockResolvedValue({
       data: [template],
       count: 1,
@@ -631,6 +651,86 @@ describe('EventsEmailTab', () => {
 
       resolveSave()
       await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
+    })
+  })
+
+  describe('leaving with unsaved changes', () => {
+    it('lets a navigation through while nothing has been edited', () => {
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(false)
+      expect(blockerOptions?.enableBeforeUnload()).toBe(false)
+    })
+
+    it('blocks a navigation once a setting has been changed', async () => {
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.type(senderField(), 'x')
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(true)
+      expect(blockerOptions?.enableBeforeUnload()).toBe(true)
+    })
+
+    it('blocks a navigation once the channel has been switched on', async () => {
+      renderTab({ values: { ...savedAndActive, active: false }, isConfigured: true })
+
+      await userEvent.click(activateSwitch())
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(true)
+    })
+
+    it("does not block the save's own navigation", async () => {
+      let resolveSave: () => void = () => {}
+      const onSave = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve
+          }),
+      )
+      renderTab({ values: savedAndActive, isConfigured: true, onSave })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      await screen.findByRole('button', { name: 'Saving…' })
+      expect(blockerOptions?.shouldBlockFn()).toBe(false)
+
+      resolveSave()
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
+    })
+
+    it('warns before a blocked navigation', () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'You have unsaved changes to your email notification settings. If you leave this page, your changes will be lost.',
+        ),
+      ).toBeInTheDocument()
+    })
+
+    it('abandons the changes when the user leaves', async () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Leave without saving' }))
+
+      expect(proceedMock).toHaveBeenCalled()
+      expect(resetMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps the user on the page when they stay, and when they close the dialog', async () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Stay on page' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+      expect(resetMock).toHaveBeenCalledTimes(2)
+      expect(proceedMock).not.toHaveBeenCalled()
     })
   })
 

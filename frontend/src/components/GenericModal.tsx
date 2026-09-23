@@ -55,6 +55,25 @@ interface GenericModalProps {
   cancelText?: string
 
   /**
+   * Callback for the cancel button, for the dialogs where cancelling and closing are not
+   * the same thing (e.g. "Leave without saving" next to an X that keeps the user put).
+   * @default onClose
+   */
+  onCancel?: () => void
+
+  /**
+   * Variant for the cancel button, alongside a submit button
+   * @default 'secondary'
+   */
+  cancelVariant?: 'link' | 'primary' | 'secondary' | 'tertiary'
+
+  /**
+   * Whether the cancel button reads as destructive, alongside a submit button
+   * @default false
+   */
+  cancelDanger?: boolean
+
+  /**
    * Modal size
    * @default 'modal-dialog-centered'
    */
@@ -99,6 +118,9 @@ const GenericModal: FC<GenericModalProps> = ({
   submitVariant = 'primary',
   isSubmitLoading = false,
   cancelText = 'Cancel',
+  onCancel,
+  cancelVariant = 'secondary',
+  cancelDanger = false,
   size = 'modal-dialog-centered',
   closeOnBackdropClick: _closeOnBackdropClick = true,
 }) => {
@@ -151,8 +173,9 @@ const GenericModal: FC<GenericModalProps> = ({
                   <div className="d-flex gap-2 justify-content-end">
                     <Button
                       type="button"
-                      variant="secondary"
-                      onClick={onClose}
+                      variant={cancelVariant}
+                      danger={cancelDanger}
+                      onClick={onCancel ?? onClose}
                       isDisabled={isSubmitLoading}
                     >
                       {cancelText}
@@ -166,7 +189,7 @@ const GenericModal: FC<GenericModalProps> = ({
                 <>
                   {children}
                   <div className="d-flex gap-2 justify-content-end mt-3">
-                    <Button variant="primary" onClick={onClose}>
+                    <Button variant="primary" onClick={onCancel ?? onClose}>
                       {cancelText}
                     </Button>
                   </div>
