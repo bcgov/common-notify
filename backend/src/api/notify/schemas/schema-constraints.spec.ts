@@ -36,31 +36,48 @@ describe('applyNotifySchemaConstraints', () => {
     expect(schemas[channel].properties[property].oneOf).toEqual(names.map(ref))
   })
 
-  it('makes a stored template exclude every inline and rendering field', () => {
-    expect(schemas.TemplateContent.required).toEqual(['templateId'])
-    expect(schemas.TemplateContent.not.anyOf.map((c: any) => c.required[0])).toEqual([
-      'subject',
-      'body',
-      'renderer',
-      'bodyType',
-      'encoding',
-    ])
+  // Each branch is closed to its own fields, which is what makes the branches exclusive.
+  it.each([
+    'EmailRecipients',
+    'EmailMailMerge',
+    'SmsRecipients',
+    'SmsMailMerge',
+    'TemplateContent',
+    'EmailInlineContent',
+    'SmsInlineContent',
+  ])('closes %s to its own fields', (name) => {
+    expect(schemas[name].additionalProperties).toBe(false)
+    expect(schemas[name].not).toBeUndefined()
+    expect(schemas[name].anyOf).toBeUndefined()
   })
 
-  it.each(['EmailInlineContent', 'SmsInlineContent'])('makes %s exclude a templateId', (name) => {
-    expect(schemas[name].not).toEqual({ required: ['templateId'] })
+  it('requires the field that identifies each branch', () => {
+    expect(schemas.TemplateContent.required).toEqual(['templateId'])
+    expect(schemas.EmailMailMerge.required).toEqual(['mergeArray'])
+    expect(schemas.SmsRecipients.required).toEqual(['to'])
+    expect(schemas.SmsMailMerge.required).toEqual(['mergeArray'])
+  })
+
+  it('requires an addressed email to carry at least one of to/cc/bcc', () => {
+    expect(Object.keys(schemas.EmailRecipients.properties)).toEqual(['to', 'cc', 'bcc'])
+    expect(schemas.EmailRecipients.minProperties).toBe(1)
+    expect(schemas.EmailRecipients.required).toBeUndefined()
+  })
+
+  it.each(['EmailInlineContent', 'SmsInlineContent'])('leaves %s requiring nothing', (name) => {
     expect(schemas[name].required).toBeUndefined()
   })
 
-  it('publishes only the fields SMS inline rendering reads', () => {
+  // The SMS runtime DTO is narrower than the email one, so the published branch is too.
+  it('publishes only the fields an SMS channel accepts', () => {
     expect(Object.keys(schemas.SmsInlineContent.properties)).toEqual(['body', 'renderer'])
-  })
-
-  it('makes addressed and mail-merge recipients mutually exclusive', () => {
-    expect(schemas.EmailRecipients.not).toEqual({ required: ['mergeArray'] })
-    expect(schemas.EmailMailMerge.required).toEqual(['mergeArray'])
-    expect(schemas.SmsRecipients.required).toEqual(['to'])
-    expect(schemas.SmsMailMerge.not).toEqual({ required: ['to'] })
+    expect(Object.keys(schemas.EmailInlineContent.properties)).toEqual([
+      'body',
+      'subject',
+      'bodyType',
+      'renderer',
+      'encoding',
+    ])
   })
 
   it('throws when a constrained component is missing from the document', async () => {

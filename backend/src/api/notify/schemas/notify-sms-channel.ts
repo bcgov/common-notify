@@ -11,7 +11,7 @@ import {
   NotifySmsRecipients,
 } from './notify-sms-recipients'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
-import { NotifyContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
+import { NotifySmsContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
   description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
@@ -46,8 +46,8 @@ export class NotifySmsChannel {
   })
   @IsOptional()
   @ValidateNested()
-  @Type(() => NotifyContent)
-  content?: NotifyContent
+  @Type(() => NotifySmsContent)
+  content?: NotifySmsContent
 
   @ApiPropertyOptional({ type: [NotifyAttachment] })
   @IsOptional()

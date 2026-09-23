@@ -32,7 +32,11 @@ export class TemplateOrContentConstraint implements ValidatorConstraintInterface
     for (const channel of channels) {
       const content = channel.content
       const hasTemplateId = !!content?.templateId
-      const hasInlineContent = !!(content && (content.subject || content.body))
+      // `subject` is email and message-app content only - NotifySmsContent has no such field.
+      const hasInlineContent = !!(
+        content &&
+        (('subject' in content && content.subject) || content.body)
+      )
 
       // Within a channel, a templateId and inline content are mutually exclusive
       if (hasTemplateId && hasInlineContent) {

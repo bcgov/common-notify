@@ -79,10 +79,37 @@ export class NotifyContent {
 }
 
 /**
- * The shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
- * the choice is enforced by TemplateOrContentConstraint (templateId never alongside subject/body)
- * and TemplateOrRendererConstraint (templateId never alongside renderer, bodyType or encoding).
- * The keywords that make the shapes mutually exclusive live in schema-constraints.ts.
+ * The content an SMS channel accepts. Narrower than NotifyContent on purpose: an SMS carries no
+ * subject, is always plain text, and its encoding is fixed, so those fields are not part of the
+ * contract at all. The global ValidationPipe runs with forbidNonWhitelisted, so sending one is a
+ * 400 rather than a value that is quietly ignored.
+ *
+ * Email and message-app channels keep the full NotifyContent.
+ *
+ * Deliberately carries no @ApiSchema name: it is never published on its own - the SMS channel
+ * documents this shape as the TemplateContent/SmsInlineContent branches - and the obvious name,
+ * SmsContent, already belongs to the GC Notify response schema, which a duplicate would overwrite.
+ */
+export class NotifySmsContent extends PickType(NotifyContent, [
+  'templateId',
+  'body',
+  'renderer',
+] as const) {
+  @ApiPropertyOptional({
+    description:
+      'The message text. Placeholders are filled from `params` using the chosen renderer. ' +
+      'Sent exactly as written - an SMS carries no formatting.',
+    example: 'Hello {{firstName}}, your application has been received.',
+  })
+  body?: string
+}
+
+/**
+ * The shapes `content` may take, for documentation only. The runtime DTOs stay NotifyContent and
+ * NotifySmsContent; the choice is enforced by TemplateOrContentConstraint (templateId never
+ * alongside subject/body) and TemplateOrRendererConstraint (templateId never alongside renderer,
+ * bodyType or encoding). The keywords that make the shapes mutually exclusive live in
+ * schema-constraints.ts.
  *
  * The template branch is templateId and nothing else: a stored template carries its own body type
  * and renderer, and there is nothing left for the request to say about how it renders.
@@ -105,15 +132,11 @@ export class NotifyEmailInlineContent extends PickType(NotifyContent, [
   'encoding',
 ] as const) {}
 
-// SMS inline rendering reads only body and renderer. The DTO still accepts subject and bodyType
-// on an SMS channel, so they are left out of this schema rather than forbidden by it.
 @ApiSchema({
   name: 'SmsInlineContent',
-  description:
-    'Supply the SMS inline, optionally naming a renderer for the placeholders. SMS is plain ' +
-    'text: a subject or bodyType is accepted but has no effect.',
+  description: 'Supply the SMS inline, optionally naming a renderer for the placeholders.',
 })
-export class NotifySmsInlineContent extends PickType(NotifyContent, [
+export class NotifySmsInlineContent extends PickType(NotifySmsContent, [
   'body',
   'renderer',
 ] as const) {}
