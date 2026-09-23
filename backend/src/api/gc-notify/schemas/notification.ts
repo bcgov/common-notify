@@ -85,7 +85,7 @@ export class Notification {
   })
   provider_response?: string
 
-  @ApiProperty({ type: NotificationTemplate })
+  @ApiProperty({ description: 'Template information', type: NotificationTemplate })
   template: NotificationTemplate
 
   @ApiProperty({

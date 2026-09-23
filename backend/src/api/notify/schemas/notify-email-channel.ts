@@ -31,6 +31,7 @@ export class NotifyEmailChannel {
   // or the other. The keywords that make the branches mutually exclusive are in
   // schema-constraints.ts, so each branch stays a bare $ref that Swagger UI labels by name.
   @ApiOneOf({
+    description: 'Email recipients: to/cc/bcc or a mergeArray for mail-merge',
     oneOf: [
       { $ref: getSchemaPath(NotifyEmailAddressRecipients) },
       { $ref: getSchemaPath(NotifyEmailMergeRecipients) },
@@ -46,6 +47,7 @@ export class NotifyEmailChannel {
   // Neither rule requires a channel to carry content at all - the request-level rule only asks that
   // *some* channel renders something - so the inline branch deliberately requires nothing.
   @ApiOneOfOptional({
+    description: 'Email content (subject, body, etc.)',
     oneOf: [
       { $ref: getSchemaPath(NotifyTemplateContent) },
       { $ref: getSchemaPath(NotifyEmailInlineContent) },

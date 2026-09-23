@@ -10,12 +10,12 @@ import { NotifyContent } from './notify-content'
 @ApiSchema({ description: 'Send by messaging app.' })
 @ValidateTemplateOrRenderer()
 export class NotifyMsgAppChannel {
-  @ApiProperty({ type: NotifyMsgAppRecipients })
+  @ApiProperty({ description: 'Message app recipients', type: NotifyMsgAppRecipients })
   @ValidateNested()
   @Type(() => NotifyMsgAppRecipients)
   recipients: NotifyMsgAppRecipients
 
-  @ApiProperty({ type: NotifyContent })
+  @ApiProperty({ description: 'Message app content', type: NotifyContent })
   @ValidateNested()
   @Type(() => NotifyContent)
   content: NotifyContent

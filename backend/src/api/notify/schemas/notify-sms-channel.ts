@@ -27,6 +27,7 @@ export class NotifySmsChannel {
   // Mirrors ValidateRecipientsOrMerge exactly; the keywords that make the branches mutually
   // exclusive are in schema-constraints.ts - see NotifyEmailChannel.
   @ApiOneOf({
+    description: 'SMS recipients',
     oneOf: [
       { $ref: getSchemaPath(NotifySmsAddressRecipients) },
       { $ref: getSchemaPath(NotifySmsMergeRecipients) },
@@ -39,6 +40,7 @@ export class NotifySmsChannel {
 
   // Mirrors the two constraints that actually run - see NotifyEmailChannel.
   @ApiOneOfOptional({
+    description: 'SMS content (body, renderer, encoding, etc.)',
     oneOf: [
       { $ref: getSchemaPath(NotifyTemplateContent) },
       { $ref: getSchemaPath(NotifySmsInlineContent) },
