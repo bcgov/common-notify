@@ -20,8 +20,7 @@ export class NotifyContent {
 
   @ApiPropertyOptional({
     description:
-      'The message body. Placeholders are filled from `params` using the chosen renderer. ' +
-      'Markdown, not HTML - raw tags are escaped and reach the recipient as visible text.',
+      'The message body. Placeholders are filled from `params` using the chosen renderer.',
     example: '# Hello {{firstName}}\n\nYour application has been received.',
   })
   @IsOptional()
@@ -45,12 +44,7 @@ export class NotifyContent {
   @ApiPropertyOptional({
     enum: ['text', 'markdown', 'html'],
     description:
-      'How to interpret the body: markdown converted to HTML, or plain text. ' +
-      '`html` keeps your own markup and is gated by the `html_body_type` feature flag - ' +
-      'without it the request is rejected. An `html` body is sanitised: formatting, links, ' +
-      'images, tables and inline styles are kept, while scripts, form elements, embedded ' +
-      'frames and styles that hide content are removed. The delivered email is HTML either ' +
-      "way; the flag decides whether the markup is ours or the caller's.",
+      'How to interpret the body: plain text, markdown converted to HTML, or raw HTML.',
     default: 'markdown',
     example: 'markdown',
   })

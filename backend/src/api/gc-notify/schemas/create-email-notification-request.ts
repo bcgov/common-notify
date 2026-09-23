@@ -29,8 +29,7 @@ export class CreateEmailNotificationRequest {
 
   @ApiPropertyOptional({
     description:
-      'Values for the template placeholders. A value may also be a list, which renders as bullets ' +
-      'in the email body and as "a, b and c" in the subject, or a file attachment.',
+      'Values for the template placeholders. A value may also be a file attachment.',
     example: { firstName: 'Alice', permitNumber: 'BC-2026-00417', items: ['apples', 'pears'] },
   })
   @IsOptional()
@@ -39,9 +38,7 @@ export class CreateEmailNotificationRequest {
 
   @ApiPropertyOptional({
     description:
-      'Hold the message until this time instead of sending immediately. A timezone is required - ' +
-      'use a `Z` suffix or a numeric offset such as `-07:00`. A local time with no zone is ' +
-      'rejected rather than guessed at.',
+      'Hold the message until this time instead of sending immediately.',
     format: 'date-time A time in the past is rejected rather than sent immediately.',
     example: '2027-06-01T16:00:00Z',
   })

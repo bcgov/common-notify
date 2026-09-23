@@ -4,9 +4,7 @@ import { IsString, IsIn } from 'class-validator'
 export class FileAttachment {
   @ApiProperty({
     description:
-      'File contents, base64 encoded. Up to 5 MB per file and 25 MB across the request by default, ' +
-      'and the file extension must be one this environment allows. Both limits are configurable ' +
-      'per environment.',
+      'File contents, base64 encoded.',
     example: 'JVBERi0xLjQKJcfsj6IK...',
   })
   @IsString()
