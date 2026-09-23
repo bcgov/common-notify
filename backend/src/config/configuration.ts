@@ -61,11 +61,6 @@ export default () => {
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
     },
 
-    // GC Notify
-    gcNotify: {
-      baseUrl: process.env.GC_NOTIFY_BASE_URL,
-    },
-
     // Notification events
     events: {
       // The only domain an event may send from. Tenant settings store a local part and append

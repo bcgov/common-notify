@@ -1,32 +1,53 @@
 import { IsArray, IsOptional, IsUUID, IsObject, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsValidDateString } from './validators/date-string.validator'
+import { ApiExtraModels, ApiPropertyOptional, ApiSchema, getSchemaPath } from '@nestjs/swagger'
+import { IsFutureDateString } from './validators/date-string.validator'
+import { ApiOneOf, ApiOneOfOptional } from './api-one-of.decorator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { NotifyAttachment } from './notify-attachment'
-import { NotifySmsRecipients } from './notify-sms-recipients'
+import {
+  NotifySmsAddressRecipients,
+  NotifySmsMergeRecipients,
+  NotifySmsRecipients,
+} from './notify-sms-recipients'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
-import { NotifyContent } from './notify-content'
+import { NotifySmsContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
 
+@ApiSchema({
+  description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
+})
 @ValidateTemplateOrRenderer()
+@ApiExtraModels(
+  NotifySmsAddressRecipients,
+  NotifySmsMergeRecipients,
+  NotifyTemplateContent,
+  NotifySmsInlineContent,
+)
 export class NotifySmsChannel {
-  @ApiProperty({
-    type: NotifySmsRecipients,
-    description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send',
+  // Mirrors ValidateRecipientsOrMerge exactly; the keywords that make the branches mutually
+  // exclusive are in schema-constraints.ts - see NotifyEmailChannel.
+  @ApiOneOf({
+    oneOf: [
+      { $ref: getSchemaPath(NotifySmsAddressRecipients) },
+      { $ref: getSchemaPath(NotifySmsMergeRecipients) },
+    ],
   })
   @ValidateNested()
   @ValidateRecipientsOrMerge()
   @Type(() => NotifySmsRecipients)
   recipients: NotifySmsRecipients
 
-  @ApiPropertyOptional({
-    type: NotifyContent,
-    description: 'SMS content (body, renderer, encoding, etc.)',
+  // Mirrors the two constraints that actually run - see NotifyEmailChannel.
+  @ApiOneOfOptional({
+    oneOf: [
+      { $ref: getSchemaPath(NotifyTemplateContent) },
+      { $ref: getSchemaPath(NotifySmsInlineContent) },
+    ],
   })
   @IsOptional()
   @ValidateNested()
-  @Type(() => NotifyContent)
-  content?: NotifyContent
+  @Type(() => NotifySmsContent)
+  content?: NotifySmsContent
 
   @ApiPropertyOptional({ type: [NotifyAttachment] })
   @IsOptional()
@@ -37,12 +58,16 @@ export class NotifySmsChannel {
 
   @ApiPropertyOptional({
     description:
-      'Hold the message until this time. Omit to send as soon as possible. Accepts ISO 8601 and ' +
-      'other common date formats.',
-    example: '2026-06-01T16:00:00Z',
+      'Hold the message until this time. Omit to send as soon as possible. ' +
+      '**A timezone is required.** Use a `Z` suffix (`2026-06-01T16:00:00Z`), a numeric offset ' +
+      'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
+      'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
+      'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
+      'compact offset (`-0700`) are all rejected. A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsValidDateString()
+  @IsFutureDateString()
   delayedSend?: string
 
   @ApiPropertyOptional({

@@ -19,6 +19,7 @@ import {
 import Bull from 'bull'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
+import { HtmlBodyTypeFeatureFlagGuard } from '../../common/guards/html-body-type-feature-flag.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { MailMergeUiLimitsGuard } from '../../common/guards/mail-merge-ui-limits.guard'
@@ -76,7 +77,7 @@ import {
 @ApiTags('Send')
 @ApiSecurity('api-key')
 @Controller('notifysimple')
-@UseGuards(NotifyServiceGuard)
+@UseGuards(NotifyServiceGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -118,8 +119,8 @@ export class NotifySimpleController {
             recipients: { to: ['citizen@example.com'] },
             content: {
               subject: 'Your permit application',
-              body: '<p>Hello {{firstName}}, your application has been received.</p>',
-              bodyType: 'html',
+              body: '# Hello {{firstName}}\n\nYour application has been received.',
+              bodyType: 'markdown',
               renderer: 'handlebars',
             },
           },
@@ -205,8 +206,8 @@ export class NotifySimpleController {
           recipients: { to: ['citizen@example.com'], bcc: ['records@example.com'] },
           content: {
             subject: 'Your permit application',
-            body: '<p>Your application has been received.</p>',
-            bodyType: 'html',
+            body: 'Your application has been received.',
+            bodyType: 'markdown',
           },
         },
       },
@@ -257,8 +258,8 @@ export class NotifySimpleController {
           },
           content: {
             subject: 'Permit {{permitNumber}}',
-            body: '<p>Hello {{firstName}}, permit {{permitNumber}} is ready.</p>',
-            bodyType: 'html',
+            body: 'Hello {{firstName}}, permit {{permitNumber}} is ready.',
+            bodyType: 'markdown',
             renderer: 'handlebars',
           },
         },
@@ -566,7 +567,7 @@ export class NotifySimpleController {
 // Not part of the service API; kept out of the published spec.
 @ApiExcludeController()
 @Controller('frontend/notifysimple')
-@UseGuards(NotifyFrontendRoleGuard)
+@UseGuards(NotifyFrontendRoleGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleFrontendController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -675,6 +676,9 @@ export class NotifySimpleFrontendController {
   }
 }
 
+// Not implemented - every operation below returns 501 - so it is kept out of the published
+// spec until it does something. Remove this when the endpoints land.
+@ApiExcludeController()
 @Controller('notifyevent')
 @UseGuards(NotifyServiceGuard)
 export class NotifyEventController {

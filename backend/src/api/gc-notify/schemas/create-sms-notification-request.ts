@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
+import { IsFutureDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class CreateSmsNotificationRequest {
   @ApiProperty({
@@ -40,12 +41,15 @@ export class CreateSmsNotificationRequest {
   reference?: string
 
   @ApiPropertyOptional({
-    description: 'Hold the message until this time instead of sending immediately.',
-    format: 'date-time',
-    example: '2026-06-01T16:00:00Z',
+    description:
+      'Hold the message until this time instead of sending immediately. A timezone is required - ' +
+      'use a `Z` suffix or a numeric offset such as `-07:00`. A local time with no zone is ' +
+      'rejected rather than guessed at.',
+    format: 'date-time A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsString()
+  @IsFutureDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({

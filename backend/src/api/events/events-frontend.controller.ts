@@ -12,7 +12,14 @@ import {
   UseGuards,
   Version,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiExcludeController,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
 import * as express from 'express'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
@@ -46,6 +53,9 @@ const EVENT_CHANNEL_CODES = [NotificationChannel.EMAIL, NotificationChannel.SMS]
  *
  * Gated by a feature flag for now.
  */
+// Browser surface, and the feature is still experimental. Drop the exclusion when events are
+// ready to be part of the published API.
+@ApiExcludeController()
 @ApiTags('events')
 @Controller('frontend/events')
 @UseGuards(NotifyFrontendRoleGuard, FeatureFlagGuard)

@@ -32,9 +32,7 @@ export class NotificationResponse {
   })
   uri: string
 
-  @ApiProperty({
-    description: 'Template information',
-  })
+  @ApiProperty({ type: NotificationTemplate })
   template: NotificationTemplate
 
   @ApiPropertyOptional({
