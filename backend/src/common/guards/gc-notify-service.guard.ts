@@ -28,7 +28,7 @@ import {
  * Additionally validates the literal `Authorization: ApiKey-v1 {key}` header GC
  * Notify clients send (the real GC Notify auth scheme), so a client that authenticates
  * the way GC Notify taught it gets a clear error rather than a confusing one. The value
- * itself is not retained: nothing forwards upstream any more.
+ * itself is not retained: nothing forwards upstream any more
  */
 @Injectable()
 export class GcNotifyServiceGuard implements CanActivate {
