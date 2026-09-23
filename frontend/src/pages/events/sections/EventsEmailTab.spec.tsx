@@ -580,6 +580,21 @@ describe('EventsEmailTab', () => {
       )
     })
 
+    it('reports an incomplete form instead of saving it', async () => {
+      const { onSave } = renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.clear(senderField())
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith(
+          'Required fields missing',
+          'Settings not saved. Complete all required fields before saving.',
+        ),
+      )
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
     it('reports a failed save without clearing the form', async () => {
       const onSave = vi.fn().mockRejectedValue(new Error('Template belongs to another tenant'))
       renderTab({ values: savedAndActive, isConfigured: true, onSave })

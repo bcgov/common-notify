@@ -259,6 +259,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     // Only an active channel has to be complete, matching what the backend enforces.
     if (hasValidationError || (channelActive && isIncomplete)) {
       setValidationAttempted(true)
+      showErrorToast(
+        'Required fields missing',
+        'Settings not saved. Complete all required fields before saving.',
+      )
       return
     }
 
