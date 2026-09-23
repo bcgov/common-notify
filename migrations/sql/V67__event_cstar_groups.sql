@@ -1,4 +1,4 @@
--- V65: CSTAR group recipients on an event's email channel.
+-- V67: CSTAR group recipients on an event's email channel.
 --
 -- The Email settings tab can address a notification to CSTAR groups rather than (or as well as)
 -- typed-in addresses. Only the group IDs are stored here; the members and their email addresses
