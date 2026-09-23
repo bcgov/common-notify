@@ -214,7 +214,12 @@ export class EventsFrontendController {
   ): Promise<EventResponseDto> {
     const tenant = this.getTenant(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.eventsService.updateEmailChannelSetting(tenant.id, eventId, updateDto, user)
+    // externalId, not id: the CSTAR context is what validates any submitted group IDs against
+    // the tenant's own groups, and CSTAR knows the tenant by its external ID.
+    return this.eventsService.updateEmailChannelSetting(tenant.id, eventId, updateDto, user, {
+      tenantId: tenant.externalId,
+      authHeader: req.headers.authorization,
+    })
   }
 
   /**

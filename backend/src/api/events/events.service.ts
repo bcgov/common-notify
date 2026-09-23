@@ -12,6 +12,7 @@ import type { EntityManager } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
+import { EventChannelCstarGroup } from './entities/event-channel-cstar-group.entity'
 import { CreateEventDto } from './schemas/create-event.dto'
 import { UpdateEventDto } from './schemas/update-event.dto'
 import { UpdateEmailChannelSettingDto } from './schemas/update-email-channel-setting.dto'
@@ -45,6 +46,12 @@ export interface DerivedEventFilters {
 interface DesiredRecipient {
   kind: EventRecipientKind
   address: string
+}
+
+/** A CSTAR group as the tab submitted it, ready to store. One list may hold many. */
+interface DesiredCstarGroup {
+  kind: EventRecipientKind
+  cstarGroupId: string
 }
 
 /**
@@ -293,6 +300,7 @@ export class EventsService {
     eventId: string,
     updateDto: UpdateEmailChannelSettingDto,
     userId: string = 'system',
+    cstar?: CstarRequestContext,
   ): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
     const senderEmail = updateDto.senderEmail?.trim() || null
@@ -301,6 +309,20 @@ export class EventsService {
       ...this.toRecipients(EventRecipientKind.TO, this.normalizeEmailAddresses(updateDto.to)),
       ...this.toRecipients(EventRecipientKind.CC, this.normalizeEmailAddresses(updateDto.cc)),
       ...this.toRecipients(EventRecipientKind.BCC, this.normalizeEmailAddresses(updateDto.bcc)),
+    ]
+    const cstarGroups = [
+      ...this.toCstarGroups(
+        EventRecipientKind.TO,
+        this.normalizeCstarGroupIds(updateDto.cstarGroupIdsTo),
+      ),
+      ...this.toCstarGroups(
+        EventRecipientKind.CC,
+        this.normalizeCstarGroupIds(updateDto.cstarGroupIdsCc),
+      ),
+      ...this.toCstarGroups(
+        EventRecipientKind.BCC,
+        this.normalizeCstarGroupIds(updateDto.cstarGroupIdsBcc),
+      ),
     ]
     // When useCustomHeader is false the header columns stay null and inherit from tenant_settings
     // at render time, so a tenant default title added there later needs no change here.
@@ -319,7 +341,10 @@ export class EventsService {
 
     this.assertPermittedSenderDomain(senderEmail)
     await this.assertTemplateUsable(tenantId, templateId, NotificationChannel.EMAIL)
+    // Groups are deliberately absent from the cap: how many people a group stands for is only
+    // known once CSTAR resolves it, which is the send path's job, not this save's.
     await this.assertWithinRecipientCap('email', recipients.length)
+    await this.assertCstarGroupsBelongToTenant(cstarGroups, cstar)
 
     const setting = this.findOrCreateEmailSetting(event, userId)
 
@@ -327,9 +352,12 @@ export class EventsService {
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. The recipient half is only enforced here, since the constraint
     // cannot see the recipient table. An inactive channel can be saved half-filled.
-    if (updateDto.active && (!senderEmail || !this.hasToRecipient(recipients) || !templateId)) {
+    if (
+      updateDto.active &&
+      (!senderEmail || !this.hasToRecipient(recipients, cstarGroups) || !templateId)
+    ) {
       throw new BadRequestException(
-        'The email channel cannot be activated until a sender email address, at least one recipient, and a template are set',
+        'The email channel cannot be activated until a sender email address, at least one recipient (an address or a CSTAR group), and a template are set',
       )
     }
 
@@ -342,7 +370,7 @@ export class EventsService {
     setting.isDeleted = false
     setting.updatedBy = userId
 
-    await this.saveWithRecipients(setting, recipients, userId)
+    await this.saveWithRecipients(setting, recipients, userId, cstarGroups)
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)
@@ -510,10 +538,12 @@ export class EventsService {
     setting: EventChannelSetting,
     recipients: DesiredRecipient[],
     userId: string,
+    cstarGroups: DesiredCstarGroup[] = [],
   ): Promise<void> {
     await this.eventRepository.manager.transaction(async (manager) => {
       const saved = await manager.save(EventChannelSetting, setting)
       await this.syncRecipients(manager, saved, recipients, userId)
+      await this.syncCstarGroups(manager, saved, cstarGroups, userId)
     })
   }
 
@@ -579,12 +609,74 @@ export class EventsService {
   }
 
   /**
-   * Load an event with its channel settings and their recipients, or throw
+   * Bring a channel's stored CSTAR groups in line with what the tab submitted.
+   *
+   * The same diff as syncRecipients, keyed on (kind, group) instead of (kind, address), and for
+   * the same reasons: removals are soft deletes so event_channel_cstar_group_history keeps which
+   * groups were taken off an event, and a group that comes back revives its own row rather than
+   * inserting a second one, since uq_event_channel_cstar_group_active only covers live rows.
+   *
+   * A field's groups are a set, not a single value, so this adds and removes within a list
+   * rather than replacing it.
+   */
+  private async syncCstarGroups(
+    manager: EntityManager,
+    setting: EventChannelSetting,
+    desired: DesiredCstarGroup[],
+    userId: string,
+  ): Promise<void> {
+    const existing = await manager.find(EventChannelCstarGroup, {
+      where: { channelSettingId: setting.id },
+    })
+    const identity = (kind: EventRecipientKind, cstarGroupId: string) => `${kind}:${cstarGroupId}`
+    const desiredKeys = new Set(desired.map((group) => identity(group.kind, group.cstarGroupId)))
+    const changed: EventChannelCstarGroup[] = []
+
+    for (const row of existing) {
+      if (!row.isDeleted && !desiredKeys.has(identity(row.kind, row.cstarGroupId))) {
+        row.isDeleted = true
+        row.updatedBy = userId
+        changed.push(row)
+      }
+    }
+
+    for (const group of desired) {
+      const row = existing.find(
+        (candidate) =>
+          identity(candidate.kind, candidate.cstarGroupId) ===
+          identity(group.kind, group.cstarGroupId),
+      )
+
+      if (!row) {
+        changed.push(
+          manager.create(EventChannelCstarGroup, {
+            channelSettingId: setting.id,
+            channelCode: setting.channelCode,
+            kind: group.kind,
+            cstarGroupId: group.cstarGroupId,
+            createdBy: userId,
+            updatedBy: userId,
+          }),
+        )
+      } else if (row.isDeleted) {
+        row.isDeleted = false
+        row.updatedBy = userId
+        changed.push(row)
+      }
+    }
+
+    if (changed.length > 0) {
+      await manager.save(EventChannelCstarGroup, changed)
+    }
+  }
+
+  /**
+   * Load an event with its channel settings, their recipients and their CSTAR groups, or throw
    */
   private async findEvent(tenantId: string, eventId: string): Promise<NotifyEvent> {
     const event = await this.eventRepository.findOne({
       where: { id: eventId, tenantId, isDeleted: false },
-      relations: ['channelSettings', 'channelSettings.recipients'],
+      relations: ['channelSettings', 'channelSettings.recipients', 'channelSettings.cstarGroups'],
     })
 
     if (!event) {
@@ -663,6 +755,9 @@ export class EventsService {
             to: this.addressesOfKind(emailSetting, EventRecipientKind.TO),
             cc: this.addressesOfKind(emailSetting, EventRecipientKind.CC),
             bcc: this.addressesOfKind(emailSetting, EventRecipientKind.BCC),
+            cstarGroupIdsTo: this.groupIdsOfKind(emailSetting, EventRecipientKind.TO),
+            cstarGroupIdsCc: this.groupIdsOfKind(emailSetting, EventRecipientKind.CC),
+            cstarGroupIdsBcc: this.groupIdsOfKind(emailSetting, EventRecipientKind.BCC),
             useCustomHeader: emailSetting.useCustomHeader,
             headerLogoId: emailSetting.headerLogoId,
             headerTitle: emailSetting.headerTitle,
@@ -701,13 +796,55 @@ export class EventsService {
       .map((recipient) => recipient.address)
   }
 
+  /**
+   * A channel's live CSTAR group IDs for one list (to/cc/bcc). A list can address any number of
+   * groups, so this is a set rather than a single value.
+   */
+  private groupIdsOfKind(setting: EventChannelSetting, kind: EventRecipientKind): string[] {
+    return (setting.cstarGroups ?? [])
+      .filter((group) => !group.isDeleted && group.kind === kind)
+      .map((group) => group.cstarGroupId)
+  }
+
   /** Pairs each address with the list it belongs to. */
   private toRecipients(kind: EventRecipientKind, addresses: string[]): DesiredRecipient[] {
     return addresses.map((address) => ({ kind, address }))
   }
 
-  private hasToRecipient(recipients: DesiredRecipient[]): boolean {
-    return recipients.some((recipient) => recipient.kind === EventRecipientKind.TO)
+  /** Pairs each CSTAR group with the list it belongs to. */
+  private toCstarGroups(kind: EventRecipientKind, groupIds: string[]): DesiredCstarGroup[] {
+    return groupIds.map((cstarGroupId) => ({ kind, cstarGroupId }))
+  }
+
+  /**
+   * Drops blanks and duplicates from a submitted group list.
+   *
+   * Deduplicated for the same reason addresses are: one group listed twice in a field must not
+   * become two rows, which uq_event_channel_cstar_group_active would reject outright. Groups
+   * repeated across *different* fields are left alone - that is allowed, exactly as it is for
+   * addresses. Overlapping membership between two different groups is not this method's
+   * concern: the rows record which groups were chosen, and collapsing the people behind them
+   * is the send path's job.
+   */
+  private normalizeCstarGroupIds(groupIds?: string[]): string[] {
+    if (!groupIds?.length) return []
+
+    return [...new Set(groupIds.map((groupId) => groupId.trim()).filter((groupId) => !!groupId))]
+  }
+
+  /**
+   * Whether the submitted settings address anyone in the "to" list - a typed-in address or a
+   * CSTAR group. Either is a complete recipient choice on its own. CC/BCC do not count, for
+   * groups as for addresses.
+   */
+  private hasToRecipient(
+    recipients: DesiredRecipient[],
+    cstarGroups: DesiredCstarGroup[] = [],
+  ): boolean {
+    return (
+      recipients.some((recipient) => recipient.kind === EventRecipientKind.TO) ||
+      cstarGroups.some((group) => group.kind === EventRecipientKind.TO)
+    )
   }
 
   /**
@@ -745,6 +882,44 @@ export class EventsService {
           .filter((address): address is string => !!address),
       ),
     ]
+  }
+
+  /**
+   * Rejects a CSTAR group the event's tenant does not own.
+   *
+   * cstar_group_id is not a foreign key - groups live in CSTAR and have no table here - so this
+   * is the only thing standing between a save and an event quietly addressing another tenant's
+   * group. Checked against the same listing the picker is populated from (listCstarGroups), so
+   * an ID the UI could offer is an ID that passes here.
+   *
+   * One CSTAR call per save, and only when groups were actually submitted: an event saved with
+   * typed-in addresses alone never reaches CSTAR.
+   */
+  private async assertCstarGroupsBelongToTenant(
+    cstarGroups: DesiredCstarGroup[],
+    cstar?: CstarRequestContext,
+  ): Promise<void> {
+    if (cstarGroups.length === 0) return
+
+    if (!cstar) {
+      throw new BadRequestException(
+        'CSTAR group recipients cannot be saved without a CSTAR tenant context',
+      )
+    }
+
+    const tenantGroups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    const permitted = new Set(tenantGroups.map((group) => group.id))
+    const unknown = [
+      ...new Set(
+        cstarGroups.map((group) => group.cstarGroupId).filter((groupId) => !permitted.has(groupId)),
+      ),
+    ]
+
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `CSTAR group(s) ${unknown.join(', ')} do not belong to this tenant`,
+      )
+    }
   }
 
   /**
