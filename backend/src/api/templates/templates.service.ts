@@ -411,6 +411,8 @@ export class TemplatesService {
     switch (engine) {
       case TemplateEngine.LEGACY_GC_NOTIFY:
         return 'legacy_gc_notify'
+      case TemplateEngine.GC_NOTIFY_NATIVE:
+        return 'gc_notify_native'
       case TemplateEngine.HANDLEBARS:
         return 'handlebars'
       case TemplateEngine.MUSTACHE:

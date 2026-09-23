@@ -6,7 +6,7 @@ import {
   ArrayMinSize,
   ValidationArguments,
 } from 'class-validator'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiSchema, ApiPropertyOptional, PickType } from '@nestjs/swagger'
 import { IsNormalizablePhoneNumber } from './validators/normalizable-phone-number.validator'
 import { PhoneNumberService } from '../services/phone-number.service'
 import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
@@ -26,6 +26,9 @@ function e164RecipientMessage(args: ValidationArguments): string {
   return `${invalidRecipients.join(', ')} is not a valid phone number`
 }
 
+@ApiSchema({
+  description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send.',
+})
 export class NotifySmsRecipients {
   @ApiPropertyOptional({
     type: [String],
@@ -43,6 +46,8 @@ export class NotifySmsRecipients {
   to?: string[]
 
   @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'array', items: { type: 'string' } },
     description:
       'Mail-merge rows. The first row is the header and its first column must be "to" (the recipient phone number); each following row is one recipient. Extra columns become that recipient\'s template params, so every recipient can receive a different message. Mutually exclusive with "to".',
     example: [
@@ -57,3 +62,22 @@ export class NotifySmsRecipients {
   @IsValidMergeArray()
   mergeArray?: string[][]
 }
+
+/**
+ * The two shapes `recipients` may take, for documentation only - see the email equivalents. The
+ * runtime DTO stays NotifySmsRecipients, with ValidateRecipientsOrMerge enforcing the choice.
+ */
+@ApiSchema({
+  name: 'SmsRecipients',
+  description: 'Address the message directly. Mutually exclusive with a mail-merge send.',
+})
+export class NotifySmsAddressRecipients extends PickType(NotifySmsRecipients, ['to'] as const) {}
+
+@ApiSchema({
+  name: 'SmsMailMerge',
+  description:
+    'Mail-merge: one message per row, personalised from the row. Mutually exclusive with to.',
+})
+export class NotifySmsMergeRecipients extends PickType(NotifySmsRecipients, [
+  'mergeArray',
+] as const) {}

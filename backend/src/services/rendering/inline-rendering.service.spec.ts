@@ -586,6 +586,101 @@ describe('InlineRenderingService', () => {
     })
   })
 
+  describe('html body sanitisation', () => {
+    let realService: InlineRenderingService
+
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [RenderingModule],
+      }).compile()
+
+      realService = module.get<InlineRenderingService>(InlineRenderingService)
+    })
+
+    // The boundary sanitiser on NotifyContent.body has already run by the time content reaches
+    // this service, so every body below is one it would have passed: the dangerous markup only
+    // exists once a personalisation value has been substituted into it.
+
+    it('strips markup a handlebars triple-stache injected into an html body', async () => {
+      const rendered = await realService.renderEmail(
+        { body: '<p>{{{block}}}</p>', bodyType: 'html', renderer: 'handlebars' },
+        {
+          block:
+            '<iframe src="https://evil.example"></iframe><div style="display:none">hidden</div>',
+        },
+      )
+
+      expect(rendered.body).not.toContain('<iframe')
+      expect(rendered.body).not.toContain('display:none')
+      // The text stays; only the means of hiding it from the reader is removed.
+      expect(rendered.body).toContain('hidden')
+    })
+
+    it('strips markup the legacy engine injected, which escapes no placeholder at all', async () => {
+      const rendered = await realService.renderEmail(
+        { body: '<p>((block))</p>', bodyType: 'html', renderer: 'legacy_gc_notify' },
+        { block: '<a href="javascript:alert(1)">Click</a>' },
+      )
+
+      expect(rendered.body).not.toContain('javascript:')
+      expect(rendered.body).toContain('Click')
+    })
+
+    it('keeps the formatting an html email is written with', async () => {
+      const body =
+        '<table width="100%"><tr><td style="padding:16px;color:#234075">' +
+        '<img src="https://x.ca/a.png" width="240" alt="A">' +
+        '<a href="https://x.ca">link</a></td></tr></table>'
+
+      const rendered = await realService.renderEmail(
+        { body, bodyType: 'html', renderer: 'handlebars' },
+        {},
+      )
+
+      expect(rendered.body).toContain('src="https://x.ca/a.png"')
+      expect(rendered.body).toContain('padding:16px')
+      expect(rendered.body).toContain('href="https://x.ca"')
+      expect(rendered.body).toContain('width="100%"')
+    })
+
+    it('leaves an escaped value escaped rather than double-escaping it', async () => {
+      const rendered = await realService.renderEmail(
+        { body: '<p>{{name}}</p>', bodyType: 'html', renderer: 'handlebars' },
+        { name: 'Bob & Co <tag>' },
+      )
+
+      expect(rendered.body).toContain('Bob &amp; Co &lt;tag&gt;')
+      expect(rendered.body).not.toContain('&amp;amp;')
+    })
+
+    it('does not touch a markdown body, which markdown-it neutralises later', async () => {
+      const rendered = await realService.renderEmail(
+        {
+          body: 'Hi {{name}}\n\n<iframe src="https://evil.example"></iframe>',
+          bodyType: 'markdown',
+          renderer: 'handlebars',
+        },
+        { name: 'Alice' },
+      )
+
+      expect(rendered.body).toContain('<iframe')
+    })
+
+    it('does not sanitise the subject, which is header text rather than html', async () => {
+      const rendered = await realService.renderEmail(
+        {
+          subject: 'Re: {{{tag}}}',
+          body: '<p>x</p>',
+          bodyType: 'html',
+          renderer: 'handlebars',
+        },
+        { tag: '<b>x</b>' },
+      )
+
+      expect(rendered.subject).toBe('Re: <b>x</b>')
+    })
+  })
+
   describe('MJML integration', () => {
     let realService: InlineRenderingService
 

@@ -11,6 +11,7 @@ import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
 import { JwtGuard } from './common/guards/auth.jwt-guard'
+import { applyNotifySchemaConstraints } from './api/notify/schemas/schema-constraints'
 
 /**
  *
@@ -129,7 +130,6 @@ export async function bootstrap() {
       ].join('\n'),
     )
     .setVersion('1.0')
-    .addBearerAuth()
     .addApiKey(
       {
         type: 'apiKey',
@@ -153,12 +153,10 @@ export async function bootstrap() {
     .addTag('Notification status', 'Find out what happened to a notification')
     .addTag('Templates', 'Reusable message content')
     .addTag('Webhooks', 'Be called when a notification changes state')
-    .addTag('Reference data', 'Code tables for statuses, channels and event types')
-    .addTag('API keys', 'Bind an API key to a tenant')
     .addTag('Service', 'Availability')
     .build()
 
-  const document = SwaggerModule.createDocument(app, config)
+  const document = applyNotifySchemaConstraints(SwaggerModule.createDocument(app, config))
   SwaggerModule.setup('/api/docs', app, document)
   return app
 }

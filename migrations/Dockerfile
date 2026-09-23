@@ -10,5 +10,4 @@ USER app
 
 # Health check and startup
 HEALTHCHECK CMD info
-# Adding repair to see if it fixes migration issues.
-CMD ["info", "migrate", "repair"] 
+CMD ["info", "migrate"] 
