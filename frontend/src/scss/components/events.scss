@@ -94,6 +94,11 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+
+  // Padding belongs to the switch control only, not to the field label above it.
+  .bcds-react-aria-Switch {
+    padding: $spacing-sm;
+  }
 }
 
 // Additional recipients section
