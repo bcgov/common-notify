@@ -11,7 +11,7 @@ import {
   NotifyEmailMergeRecipients,
   NotifyEmailRecipients,
 } from './notify-email-recipients'
-import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './notify-content'
+import { NotifyContent, NotifyEmailInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
   description:
@@ -22,29 +22,18 @@ import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './not
   NotifyEmailAddressRecipients,
   NotifyEmailMergeRecipients,
   NotifyTemplateContent,
-  NotifyInlineContent,
+  NotifyEmailInlineContent,
 )
 export class NotifyEmailChannel {
   // Exactly one of the two forms, which is what ValidateRecipientsOrMerge enforces at runtime.
   // The transform target stays the combined class: class-transformer has no discriminator to pick
   // between them, and it does not need one - the validator rejects anything that is not one shape
-  // or the other.
-  // The published schema mirrors ValidateRecipientsOrMerge exactly: one of the two shapes, never
-  // both, never neither. Both branches are all-optional objects on their own, so each carries the
-  // required/not constraints that make them mutually exclusive - without those, every payload
-  // matches both branches and "exactly one" can never hold.
+  // or the other. The keywords that make the branches mutually exclusive are in
+  // schema-constraints.ts, so each branch stays a bare $ref that Swagger UI labels by name.
   @ApiOneOf({
     oneOf: [
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyEmailAddressRecipients) }],
-        anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }],
-        not: { required: ['mergeArray'] },
-      },
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyEmailMergeRecipients) }],
-        required: ['mergeArray'],
-        not: { anyOf: [{ required: ['to'] }, { required: ['cc'] }, { required: ['bcc'] }] },
-      },
+      { $ref: getSchemaPath(NotifyEmailAddressRecipients) },
+      { $ref: getSchemaPath(NotifyEmailMergeRecipients) },
     ],
   })
   @ValidateNested()
@@ -58,23 +47,8 @@ export class NotifyEmailChannel {
   // *some* channel renders something - so the inline branch deliberately requires nothing.
   @ApiOneOfOptional({
     oneOf: [
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
-        required: ['templateId'],
-        not: {
-          anyOf: [
-            { required: ['subject'] },
-            { required: ['body'] },
-            { required: ['renderer'] },
-            { required: ['bodyType'] },
-            { required: ['encoding'] },
-          ],
-        },
-      },
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyInlineContent) }],
-        not: { required: ['templateId'] },
-      },
+      { $ref: getSchemaPath(NotifyTemplateContent) },
+      { $ref: getSchemaPath(NotifyEmailInlineContent) },
     ],
   })
   @IsOptional()

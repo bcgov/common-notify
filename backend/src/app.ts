@@ -11,6 +11,7 @@ import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
 import { JwtGuard } from './common/guards/auth.jwt-guard'
+import { applyNotifySchemaConstraints } from './api/notify/schemas/schema-constraints'
 
 /**
  *
@@ -155,7 +156,7 @@ export async function bootstrap() {
     .addTag('Service', 'Availability')
     .build()
 
-  const document = SwaggerModule.createDocument(app, config)
+  const document = applyNotifySchemaConstraints(SwaggerModule.createDocument(app, config))
   SwaggerModule.setup('/api/docs', app, document)
   return app
 }

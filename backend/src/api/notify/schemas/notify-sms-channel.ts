@@ -11,7 +11,7 @@ import {
   NotifySmsRecipients,
 } from './notify-sms-recipients'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
-import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './notify-content'
+import { NotifyContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
   description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
@@ -21,23 +21,15 @@ import { NotifyContent, NotifyInlineContent, NotifyTemplateContent } from './not
   NotifySmsAddressRecipients,
   NotifySmsMergeRecipients,
   NotifyTemplateContent,
-  NotifyInlineContent,
+  NotifySmsInlineContent,
 )
 export class NotifySmsChannel {
-  // Mirrors ValidateRecipientsOrMerge exactly - see NotifyEmailChannel for why each branch needs
-  // its own required/not constraints.
+  // Mirrors ValidateRecipientsOrMerge exactly; the keywords that make the branches mutually
+  // exclusive are in schema-constraints.ts - see NotifyEmailChannel.
   @ApiOneOf({
     oneOf: [
-      {
-        allOf: [{ $ref: getSchemaPath(NotifySmsAddressRecipients) }],
-        required: ['to'],
-        not: { required: ['mergeArray'] },
-      },
-      {
-        allOf: [{ $ref: getSchemaPath(NotifySmsMergeRecipients) }],
-        required: ['mergeArray'],
-        not: { required: ['to'] },
-      },
+      { $ref: getSchemaPath(NotifySmsAddressRecipients) },
+      { $ref: getSchemaPath(NotifySmsMergeRecipients) },
     ],
   })
   @ValidateNested()
@@ -48,23 +40,8 @@ export class NotifySmsChannel {
   // Mirrors the two constraints that actually run - see NotifyEmailChannel.
   @ApiOneOfOptional({
     oneOf: [
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyTemplateContent) }],
-        required: ['templateId'],
-        not: {
-          anyOf: [
-            { required: ['subject'] },
-            { required: ['body'] },
-            { required: ['renderer'] },
-            { required: ['bodyType'] },
-            { required: ['encoding'] },
-          ],
-        },
-      },
-      {
-        allOf: [{ $ref: getSchemaPath(NotifyInlineContent) }],
-        not: { required: ['templateId'] },
-      },
+      { $ref: getSchemaPath(NotifyTemplateContent) },
+      { $ref: getSchemaPath(NotifySmsInlineContent) },
     ],
   })
   @IsOptional()

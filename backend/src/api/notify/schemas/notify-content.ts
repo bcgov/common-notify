@@ -79,9 +79,10 @@ export class NotifyContent {
 }
 
 /**
- * The two shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
+ * The shapes `content` may take, for documentation only. The runtime DTO stays NotifyContent;
  * the choice is enforced by TemplateOrContentConstraint (templateId never alongside subject/body)
  * and TemplateOrRendererConstraint (templateId never alongside renderer, bodyType or encoding).
+ * The keywords that make the shapes mutually exclusive live in schema-constraints.ts.
  *
  * The template branch is templateId and nothing else: a stored template carries its own body type
  * and renderer, and there is nothing left for the request to say about how it renders.
@@ -93,13 +94,26 @@ export class NotifyContent {
 export class NotifyTemplateContent extends PickType(NotifyContent, ['templateId'] as const) {}
 
 @ApiSchema({
-  name: 'InlineContent',
-  description: 'Supply the message inline, optionally naming a renderer for the placeholders.',
+  name: 'EmailInlineContent',
+  description: 'Supply the email inline, optionally naming a renderer for the placeholders.',
 })
-export class NotifyInlineContent extends PickType(NotifyContent, [
+export class NotifyEmailInlineContent extends PickType(NotifyContent, [
   'subject',
   'body',
   'bodyType',
   'renderer',
   'encoding',
+] as const) {}
+
+// SMS inline rendering reads only body and renderer. The DTO still accepts subject and bodyType
+// on an SMS channel, so they are left out of this schema rather than forbidden by it.
+@ApiSchema({
+  name: 'SmsInlineContent',
+  description:
+    'Supply the SMS inline, optionally naming a renderer for the placeholders. SMS is plain ' +
+    'text: a subject or bodyType is accepted but has no effect.',
+})
+export class NotifySmsInlineContent extends PickType(NotifyContent, [
+  'body',
+  'renderer',
 ] as const) {}
