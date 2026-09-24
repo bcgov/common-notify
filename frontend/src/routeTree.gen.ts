@@ -25,6 +25,7 @@ import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as EventsEventIdIndexRouteImport } from './routes/events/$eventId/index'
 import { Route as EventsEventIdSavedRouteImport } from './routes/events/$eventId/saved'
+import { Route as EventsEventIdEmailTestSendRouteImport } from './routes/events/$eventId/email-test-send'
 
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
@@ -107,6 +108,12 @@ const EventsEventIdSavedRoute = EventsEventIdSavedRouteImport.update({
   path: '/events/$eventId/saved',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsEventIdEmailTestSendRoute =
+  EventsEventIdEmailTestSendRouteImport.update({
+    id: '/events/$eventId/email-test-send',
+    path: '/events/$eventId/email-test-send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
 }
@@ -141,6 +149,7 @@ export interface FileRoutesByTo {
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/bulk-notifications': typeof BulkNotificationsIndexRoute
   '/events': typeof EventsIndexRoute
+  '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
   '/events/$eventId': typeof EventsEventIdIndexRoute
 }
@@ -160,6 +169,7 @@ export interface FileRoutesById {
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
 }
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/template-edit/$templateId'
     | '/bulk-notifications/'
     | '/events/'
+    | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
     | '/events/$eventId/'
   fileRoutesByTo: FileRoutesByTo
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/template-edit/$templateId'
     | '/bulk-notifications'
     | '/events'
+    | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
     | '/events/$eventId'
   id:
@@ -216,6 +228,7 @@ export interface FileRouteTypes {
     | '/template-edit/$templateId'
     | '/bulk-notifications/'
     | '/events/'
+    | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
     | '/events/$eventId/'
   fileRoutesById: FileRoutesById
@@ -235,6 +248,7 @@ export interface RootRouteChildren {
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
   BulkNotificationsIndexRoute: typeof BulkNotificationsIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
+  EventsEventIdEmailTestSendRoute: typeof EventsEventIdEmailTestSendRoute
   EventsEventIdSavedRoute: typeof EventsEventIdSavedRoute
   EventsEventIdIndexRoute: typeof EventsEventIdIndexRoute
 }
@@ -353,6 +367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsEventIdSavedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events/$eventId/email-test-send': {
+      id: '/events/$eventId/email-test-send'
+      path: '/events/$eventId/email-test-send'
+      fullPath: '/events/$eventId/email-test-send'
+      preLoaderRoute: typeof EventsEventIdEmailTestSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -372,6 +393,7 @@ const rootRouteChildren: RootRouteChildren = {
   TemplateEditTemplateIdRoute: TemplateEditTemplateIdRoute,
   BulkNotificationsIndexRoute: BulkNotificationsIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
+  EventsEventIdEmailTestSendRoute: EventsEventIdEmailTestSendRoute,
   EventsEventIdSavedRoute: EventsEventIdSavedRoute,
   EventsEventIdIndexRoute: EventsEventIdIndexRoute,
 }

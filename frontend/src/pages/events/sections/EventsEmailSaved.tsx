@@ -6,12 +6,12 @@ import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
 import EventTabs from '../components/EventTabs'
 import type { EventTab } from '../components/EventTabs'
+import EventEmailPreview from '../components/EventEmailPreview'
 import { getEventById } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
+import { useAppSelector } from '@/redux/hooks'
 import '@/scss/components/events.scss'
 
 interface EventsEmailSavedProps {
@@ -24,23 +24,10 @@ interface EventsEmailSavedProps {
  */
 const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
-  const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
-  const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-
-  // The header below is previewed from the tenant's logo, the same as on the email tab. Both
-  // thunks return early without a selected tenant, so they wait for one and re-run when it
-  // changes.
-  useEffect(() => {
-    if (!selectedTenantId) return
-
-    dispatch(fetchSettings())
-    dispatch(fetchApprovedEmailLogos())
-  }, [dispatch, selectedTenantId])
 
   // The page is landed on directly after a save and on a refresh, so it fetches the event
   // itself rather than being handed the settings it shows. Tenant-scoped, the same way the
@@ -89,13 +76,6 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
     }
   }, [templateId])
 
-  // A custom header shows its own logo and title; the tenant default shows the tenant's
-  // configured logo on its own.
-  const useCustomHeader = emailSettings?.useCustomHeader ?? false
-  const headerLogoId = useCustomHeader ? emailSettings?.headerLogoId : tenantEmailLogoId
-  const headerLogo = approvedLogos.find((logo) => logo.id === headerLogoId)
-  const headerTitle = useCustomHeader ? (emailSettings?.headerTitle ?? '') : ''
-
   function openTab(tab: EventTab) {
     navigate({ to: '/events/$eventId', params: { eventId }, search: { tab } })
   }
@@ -130,43 +110,19 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
               description="Your email settings are ready. Continue to select recipients and send a test notification to verify the content and formatting."
             />
 
-            {template && (
-              <div className="events__saved-preview">
-                <p className="events__saved-subject">
-                  <strong>Subject line:</strong> {template.subject}
-                </p>
-
-                {(headerLogo || headerTitle) && (
-                  <div className="events__header-preview-row">
-                    {headerLogo && (
-                      <img
-                        alt=""
-                        className="events__header-preview-logo"
-                        loading="lazy"
-                        src={headerLogo.imageUrl}
-                      />
-                    )}
-                    {headerTitle && (
-                      <span className="events__header-preview-title">{headerTitle}</span>
-                    )}
-                  </div>
-                )}
-                {/** TODO
-                 *   render the template using saved preview variables once
-                 *   the preview variables database table is added. For now
-                 *   the preview displays the raw template body.
-                 */}
-                <p className="events__saved-body">{template.body}</p>
-              </div>
-            )}
+            {template && <EventEmailPreview emailSettings={emailSettings} template={template} />}
 
             <StickyBar>
               <Button variant="secondary" type="button" onPress={() => openTab('email')}>
                 Edit settings
               </Button>
-              {/* The test notification screen isn't built yet, so this marks where it goes and
-                  stays disabled until there is something to navigate to. */}
-              <Button variant="primary" type="button" isDisabled>
+              <Button
+                variant="primary"
+                type="button"
+                onPress={() =>
+                  navigate({ to: '/events/$eventId/email-test-send', params: { eventId } })
+                }
+              >
                 Continue to test notification
               </Button>
             </StickyBar>

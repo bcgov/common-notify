@@ -199,7 +199,6 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-bottom: 16px;
   border-bottom: 1px solid $border-default;
 }
 
@@ -242,4 +241,45 @@
   font: var(--typography-regular-body);
   color: var(--typography-color-primary);
   white-space: pre-wrap;
+}
+
+// Test send page. The notification sits in a card of its own, under the addresses it will
+// be sent between.
+.events__preview-card {
+  padding: 24px;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+}
+
+.events__preview-envelope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.events__preview-envelope-line {
+  margin: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}
+
+// A heading and its help text belong together, closer than the 24px the section gives its
+// own children.
+.events__subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.events__subheading {
+  margin: 0;
+  font-size: $font-size-xl;
+  font-weight: 700;
+  color: $dark-text;
+}
+
+// Placeholder height for the review the test send page has yet to show - see the comment
+// on the element itself.
+.events__test-send-spacer {
+  min-height: 320px;
 }
