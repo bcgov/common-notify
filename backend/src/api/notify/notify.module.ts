@@ -29,6 +29,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { PhoneNumberService } from './services/phone-number.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { SafelistModule } from '../safelist/safelist.module'
 
@@ -57,6 +58,7 @@ import { SafelistModule } from '../safelist/safelist.module'
   providers: [
     NotifyPreviewInterceptor,
     NotifyPreviewService,
+    PhoneNumberService,
     NotifyService,
     NotifyFrontendRoleGuard,
     NotifyServiceGuard,

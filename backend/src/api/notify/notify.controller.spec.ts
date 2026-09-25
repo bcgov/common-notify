@@ -978,6 +978,28 @@ describe('Notify Controllers', () => {
       })
 
       describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        it.each(['', '?preview=false'])(
+          'keeps ordinary SMS sends unchanged with query %s',
+          async (query) => {
+            const body = {
+              sms: { recipients: { to: ['250 555 0123'] }, content: { body: 'Hello' } },
+            }
+            await request(app.getHttpServer())
+              .post(`/api/v1/notifysimple/sms${query}`)
+              .send(body)
+              .expect(202)
+              .expect((res) => {
+                expect(res.body.notifyId).toBeDefined()
+                expect(res.body.status).toBe('accepted')
+                expect(res.body.channels).toEqual(['sms'])
+                expect(res.body.sms).toBeUndefined()
+              })
+            expect(mockNotificationService.create).toHaveBeenCalled()
+            expect(mockIngestionQueue.add).toHaveBeenCalled()
+            expect(mockNotificationService.validateBusinessRules).toHaveBeenCalled()
+          },
+        )
+
         // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
         const validSmsMerge = {
           sms: {

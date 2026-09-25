@@ -100,14 +100,22 @@ export async function bootstrap() {
         '1. Ensure you have a tenant and an administrator has configured its Notify settings.',
         '2. Ask a tenant administrator to obtain an API key from the Notify UI.',
         '3. Add the key to the `X-API-KEY` header and send with `POST /api/v1/notifysimple` ' +
-          "(or the `/email` and `/sms` shorthands). SMS requires the tenant's `sms_notifications` feature flag.",
+          '(or the `/email` and `/sms` shorthands).',
         '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
+        '',
+        'SMS must be enabled for your tenant before you can send or preview SMS messages. ' +
+          'This is controlled by `sms_notifications`, a feature flag (an on/off setting for a capability). ' +
+          'Ask a Notify platform administrator with the `NOTIFY_ADMIN` role to enable it for your tenant ' +
+          'in the Notify UI under **Feature Flags**. The administrator can enable an existing tenant ' +
+          'entry or use **Create New Feature Flag**, select `sms_notifications` and your tenant, ' +
+          'and check **Enable this flag**. A tenant administrator role alone does not grant this permission.',
         '',
         '### Try it out from here',
         '',
         '1. Click **Authorize** and enter your API key in the `api-key` scheme.',
-        '2. Open `POST /api/v1/notifysimple/email` under **Send** and click **Try it out**.',
+        "2. Select an endpoint to test, let's say `POST /api/v1/notifysimple/email` under **Send**, " +
+          'and click **Try it out**.',
         '3. Choose **One message to several recipients** from the examples dropdown.',
         '4. Replace the example recipients with your own addresses and edit the subject and body.',
         '5. Set `preview` to `true` to render without sending, or omit it to send, then click **Execute**.',
@@ -142,10 +150,6 @@ export async function bootstrap() {
         'On `POST /api/v1/notifysimple` and `POST /api/v1/notifysimple/email`, use `preview`: ' +
           'set to true to enable a preview of what would be sent, including template rendering, ' +
           'parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
-        '',
-        'Preview returns rendered content and the submitted recipients, grouped by channel. ' +
-          'Recipients are echoed unchanged. Authentication, feature flags and request validation still apply. ' +
-          'Preview does not create notification requests, enqueue delivery, consume send limits or check safelists.',
         '',
         '### Feature availability',
         '',

@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import request from 'supertest'
 import { NotifySimpleController } from './notify.controller'
 import { NotifyPreviewService } from './services/notify-preview.service'
+import { PhoneNumberService } from './services/phone-number.service'
 import { TemplatesService } from '../templates/templates.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { EmailTemplateLayoutService } from '../templates/email-template-layout.service'
@@ -73,6 +74,7 @@ describe('Notify preview HTTP pipeline', () => {
       controllers: [NotifySimpleController],
       providers: [
         NotifyPreviewService,
+        PhoneNumberService,
         TemplatesService,
         { provide: TemplatesRepository, useValue: repository },
         { provide: EmailTemplateLayoutService, useValue: layout },
@@ -158,8 +160,9 @@ describe('Notify preview HTTP pipeline', () => {
     }).expect(200)
     expect(response.body.email.content.body).toBe('Welcome Alice')
     expect(response.body.sms).toEqual({
-      recipients: channel.recipients,
+      recipients: { to: ['+12505550123'] },
       content: { body: 'Hi Shared' },
+      segmentsPerRecipient: 1,
     })
     expect(response.body.msgApp.content.body).toBe('App Shared')
     expect(flags.getFlagsForTenant).toHaveBeenCalledWith('tenant-1')
@@ -215,6 +218,95 @@ describe('Notify preview HTTP pipeline', () => {
     }).expect(200)
     expect(response.body.sms.content).toEqual({ body: 'Welcome Sam' })
     expect(layout.apply).not.toHaveBeenCalled()
+  })
+
+  it('renders inline SMS with normalised recipients on the SMS route', async () => {
+    const response = await post('/sms?preview=true', {
+      sms: {
+        ...sms(),
+        recipients: { to: ['250 555 0123', '(604) 555-0147'] },
+        params: { name: 'Sam' },
+      },
+    }).expect(200)
+    expect(response.body.sms.recipients).toEqual({ to: ['+12505550123', '+16045550147'] })
+    expect(response.body.sms.content).toEqual({ body: 'Hi Sam' })
+    expect(response.body.sms.segmentsPerRecipient).toBe(1)
+    expect(repository.findById).not.toHaveBeenCalled()
+  })
+
+  it('renders an SMS template on the SMS route', async () => {
+    repository.findById.mockResolvedValue({ ...template, channelCode: NotificationChannel.SMS })
+    const response = await post('/sms?preview=true', {
+      sms: { recipients: sms().recipients, content: { templateId } },
+      params: { name: 'Sam' },
+    }).expect(200)
+    expect(response.body.sms.content).toEqual({ body: 'Welcome Sam' })
+    expect(response.body.sms.recipients).toEqual({ to: ['+12505550123'] })
+    expect(repository.findById).toHaveBeenCalledWith('tenant-1', templateId)
+    expect(layout.apply).not.toHaveBeenCalled()
+  })
+
+  it('rejects SMS route mergeArray before rendering', async () => {
+    const response = await post('/sms?preview=true', {
+      sms: { ...sms(), recipients: { mergeArray: [['to'], ['2505550123']] } },
+    }).expect(400)
+    expect(JSON.stringify(response.body)).toContain('mail-merge preview is not yet supported')
+    expect(repository.findById).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a'.repeat(161), 2],
+    ['a'.repeat(400), 3],
+    ['\u4f60'.repeat(71), 2],
+  ])('counts segments of the rendered SMS body (case %#)', async (body, segments) => {
+    const response = await post('/sms?preview=true', {
+      sms: {
+        recipients: { to: ['250 555 0123', '6045550147'] },
+        content: { body: '{{message}}', renderer: 'handlebars' },
+        params: { message: body },
+      },
+    }).expect(200)
+    expect(response.body.sms).toEqual({
+      recipients: { to: ['+12505550123', '+16045550147'] },
+      content: { body },
+      segmentsPerRecipient: segments,
+    })
+  })
+
+  it('counts segments after rendering an SMS template', async () => {
+    repository.findById.mockResolvedValue({
+      ...template,
+      channelCode: NotificationChannel.SMS,
+      body: '{{name}}',
+    })
+    const response = await post('/sms?preview=true', {
+      sms: { recipients: sms().recipients, content: { templateId } },
+      params: { name: 'a'.repeat(161) },
+    }).expect(200)
+    expect(response.body.sms.content).toEqual({ body: 'a'.repeat(161) })
+    expect(response.body.sms.segmentsPerRecipient).toBe(2)
+    expect(repository.findById).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects SMS route attachments before rendering', async () => {
+    const response = await post('/sms?preview=true', {
+      sms: {
+        ...sms(),
+        attachments: [{ filename: 'a.txt', mimeType: 'text/plain', content: 'aGVsbG8=' }],
+      },
+    }).expect(400)
+    expect(response.body.fieldErrors).toEqual({ 'sms.attachments': 'are not supported in preview' })
+    expect(repository.findById).not.toHaveBeenCalled()
+  })
+
+  it('preserves the SMS route feature guard 403 response', async () => {
+    flags.isEnabled.mockResolvedValue(false)
+    const body = { sms: sms() }
+    const normal = await post('/sms', body).expect(403)
+    const preview = await post('/sms?preview=true', body).expect(403)
+    expect(preview.body).toEqual(normal.body)
+    expect(flags.isEnabled).toHaveBeenCalledWith('sms_notifications', 'tenant-1')
+    expect(repository.findById).not.toHaveBeenCalled()
   })
 
   it('rejects inaccessible templates', async () => {
@@ -315,7 +407,7 @@ describe('Notify preview HTTP pipeline', () => {
     expect(preview.body).toEqual(normal.body)
   })
 
-  it('documents preview on both routes', () => {
+  it('documents preview on all three routes', () => {
     const doc = SwaggerModule.createDocument(app, new DocumentBuilder().build())
     const patchBody = doc.paths['/api/v1/notifysimple/{notificationId}'].patch.requestBody
     expect(patchBody).toMatchObject({
@@ -332,7 +424,11 @@ describe('Notify preview HTTP pipeline', () => {
     })
     expect(doc.components.schemas.CancelNotificationDto).toBeDefined()
     expect(doc.components.schemas.RescheduleNotificationDto).toBeDefined()
-    for (const path of ['/api/v1/notifysimple', '/api/v1/notifysimple/email']) {
+    for (const path of [
+      '/api/v1/notifysimple',
+      '/api/v1/notifysimple/email',
+      '/api/v1/notifysimple/sms',
+    ]) {
       expect(doc.paths[path].post.parameters).toContainEqual(
         expect.objectContaining({
           name: 'preview',

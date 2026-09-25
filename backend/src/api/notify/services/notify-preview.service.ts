@@ -4,13 +4,21 @@ import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { NotifyContent } from '../schemas/notify-content'
+import { PhoneNumberService } from './phone-number.service'
+import { countSmsSegments } from '../../../common/utils/sms-segments'
 
 type ChannelName = 'email' | 'sms' | 'msgApp'
 const CHANNELS: ChannelName[] = ['email', 'sms', 'msgApp']
 const CHANNEL_CODES = { email: 'EMAIL', sms: 'SMS', msgApp: 'MSGAPP' } as const
 
 export type NotifyPreviewResponse = Partial<
-  Record<ChannelName, { recipients: unknown; content: Partial<NotifyContent> }>
+  Record<'email' | 'msgApp', { recipients: unknown; content: Partial<NotifyContent> }> & {
+    sms: {
+      recipients: { to: string[] }
+      content: { body: string | undefined }
+      segmentsPerRecipient: number
+    }
+  }
 >
 
 /** Rendering only: deliberately has no notification, queue, safelist or usage dependencies. */
@@ -20,6 +28,7 @@ export class NotifyPreviewService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly templatesService: TemplatesService,
     private readonly inlineRenderingService: InlineRenderingService,
+    private readonly phoneNumberService: PhoneNumberService,
   ) {}
 
   async render(
@@ -81,18 +90,29 @@ export class NotifyPreviewService {
       } else {
         rendered = content
       }
-      result[name] = {
-        recipients: original[name]!.recipients,
-        content:
-          name === 'sms'
-            ? { body: rendered.body }
-            : {
-                subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
-                body: rendered.body,
-                bodyType:
-                  rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
-                encoding: 'encoding' in content ? content.encoding : undefined,
-              },
+      if (name === 'sms') {
+        result.sms = {
+          recipients: {
+            to: request.sms!.recipients.to!.map((number) => {
+              const normalized = this.phoneNumberService.normalize(number)
+              if (!normalized) throw new BadRequestException(['Invalid SMS recipient'])
+              return normalized
+            }),
+          },
+          content: { body: rendered.body },
+          // Same calculation as SmsSegmentService billing, on the already-rendered body.
+          segmentsPerRecipient: countSmsSegments(rendered.body),
+        }
+      } else {
+        result[name] = {
+          recipients: original[name]!.recipients,
+          content: {
+            subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
+            body: rendered.body,
+            bodyType: rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
+            encoding: 'encoding' in content ? content.encoding : undefined,
+          },
+        }
       }
     }
     return result

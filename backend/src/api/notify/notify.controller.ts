@@ -338,7 +338,7 @@ export class NotifySimpleController {
       'Sends the `sms` channel of the request. Recipient numbers are normalised to E.164, so ' +
       '"250 555 0123" and "+12505550123" are equivalent. Long messages are split into multiple ' +
       'segments and billed per segment.\n\n' +
-      'Requires the `sms_notifications` feature flag for the tenant; without it this returns 404.',
+      'Requires the `sms_notifications` feature flag for the tenant; without it this returns 403.',
   })
   @ApiBody({
     type: NotifySimpleRequest,
@@ -371,10 +371,11 @@ export class NotifySimpleController {
   })
   @ApiResponse({ status: 400, description: 'Malformed request, or an unusable phone number.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'SMS is not enabled for this tenant.' })
+  @ApiResponse({ status: 403, description: 'SMS is not enabled for this tenant.' })
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
-  @Queueable(QueueName.INGESTION)
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifySimpleRequest)
+  @UseInterceptors(NotifyPreviewInterceptor)
   @ApiOperation({
     summary: 'Send an SMS notification, to one list of recipients or as a mail merge',
     description: [
@@ -400,7 +401,7 @@ export class NotifySimpleController {
       '',
       `Limits: at most ${MAIL_MERGE_MAX_RECIPIENTS.toLocaleString()} recipients per merge. Daily and`,
       'annual send limits are enforced per API key before the request is accepted. This route is',
-      'gated by the `sms_notifications` feature flag and returns 404 for a tenant without it.',
+      'gated by the `sms_notifications` feature flag and returns 403 for a tenant without it.',
     ].join('\n'),
   })
   @ApiResponse({
@@ -415,7 +416,7 @@ export class NotifySimpleController {
       'The request body failed validation - for example both `to` and `mergeArray` were supplied, a phone number could not be normalised to E.164, or a merge row had a different column count to its header.',
   })
   @ApiResponse({
-    status: 404,
+    status: 403,
     description: 'The `sms_notifications` feature flag is not enabled for this tenant.',
   })
   @ApiResponse({
@@ -427,6 +428,28 @@ export class NotifySimpleController {
     status: 429,
     description: 'This send would exceed the daily or annual SMS limit for the calling API key.',
   })
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description:
+      'Set to true to render without sending, persisting or consuming limits. SMS recipients are normalised to E.164. Attachments and mergeArray are not supported.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Preview: sms contains recipients.to (E.164 numbers), content ({ body }) and segmentsPerRecipient (billable segments of the rendered body for each recipient).',
+    schema: {
+      example: {
+        sms: {
+          recipients: { to: ['+12505550123'] },
+          content: { body: 'Your appointment is confirmed.' },
+          segmentsPerRecipient: 1,
+        },
+      },
+    },
+  })
+  @Queueable(QueueName.INGESTION)
   simpleSendSms(
     @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
