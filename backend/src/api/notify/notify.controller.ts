@@ -56,6 +56,7 @@ import { WebhookService } from '../webhook/webhook.service'
 import {
   ApiBody,
   ApiExcludeController,
+  ApiExtraModels,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -187,9 +188,13 @@ export class NotifySimpleController {
     name: 'preview',
     required: false,
     type: Boolean,
-    description: 'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+    description:
+      'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
   })
-  @ApiResponse({ status: 200, description: 'Preview: rendered content and unchanged recipients, keyed by channel.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview: rendered content and unchanged recipients, keyed by channel.',
+  })
   @Queueable(QueueName.INGESTION)
   simpleSend(
     @Req() _req: any,
@@ -309,9 +314,13 @@ export class NotifySimpleController {
     name: 'preview',
     required: false,
     type: Boolean,
-    description: 'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+    description:
+      'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
   })
-  @ApiResponse({ status: 200, description: 'Preview: rendered content and unchanged recipients in an email entry.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview: rendered content and unchanged recipients in an email entry.',
+  })
   @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,
@@ -443,6 +452,7 @@ export class NotifySimpleController {
     description: 'The notifyId returned when the notification was accepted.',
     example: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   })
+  @ApiExtraModels(CancelNotificationDto, RescheduleNotificationDto)
   @ApiBody({
     schema: {
       oneOf: [

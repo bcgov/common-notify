@@ -239,6 +239,28 @@ describe('Notify Controllers', () => {
   })
 
   describe('NotifySimpleController', () => {
+    it.each([
+      ['', ''],
+      ['', '?preview=false'],
+      ['', '?preview=TRUE'],
+      ['/email', ''],
+      ['/email', '?preview=false'],
+      ['/email', '?preview=1'],
+    ])('keeps real sends active on %s%s', async (path, query) => {
+      mockApiKeyConsumerId = 'consumer-standard'
+      const channel = {
+        recipients: { to: ['test@example.com'] },
+        content: { subject: 'Test', body: 'Hello' },
+      }
+      await request(app.getHttpServer())
+        .post(`/api/v1/notifysimple${path}${query}`)
+        .send(path ? channel : { email: channel })
+        .expect(202)
+      expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
+      expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
+      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+    })
+
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()

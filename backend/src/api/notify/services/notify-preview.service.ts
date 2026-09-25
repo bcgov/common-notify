@@ -37,12 +37,18 @@ export class NotifyPreviewService {
       if (!channel.recipients) {
         throw new BadRequestException([`${name}.recipients must be provided`])
       }
-      if ('mergeArray' in channel.recipients) {
-        throw new BadRequestException([`${name}.recipients.mergeArray mail-merge preview is not yet supported`])
+      // Transformed DTOs can own optional fields with undefined values. Inspect the
+      // submitted object to distinguish an absent mergeArray from a supplied one.
+      if (Object.prototype.hasOwnProperty.call(original[name]?.recipients ?? {}, 'mergeArray')) {
+        throw new BadRequestException([
+          `${name}.recipients.mergeArray mail-merge preview is not yet supported`,
+        ])
       }
       // Content is optional in some send DTOs; a preview still needs something to render.
       if (!channel.content?.templateId && !channel.content?.body?.trim()) {
-        throw new BadRequestException([`${name}.content must provide a templateId or a non-empty body`])
+        throw new BadRequestException([
+          `${name}.content must provide a templateId or a non-empty body`,
+        ])
       }
     }
 
@@ -57,27 +63,36 @@ export class NotifyPreviewService {
         const template = await this.templatesRepository.findById(tenantId, content.templateId)
         if (!template) throw new NotFoundException(`Template ${content.templateId} not found`)
         if (template.channelCode !== CHANNEL_CODES[name]) {
-          throw new BadRequestException([`${name}.content.templateId must reference a ${CHANNEL_CODES[name]} template`])
+          throw new BadRequestException([
+            `${name}.content.templateId must reference a ${CHANNEL_CODES[name]} template`,
+          ])
         }
         const templateContent = await this.templatesService.renderTemplateContent(template, params)
-        rendered = name === 'email'
-          ? await this.templatesService.applyEmailLayout(template, templateContent)
-          : templateContent
+        rendered =
+          name === 'email'
+            ? await this.templatesService.applyEmailLayout(template, templateContent)
+            : templateContent
       } else if (content.renderer) {
-        if (name === 'email') rendered = await this.inlineRenderingService.renderEmail(content, params)
-        else if (name === 'sms') rendered = await this.inlineRenderingService.renderSms(content, params)
+        if (name === 'email')
+          rendered = await this.inlineRenderingService.renderEmail(content, params)
+        else if (name === 'sms')
+          rendered = await this.inlineRenderingService.renderSms(content, params)
         else rendered = await this.inlineRenderingService.renderMsgApp(content, params)
       } else {
         rendered = content
       }
       result[name] = {
         recipients: original[name]!.recipients,
-        content: name === 'sms' ? { body: rendered.body } : {
-          subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
-          body: rendered.body,
-          bodyType: rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
-          encoding: 'encoding' in content ? content.encoding : undefined,
-        },
+        content:
+          name === 'sms'
+            ? { body: rendered.body }
+            : {
+                subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
+                body: rendered.body,
+                bodyType:
+                  rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
+                encoding: 'encoding' in content ? content.encoding : undefined,
+              },
       }
     }
     return result

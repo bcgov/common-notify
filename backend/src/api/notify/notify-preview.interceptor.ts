@@ -38,13 +38,16 @@ export class NotifyPreviewInterceptor implements NestInterceptor {
       NOTIFY_PREVIEW_BODY,
       context.getHandler(),
     )
-    const body = request.body ?? {}
+    const body: object = request.body ?? {}
     if (typeof body !== 'object' || Array.isArray(body)) {
       throw new BadRequestException(['body must be an object'])
     }
     // Match the global ValidationPipe options and exception factory; the global filter
     // then produces the same fieldErrors/errors envelope as an ordinary send.
-    const instance = plainToInstance<NotifySimpleRequest | NotifyEmailChannel, object>(bodyType, body)
+    const instance = plainToInstance<NotifySimpleRequest | NotifyEmailChannel, object>(
+      bodyType,
+      body,
+    )
     const errors = await validate(instance, {
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -52,7 +55,9 @@ export class NotifyPreviewInterceptor implements NestInterceptor {
     })
     if (errors.length) throw this.validationException(errors)
     const emailOnly = bodyType === NotifyEmailChannel
-    const envelope = emailOnly ? { email: instance as NotifyEmailChannel } : instance as NotifySimpleRequest
+    const envelope = emailOnly
+      ? { email: instance as NotifyEmailChannel }
+      : (instance as NotifySimpleRequest)
     const original = emailOnly ? { email: body } : body
     const result = await this.previewService.render(request.tenant.id, envelope, original)
     http.getResponse().status(200)
