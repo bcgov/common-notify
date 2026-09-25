@@ -12,6 +12,11 @@ export default () => {
     // Application
     port: parseInt(process.env.PORT || '3000', 10),
     environment: process.env.NODE_ENV || 'development',
+    // Helm release name — common-notify-dev, common-notify-test, common-notify-<pr>. The
+    // only value that tells the deployed environments apart: NODE_ENV is 'production'
+    // everywhere. Used to label issued gateway credentials, since DEV, TEST and every PR
+    // now issue into the same APS gateway and Environment.
+    releaseName: process.env.RELEASE_NAME || 'local',
     /** Express `trust proxy` hop count when `TRUST_PROXY` is set (required behind API gateway / LB for correct client IP + rate limiting). */
 
     // Logging (trace, debug, info, warn, error, fatal)
@@ -56,9 +61,12 @@ export default () => {
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
     },
 
-    // GC Notify
-    gcNotify: {
-      baseUrl: process.env.GC_NOTIFY_BASE_URL,
+    // Notification events
+    events: {
+      // The only domain an event may send from. Tenant settings store a local part and append
+      // this same domain (see the Settings > Email tab), so an event's own sender address is
+      // held to it too rather than being free text.
+      senderEmailDomain: process.env.EVENT_SENDER_EMAIL_DOMAIN || 'gov.bc.ca',
     },
 
     // Kong Admin API (for API key management)
@@ -67,6 +75,33 @@ export default () => {
       adminTokenEndpoint: process.env.KONG_ADMIN_TOKEN_ENDPOINT,
       adminClientId: process.env.KONG_ADMIN_CLIENT_ID,
       adminClientSecret: process.env.KONG_ADMIN_CLIENT_SECRET,
+    },
+
+    // APS Directory API (API Programme Services) — Credential Issuer.
+    // Lets Notify issue and regenerate gateway consumer credentials on behalf of a
+    // tenant instead of the tenant requesting a key through the API Services Portal.
+    // Requires an APS service account with the CredentialIssuer.Generate scope on the
+    // gateway. When clientId/clientSecret are absent the issuer falls back to the local
+    // Kong Admin API (dev only) — see credential-issuer.module.ts.
+    aps: {
+      baseUrl: process.env.APS_API_BASE_URL,
+      gatewayId: process.env.APS_GATEWAY_ID,
+      environmentAppId: process.env.APS_ENVIRONMENT_APP_ID,
+      tokenUrl: process.env.APS_TOKEN_URL,
+      clientId: process.env.APS_CLIENT_ID,
+      clientSecret: process.env.APS_CLIENT_SECRET,
+      // Optional. Left unset, Keycloak issues the service account's default scopes,
+      // which already carry CredentialIssuer.Generate. Set it only if the realm
+      // requires the scope to be requested explicitly.
+      scope: process.env.APS_TOKEN_SCOPE,
+      timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
+      // Shared ACL group every issued credential joins, alongside the tenant's own
+      // CSTAR id. Unset by default, and unset means no ACL controls are sent at all:
+      // gw-fe8c5's Environments are kong-api-key-only and the generated routes carry no
+      // acl plugin, so the groups would authorize nothing and only risk the gateway
+      // rejecting a control its flow does not support. Set this when an Environment
+      // moves to the kong-api-key-acl flow and the routes gain an allow-list.
+      aclGroup: process.env.APS_ACL_GROUP,
     },
 
     // CSTAR (BC Services Card Authentication Service) - RBAC source of truth
@@ -99,7 +134,7 @@ export default () => {
     // Delivery Adapter Selection
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
-      sms: process.env.DELIVERY_SMS_ADAPTER || 'twilio',
+      sms: process.env.DELIVERY_SMS_ADAPTER || 'acs',
     },
 
     // Load-test-only switches. MUST stay false outside DEV / ephemeral PR dev envs.

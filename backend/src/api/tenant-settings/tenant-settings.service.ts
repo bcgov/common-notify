@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { EmailLogoService } from '../email-logo/email-logo.service'
@@ -15,10 +16,43 @@ export class TenantSettingsService {
     @InjectRepository(TenantSettings)
     private tenantSettingsRepository: Repository<TenantSettings>,
     private readonly emailLogoService: EmailLogoService,
+    private readonly configService: ConfigService,
   ) {}
 
   async findByTenantId(tenantId: string): Promise<TenantSettings | null> {
     return this.tenantSettingsRepository.findOne({ where: { tenantId } })
+  }
+
+  /**
+   * The address this tenant's email is sent from, or null to fall back to the service-wide
+   * `ches.from`.
+   *
+   * `default_sender_email` holds only the local part - the Settings tab appends the domain when
+   * it shows the field - so the domain is put back here from the same config value an event's
+   * own sender address is held to.
+   */
+  async getSenderAddress(tenantId: string): Promise<string | null> {
+    const settings = await this.findByTenantId(tenantId)
+    const localPart = settings?.defaultSenderEmail?.trim()
+    if (!localPart) {
+      return null
+    }
+
+    const domain = this.configService.get<string>('events.senderEmailDomain') || 'gov.bc.ca'
+    return `${localPart}@${domain}`
+  }
+
+  /**
+   * The address a send from this tenant will actually come from: its own configured sender, else
+   * the service-wide default the email transports fall back to. One resolution, so a response or
+   * a preview that reports the sender cannot drift from the address delivery uses.
+   */
+  async resolveSenderAddress(tenantId: string): Promise<string> {
+    return (
+      (await this.getSenderAddress(tenantId)) ??
+      this.configService.get<string>('ches.from') ??
+      this.configService.get<string>('defaults.email.from')
+    )
   }
 
   async upsert(

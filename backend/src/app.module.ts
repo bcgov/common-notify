@@ -11,7 +11,6 @@ import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
-import { ChesModule } from './ches/ches.module'
 import { QueueModule } from './queue/queue.module'
 import { NotificationModule } from './api/notification/notification.module'
 import configuration from './config/configuration'
@@ -35,7 +34,6 @@ import { LoggerModule } from './common/logger'
     AdminModule,
     ApiModule,
     AuthModule,
-    ChesModule,
     NotificationModule,
     FeatureFlagModule,
     AdaptersModule.forRoot(),

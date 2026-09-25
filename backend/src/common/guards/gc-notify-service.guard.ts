@@ -11,19 +11,24 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
 import { ApiKeyConsumer } from '../../api/api-keys/entities/api-key-consumer.entity'
+import {
+  hasNoCredentialHeaders,
+  readGatewayCredentialHeaders,
+  resolveApiKeyConsumer,
+} from './resolve-api-key-consumer'
 
 /**
  * GcNotifyServiceGuard
  *
  * Tenant resolution for GC Notify-compatible routes (GcNotifyController), mirroring
- * NotifyServiceGuard's Kong x-credential-identifier -> ApiKeyConsumer -> Tenant flow
+ * NotifyServiceGuard's Kong credential-header -> ApiKeyConsumer -> Tenant flow
  * (see notify-service.guard.ts). Tenants migrating off GC Notify are issued a key
  * Kong validates the same way it validates keys for /notifysimple today.
  *
  * Additionally validates the literal `Authorization: ApiKey-v1 {key}` header GC
- * Notify clients send (the real GC Notify auth scheme) and attaches the raw header
- * value as request.gcNotifyAuthHeader, so passthrough mode can still forward it
- * unmodified to the real GC Notify API.
+ * Notify clients send (the real GC Notify auth scheme), so a client that authenticates
+ * the way GC Notify taught it gets a clear error rather than a confusing one. The value
+ * itself is not retained: nothing forwards upstream any more
  */
 @Injectable()
 export class GcNotifyServiceGuard implements CanActivate {
@@ -39,22 +44,26 @@ export class GcNotifyServiceGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
 
-    request.gcNotifyAuthHeader = this.requireAuthHeader(request)
+    this.requireAuthHeader(request)
 
-    const credentialIdentifier = request.headers['x-credential-identifier'] as string
-    if (!credentialIdentifier) {
+    const credentialHeaders = readGatewayCredentialHeaders(request.headers)
+    if (hasNoCredentialHeaders(credentialHeaders)) {
       this.logger.warn(
-        'Request missing x-credential-identifier header. Kong did not authenticate the API key.',
+        'Request carries no gateway credential headers. Kong did not authenticate the API key.',
       )
       throw new UnauthorizedException('API request must be authenticated with a valid API key')
     }
 
+    const credentialIdentifier = credentialHeaders.credentialIdentifier
+
     let mapping: ApiKeyConsumer | null = null
     try {
-      mapping = await this.apiKeyConsumerRepository.findOne({
-        where: { credentialIdentifier },
-        relations: ['tenant'],
-      })
+      mapping = await resolveApiKeyConsumer(
+        this.apiKeyConsumerRepository,
+        credentialHeaders,
+        this.logger,
+        request.headers,
+      )
     } catch (error) {
       this.logger.error(
         `Failed to look up api_key_consumer for credential ${credentialIdentifier}: ${error instanceof Error ? error.message : String(error)}`,
@@ -65,11 +74,11 @@ export class GcNotifyServiceGuard implements CanActivate {
     if (!mapping) {
       this.logger.warn(
         `No tenant binding found for credential identifier ${credentialIdentifier}. ` +
-          `The API key must be bound to a tenant via POST /api/v1/service/api-key/bind`,
+          `The API key must be issued from the Notify UI, or bound via POST /api/v1/service/api-key/bind`,
       )
       throw new NotFoundException(
         'This API key has not been associated with a tenant. ' +
-          'Please call POST /api/v1/service/api-key/bind to complete setup.',
+          'Request a key from the Notify UI to complete setup.',
       )
     }
 
@@ -84,6 +93,9 @@ export class GcNotifyServiceGuard implements CanActivate {
     request.tenant = tenant
     request.tenantId = tenant.id
     request.tenantExternalId = tenant.externalId
+    // Mirrors NotifyServiceGuard: sends on these routes are counted against the key's usage and
+    // checked against its limits, which needs the consumer, not just the tenant.
+    request.apiKeyConsumerId = mapping.id
 
     this.logger.debug(`✓ GC Notify request authorized. Tenant: "${tenant.name}" (${tenant.id})`)
 

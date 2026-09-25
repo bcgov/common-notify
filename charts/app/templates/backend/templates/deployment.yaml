@@ -60,7 +60,7 @@ spec:
               value: "true"
           command: ["/bin/sh", "-c"]
           args:
-            - /flyway/flyway info migrate repair && cp -R /flyway/assets/email-logos/. /email-logo-seed-assets/
+            - /flyway/flyway info migrate && cp -R /flyway/assets/email-logos/. /email-logo-seed-assets/
           volumeMounts:
             - name: email-logo-seed-assets
               mountPath: /email-logo-seed-assets
@@ -84,11 +84,39 @@ spec:
                 name: {{.Release.Name}}-backend
             - secretRef:
                 name: app-api-secrets
+            # Per-release overrides, layered last so its keys win. envFrom entries are
+            # applied in order and a later duplicate key replaces an earlier one, so this
+            # secret only needs the handful of keys being changed — everything else falls
+            # through to app-api-secrets above.
+            #
+            # Exists so a single PR environment can be repointed (at a different APS
+            # instance, say) without a chart change, a redeploy, or disturbing the other
+            # releases that share the namespace secret. Not created by this chart: Helm
+            # would reconcile it back on the next upgrade and silently discard manual
+            # edits. Create it by hand and delete it when finished:
+            #
+            #   oc create secret generic {{ .Release.Name }}-overrides --from-literal=KEY=value
+            #   oc delete secret {{ .Release.Name }}-overrides
+            #
+            # pr-close.yml removes it automatically when a PR is closed. Optional, so a
+            # release without one deploys exactly as before.
+            #
+            # Worth knowing in a long-lived environment: an override here is invisible in
+            # git. Prefer values.yaml or app-api-secrets for anything meant to persist.
+            - secretRef:
+                name: {{ .Release.Name }}-overrides
+                optional: true
           env:
             - name: LOG_LEVEL
               value: info
-            - name: GC_NOTIFY_BASE_URL
-              value: https://api.notification.canada.ca
+            # Which transport actually sends. Not secret - the credentials behind each one are,
+            # and those come from app-api-secrets below. Without these the container falls through
+            # to the defaults in configuration.ts, which is why the adapter could not previously be
+            # chosen per environment.
+            - name: DELIVERY_EMAIL_ADAPTER
+              value: {{ .Values.backend.delivery.emailAdapter | default "ches" | quote }}
+            - name: DELIVERY_SMS_ADAPTER
+              value: {{ .Values.backend.delivery.smsAdapter | default "acs" | quote }}
             - name: REDIS_HOST
               value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Release.Name) }}
             - name: REDIS_PORT

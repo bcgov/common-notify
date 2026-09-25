@@ -19,6 +19,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { useCsvUpload } from '@/hooks/useCsvUpload'
 import {
   buildSampleCsv,
@@ -42,6 +43,7 @@ const BulkNotifications: FC = () => {
   // Template editors send as well as operations admins, matching the roles on the
   // frontend notifysimple endpoint. `canEdit` is exactly that pair.
   const { canEdit: canSend } = useCstarRoles()
+  const smsEnabled = useFeatureFlag('sms_notifications', selectedTenant?.id)
 
   const [channel, setChannel] = useState<Channel | null>(null)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
@@ -56,16 +58,20 @@ const BulkNotifications: FC = () => {
   const placeholders = templateDetail?.placeholders?.paths ?? []
   const unsupported = templateDetail?.placeholders?.unsupported ?? []
 
-  const csv = useCsvUpload(placeholders)
+  // Email until a channel is chosen; nothing downstream is reachable before that.
+  const csv = useCsvUpload(placeholders, channel ?? 'email')
   const { reset: resetCsv } = csv
 
   // Fetched here rather than read from the templates slice: that slice holds the Templates page's
   // paginated, filtered query, and reusing it would mean rewriting its filters on every visit.
   useEffect(() => {
-    if (!selectedTenant) return
+    // Waits for a channel: the list is per-channel, and fetching before one is chosen would show
+    // email templates to someone who then picks SMS.
+    if (!selectedTenant || !channel) return
 
     let active = true
-    getTemplates(1, 100, undefined, 'name', [`channelCode:eq:${NotificationChannel.EMAIL}`])
+    const channelCode = channel === 'sms' ? NotificationChannel.SMS : NotificationChannel.EMAIL
+    getTemplates(1, 100, undefined, 'name', [`channelCode:eq:${channelCode}`])
       .then((response) => {
         if (active) setTemplates(response.data)
       })
@@ -76,7 +82,7 @@ const BulkNotifications: FC = () => {
     return () => {
       active = false
     }
-  }, [selectedTenant])
+  }, [selectedTenant, channel])
 
   /**
    * The columns come from the API, not from parsing the template here.
@@ -150,10 +156,13 @@ const BulkNotifications: FC = () => {
 
   const handleDownload = () => {
     if (!selectedTemplate) return
-    downloadCsv(csvFilenameFor(selectedTemplate.name), buildSampleCsv(placeholders))
+    downloadCsv(
+      csvFilenameFor(selectedTemplate.name),
+      buildSampleCsv(placeholders, channel ?? 'email'),
+    )
     showSuccessToast(
       'Sample CSV downloaded.',
-      'Complete the file and upload it to continue with the bulk send.',
+      'Complete the file and upload it to continue with the batch send.',
     )
   }
 
@@ -172,7 +181,11 @@ const BulkNotifications: FC = () => {
     const rowCount = csv.parsed.rows.length
     setSending(true)
     try {
-      const response = await sendBulkNotifications(selectedTemplateId, toMergeArray(csv.parsed))
+      const response = await sendBulkNotifications(
+        selectedTemplateId,
+        toMergeArray(csv.parsed, channel ?? 'email'),
+        channel ?? 'email',
+      )
       setResult({
         notifyId: response.notifyId,
         recipientCount: response.recipientCount ?? rowCount,
@@ -199,18 +212,19 @@ const BulkNotifications: FC = () => {
 
   return (
     <div className="page bulk-notifications">
-      <PageHeading title="Bulk Notifications" />
+      <PageHeading title="Send Batch Notification" />
 
       {!canSend && (
         <p className="bulk-notifications__notice">
-          Sending bulk notifications needs the Template Editor or Tenant Administrator role. You can
-          still download a sample CSV for a template.
+          Sending a batch needs the Template Editor or Tenant Administrator role. You can still
+          download a sample CSV for a template.
         </p>
       )}
 
       <RadioGroup
         label="Notification channel"
         isRequired
+        description={smsEnabled ? undefined : 'SMS is not enabled for this tenant.'}
         value={channel ?? ''}
         onChange={(value) => {
           setChannel(value as Channel)
@@ -219,10 +233,8 @@ const BulkNotifications: FC = () => {
         }}
       >
         <Radio value="email">Email notification</Radio>
-        {/* Offered but not selectable: the send pipeline is email-only - `mergeArray` exists on the
-            email channel alone - so the option shows the roadmap without offering a control that
-            cannot work. */}
-        <Radio value="sms" isDisabled>
+        {/* Shown even when unavailable, so it is clear the option exists and why it is off. */}
+        <Radio value="sms" isDisabled={!smsEnabled}>
           SMS notification
         </Radio>
       </RadioGroup>
@@ -249,7 +261,7 @@ const BulkNotifications: FC = () => {
       {selectedTemplate && unsupported.length > 0 && (
         <InlineAlert
           variant="warning"
-          title="This template can't be used for a bulk send."
+          title="This template can't be used for a batch send."
           description={`It repeats a list (${unsupported.join(', ')}). A spreadsheet row holds one value per column, so it cannot supply a list of items. Pick a template without repeated sections, or send this one through the API.`}
         />
       )}
@@ -321,6 +333,7 @@ const BulkNotifications: FC = () => {
           onClose={() => setPreviewOpen(false)}
           templateId={selectedTemplateId}
           parsed={csv.parsed}
+          channel={channel ?? 'email'}
           isSending={isSending}
           onSend={() => {
             setPreviewOpen(false)

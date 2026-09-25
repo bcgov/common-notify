@@ -75,6 +75,8 @@ describe('SmsDeliveryWorker', () => {
       resetForRetry: vi.fn().mockResolvedValue(undefined),
       markSent: vi.fn().mockResolvedValue(undefined),
       markFailed: vi.fn().mockResolvedValue(undefined),
+      markRecipientSent: vi.fn().mockResolvedValue(undefined),
+      markRecipientFailed: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -136,6 +138,112 @@ describe('SmsDeliveryWorker', () => {
   })
 
   describe('process handler', () => {
+    it('records each recipient separately when the transport reports a partial failure', async () => {
+      mockSmsAdapter.send = vi.fn().mockResolvedValue({
+        messageId: 'SM1',
+        providerResponse: 'sent to 1 of 2 recipient(s)',
+        results: [
+          { to: '+16135551234', success: true, messageId: 'SM1' },
+          { to: '+16135559999', success: false, error: 'Invalid recipient' },
+        ],
+      })
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-partial',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234', '+16135559999'] },
+            content: { body: 'Test SMS', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      // The job must not fail: throwing here is what made the queue retry and re-send to the
+      // recipient who had already received the message.
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).resolves.toMatchObject({
+        success: true,
+      })
+
+      expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+        'notify-partial',
+        null,
+        '+16135551234',
+        'SM1',
+      )
+      expect(mockRequestDetailService.markRecipientFailed).toHaveBeenCalledWith(
+        'notify-partial',
+        null,
+        '+16135559999',
+        'Invalid recipient',
+      )
+      // The old code stamped every row sent with one id.
+      expect(mockRequestDetailService.markSent).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-partial',
+        'tenant-123',
+        expect.objectContaining({ status: 'partially_completed' }),
+      )
+    })
+
+    it('falls back to all-or-nothing when the transport reports no per-recipient detail', async () => {
+      mockSmsAdapter.send = vi
+        .fn()
+        .mockResolvedValue({ messageId: 'SM1', providerResponse: 'sent' })
+
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-plain',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: { body: 'Test SMS', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockRequestDetailService.markSent).toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-plain',
+        'tenant-123',
+        expect.objectContaining({ status: 'completed' }),
+      )
+    })
+
     it('should successfully send SMS and update status', async () => {
       await SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,

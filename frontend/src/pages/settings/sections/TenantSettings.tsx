@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
+import ApiKeyField from './ApiKeyField'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { updateTenantSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -104,13 +105,12 @@ const TenantSettings: FC = () => {
 
       {error && <div className="alert alert-danger">{error}</div>}
 
-      <div className="settings__field">
+      <div className="settings__field settings__field--email">
         <span className="settings__label">
           <span id="default-sending-email-label">Default sending email address</span>
           <TooltipTrigger>
             <Button
               aria-label="About the default sending email address"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -151,7 +151,6 @@ const TenantSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the API rate limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -170,6 +169,10 @@ const TenantSettings: FC = () => {
           <SvgUpRightFromSquareIcon />
         </Link>
       </div>
+
+      {/* Grouped with the rate limit because both are gateway concerns. Owns its own
+          fetch and its own dialogs; it contributes nothing to this form's submit. */}
+      <ApiKeyField />
 
       <div className="settings__field">
         <span className="settings__label" id="alert-email-label">

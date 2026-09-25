@@ -70,7 +70,8 @@ export interface IngestionJobPayload {
   request: NotifyRequest
   requestedAt: string
   scheduledFor?: string // ISO datetime for delayed sends (optional).  Works by delaying the ingestion job, which in turn delays all downstream delivery jobs.  This simplifies handling of scheduled notifications by centralizing the scheduling logic in one place (ingestion worker) rather than needing to handle scheduling in each delivery worker.
-  mailMerge?: boolean // When true, this is an email merge send and `mailMergeData` carries the recipients
+  mailMerge?: boolean // When true, this is a merge send and `mailMergeData` carries the recipients
+  mailMergeChannel?: NotificationChannel // Which channel the merge fans out to (defaults to EMAIL)
   mailMergeData?: MailMergeJobData
 }
 
@@ -84,7 +85,7 @@ export interface DeliveryJobPayload {
   request: NotifyRequest // Original request (channels may carry a content.templateId)
   payload: DeliveryPayload // Channel-specific payload
   attempt: number
-  mailMerge?: boolean // When true, this is one batch of an email merge send
+  mailMerge?: boolean // When true, this is one batch of a merge send
   batchId?: string // Identifies the batch within the parent notification_request (mail merge only)
   mailMergeData?: MailMergeJobData // Recipients for this batch (mail merge only)
 }

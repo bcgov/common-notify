@@ -1,8 +1,12 @@
-# Notify Service — Overview
+# Notify Service
 
-**version 4**
+**_View and test live Swagger API Spec [here](https://notify.digital.gov.bc.ca/api/docs)_**
+**_Download OpenApi YAML  [here](https://notify.digital.gov.bc.ca/api/docs-yaml)_**
 
-**_[ Swagger API Spec](https://citz-do.atlassian.net/wiki/spaces/CCP/pages/657719331/Notification+API+definition)_**
+> [!NOTE]
+> This README explains concepts, design rationale, and end-to-end usage patterns. For the
+> authoritative, always-current list of endpoints, request/response schemas and error codes, see the
+> Swagger docs linked above — payloads shown here are illustrative, not exhaustive.
 
 ## What it does
 
@@ -192,9 +196,10 @@ capability to mix and match between different service providers.
 
 ## Tracking and status
 
-Every send returns a `notifyId` and a `statusUrl`. Clients can poll `GET /notify/{notifyId}` to
-check delivery status per channel, or query `GET /notify` to search notification history by
-correlation ID, date range, status, or tag. For real-time updates, tenants can configure a **webhook
+Every send returns a `notifyId` and a `statusUrl`. Clients can poll
+`GET /api/v1/notification_request/{id}/request_details` to check delivery status per channel, or
+query `GET /api/v1/notification_request` to search notification history by correlation ID, date
+range, status, or tag. For real-time updates, tenants can configure a **webhook
 callback** in their defaults — the API will POST status events (delivered, failed, etc.) to the
 tenant's endpoint with structured data including whether the failure is retryable.
 
@@ -235,7 +240,7 @@ No setup except tenant sender email address.
 
 **API**
 
-POST to /notifysimple/email
+POST to /api/v1/notifysimple/email
 
 **Payload**
 
@@ -256,7 +261,7 @@ POST to /notifysimple/email
 
 alternatively -
 
-POST to /notifysimple
+POST to /api/v1/notifysimple
 
 **Payload**
 
@@ -285,7 +290,7 @@ No setup except tenant sender email address.
 
 **API**
 
-POST to /notifysimple
+POST to /api/v1/notifysimple
 
 **Payload**
 
@@ -327,7 +332,7 @@ No setup except tenant sender email address.
 
 **API**
 
-POST to /notifysimple/email
+POST to /api/v1/notifysimple/email
 
 **Payload**
 
@@ -354,47 +359,49 @@ POST to /notifysimple/email
 In this case, the "to" address is substituted with "my@example.com" the subject is replaced with
 "Sample Subject" and the body with "This is an example of templating and parameter substitution"
 
-#### 2.2 Preview 2.1
-
-Preview the output of the previous example, no actual sending
-
-**Admin UI**
-
-No setup except tenant sender email address.
-
-> [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
-
-**API**
-
-POST to /notifysimple/email?preview=true
-
-**Payload**
-
-As per 2.1
-
-**Return**
-
-```json
-{
-  "recipients" : {
-    "to": ["me@example.com", "you@example.com"],
-    "cc": ["copyto@example.com"],
-    "bcc": ["blindcopyto@example.com"]
-  }
-  "content": {
-    "subject": "Sample subject",
-    "body": "This is an example of templating and parameter substitution",
-    "renderer" : "handlebar"
-  },
-}
-
-```
-
-> [!NOTE]
+#### 2.2 Preview 2.1 
+> >[!WARNING] 🚧 Under construction - coming in Oct 2026 🚧
 >
-> - Variable substitutions are performed on templates
-> - Variable substititions are performed on recipient fields
-> - The result is exactly what would be sent to the SMTP email gateway or SMS API
+
+> Preview the output of the previous example, no actual sending
+> 
+> **Admin UI**
+> 
+> No setup except tenant sender email address.
+> 
+> > [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
+> 
+> **API**
+> 
+> POST to /api/v1/notifysimple/email?preview=true
+> 
+> **Payload**
+> 
+> As per 2.1
+> 
+> **Return**
+> 
+> ```json
+> {
+  > "recipients" : {
+    > "to": ["me@example.com", "you@example.com"],
+    > "cc": ["copyto@example.com"],
+    > "bcc": ["blindcopyto@example.com"]
+  > }
+  > "content": {
+    > "subject": "Sample subject",
+    > "body": "This is an example of templating and parameter substitution",
+    > "renderer" : "handlebar"
+  > },
+> }
+> 
+> ```
+> 
+> > [!NOTE]
+> >
+> > - Variable substitutions are performed on templates
+> > - Variable substititions are performed on recipient fields
+> > - The result is exactly what would be sent to the SMTP email gateway or SMS API
 
 #### 2.3 Send an email using a server template
 
@@ -414,9 +421,9 @@ following
 
 **API**
 
-- GET the template with a GET reqest to /templates?name="Sample template" This returns a GUID of the
-  template, say \<GUID>
-- POST to /notifysimple/email
+- GET the template with a GET reqest to /api/v1/templates?name="Sample template" This returns a GUID
+  of the template, say \<GUID>
+- POST to /api/v1/notifysimple/email
 
 **Payload**
 
@@ -455,7 +462,7 @@ As per 2.3
 
 **API**
 
-POST to /notifysimple/email
+POST to /api/v1/notifysimple/email
 
 **Payload**
 
@@ -497,239 +504,242 @@ POST to /notifysimple/email
 
 ### 3. Use of Notification Events
 
-##### 3.1 Send a notification from an application using a Notification Event.
-
-Send a notification from a "Funding Application webapp" using notification defaults. Notify the
-successful applicant and internal staff using predefined templates, default addresses and channels
-assocated with a Notification Event, customised with substitutable parameters. parameter
-substitution
-
-**Admin UI**
-
-- Create a template "Funding Approved Email" using the template UI . The template might look like
-  the following
-
-```json
-{
-  "subject" : "Notification of funding approval for {{program}}"
-  "body" : "Dear {{firstname}} {{lastname}} \n
-           Your funding to the amount of ${{amount}} for program {{program}} has been approved"
-}
-```
-
-- Create another template "Funding Approved SMS" using the template UI .
-
-```json
-{
-  "message": "Hey {{firstname}} {{lastname}} You just got awarded ${{amount}} for {{program}}"
-}
-```
-
-> [!NOTE]
+> >[!WARNING] 🚧 Under construction - coming in Nov 2026 🚧
 >
-> - For SMS templates there is no subject.
 
-- Create a **Notification Event Type** called "funding-approved".
-- Under **Email defaults**
-  - Add the **Funding Approved Email** template to the "**template**" field
-  - Add recipient "**{{emailaddress}}**" to the "**to**" field.
-  - Attach group "**FundingApprovers**" to the CC field. (Note: Group **FundingApprovers** comes
-    directly from **CSTAR**)
-- Under **SMS Defaults**
-  - Add the **Funding Approved Email** template to the "**template**" field
-  - Add recipient "**{{phonenumber}}**" to the "**to**" field.
-    > [!NOTE] Variable substitution can occur in "to" and other recipient fields
-
-  **API**
-
-  POST to /notifyevent
-
-  **Payload**
-
-```json
-{
-"notificationEventType": "funding-approval",
-  "params": {
-    "firstname": "Lucky",
-    "lastname" : "Applicant",
-    "program" : "Small Business Development Fund",
-    "amount" : "1000",
-    "emailaddress":"lucky@me.com",
-    "phonenumber":"7787001234"
-  }
-```
-
-> [!NOTE]
->
-> The parameter list passed into the API call can now be restricted to data generated or managed by
-> the calling application. This keeps the application simple and pushes all notification logic into
-> configuration, making content, formatting and recipient updates easier without code changes.
-
-##### 3.2 Preview
-
-As per 3.1 , but don't actually send the notification, just preview exactly what would be sent
-
-**API**
-
-POST to /notifyevent?preview=true
-
-**Payload**
-
-As per 3.1
-
-**Return**
-
-```json
-{
-  "email": [
-    {
-      "recipients": {
-        "to": ["lucky@me.com"],
-        "cc": ["fred@gov.bc.ca", "joan@gov.bc.ca"]
-      }
-      "content" : {
-        "subject" : "Nofication of funding approval for Small Business Development Fund",
-        "body": "Dear Lucky Applicant \n
-           Your funding to the amount of $1000 for program Small Business Development fund has been approved",
-        "bodyType": "text",
-        "encoding": "utf-8"
-
-      }
-    }
-  ],
-  "sms": [
-    {
-      "recipients" :{
-        "to": ["7787001234"]
-      }
-      "content" : {
-        "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund"
-      }
-    }
-  ]
-}
-```
-
-> [!NOTE]
->
-> - CSTAR group email addresses are resolved
-> - Variable substitutions are performed on templates
-> - Variable substititions are performed on recipient fields
-> - The result is exactly what would be sent to the SMTP email gateway or SMS API
-> - The email and SMS results are array elements - this is because it is possible to send multiple
->   emails and / or SMS messages as a mail-merge - see sect 4.
-> - This result can be viewed directly in the preview capability of the admin UI - it is required to
->   provide the substitutable params
-
-##### 3.3 SMS Overrides
-
-As per 3.1 but overrride so that no SMS is sent
-
-**API**
-
-POST to /notifyevent
-
-**Payload**
-
-```json
-{
-"notificationEventType": "funding-approval",
-  "params": {
-    "firstname": "Lucky",
-    "lastname" : "Applicant",
-    "program" : "Small Business Development Fund",
-    "amount" : "1000",
-    "emailaddress":"lucky@me.com",
-    "phonenumber":"7787001234"
-  }
-  "overrides" : {
-    "sms" :{}
-  }
-}
-```
-
-##### 3.4 Template Overrides
-
-As per 3.3 but overrride the email template with one on the server (given by \<guid\> )
-
-**API**
-
-POST to /notifyevent
-
-**Payload**
-
-```json
-{
-"notificationEventType": "funding-approval",
-  "params": {
-    "firstname": "Lucky",
-    "lastname" : "Applicant",
-    "program" : "Small Business Development Fund",
-    "amount" : "1000",
-    "emailaddress":"lucky@me.com",
-    "phonenumber":"7787001234"
-  }
-  "overrides" : {
-    "email" : {
-      "content": {
-        "template" : {
-            "templateId": "<guid>"
-        }
-      }
-    }
-    "sms" :{}
-  }
-}
-```
-
-##### 3.5 Augment recipients
-
-As per 3.4 but add an additional recipient to the CC list.
-
-**API**
-
-POST to /notifyevent
-
-**Payload**
-
-```json
-{
-  "notificationEventType": "funding-approval",
-  "params": {
-    "firstname": "Lucky",
-    "lastname": "Applicant",
-    "program": "Small Business Development Fund",
-    "amount": "1000",
-    "emailaddress": "lucky@me.com",
-    "phonenumber": "7787001234"
-  },
-  "overrides": {
-    "email": {
-      "content": {
-        "template": {
-          "templateId": "<guid>"
-        }
-      }
-    },
-    "sms": {}
-  },
-  "augments": {
-    "email": {
-      "recipients": {
-        "cc": ["tom@gov.bc.ca"]
-      }
-    }
-  }
-}
-```
-
-> [!NOTE]
->
-> - A combination of augments and overrides can replace or supplement almost any part of the
->   notification
-> - This is not expected to be the normal use of Notification Event Types, but it does provide
->   flexibility where needed or for testing purposes
-
+> ##### 3.1 Send a notification from an application using a Notification Event.
+> 
+> Send a notification from a "Funding Application webapp" using notification defaults. Notify the
+> successful applicant and internal staff using predefined templates, default addresses and channels
+> assocated with a Notification Event, customised with substitutable parameters. parameter
+> substitution
+> 
+> **Admin UI**
+> 
+> - Create a template "Funding Approved Email" using the template UI . The template might look like
+  > the following
+> 
+> ```json
+> {
+  > "subject" : "Notification of funding approval for {{program}}"
+  > "body" : "Dear {{firstname}} {{lastname}} \n
+           > Your funding to the amount of ${{amount}} for program {{program}} has been approved"
+> }
+> ```
+> 
+> - Create another template "Funding Approved SMS" using the template UI .
+> 
+> ```json
+> {
+  > "message": "Hey {{firstname}} {{lastname}} You just got awarded ${{amount}} for {{program}}"
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - For SMS templates there is no subject.
+> 
+> - Create a **Notification Event Type** called "funding-approved".
+> - Under **Email defaults**
+  > - Add the **Funding Approved Email** template to the "**template**" field
+  > - Add recipient "**{{emailaddress}}**" to the "**to**" field.
+  > - Attach group "**FundingApprovers**" to the CC field. (Note: Group **FundingApprovers** comes
+    > directly from **CSTAR**)
+> - Under **SMS Defaults**
+  > - Add the **Funding Approved Email** template to the "**template**" field
+  > - Add recipient "**{{phonenumber}}**" to the "**to**" field.
+    > > [!NOTE] Variable substitution can occur in "to" and other recipient fields
+> 
+  > **API**
+> 
+  > POST to /api/v1/notifyevent
+> 
+  > **Payload**
+> 
+> ```json
+> {
+> "notificationEventType": "funding-approval",
+  > "params": {
+    > "firstname": "Lucky",
+    > "lastname" : "Applicant",
+    > "program" : "Small Business Development Fund",
+    > "amount" : "1000",
+    > "emailaddress":"lucky@me.com",
+    > "phonenumber":"7787001234"
+  > }
+> ```
+> 
+> > [!NOTE]
+> >
+> > The parameter list passed into the API call can now be restricted to data generated or managed by
+> > the calling application. This keeps the application simple and pushes all notification logic into
+> > configuration, making content, formatting and recipient updates easier without code changes.
+> 
+> ##### 3.2 Preview
+> 
+> As per 3.1 , but don't actually send the notification, just preview exactly what would be sent
+> 
+> **API**
+> 
+> POST to /api/v1/notifyevent?preview=true
+> 
+> **Payload**
+> 
+> As per 3.1
+> 
+> **Return**
+> 
+> ```json
+> {
+  > "email": [
+    > {
+      > "recipients": {
+        > "to": ["lucky@me.com"],
+        > "cc": ["fred@gov.bc.ca", "joan@gov.bc.ca"]
+      > }
+      > "content" : {
+        > "subject" : "Nofication of funding approval for Small Business Development Fund",
+        > "body": "Dear Lucky Applicant \n
+           > Your funding to the amount of $1000 for program Small Business Development fund has been approved",
+        > "bodyType": "text",
+        > "encoding": "utf-8"
+> 
+      > }
+    > }
+  > ],
+  > "sms": [
+    > {
+      > "recipients" :{
+        > "to": ["7787001234"]
+      > }
+      > "content" : {
+        > "message": "Hey Lucky Applicant You just got awarded $1000 for Small Business Development fund"
+      > }
+    > }
+  > ]
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - CSTAR group email addresses are resolved
+> > - Variable substitutions are performed on templates
+> > - Variable substititions are performed on recipient fields
+> > - The result is exactly what would be sent to the SMTP email gateway or SMS API
+> > - The email and SMS results are array elements - this is because it is possible to send multiple
+> >   emails and / or SMS messages as a mail-merge - see sect 4.
+> > - This result can be viewed directly in the preview capability of the admin UI - it is required to
+> >   provide the substitutable params
+> 
+> ##### 3.3 SMS Overrides
+> 
+> As per 3.1 but overrride so that no SMS is sent
+> 
+> **API**
+> 
+> POST to /api/v1/notifyevent
+> 
+> **Payload**
+> 
+> ```json
+> {
+> "notificationEventType": "funding-approval",
+  > "params": {
+    > "firstname": "Lucky",
+    > "lastname" : "Applicant",
+    > "program" : "Small Business Development Fund",
+    > "amount" : "1000",
+    > "emailaddress":"lucky@me.com",
+    > "phonenumber":"7787001234"
+  > }
+  > "overrides" : {
+    > "sms" :{}
+  > }
+> }
+> ```
+> 
+> ##### 3.4 Template Overrides
+> 
+> As per 3.3 but overrride the email template with one on the server (given by \<guid\> )
+> 
+> **API**
+> 
+> POST to /api/v1/notifyevent
+> 
+> **Payload**
+> 
+> ```json
+> {
+> "notificationEventType": "funding-approval",
+  > "params": {
+    > "firstname": "Lucky",
+    > "lastname" : "Applicant",
+    > "program" : "Small Business Development Fund",
+    > "amount" : "1000",
+    > "emailaddress":"lucky@me.com",
+    > "phonenumber":"7787001234"
+  > }
+  > "overrides" : {
+    > "email" : {
+      > "content": {
+        > "template" : {
+            > "templateId": "<guid>"
+        > }
+      > }
+    > }
+    > "sms" :{}
+  > }
+> }
+> ```
+> 
+> ##### 3.5 Augment recipients
+> 
+> As per 3.4 but add an additional recipient to the CC list.
+> 
+> **API**
+> 
+> POST to /api/v1/notifyevent
+> 
+> **Payload**
+> 
+> ```json
+> {
+  > "notificationEventType": "funding-approval",
+  > "params": {
+    > "firstname": "Lucky",
+    > "lastname": "Applicant",
+    > "program": "Small Business Development Fund",
+    > "amount": "1000",
+    > "emailaddress": "lucky@me.com",
+    > "phonenumber": "7787001234"
+  > },
+  > "overrides": {
+    > "email": {
+      > "content": {
+        > "template": {
+          > "templateId": "<guid>"
+        > }
+      > }
+    > },
+    > "sms": {}
+  > },
+  > "augments": {
+    > "email": {
+      > "recipients": {
+        > "cc": ["tom@gov.bc.ca"]
+      > }
+    > }
+  > }
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - A combination of augments and overrides can replace or supplement almost any part of the
+> >   notification
+> > - This is not expected to be the normal use of Notification Event Types, but it does provide
+> >   flexibility where needed or for testing purposes
+> > 
 ## 4. Mail merge (Bulk Send)
 
 Notify provides Mail Merge (sometimes called "Bulk Send") capabilities. This is when customised
@@ -742,7 +752,7 @@ venture, or perhaps a default bcc to a records-management system which records a
 For this reason, the system distinguishes between the recipients as they exist in a "**single
 notification with multiple recipients**" - as has been the case in all examples till now - and the
 recipients as they exist in a "**multiple custom notifications to specified recipient(s)**" by means
-of a mutually-exclusive "**mergeArray**" field. To clarify - recipients can be sepcified in the
+of a mutually-exclusive "**mergeArray**" field. To clarify - recipients can be specified in the
 payload as a combination of "to", "cc", "bcc" and subscription service **OR**  
 "mergeArray" , but not both.
 
@@ -767,7 +777,7 @@ No setup except tenant sender email address.
 
 **API**
 
-POST to /notifysimple/email
+POST to /api/v1/notifysimple/email
 
 **Payload**
 
@@ -815,7 +825,7 @@ The setup and payload are identical to 4.1, but now the endpoint uses the previe
 
 **API**
 
-POST to /notifysimple/email?preview=true
+POST to /api/v1/notifysimple/email?preview=true
 
 **Response**
 
@@ -850,207 +860,210 @@ POST to /notifysimple/email?preview=true
 
 ## 5. Services
 
-Services are call-outs to external systems for things like templates, recipients or documents -
-performed at run-time while processing a notification.
+> >[!WARNING] 🚧 Under construction - coming in Dec 2026 🚧
 
-Notification services can do things like :
 
-- Dynamically fill in the recipients for email or SMS from external subscription services
-- Automatically create and attach mail-merge documents from templating services
-- Render complex templated content from templating services
+> Services are call-outs to external systems for things like templates, recipients or documents -
+> performed at run-time while processing a notification.
+> 
+> Notification services can do things like :
+> 
+> - Dynamically fill in the recipients for email or SMS from external subscription services
+> - Automatically create and attach mail-merge documents from templating services
+> - Render complex templated content from templating services
+> 
+> Services need to be added to the tenant by the tenant admin in the Notification UI by selecting one
+> of the services which are available from the services catalog. On selection, the tenant admin will
+> be prompted for some details to configure the service for the tenancy. There are mandatory
+> parameters, like the API key for the service which is typically obtained from the service itself.
+> For some services there may be additional configuration to further filter the returned data (perhaps
+> remote tenant ID, channel or service for example). In all cases, the admin user is prompted for the
+> applicable data. And in many cases there are mandatory run-time parameters which must nbe supplied
+> in the notification payload "params" field, which further filter the returned data. These mandatory
+> parameters are clearly signalled AND MUST BE INCLUDED AS ONE OF THE FIELDS IN "PARAMS" RUNTIME
+> PAYLOAD.
+> 
+> For example, if the service configuration indicates to the tenant admin that a field "accountNumber"
+> is a mandatory field, the runtime notification post data MUST contain a key-value pair in the
+> cascading "params" structure (remember "params" can exist in the notification request at the root
+> level AND at the service level - they are merged to create a cascading "params" structure) with
+> "accountNumber" as an element. If this is not the case, a run-time error for the notification will
+> be raised.
+> 
+> Once the service is configured for the tenant, it can be used in the notification request as
+> described in the following service types.
+> 
+> ### MessagingApp
+> 
+> Messaging application services refer to 3rd party messaging applications like Teams, Rocketchat and
+> so on. Their initial configuration requires :
+> 
+> - Authentication
+> - Tenant identifier - in this case the native tenant identifier of the messaging application
+> - Stream or channel mandatory runtime variable name.
+> - Once configured, this messaging application may be used as the third of the supported channels,
+  > **email**, **SMS** and **msgApp**. It may be added to a notification-event type or passed in as
+  > the "msgAppServiceId" element in a notification request payload.
 
-Services need to be added to the tenant by the tenant admin in the Notification UI by selecting one
-of the services which are available from the services catalog. On selection, the tenant admin will
-be prompted for some details to configure the service for the tenancy. There are mandatory
-parameters, like the API key for the service which is typically obtained from the service itself.
-For some services there may be additional configuration to further filter the returned data (perhaps
-remote tenant ID, channel or service for example). In all cases, the admin user is prompted for the
-applicable data. And in many cases there are mandatory run-time parameters which must nbe supplied
-in the notification payload "params" field, which further filter the returned data. These mandatory
-parameters are clearly signalled AND MUST BE INCLUDED AS ONE OF THE FIELDS IN "PARAMS" RUNTIME
-PAYLOAD.
+> #### 5.1 Send a notification to a teams messaging app.
+> 
+> **Admin UI**
+> 
+> - Add the "Teams" message app from the registry
+> - Configure the "Teams" app - add the API key, add a default channel.
+> 
+> **API**
+> 
+> Get the Teams MsgApp ID
+> 
+> GET `/api/v1/service/msgapps?query=name%3Dteams`
+> 
+> Returns
+> 
+> ```json
+> {
+  > "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  > "mandatoryParams": {
+    > "channelId": "guid"
+  > },
+  > "optionalParams": {
+    > "important": "boolean"
+  > },
+  > "defaults": {
+    > "channelId": "ASSDF2342"
+  > }
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - The return from GET /api/v1/service/msgApps/\<msgId\> provides a list of runtime parameter names and
+> >   their types, together with defaults and any values.
+> > - These are either mandatory (in which case a runtime "params" array must have an element of this
+> >   name, else the call will use the "defaults" value if present, or fail) or optional (which is at
+> >   the discretion of the caller to use in the "params" array)
+> 
+> POST to /api/v1/notifysimple
+> 
+> **Payload**
+> 
+> ```json
+> {
+  > "msgApp": {
+    > "recipients" : {
+       > "MsgAppServiceId": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    > }
+    > "content" : {
+      > "subject": "New post from Notify",
+      > "body": "This is a simple example of posting to a Teams channel with ID {{channelId}} and name {{channelName}}",
+      > "bodyType": "text"
+    > }
+    > "params": {
+        > "channelId" : "id1234",
+        > "channelName": "Tech talk"
+    > }
+  > }
+> }
+> ```
+> 
+> ### Subscriptions
+> 
+> Subscription services are used solely to get a list of recipients for email and SMS. At this stage
+> subscriptions are not envisaged for 3rd party messaging apps , because they invariably manage their
+> own subscriptions. As with other services, they need to be added by a tenant Admin in the UI before
+> they can be used in notification requests.
+> 
+> #### 5.2 Send a notification to email and SMS users subscribed to a regional alert service
+> 
+> **Admin UI**
+> 
+> - Add the "AlertMe" subscription service from the registry
+> - Configure the "AlertMe" service - add the API key, and a default region.
+> 
+> **API**
+> 
+> Get the AlertMe subscription service instance ID
+> 
+> GET `/api/v1/service/subscription?query=name%3DalertMe`
+> 
+> Returns
+> 
+> ```json
+> {
+  > "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  > "mandatoryParams": {
+    > "region": "string"
+  > },
+  > "optionalParams": {
+    > "level": "string",
+    > "type": "string"
+  > },
+  > "defaults": {
+    > "region": "Victoria"
+  > }
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - The return from GET /api/v1/service/subscriptions/\<subscrId\> provides a list of runtime parameter
+> >   names and their types, together with defaults and any values.
+> > - These are either mandatory (in which case a runtime "params" array must have an element of this
+> >   name, else the call will use the "defaults" value if present, or fail) or optional (which is at
+> >   the discretion of the caller to use in the "params" array)
+> 
+> POST to /api/v1/notifysimple
+> 
+> **Payload**
+> 
+> ```json
+> {
+  > "params": {
+    > "region": "nanaimo",
+    > "type": "fire",
+    > "level": "severe"
+  > },
+  > "email": {
+    > "recipients": {
+      > "to": ["{{3fa85f64-5717-4562-b3fc-2c963f66afa6}}"],
+      > "cc": ["copyto@example.com"]
+    > },
+    > "content": {
+      > "subject": "Alert email",
+      > "body": "This is an an alert of type {{type}} for region {{region}}",
+      > "bodyType": "text"
+    > }
+  > },
+  > "sms": {
+    > "recipients": {
+      > "to": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    > },
+    > "content": {
+      > "body": "SMS alert - {{type}} for region {{region}}",
+      > "bodyType": "text"
+    > }
+  > }
+> }
+> ```
+> 
+> > [!NOTE]
+> >
+> > - The subscription service guid is used as a quasi-parameter within the recipients structure,
+> >   interpreted by the notification system to mean a service call
+> > - At runtime, the notification system calls the subscription service described by the GUID with
+> >   the passed in "params". The return from the subscription service contains a section for emails,
+> >   divided into "to", "cc" and "bcc" and for SMS
+> > - In this example, the subscription service is requested to return all email and sms users in the
+> >   Nanaimo area who have subscribed to severe fire alerts.
+> > - Based on the position of the guid in the request, the notification system substitutes the
+> >   appropriate values from the subscription service return into the "to", "cc" and "bcc" sections
+> >   of the email and the "to" section of the sms, before passing it onto the final stage for
+> >   sending.
 
-For example, if the service configuration indicates to the tenant admin that a field "accountNumber"
-is a mandatory field, the runtime notification post data MUST contain a key-value pair in the
-cascading "params" structure (remember "params" can exist in the notification request at the root
-level AND at the service level - they are merged to create a cascading "params" structure) with
-"accountNumber" as an element. If this is not the case, a run-time error for the notification will
-be raised.
-
-Once the service is configured for the tenant, it can be used in the notification request as
-described in the following service types.
-
-### MessagingApp
-
-Messaging application services refer to 3rd party messaging applications like Teams, Rocketchat and
-so on. Their initial configuration requires :
-
-- Authentication
-- Tenant identifier - in this case the native tenant identifier of the messaging application
-- Stream or channel mandatory runtime variable name.
-- Once configured, this messaging application may be used as the third of the supported channels,
-  **email**, **SMS** and **msgApp**. It may be added to a notification-event type or passed in as
-  the "msgAppServiceId" element in a notification request payload.
-
-#### 5.1 Send a notification to a teams messaging app.
-
-**Admin UI**
-
-- Add the "Teams" message app from the registry
-- Configure the "Teams" app - add the API key, add a default channel.
-
-**API**
-
-Get the Teams MsgApp ID
-
-GET `/service/msgapps?query=name%3Dteams`
-
-Returns
-
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "mandatoryParams": {
-    "channelId": "guid"
-  },
-  "optionalParams": {
-    "important": "boolean"
-  },
-  "defaults": {
-    "channelId": "ASSDF2342"
-  }
-}
-```
-
-> [!NOTE]
+>### Templates
 >
-> - The return from GET /service/msgApps/\<msgId\> provides a list of runtime parameter names and
->   their types, together with defaults and any values.
-> - These are either mandatory (in which case a runtime "params" array must have an element of this
->   name, else the call will use the "defaults" value if present, or fail) or optional (which is at
->   the discretion of the caller to use in the "params" array)
-
-POST to /notifysimple
-
-**Payload**
-
-```json
-{
-  "msgApp": {
-    "recipients" : {
-       "MsgAppServiceId": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
-    }
-    "content" : {
-      "subject": "New post from Notify",
-      "body": "This is a simple example of posting to a Teams channel with ID {{channelId}} and name {{channelName}}",
-      "bodyType": "text"
-    }
-    "params": {
-        "channelId" : "id1234",
-        "channelName": "Tech talk"
-    }
-  }
-}
-```
-
-### Subscriptions
-
-Subscription services are used solely to get a list of recipients for email and SMS. At this stage
-subscriptions are not envisaged for 3rd party messaging apps , because they invariably manage their
-own subscriptions. As with other services, they need to be added by a tenant Admin in the UI before
-they can be used in notification requests.
-
-#### 5.2 Send a notification to email and SMS users subscribed to a regional alert service
-
-**Admin UI**
-
-- Add the "AlertMe" subscription service from the registry
-- Configure the "AlertMe" service - add the API key, and a default region.
-
-**API**
-
-Get the AlertMe subscription service instance ID
-
-GET `/service/subscription?query=name%3DalertMe`
-
-Returns
-
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "mandatoryParams": {
-    "region": "string"
-  },
-  "optionalParams": {
-    "level": "string",
-    "type": "string"
-  },
-  "defaults": {
-    "region": "Victoria"
-  }
-}
-```
-
-> [!NOTE]
+>### Attachments
 >
-> - The return from GET /service/sunbscriptions/\<subscrId\> provides a list of runtime parameter
->   names and their types, together with defaults and any values.
-> - These are either mandatory (in which case a runtime "params" array must have an element of this
->   name, else the call will use the "defaults" value if present, or fail) or optional (which is at
->   the discretion of the caller to use in the "params" array)
-
-POST to /notifysimple
-
-**Payload**
-
-```json
-{
-  "params": {
-    "region": "nanaimo",
-    "type": "fire",
-    "level": "severe"
-  },
-  "email": {
-    "recipients": {
-      "to": ["{{3fa85f64-5717-4562-b3fc-2c963f66afa6}}"],
-      "cc": ["copyto@example.com"]
-    },
-    "content": {
-      "subject": "Alert email",
-      "body": "This is an an alert of type {{type}} for region {{region}}",
-      "bodyType": "text"
-    }
-  },
-  "sms": {
-    "recipients": {
-      "to": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
-    },
-    "content": {
-      "body": "SMS alert - {{type}} for region {{region}}",
-      "bodyType": "text"
-    }
-  }
-}
-```
-
-> [!NOTE]
->
-> - The subscription service guid is used as a quasi-parameter within the recipients structure,
->   interpreted by the notification system to mean a service call
-> - At runtime, the notification system calls the subscription service described by the GUID with
->   the passed in "params". The return from the subscription service contains a section for emails,
->   divided into "to", "cc" and "bcc" and for SMS
-> - In this example, the subscription service is requested to return all email and sms users in the
->   Nanaimo area who have subscribed to severe fire alerts.
-> - Based on the position of the guid in the request, the notification system substitutes the
->   appropriate values from the subscription service return into the "to", "cc" and "bcc" sections
->   of the email and the "to" section of the sms, before passing it onto the final stage for
->   sending.
-
-### Templates
-
-### Attachments
-
-### Webhooks
+>### Webhooks
 
 <!-- Testing API gateway automation -->

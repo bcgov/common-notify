@@ -9,8 +9,8 @@ describe('EmailLogoRepository', () => {
 
   const approvedLogo: EmailLogo = {
     id: '00000000-0000-0000-0000-000000000001',
-    name: 'BC Gov Logo Primary',
-    fileKey: 'logos/bc-gov-logo-primary.png',
+    name: 'Attorney General (AG)',
+    fileKey: 'logos/BC_AG_H_RGB_pos.svg',
     sourceCode: 'SYSTEM',
     statusCode: 'APPROVED',
     tenantId: null,

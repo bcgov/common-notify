@@ -24,6 +24,7 @@ import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
   extractTemplatePersonalisationKeys,
   describeTemplatePlaceholders,
@@ -44,6 +45,7 @@ export class TemplatesService {
     private readonly inlineRenderingService: InlineRenderingService,
     private readonly emailTemplateLayoutService: EmailTemplateLayoutService,
     private readonly configService: ConfigService,
+    private readonly tenantSettingsService: TenantSettingsService,
   ) {}
 
   public applyEmailLayout(
@@ -254,12 +256,8 @@ export class TemplatesService {
       // plain-text bodies carry no markup and are left for the caller to render as text.
       html:
         rendered.bodyType === 'text' ? undefined : toEmailHtml(rendered.body, rendered.bodyType),
-      // The address the send would actually use. Resolved the same way the transport resolves it,
-      // rather than from the tenant's default_sender_email - that setting is stored and displayed
-      // but is not consulted at send time, so showing it here would preview a lie.
-      from:
-        this.configService.get<string>('ches.from') ??
-        this.configService.get<string>('defaults.email.from'),
+      // The address the send would actually use, resolved exactly as delivery resolves it.
+      from: await this.tenantSettingsService.resolveSenderAddress(tenantId),
     }
   }
 
@@ -354,7 +352,13 @@ export class TemplatesService {
         ? Object.fromEntries(
             Object.entries(normalizedPersonalisation).map(([key, value]) => [
               key,
-              value !== null && value !== undefined ? String(value) : '',
+              // An array is a list value the legacy renderer formats itself, so it is passed
+              // through; String(["a","b"]) would flatten it to "a,b".
+              Array.isArray(value)
+                ? value
+                : value !== null && value !== undefined
+                  ? String(value)
+                  : '',
             ]),
           )
         : normalizedPersonalisation
@@ -407,6 +411,8 @@ export class TemplatesService {
     switch (engine) {
       case TemplateEngine.LEGACY_GC_NOTIFY:
         return 'legacy_gc_notify'
+      case TemplateEngine.GC_NOTIFY_NATIVE:
+        return 'gc_notify_native'
       case TemplateEngine.HANDLEBARS:
         return 'handlebars'
       case TemplateEngine.MUSTACHE:

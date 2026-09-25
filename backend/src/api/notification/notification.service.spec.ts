@@ -45,6 +45,7 @@ const mockNotificationPubSubService = {
 
 const createMockQueryBuilder = () => ({
   leftJoinAndSelect: vi.fn().mockReturnThis(),
+  addSelect: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   andWhere: vi.fn().mockReturnThis(),
   addOrderBy: vi.fn().mockReturnThis(),
@@ -240,6 +241,22 @@ describe('NotificationService', () => {
       expect(queryBuilder.addOrderBy).toHaveBeenNthCalledWith(2, 'notification.status', 'ASC')
       expect(queryBuilder.skip).toHaveBeenCalledWith(5)
       expect(queryBuilder.take).toHaveBeenCalledWith(5)
+    })
+
+    it('should sort the Sent Date column on the selected sent_date expression', async () => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
+
+      const queryBuilder = createMockQueryBuilder()
+      mockRepository.createQueryBuilder.mockReturnValue(queryBuilder)
+      queryBuilder.getManyAndCount.mockResolvedValue([[], 0])
+
+      await service.findAll('cstar-external-id', { page: 1, limit: 10, sort: '-delayedSendTime' })
+
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        'COALESCE(notification.delayed_send_time, notification.created_at)',
+        'sent_date',
+      )
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('sent_date', 'DESC')
     })
 
     it('should return empty data when tenant is not found', async () => {
@@ -791,6 +808,78 @@ describe('NotificationService', () => {
 
         await expect(service.validateBusinessRules('tenant-123', request)).rejects.toThrow(
           'Missing personalisation for template ID template-123: firstName',
+        )
+      })
+
+      it('should use channel-level params when the request has no top-level params', async () => {
+        // The /notifysimple/email shorthand posts a bare channel, so the caller's params arrive
+        // under email, not at the top level. Reading only request.params reported every
+        // placeholder as missing and rejected the send with a 400.
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+            params: { firstName: 'Alice' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { firstName: 'Alice' },
+        )
+      })
+
+      it('should let channel params override top-level params, as the delivery worker does', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          params: { firstName: 'Alice', permitNumber: 'BC-1' },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+            params: { firstName: 'Bob' },
+          },
+        }
+
+        await service.validateBusinessRules('tenant-123', request)
+
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { firstName: 'Bob', permitNumber: 'BC-1' },
+        )
+      })
+
+      it('should use channel-level params for SMS', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'SMS',
+        })
+
+        const request: any = {
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { templateId: 'template-123' },
+            params: { code: '123456' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { code: '123456' },
         )
       })
 

@@ -10,12 +10,14 @@ import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { SafelistService } from '../safelist/safelist.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
+import { toGcNotifyEmailHtml, toGcNotifySubject } from '../../services/rendering/gc-notify-markdown'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -25,6 +27,20 @@ import { Notification as GcNotification } from './schemas/notification'
 import { Template as GcTemplate } from './schemas/template'
 import { Links } from './schemas/links'
 import type { FileAttachment } from './schemas/file-attachment'
+import Papa from 'papaparse'
+import { UnprocessableEntityException } from '@nestjs/common'
+import {
+  enforceLimits,
+  handleMerge,
+  recordAcceptedUsage,
+  resolveSmsSegments,
+} from '../../common/decorators/queueable.decorator'
+import type { QueueableContext } from '../../common/decorators/queueable.decorator'
+import { PostBulkRequest } from './schemas/post-bulk-request'
+import { PostBulkResponse } from './schemas/post-bulk-response'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -109,6 +125,13 @@ interface MappableNotification {
 }
 
 /**
+ * A personalisation entry that feeds template rendering. An array is a list value: the legacy
+ * renderer turns it into bullets in an email body and into "a, b and c" in a subject or SMS.
+ * Items are not deeply validated, so the element type stays `unknown`.
+ */
+type TemplateParamValue = string | unknown[]
+
+/**
  * Executes GC Notify-compatible send requests against our own Notify pipeline
  * instead of passing them through to the real GC Notify API. Templates are
  * assumed to be pre-provisioned locally with the same id the GC Notify client
@@ -147,16 +170,21 @@ export class GcNotifyInternalExecutionService {
     private readonly notificationService: NotificationService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
     private readonly safelistService: SafelistService,
+    private readonly tenantSettingsService: TenantSettingsService,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
+    private readonly bulkValidationService: GcNotifyBulkValidationService,
+    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly smsSegmentService: SmsSegmentService,
   ) {}
 
   async sendEmail(
     body: CreateEmailNotificationRequest,
     tenantId: string,
+    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(
@@ -166,7 +194,11 @@ export class GcNotifyInternalExecutionService {
     )
     const { params: personalisation, files } = this.splitPersonalisation(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
-    const fromEmail = await this.resolveDefaultSender('gc_notify_default_from_email')
+    const content = this.renderGcNotifyEmailContent(rendered)
+    // The same address delivery will send from, so the 201 cannot report a sender the recipient
+    // never sees. gc_notify_default_from_email is not consulted: nothing in the delivery path
+    // reads it.
+    const fromEmail = await this.tenantSettingsService.resolveSenderAddress(tenantId)
     const attachments = await this.storeAttachments(files, tenantId)
     // No top-level templateId: the delivery worker has two modes — template mode
     // (re-renders at delivery time when request.templateId is set) and pre-rendered
@@ -183,17 +215,21 @@ export class GcNotifyInternalExecutionService {
         recipients: { to: [body.email_address] },
         params: personalisation,
         content: {
-          subject: rendered.subject ?? '',
-          body: rendered.body,
-          // Carry the rendered body type through to delivery. Without it the CHES
-          // adapter can't tell the body is markdown, skips markdown->HTML conversion,
-          // and ships raw markdown (## H1, **bold**, - lists) in the email.
-          bodyType: rendered.bodyType,
+          subject: content.subject,
+          body: content.deliveryBody,
+          // Already GC Notify's HTML, so delivery must pass it through rather than run the
+          // CommonMark converter over it - that would escape every tag into visible markup.
+          bodyType: 'html' as const,
         },
         ...(attachments.length > 0 && { attachments }),
         delayedSend: body.scheduled_for,
       },
     }
+
+    // One email_address per request, so one message. Checked before the send is accepted and
+    // recorded after, the same order the @Queueable path uses.
+    const usage = [{ channel: NotificationChannel.EMAIL, count: 1 }]
+    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
 
     const notificationRecord = await this.createAndEnqueue(
       tenantId,
@@ -202,13 +238,15 @@ export class GcNotifyInternalExecutionService {
       requestRoute,
     )
 
+    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
+
     return {
       id: notificationRecord.id,
       reference: body.reference ?? null,
       content: {
         from_email: fromEmail,
-        body: rendered.body,
-        subject: rendered.subject ?? '',
+        body: content.responseBody,
+        subject: content.subject,
       },
       uri: `/gcnotify/v2/notifications/${notificationRecord.id}`,
       template: {
@@ -223,10 +261,11 @@ export class GcNotifyInternalExecutionService {
   async sendSms(
     body: CreateSmsNotificationRequest,
     tenantId: string,
+    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
-    const personalisation = this.toStringPersonalisation(body.personalisation)
+    const personalisation = this.toTemplateParams(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromNumber = await this.resolveDefaultSender('gc_notify_default_sms_sender')
 
@@ -243,12 +282,20 @@ export class GcNotifyInternalExecutionService {
       },
     }
 
+    // An SMS is billed per segment, not per message: a long body is concatenated and the carrier
+    // charges for each part. resolveSmsSegments fails open at 1 rather than failing the send.
+    const segments = await resolveSmsSegments(this.queueableContext(), tenantId, notifyRequest)
+    const usage = [{ channel: NotificationChannel.SMS, count: segments }]
+    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
+
     const notificationRecord = await this.createAndEnqueue(
       tenantId,
       notifyRequest,
       body.scheduled_for,
       requestRoute,
     )
+
+    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
 
     return {
       id: notificationRecord.id,
@@ -267,13 +314,169 @@ export class GcNotifyInternalExecutionService {
     }
   }
 
+  /**
+   * GC Notify-compatible bulk send.
+   *
+   * Reuses the ordinary mail-merge path rather than reimplementing it: `handleMerge` already
+   * extracts recipients, applies the safelist, counts SMS segments, creates the notification
+   * record and enqueues the ingestion fan-out. This method's job is only translation - GC Notify's
+   * request shape in, GC Notify's job shape out.
+   *
+   * The template decides the channel. GC Notify infers it from the header column, but a bulk send
+   * names a template, and a template is already email or SMS.
+   */
+  async sendBulk(
+    body: PostBulkRequest,
+    tenantId: string,
+    apiKeyConsumerId?: string,
+    requestRoute?: string,
+  ): Promise<PostBulkResponse> {
+    const template = await this.requireTemplate(tenantId, body.template_id)
+    const channel = template.channelCode as NotificationChannel
+    const rows = this.resolveBulkRows(body)
+
+    // Unconditional, as the controller did before: the validator self-selects on the header row,
+    // returning valid for an email-shaped bulk and checking E.164 for a phone-shaped one.
+    const validation = this.bulkValidationService.validateRows(rows)
+    if (!validation.valid) {
+      throw new UnprocessableEntityException({
+        errors: validation.errors.map((message) => ({
+          error: 'ValidationError',
+          message,
+        })),
+      })
+    }
+
+    const mergeArray = this.toMergeArray(rows)
+    const channelPayload = {
+      recipients: { mergeArray },
+      content: { templateId: template.id },
+      ...(body.scheduled_for && { delayedSend: body.scheduled_for }),
+    }
+    const notifyRequest = (channel === NotificationChannel.SMS
+      ? { sms: channelPayload, reference: body.reference }
+      : { email: channelPayload, reference: body.reference }) as unknown as NotifySimpleRequest
+
+    const accepted = (await handleMerge(
+      this.queueableContext(),
+      this.ingestionQueue as unknown as Bull.Queue,
+      QueueName.INGESTION,
+      tenantId,
+      notifyRequest,
+      apiKeyConsumerId,
+      requestRoute,
+      channel,
+    )) as { notifyId: string; recipientCount: number; createdAt: Date }
+
+    // created_by, api_key, service_name and sender_id are deliberately absent: GC Notify fills them
+    // from its own user and key model, and inventing values here would misreport who sent what.
+    return {
+      data: {
+        id: accepted.notifyId,
+        template: template.id,
+        job_status: 'pending',
+        notification_count: accepted.recipientCount,
+        original_file_name: body.name,
+        template_version: template.version,
+        template_type: channel === NotificationChannel.SMS ? 'sms' : 'email',
+        created_at: (accepted.createdAt ?? new Date()).toISOString(),
+        ...(body.scheduled_for && { scheduled_for: body.scheduled_for }),
+        archived: false,
+      },
+    }
+  }
+
+  /**
+   * The rows to send, from whichever form the caller used. GC Notify accepts `rows` or a raw `csv`
+   * string and the schema requires exactly one of them.
+   */
+  private resolveBulkRows(body: PostBulkRequest): string[][] {
+    if (body.rows) {
+      return body.rows
+    }
+
+    // `skipEmptyLines` because a trailing newline is normal in an uploaded file and would otherwise
+    // become a row of empty strings - a recipient with no address.
+    const parsed = Papa.parse<string[]>(body.csv ?? '', { skipEmptyLines: true })
+    if (parsed.errors.length > 0) {
+      throw new BadRequestException({
+        errors: parsed.errors.slice(0, 10).map((error) => ({
+          error: 'ValidationError',
+          message: `csv could not be parsed: ${error.message} (row ${error.row ?? 0})`,
+        })),
+      })
+    }
+    if (parsed.data.length < 2) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: 'csv must have a header row and at least one data row',
+          },
+        ],
+      })
+    }
+    return parsed.data
+  }
+
+  /**
+   * GC Notify names the recipient column `email address` or `phone number`; the merge pipeline
+   * requires it to be called `to`. Every other column is personalisation and passes through as-is.
+   */
+  private toMergeArray(rows: string[][]): string[][] {
+    const [header, ...dataRows] = rows
+    const recipientColumn = header.findIndex((column) =>
+      ['email address', 'phone number'].includes(
+        String(column ?? '')
+          .trim()
+          .toLowerCase(),
+      ),
+    )
+
+    if (recipientColumn === -1) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message:
+              'The header row must contain an "email address" or "phone number" column naming the recipient',
+          },
+        ],
+      })
+    }
+
+    const mappedHeader = header.map((column, index) => (index === recipientColumn ? 'to' : column))
+    return [mappedHeader, ...dataRows]
+  }
+
+  /**
+   * The queueable context `handleMerge` needs. `apiKeyUsageService` and `smsSegmentService` are
+   * what make a bulk send count: the first checks the key's limits before accepting and records the
+   * usage after, the second prices an SMS in billable segments rather than one per recipient.
+   *
+   * `limitAlertNotificationService` is absent, so crossing a threshold is recorded but does not
+   * send the alert email `/notifysimple` would.
+   */
+  private queueableContext(): QueueableContext {
+    return {
+      notificationService: this.notificationService,
+      attachmentValidationService: this.attachmentValidationService,
+      attachmentProcessingService: this.attachmentProcessingService,
+      safelistService: this.safelistService,
+      notificationRequestDetailService: this.notificationRequestDetailService,
+      apiKeyUsageService: this.apiKeyUsageService,
+      smsSegmentService: this.smsSegmentService,
+      queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Bull.Queue]]),
+    }
+  }
+
   private async requireTemplate(
     tenantId: string,
     templateId: string,
-    channel: NotificationChannel,
+    channel?: NotificationChannel,
   ): Promise<Template> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
-    if (!template || template.channelCode !== channel) {
+    if (!template || (channel !== undefined && template.channelCode !== channel)) {
       throw new BadRequestException({
         errors: [{ error: 'ValidationError', message: 'Template not found' }],
       })
@@ -285,39 +488,68 @@ export class GcNotifyInternalExecutionService {
     template: Template,
     personalisation: Record<string, unknown>,
   ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
-    // GC Notify routes always use legacy GC Notify placeholder semantics ((key))
-    // and ((key??default)), regardless of the stored template engine.
+    // GC Notify routes always use GC Notify placeholder semantics ((key)) and ((key??content)),
+    // regardless of the stored template engine. GC_NOTIFY_NATIVE rather than LEGACY_GC_NOTIFY:
+    // the legacy engine is a public `renderer` option on the ordinary notify API and must keep
+    // its current behaviour for callers who are not talking to these routes.
     return this.templatesService.renderTemplateContent(
       {
         ...template,
-        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+        engineCode: TemplateEngine.GC_NOTIFY_NATIVE,
       },
       personalisation,
     )
   }
 
-  private toStringPersonalisation(
+  /**
+   * The body and subject a GC Notify email send delivers.
+   *
+   * The body is rendered to HTML here rather than left as markdown for the CHES adapter, because
+   * the adapter renders CommonMark - which is not what GC Notify renders. Handing delivery
+   * finished HTML keeps that dialect on these routes only. Our own generated HTML, so the
+   * caller-HTML sanitiser does not apply and must not: it would strip the inline styles GC Notify
+   * puts on headings and links.
+   *
+   * The 201 response keeps the unrendered body, which is the form GC Notify reports.
+   */
+  private renderGcNotifyEmailContent(rendered: { subject?: string; body: string }): {
+    responseBody: string
+    deliveryBody: string
+    subject: string
+  } {
+    return {
+      responseBody: rendered.body,
+      deliveryBody: toGcNotifyEmailHtml(rendered.body),
+      subject: toGcNotifySubject(rendered.subject ?? ''),
+    }
+  }
+
+  private toTemplateParams(
     personalisation: Record<string, unknown> | undefined,
-  ): Record<string, string> {
+  ): Record<string, TemplateParamValue> {
     return this.splitPersonalisation(personalisation).params
   }
 
   /**
    * GC Notify overloads the personalisation map: each entry is either a template
-   * variable (string) or a file attachment (object). Split them - string values
-   * feed template rendering; file-valued entries become attachments. Any other
-   * non-string value is dropped rather than stringified into garbage (unchanged
-   * from the previous string-only behaviour).
+   * variable (a string, or an array the renderer writes out as a list) or a file
+   * attachment (object). Split them - variables feed template rendering; file-valued
+   * entries become attachments. Any other value is dropped rather than stringified
+   * into garbage.
+   *
+   * An array is passed through untouched rather than coerced item by item: the legacy
+   * renderer drops empty items itself, and `String(null)` here would turn one into the
+   * printable item "null".
    */
   private splitPersonalisation(personalisation: Record<string, unknown> | undefined): {
-    params: Record<string, string>
+    params: Record<string, TemplateParamValue>
     files: FileAttachment[]
   } {
-    const params: Record<string, string> = {}
+    const params: Record<string, TemplateParamValue> = {}
     const files: FileAttachment[] = []
     if (!personalisation) return { params, files }
     for (const [key, value] of Object.entries(personalisation)) {
-      if (typeof value === 'string') {
+      if (typeof value === 'string' || Array.isArray(value)) {
         params[key] = value
       } else if (this.isFileAttachment(value)) {
         files.push(value)
