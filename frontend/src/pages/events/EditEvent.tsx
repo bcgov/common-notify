@@ -6,12 +6,12 @@ import EventTabs from './components/EventTabs'
 import type { EventTab } from './components/EventTabs'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
-import EventsEmailTab from './sections/EventsEmailTab'
+import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
 import type { EmailApplyValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
 import type { SmsApplyValues } from './sections/EventsSmsTab'
 import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
-import UnsavedChangesDialog from './components/UnsavedChangesDialog'
+import UnsavedChanges from '@/components/UnsavedChanges'
 import {
   getEventById,
   updateEvent,
@@ -171,9 +171,12 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
 
       <EventTabs selected={selectedTab} onSelect={handleSelectTab} />
 
-      {pendingTab && (
-        <UnsavedChangesDialog onLeave={leavePendingTab} onStay={() => setPendingTab(null)} />
-      )}
+      <UnsavedChanges
+        isBlocked={pendingTab !== null}
+        onLeave={leavePendingTab}
+        onStay={() => setPendingTab(null)}
+        modalMessage={UNSAVED_EMAIL_CHANGES_MESSAGE}
+      />
 
       <section className="events__section">
         {loadError ? (

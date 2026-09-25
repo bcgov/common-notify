@@ -13,14 +13,13 @@ import {
   TooltipTrigger,
   SvgInfoIcon,
 } from '@bcgov/design-system-react-components'
-import { useBlocker } from '@tanstack/react-router'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
-import UnsavedChangesDialog from '../components/UnsavedChangesDialog'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
+import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -28,6 +27,11 @@ import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
+
+// Shown by both guards on these settings: the route blocker below, and the page's own guard on
+// the tab bar, which is not routing and so has to intercept the switch itself.
+export const UNSAVED_EMAIL_CHANGES_MESSAGE =
+  'You have unsaved changes to your email notification settings. If you leave this page, your changes will be lost.'
 
 // Tenant default_sender_email stores only the local part (before @gov.bc.ca); matches the
 // suffix shown on the Settings > Email tab. The backend holds an event's sender to this same
@@ -248,17 +252,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     isFormDisabled || (!settingsChanged && !activeChanged) || recipientsHaveError
   const hasUnsavedChanges = settingsChanged || activeChanged
 
-  // A save of its own navigates on to the saved-settings page, and `saving` is still true while
-  // that happens, so the blocker stands down for it rather than asking about changes it is in
-  // the middle of persisting.
-  const blocker = useBlocker({
-    shouldBlockFn: () => hasUnsavedChanges && !saving,
-    // A refresh or a closed tab can't be answered with this dialog, so those fall back to the
-    // browser's own prompt - and only while there is something to lose.
-    enableBeforeUnload: () => hasUnsavedChanges,
-    withResolver: true,
-  })
-
   useEffect(() => {
     onUnsavedChangesChange?.(hasUnsavedChanges)
   }, [hasUnsavedChanges, onUnsavedChangesChange])
@@ -340,9 +333,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         onConfirm={confirmDeactivate}
       />
 
-      {blocker.status === 'blocked' && (
-        <UnsavedChangesDialog onLeave={blocker.proceed} onStay={blocker.reset} />
-      )}
+      {/** Prompts the user if they attempt to navigate away from the page with unsaved changes */}
+      <UnsavedChanges
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={saving}
+        modalMessage={UNSAVED_EMAIL_CHANGES_MESSAGE}
+      />
 
       {showFields && (
         <>
