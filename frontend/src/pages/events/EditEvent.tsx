@@ -22,6 +22,7 @@ import {
 import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useCstarGroups } from '@/hooks/useCstarGroups'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
@@ -34,6 +35,9 @@ interface EditEventProps {
 
 const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => {
   const { canEdit } = useCstarRoles()
+  // Fetched here rather than in the email tab, the same way the tenant's logos and default sender
+  // are: the tab takes everything outside its own form as a prop.
+  const cstarGroups = useCstarGroups()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
@@ -109,6 +113,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
       to: values.to,
       cc: values.cc,
       bcc: values.bcc,
+      cstarGroupIdsTo: values.cstarGroupIdsTo,
+      cstarGroupIdsCc: values.cstarGroupIdsCc,
+      cstarGroupIdsBcc: values.cstarGroupIdsBcc,
       useCustomHeader: values.useCustomHeader,
       headerLogoId: values.headerLogoId,
       headerTitle: values.headerTitle || null,
@@ -172,6 +179,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
               to: event.emailSettings?.to ?? [],
               cc: event.emailSettings?.cc ?? [],
               bcc: event.emailSettings?.bcc ?? [],
+              cstarGroupIdsTo: event.emailSettings?.cstarGroupIdsTo ?? [],
+              cstarGroupIdsCc: event.emailSettings?.cstarGroupIdsCc ?? [],
+              cstarGroupIdsBcc: event.emailSettings?.cstarGroupIdsBcc ?? [],
               useCustomHeader: event.emailSettings?.useCustomHeader ?? false,
               headerLogoId: event.emailSettings?.headerLogoId ?? null,
               headerTitle: event.emailSettings?.headerTitle ?? '',
@@ -184,6 +194,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
             approvedLogos={approvedLogos}
             tenantEmailLogoId={tenantEmailLogoId}
             tenantName={tenantName}
+            cstarGroups={cstarGroups}
           />
         ) : selectedTab === 'sms' ? (
           // The SMS channel starts disabled until the tab has been saved with it switched on.

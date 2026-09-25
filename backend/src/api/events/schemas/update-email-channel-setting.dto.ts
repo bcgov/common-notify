@@ -5,9 +5,17 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator'
+
+/**
+ * The character set a CSTAR group ID may use, matching CstarApiClient.SAFE_PATH_SEGMENT and the
+ * chk_event_channel_cstar_group_id constraint: an ID accepted here is one the client can safely
+ * place in a CSTAR URL path when it resolves the group's members.
+ */
+const CSTAR_GROUP_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
 /**
  * DTO for updating an event's EMAIL channel settings (Email Notification tab)
@@ -15,12 +23,17 @@ import {
  * The tab owns every field it submits, so this replaces the stored settings rather than patching
  * individual ones. `senderEmail` and `templateId` are required, explicitly nullable so an
  * inactive channel can be saved half-filled. `to`/`cc`/`bcc` are optional lists of recipient
- * addresses, normalized and stored as comma-separated strings.
+ * addresses, normalized and stored as rows in notify.event_channel_recipient.
+ *
+ * `cstarGroupIdsTo`/`Cc`/`Bcc` address the same three lists to CSTAR groups instead of, or as
+ * well as, typed-in addresses. A list may carry any number of groups; only the IDs are stored,
+ * in notify.event_channel_cstar_group, and their members are resolved from CSTAR at send time.
  *
  * `active` is included here because this is the only path that switches the channel on - the
  * tab's toggle is local until the settings are applied. When it is true the submitted fields
- * must be complete (sender email, at least one "to" recipient, and template), matching
- * chk_event_channel_setting_active_complete.
+ * must be complete (sender email, template, and at least one "to" recipient - an address or a
+ * group), matching chk_event_channel_setting_active_complete and the recipient half that
+ * EventsService enforces alongside it.
  */
 export class UpdateEmailChannelSettingDto {
   /**
@@ -77,6 +90,37 @@ export class UpdateEmailChannelSettingDto {
   @IsEmail({}, { each: true })
   @MaxLength(320, { each: true })
   bcc?: string[]
+
+  /**
+   * CSTAR groups addressed in the To field. Any number of groups; their members are resolved
+   * from CSTAR at send time.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  cstarGroupIdsTo?: string[]
+
+  /**
+   * CSTAR groups addressed in the CC field.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  cstarGroupIdsCc?: string[]
+
+  /**
+   * CSTAR groups addressed in the BCC field.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  cstarGroupIdsBcc?: string[]
 
   /**
    * Whether the email uses a custom header rather than the tenant's default one. Omitted means

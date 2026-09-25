@@ -15,6 +15,8 @@ import {
 } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
+import EventsCstarGroups from '../components/EventsCstarGroups'
+import type { CstarGroupSelections } from '../components/EventsCstarGroups'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
@@ -23,6 +25,7 @@ import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
+import type { CstarGroup } from '@/api/cstar.api'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
@@ -37,10 +40,14 @@ const HEADER_CUSTOM_ID = 'custom'
 // Sentinel for the "No logo" entry in the logo select; saved as a null headerLogoId.
 const NO_LOGO_ID = 'no-logo'
 
-// Subscription service and CSTAR group recipients are not implemented yet.
+// Subscription service recipients are not implemented yet.
 const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
 const CSTAR_GROUPS_ID = 'cstar-groups'
 const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
+
+// What a recipient source contributes while its checkbox is off. Its own fields are left holding
+// what was entered, so checking it back on restores them, but nothing there is saved or validated.
+const NO_SELECTION: RecipientAddresses & CstarGroupSelections = { to: [], cc: [], bcc: [] }
 
 export type EmailSettingsValues = {
   active: boolean
@@ -49,6 +56,10 @@ export type EmailSettingsValues = {
   to: string[]
   cc: string[]
   bcc: string[]
+  /** CSTAR groups addressed in each field; only the group IDs, resolved to people at send time. */
+  cstarGroupIdsTo: string[]
+  cstarGroupIdsCc: string[]
+  cstarGroupIdsBcc: string[]
   useCustomHeader: boolean
   headerLogoId: string | null
   headerTitle: string
@@ -93,6 +104,8 @@ type EventsEmailTabProps = {
   tenantEmailLogoId?: string | null
   /** Selected tenant's name, used as the default header title. */
   tenantName?: string | null
+  /** The tenant's CSTAR groups, the options the group picker offers. */
+  cstarGroups?: CstarGroup[]
 }
 
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
@@ -105,6 +118,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   approvedLogos = [],
   tenantEmailLogoId,
   tenantName,
+  cstarGroups = [],
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
@@ -120,9 +134,27 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     cc: values.cc,
     bcc: values.bcc,
   })
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>(
-    values.to.length || values.cc.length || values.bcc.length ? [ADDITIONAL_RECIPIENTS_ID] : [],
-  )
+  const [groupSelections, setGroupSelections] = useState<CstarGroupSelections>({
+    to: values.cstarGroupIdsTo,
+    cc: values.cstarGroupIdsCc,
+    bcc: values.cstarGroupIdsBcc,
+  })
+  // A source is shown as chosen when the saved settings carry anything for it, so the tab opens
+  // on what the event actually sends to.
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>(() => {
+    const sources: string[] = []
+    if (
+      values.cstarGroupIdsTo.length ||
+      values.cstarGroupIdsCc.length ||
+      values.cstarGroupIdsBcc.length
+    ) {
+      sources.push(CSTAR_GROUPS_ID)
+    }
+    if (values.to.length || values.cc.length || values.bcc.length) {
+      sources.push(ADDITIONAL_RECIPIENTS_ID)
+    }
+    return sources
+  })
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const templates = useChannelTemplates(NotificationChannel.EMAIL)
@@ -198,10 +230,18 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const senderEmailFormatError = senderEmailProblem(trimmedSenderEmail)
   const senderEmailError =
     trimmedSenderEmail === '' ? 'Sender email address cannot be empty.' : senderEmailFormatError
+  // Only the sources ticked in Recipient(s) reach the save, so they are also what is validated -
+  // an address left behind in an unticked field must not block a save it isn't part of.
+  const submittedRecipients = selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID)
+    ? recipients
+    : NO_SELECTION
+  const submittedGroups = selectedRecipients.includes(CSTAR_GROUPS_ID)
+    ? groupSelections
+    : NO_SELECTION
   const invalidRecipients: RecipientAddresses = {
-    to: recipients.to.filter((address) => !isValidEmail(address)),
-    cc: recipients.cc.filter((address) => !isValidEmail(address)),
-    bcc: recipients.bcc.filter((address) => !isValidEmail(address)),
+    to: submittedRecipients.to.filter((address) => !isValidEmail(address)),
+    cc: submittedRecipients.cc.filter((address) => !isValidEmail(address)),
+    bcc: submittedRecipients.bcc.filter((address) => !isValidEmail(address)),
   }
   const recipientsHaveError =
     invalidRecipients.to.length > 0 ||
@@ -210,11 +250,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Malformed input is rejected whatever the channel's state; the required-but-empty fields
   // below only have to be complete while it is active, matching what the backend enforces.
   const hasValidationError = Boolean(senderEmailFormatError) || recipientsHaveError
-  // "Additional recipient(s)" is only a complete choice once it has a To address, so an empty
-  // To counts as no recipient selected and reports the same error under the checkbox group.
+  // A recipient source is only a complete choice once something addresses the To field, so a
+  // chosen source with an empty To counts as no recipient at all and reports the same error under
+  // the checkbox group. An address or a CSTAR group satisfies it - the rule the backend applies
+  // before it will activate the channel - while cc and bcc on their own never do.
   const recipientSelectionError =
     selectedRecipients.length === 0 ||
-    (selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && recipients.to.length === 0)
+    (submittedRecipients.to.length === 0 && submittedGroups.to.length === 0)
       ? 'Please select at least one recipient.'
       : ''
   const templateError = selectedTemplateId ? '' : 'Please select a template.'
@@ -269,9 +311,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         active: channelActive,
         senderEmail: trimmedSenderEmail,
         templateId: selectedTemplateId ?? null,
-        to: recipients.to,
-        cc: recipients.cc,
-        bcc: recipients.bcc,
+        to: submittedRecipients.to,
+        cc: submittedRecipients.cc,
+        bcc: submittedRecipients.bcc,
+        cstarGroupIdsTo: submittedGroups.to,
+        cstarGroupIdsCc: submittedGroups.cc,
+        cstarGroupIdsBcc: submittedGroups.bcc,
         useCustomHeader,
         // "No logo" is a real choice, so it saves as no logo rather than as the tenant default.
         headerLogoId:
@@ -371,11 +416,21 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             <Checkbox value={SUBSCRIPTION_SERVICE_ID} isDisabled>
               Subscription Service
             </Checkbox>
-            <Checkbox value={CSTAR_GROUPS_ID} isDisabled>
-              CSTAR Group(s)
-            </Checkbox>
+            <Checkbox value={CSTAR_GROUPS_ID}>CSTAR Group(s)</Checkbox>
             <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
           </CheckboxGroup>
+
+          {selectedRecipients.includes(CSTAR_GROUPS_ID) && (
+            <EventsCstarGroups
+              values={groupSelections}
+              groups={cstarGroups}
+              onChange={(value) => {
+                setGroupSelections(value)
+                setSettingsChanged(true)
+              }}
+              isDisabled={areFieldsDisabled}
+            />
+          )}
 
           {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
             <EventsAdditionalRecipients
@@ -501,9 +556,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               onClose={() => setPreviewOpen(false)}
               template={selectedTemplate}
               senderEmail={trimmedSenderEmail}
-              toAddresses={recipients.to}
-              ccAddresses={recipients.cc}
-              bccAddresses={recipients.bcc}
+              toAddresses={submittedRecipients.to}
+              ccAddresses={submittedRecipients.cc}
+              bccAddresses={submittedRecipients.bcc}
             />
           )}
 

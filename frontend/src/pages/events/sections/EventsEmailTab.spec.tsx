@@ -7,6 +7,7 @@ import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
+import type { CstarGroup } from '@/api/cstar.api'
 
 const getTemplatesMock = vi.fn()
 
@@ -44,6 +45,11 @@ const logos: ApprovedEmailLogo[] = [
   { id: 'logo-2', name: 'Ministry', imageUrl: 'https://example.test/ministry.png' },
 ]
 
+const groups: CstarGroup[] = [
+  { id: 'group-1', name: 'Wildfire Ops', description: '' },
+  { id: 'group-2', name: 'Flood Response', description: '' },
+]
+
 const unconfigured: EmailSettingsValues = {
   active: false,
   senderEmail: '',
@@ -51,6 +57,9 @@ const unconfigured: EmailSettingsValues = {
   to: [],
   cc: [],
   bcc: [],
+  cstarGroupIdsTo: [],
+  cstarGroupIdsCc: [],
+  cstarGroupIdsBcc: [],
   useCustomHeader: false,
   headerLogoId: null,
   headerTitle: '',
@@ -72,6 +81,7 @@ type RenderOptions = {
   approvedLogos?: ApprovedEmailLogo[]
   tenantEmailLogoId?: string | null
   tenantName?: string | null
+  cstarGroups?: CstarGroup[]
   onSave?: ReturnType<typeof vi.fn>
   onDeactivate?: ReturnType<typeof vi.fn>
 }
@@ -292,11 +302,11 @@ describe('EventsEmailTab', () => {
   })
 
   describe('recipients', () => {
-    it('offers only additional recipients; the other sources are not available yet', () => {
+    it('offers CSTAR groups and additional recipients; the subscription service is not available yet', () => {
       renderTab({ values: { ...unconfigured, active: true } })
 
       expect(screen.getByRole('checkbox', { name: 'Subscription Service' })).toBeDisabled()
-      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeDisabled()
+      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeEnabled()
       expect(screen.getByRole('checkbox', { name: 'Additional recipient(s)' })).toBeEnabled()
     })
 
@@ -347,6 +357,105 @@ describe('EventsEmailTab', () => {
       )
       expect(saveButton()).toBeDisabled()
       expect(onSave).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('CSTAR groups', () => {
+    it('opens the group fields when CSTAR groups are chosen', async () => {
+      renderTab({ values: { ...unconfigured, active: true }, cstarGroups: groups })
+
+      expect(screen.queryByRole('group', { name: 'CSTAR groups' })).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' }))
+
+      expect(screen.getByRole('group', { name: 'CSTAR groups' })).toBeInTheDocument()
+    })
+
+    it('shows the saved groups as chosen', () => {
+      renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeChecked()
+      expect(screen.getByRole('group', { name: 'CSTAR groups' })).toBeInTheDocument()
+      // Shown as one removable tag per group, in the blue the design calls for.
+      expect(screen.getByRole('row', { name: 'Wildfire Ops' })).toHaveClass('blue')
+    })
+
+    it('saves the groups picked in each field', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: /To CSTAR groups/ }))
+      await userEvent.click(await screen.findByRole('option', { name: 'Flood Response' }))
+      await userEvent.keyboard('{Escape}')
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cstarGroupIdsTo: ['group-1', 'group-2'],
+            cstarGroupIdsCc: [],
+            cstarGroupIdsBcc: [],
+          }),
+        ),
+      )
+    })
+
+    it('counts a To group as a recipient, with no address needed', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, to: [], cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ to: [], cstarGroupIdsTo: ['group-1'] }),
+        ),
+      )
+      expect(screen.queryByText('Please select at least one recipient.')).not.toBeInTheDocument()
+    })
+
+    it('treats CSTAR groups with no To group as no recipient at all', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, to: [], cstarGroupIdsCc: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      expect(await screen.findByText('Please select at least one recipient.')).toBeInTheDocument()
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('does not save the groups of a source that has been unchosen', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' }))
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ to: ['alice@gov.bc.ca'], cstarGroupIdsTo: [] }),
+        ),
+      )
     })
   })
 
@@ -546,6 +655,9 @@ describe('EventsEmailTab', () => {
           to: ['alice@gov.bc.ca'],
           cc: [],
           bcc: [],
+          cstarGroupIdsTo: [],
+          cstarGroupIdsCc: [],
+          cstarGroupIdsBcc: [],
           useCustomHeader: false,
           headerLogoId: null,
           headerTitle: '',
