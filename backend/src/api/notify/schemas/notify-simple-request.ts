@@ -30,7 +30,7 @@ export class NotifySimpleRequest {
   email?: NotifyEmailChannel
 
   @ApiPropertyOptional({
-    description: 'Send by SMS. Requires the sms_notifications feature flag.',
+    description: 'Send by SMS. SMS must be enabled for the tenant.',
     type: NotifySmsChannel,
   })
   @IsOptional()

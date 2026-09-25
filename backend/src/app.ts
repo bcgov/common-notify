@@ -100,7 +100,7 @@ export async function bootstrap() {
         '1. Ensure you have a tenant and an administrator has configured its Notify settings.',
         '2. Ask a tenant administrator to obtain an API key from the Notify UI.',
         '3. Add the key to the `X-API-KEY` header and send with `POST /api/v1/notifysimple` ' +
-          "(or the `/email` and `/sms` shorthands). SMS requires the tenant's `sms_notifications` feature flag.",
+          '(or the `/email` and `/sms` shorthands). SMS must be enabled for your tenant.',
         '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
         '',
@@ -144,7 +144,7 @@ export async function bootstrap() {
           'parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
         '',
         'Preview returns rendered content and the submitted recipients, grouped by channel. ' +
-          'Recipients are echoed unchanged. Authentication, feature flags and request validation still apply. ' +
+          'Recipients are echoed unchanged. Authentication, channel availability and request validation still apply. ' +
           'Preview does not create notification requests, enqueue delivery, consume send limits or check safelists.',
         '',
         '### Feature availability',
