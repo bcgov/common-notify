@@ -105,11 +105,7 @@ export async function bootstrap() {
           'register a webhook so Notify calls you instead.',
         '',
         'SMS must be enabled for your tenant before you can send or preview SMS messages. ' +
-          'This is controlled by `sms_notifications`, a feature flag (an on/off setting for a capability). ' +
-          'Ask a Notify platform administrator with the `NOTIFY_ADMIN` role to enable it for your tenant ' +
-          'in the Notify UI under **Feature Flags**. The administrator can enable an existing tenant ' +
-          'entry or use **Create New Feature Flag**, select `sms_notifications` and your tenant, ' +
-          'and check **Enable this flag**. A tenant administrator role alone does not grant this permission.',
+          'Contact the Notify team to request it.',
         '',
         '### Try it out from here',
         '',
