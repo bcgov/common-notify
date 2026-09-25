@@ -92,9 +92,10 @@ describe('ApiKeyIssuanceService', () => {
         // Carries the CSTAR guid so the Consumers page is searchable by it, and a
         // discriminator because a repeated name is permanently unusable.
         applicationName: expect.stringMatching(/^notify-tenant-a-cstar-guid-[0-9a-f]{6}$/),
-        // Sent only because APS_ACL_GROUP is set here. The shared group is what an acl
-        // plugin's allow-list would name; the tenant's own group is never in that list
-        // and does not need to be, since Kong reports every group a consumer belongs to.
+        // The tenant's group is always sent; the shared group only because APS_ACL_GROUP
+        // is set here. The shared group is what an acl plugin's allow-list would name;
+        // the tenant's own group is never in that list and does not need to be, since
+        // Kong reports every group a consumer belongs to.
         aclGroups: ['notify-api', 'cstar-guid'],
         applicationDescription: 'Notify API key for tenant Tenant A',
         labels: {
@@ -141,17 +142,16 @@ describe('ApiKeyIssuanceService', () => {
       expect(call.aclGroups).toEqual(['notify-api'])
     })
 
-    it('sends no ACL controls at all when APS_ACL_GROUP is unset', async () => {
-      // The default, and what every gw-fe8c5 Environment needs: they are all
-      // kong-api-key-only, so a control the flow does not support is a risk taken for
-      // groups that would authorize nothing. Absent, not empty — an empty array would
-      // still put a `controls` object on the request.
+    it('still sends the tenant group when APS_ACL_GROUP is unset', async () => {
+      // The shared group is optional; the tenant's own group is the point. A
+      // kong-api-key-only Environment ignores it, so sending it costs nothing and is
+      // already correct once that Environment is switched to kong-api-key-acl.
       aclGroupConfig = undefined
 
       await issue()
 
       const call = credentialIssuer.issue.mock.calls[0][0]
-      expect(call).not.toHaveProperty('aclGroups')
+      expect(call.aclGroups).toEqual(['cstar-guid'])
     })
 
     it('seeds limits from the tenant the same way a bound key does', async () => {

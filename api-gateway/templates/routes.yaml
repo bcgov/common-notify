@@ -1042,6 +1042,23 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
+  # Forwards the consumer's ACL groups upstream as X-Consumer-Groups, which is how the
+  # tenant's CSTAR id reaches the backend (see resolve-api-key-consumer.ts). Paired with
+  # every key-auth route so service callers are identified the same way everywhere.
+  #
+  # This is NOT access control. `deny` names a group no consumer belongs to, so it
+  # rejects nobody; hide_groups_header: false is the only reason the plugin is here.
+  # Never turn this into an allow-list without first confirming every consumer carries
+  # the group it would be matched on, or live keys start getting 403s.
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}api-key-bind
+    config: &aclHeaderConfig
+      deny: ["__none__"]
+      hide_groups_header: false
+
   # Rate limiting (per API key) - applies only to key-auth (service-to-service) callers.
   # policy: redis uses a centralized counter shared across all Kong pods, so the limit is
   # enforced cluster-wide per key regardless of replica count (adds ~100-200ms latency).
@@ -1074,6 +1091,14 @@ plugins:
       key_names: ["X-API-KEY"]
       run_on_preflight: true
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}ches-email
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1087,6 +1112,14 @@ plugins:
     route: ${ROUTE_PREFIX}notify-simple
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1099,6 +1132,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
@@ -1149,6 +1190,14 @@ plugins:
     route: ${ROUTE_PREFIX}notify-event
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1162,6 +1211,14 @@ plugins:
     route: ${ROUTE_PREFIX}notify-event-preview
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-preview
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1175,6 +1232,14 @@ plugins:
     route: ${ROUTE_PREFIX}notify-event-types
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-event-types
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1188,6 +1253,14 @@ plugins:
     route: ${ROUTE_PREFIX}notify-callbacks
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notify-callbacks
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1200,6 +1273,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}templates
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}templates
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
@@ -1238,6 +1319,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-notifications-list
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-list
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1257,6 +1346,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-notifications-email
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-email
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1276,6 +1373,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-notifications-sms
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-sms
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1295,6 +1400,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notifications-bulk
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1314,6 +1427,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-notification-by-id
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-notification-by-id
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1333,6 +1454,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-templates-list
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-templates-list
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1352,6 +1481,14 @@ plugins:
     route: ${ROUTE_PREFIX}gcnotify-template-by-id
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}gcnotify-template-by-id
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1370,6 +1507,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-service
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-service
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
@@ -1393,6 +1538,14 @@ plugins:
     route: ${ROUTE_PREFIX}code-tables-status-service
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-status-service
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1414,6 +1567,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-channels-service
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-channels-service
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
@@ -1437,6 +1598,14 @@ plugins:
     route: ${ROUTE_PREFIX}code-tables-event-types-service
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-event-types-service
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1458,6 +1627,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}notification-request-service
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}notification-request-service
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
@@ -1543,6 +1720,14 @@ plugins:
     route: ${ROUTE_PREFIX}feature-flags
     config: *keyAuthConfig
 
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}feature-flags
+    config: *aclHeaderConfig
+
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting
     tags: [${CONFIG_TAG}]
@@ -1578,6 +1763,14 @@ plugins:
     enabled: true
     route: ${ROUTE_PREFIX}code-tables-feature-flags-service
     config: *keyAuthConfig
+
+  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
+  - name: acl
+    tags: [${CONFIG_TAG}]
+    protocols: [http, https]
+    enabled: true
+    route: ${ROUTE_PREFIX}code-tables-feature-flags-service
+    config: *aclHeaderConfig
 
   # Rate limiting (per API key) - see &rateLimitConfig for details
   - name: rate-limiting

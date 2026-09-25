@@ -101,19 +101,18 @@ export class ApiKeyIssuanceService {
     const credential = await this.credentialIssuer.issue({
       applicationName,
       applicationDescription: `Notify API key for tenant ${tenant.name}`,
-      // Only when APS_ACL_GROUP is set. Every gw-fe8c5 Environment is kong-api-key-only
-      // and no generated route carries an acl plugin, so groups would authorize nothing
-      // and whether the gateway accepts a control its flow does not support is untested.
-      // Nothing reads X-Consumer-Groups either — tenants resolve by credential
-      // identifier (see resolve-api-key-consumer.ts).
+      // The tenant's CSTAR id travels as an ACL group so Kong forwards it upstream as
+      // X-Consumer-Groups, which is how a request identifies its tenant without a
+      // credential lookup. Sent unconditionally: the gateway applies groups only on a
+      // kong-api-key-acl Environment and silently ignores them on kong-api-key-only, so
+      // this is correct before and after an Environment is switched over, with no second
+      // deploy to remember.
       //
-      // Once set, the shared group is what an acl plugin's allow-list would name. The
-      // tenant's own group never needs to be in that list, because Kong reports every
-      // group the consumer belongs to, not just the one that matched — which is what
-      // would keep the allow-list static while tenants stay dynamic.
-      ...(this.aclGroup
-        ? { aclGroups: [this.aclGroup, tenant.externalId].filter(Boolean) as string[] }
-        : {}),
+      // APS_ACL_GROUP is an optional shared group alongside it — what an acl plugin's
+      // allow-list would name. The tenant's own group never needs to be in that list,
+      // because Kong reports every group the consumer belongs to, not just the one that
+      // matched, which keeps the allow-list static while tenants stay dynamic.
+      aclGroups: [this.aclGroup, tenant.externalId].filter(Boolean) as string[],
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
