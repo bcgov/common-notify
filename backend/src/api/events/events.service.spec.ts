@@ -7,12 +7,14 @@ import { EventsService } from './events.service'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
+import { EventChannelCstarGroup } from './entities/event-channel-cstar-group.entity'
 import { EventStatus } from '../../enum/event-status.enum'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
+import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 
@@ -126,6 +128,10 @@ describe('EventsService', () => {
     findById: vi.fn(),
   }
 
+  const mockCstarApiClient = {
+    getTenantGroups: vi.fn(),
+  }
+
   /** Unset by default, so senderEmailDomain falls back to gov.bc.ca. */
   const mockConfigService = {
     get: vi.fn(),
@@ -141,6 +147,12 @@ describe('EventsService', () => {
   const savedRecipients = (): EventChannelRecipient[] => {
     const call = mockManager.save.mock.calls.find((args) => args[0] === EventChannelRecipient)
     return (call?.[1] ?? []) as EventChannelRecipient[]
+  }
+
+  /** CSTAR group rows written inside the transaction, if any. */
+  const savedCstarGroups = (): EventChannelCstarGroup[] => {
+    const call = mockManager.save.mock.calls.find((args) => args[0] === EventChannelCstarGroup)
+    return (call?.[1] ?? []) as EventChannelCstarGroup[]
   }
 
   /** The channel setting written inside the transaction. */
@@ -165,6 +177,7 @@ describe('EventsService', () => {
           useValue: mockConfigurationRepository,
         },
         { provide: TemplatesRepository, useValue: mockTemplatesRepository },
+        { provide: CstarApiClient, useValue: mockCstarApiClient },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
@@ -500,6 +513,9 @@ describe('EventsService', () => {
         to: [],
         cc: [],
         bcc: [],
+        cstarGroupIdsTo: [],
+        cstarGroupIdsCc: [],
+        cstarGroupIdsBcc: [],
         useCustomHeader: false,
         headerLogoId: null,
         headerTitle: null,
@@ -1140,6 +1156,233 @@ describe('EventsService', () => {
           bcc: ['carol@example.com'],
         }),
       )
+    })
+  })
+
+  /**
+   * CSTAR groups are a second, parallel recipient source on the email channel. A list holds any
+   * number of them, and they are stored as IDs only - who they resolve to is CSTAR's business,
+   * settled at send time.
+   */
+  describe('CSTAR group sync', () => {
+    const GROUP_ONE = 'group-1'
+    const GROUP_TWO = 'group-2'
+    const cstar = { tenantId: 'cstar-tenant-guid', authHeader: 'Bearer token' }
+
+    const emailSetting = () =>
+      ({
+        id: settingId,
+        channelCode: NotificationChannel.EMAIL,
+        active: false,
+        senderEmail: 'a@gov.bc.ca',
+        templateId: null,
+        recipients: [],
+        cstarGroups: [],
+        isDeleted: false,
+      }) as unknown as EventChannelSetting
+
+    const saveGroups = (to?: string[], cc?: string[], bcc?: string[]) =>
+      service.updateEmailChannelSetting(
+        tenantId,
+        eventId,
+        {
+          active: false,
+          senderEmail: 'a@gov.bc.ca',
+          templateId: null,
+          cstarGroupIdsTo: to,
+          cstarGroupIdsCc: cc,
+          cstarGroupIdsBcc: bcc,
+        },
+        'user-guid',
+        cstar,
+      )
+
+    beforeEach(() => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent([emailSetting()]))
+      mockCstarApiClient.getTenantGroups.mockResolvedValue([
+        { id: GROUP_ONE, name: 'CSTAR Group 1' },
+        { id: GROUP_TWO, name: 'CSTAR Group 2' },
+      ])
+    })
+
+    it('stores every group a list addresses, not just the first', async () => {
+      await saveGroups([GROUP_ONE, GROUP_TWO])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({
+          channelSettingId: settingId,
+          channelCode: NotificationChannel.EMAIL,
+          kind: EventRecipientKind.TO,
+          cstarGroupId: GROUP_ONE,
+          createdBy: 'user-guid',
+        }),
+        expect.objectContaining({ kind: EventRecipientKind.TO, cstarGroupId: GROUP_TWO }),
+      ])
+    })
+
+    it('tags each group with the list it was addressed through', async () => {
+      await saveGroups([GROUP_ONE], [GROUP_TWO], [GROUP_ONE])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({ kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE }),
+        expect.objectContaining({ kind: EventRecipientKind.CC, cstarGroupId: GROUP_TWO }),
+        expect.objectContaining({ kind: EventRecipientKind.BCC, cstarGroupId: GROUP_ONE }),
+      ])
+    })
+
+    it('collapses the same group listed twice in one field to a single row', async () => {
+      await saveGroups([GROUP_ONE, GROUP_ONE, GROUP_TWO])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({ cstarGroupId: GROUP_ONE }),
+        expect.objectContaining({ cstarGroupId: GROUP_TWO }),
+      ])
+    })
+
+    it('soft deletes a group the tab dropped while leaving its siblings alone', async () => {
+      const kept = {
+        kind: EventRecipientKind.TO,
+        cstarGroupId: GROUP_ONE,
+        isDeleted: false,
+      } as EventChannelCstarGroup
+      const dropped = {
+        kind: EventRecipientKind.TO,
+        cstarGroupId: GROUP_TWO,
+        isDeleted: false,
+      } as EventChannelCstarGroup
+      mockManager.find.mockResolvedValueOnce([]).mockResolvedValueOnce([kept, dropped])
+
+      await saveGroups([GROUP_ONE])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({
+          cstarGroupId: GROUP_TWO,
+          isDeleted: true,
+          updatedBy: 'user-guid',
+        }),
+      ])
+      expect(kept.isDeleted).toBe(false)
+    })
+
+    it('revives a removed group that comes back instead of inserting a second row', async () => {
+      const removed = {
+        kind: EventRecipientKind.TO,
+        cstarGroupId: GROUP_ONE,
+        isDeleted: true,
+      } as EventChannelCstarGroup
+      mockManager.find.mockResolvedValueOnce([]).mockResolvedValueOnce([removed])
+
+      await saveGroups([GROUP_ONE])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({ cstarGroupId: GROUP_ONE, isDeleted: false }),
+      ])
+      expect(mockManager.create).not.toHaveBeenCalledWith(EventChannelCstarGroup, expect.anything())
+    })
+
+    it('treats the same group in a different list as its own row', async () => {
+      mockManager.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE, isDeleted: false },
+        ] as EventChannelCstarGroup[])
+
+      await saveGroups([GROUP_ONE], [GROUP_ONE])
+
+      expect(savedCstarGroups()).toEqual([
+        expect.objectContaining({ kind: EventRecipientKind.CC, cstarGroupId: GROUP_ONE }),
+      ])
+    })
+
+    it('groups the stored IDs back into to, cc and bcc, ignoring removed ones', async () => {
+      const setting = {
+        ...emailSetting(),
+        cstarGroups: [
+          { kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE, isDeleted: false },
+          { kind: EventRecipientKind.TO, cstarGroupId: GROUP_TWO, isDeleted: false },
+          { kind: EventRecipientKind.CC, cstarGroupId: GROUP_ONE, isDeleted: false },
+          { kind: EventRecipientKind.BCC, cstarGroupId: GROUP_TWO, isDeleted: true },
+        ],
+      } as unknown as EventChannelSetting
+      mockEventRepository.findOne.mockResolvedValue(buildEvent([setting]))
+
+      const result = await service.getEvent(tenantId, eventId)
+
+      expect(result.emailSettings).toEqual(
+        expect.objectContaining({
+          cstarGroupIdsTo: [GROUP_ONE, GROUP_TWO],
+          cstarGroupIdsCc: [GROUP_ONE],
+          cstarGroupIdsBcc: [],
+        }),
+      )
+    })
+
+    it('rejects a group that does not belong to the tenant', async () => {
+      await expect(saveGroups([GROUP_ONE, 'someone-elses-group'])).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(mockManager.transaction).not.toHaveBeenCalled()
+    })
+
+    it('asks CSTAR nothing when the tab submitted no groups', async () => {
+      await service.updateEmailChannelSetting(
+        tenantId,
+        eventId,
+        { active: false, senderEmail: 'a@gov.bc.ca', templateId: null, to: ['a@example.com'] },
+        'user-guid',
+        cstar,
+      )
+
+      expect(mockCstarApiClient.getTenantGroups).not.toHaveBeenCalled()
+    })
+
+    it('activates the channel on a TO group alone, with no typed-in address', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: templateId,
+        name: 'Welcome',
+        channelCode: NotificationChannel.EMAIL,
+      })
+
+      await expect(
+        service.updateEmailChannelSetting(
+          tenantId,
+          eventId,
+          {
+            active: true,
+            senderEmail: 'a@gov.bc.ca',
+            templateId,
+            cstarGroupIdsTo: [GROUP_ONE],
+          },
+          'user-guid',
+          cstar,
+        ),
+      ).resolves.toBeDefined()
+
+      expect(savedSetting()).toEqual(expect.objectContaining({ active: true }))
+    })
+
+    it('refuses to activate on a CC group alone, the way a CC address cannot', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: templateId,
+        name: 'Welcome',
+        channelCode: NotificationChannel.EMAIL,
+      })
+
+      await expect(
+        service.updateEmailChannelSetting(
+          tenantId,
+          eventId,
+          {
+            active: true,
+            senderEmail: 'a@gov.bc.ca',
+            templateId,
+            cstarGroupIdsCc: [GROUP_ONE],
+          },
+          'user-guid',
+          cstar,
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockManager.transaction).not.toHaveBeenCalled()
     })
   })
 

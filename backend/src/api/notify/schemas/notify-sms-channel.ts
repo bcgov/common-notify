@@ -14,7 +14,7 @@ import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.vali
 import { NotifySmsContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
-  description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
+  description: 'Send by SMS. SMS must be enabled for the tenant.',
 })
 @ValidateTemplateOrRenderer()
 @ApiExtraModels(

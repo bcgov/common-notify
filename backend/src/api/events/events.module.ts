@@ -12,6 +12,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
+import { EventChannelCstarGroup } from './entities/event-channel-cstar-group.entity'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { EventsFrontendController } from './events-frontend.controller'
 import { EventsService } from './events.service'
@@ -22,6 +23,7 @@ import { EventsService } from './events.service'
       NotifyEvent,
       EventChannelSetting,
       EventChannelRecipient,
+      EventChannelCstarGroup,
       ProvisionedPhoneNumber,
       NotifyConfiguration,
     ]),

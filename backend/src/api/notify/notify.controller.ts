@@ -338,7 +338,7 @@ export class NotifySimpleController {
       'Sends the `sms` channel of the request. Recipient numbers are normalised to E.164, so ' +
       '"250 555 0123" and "+12505550123" are equivalent. Long messages are split into multiple ' +
       'segments and billed per segment.\n\n' +
-      'Requires the `sms_notifications` feature flag for the tenant; without it this returns 403.',
+      'SMS must be enabled for the tenant; without it this returns 403.',
   })
   @ApiBody({
     type: NotifySimpleRequest,
@@ -401,7 +401,7 @@ export class NotifySimpleController {
       '',
       `Limits: at most ${MAIL_MERGE_MAX_RECIPIENTS.toLocaleString()} recipients per merge. Daily and`,
       'annual send limits are enforced per API key before the request is accepted. This route is',
-      'gated by the `sms_notifications` feature flag and returns 403 for a tenant without it.',
+      'only available when SMS is enabled for the tenant, and returns 403 otherwise.',
     ].join('\n'),
   })
   @ApiResponse({
@@ -417,7 +417,7 @@ export class NotifySimpleController {
   })
   @ApiResponse({
     status: 403,
-    description: 'The `sms_notifications` feature flag is not enabled for this tenant.',
+    description: 'SMS is not enabled for this tenant.',
   })
   @ApiResponse({
     status: 422,

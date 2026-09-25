@@ -100,7 +100,7 @@ export async function bootstrap() {
         '1. Ensure you have a tenant and an administrator has configured its Notify settings.',
         '2. Ask a tenant administrator to obtain an API key from the Notify UI.',
         '3. Add the key to the `X-API-KEY` header and send with `POST /api/v1/notifysimple` ' +
-          '(or the `/email` and `/sms` shorthands).',
+          '(or the `/email` and `/sms` shorthands). SMS must be enabled for your tenant.',
         '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
         '',
@@ -147,9 +147,15 @@ export async function bootstrap() {
         '',
         '### Preview before sending',
         '',
-        'On `POST /api/v1/notifysimple` and `POST /api/v1/notifysimple/email`, use `preview`: ' +
-          'set to true to enable a preview of what would be sent, including template rendering, ' +
-          'parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
+        'On `POST /api/v1/notifysimple`, `POST /api/v1/notifysimple/email` and ' +
+          '`POST /api/v1/notifysimple/sms`, set `preview=true` to render templates and substitute ' +
+          'parameters without sending. Attachments and `mergeArray` are not supported.',
+        '',
+        'Preview returns rendered content and recipients, grouped by channel. SMS recipients are ' +
+          'normalised to E.164; other channel recipients are echoed unchanged. SMS content contains ' +
+          'only `body`, and `sms.segmentsPerRecipient` reports the segment count of that rendered body ' +
+          'for each recipient. Authentication, channel availability and request validation still apply. ' +
+          'Preview does not create notification requests, enqueue delivery, consume send limits or check safelists.',
         '',
         '### Feature availability',
         '',
