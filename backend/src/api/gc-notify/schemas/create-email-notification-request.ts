@@ -29,7 +29,7 @@ export class CreateEmailNotificationRequest {
 
   @ApiPropertyOptional({
     description: 'Values for the template placeholders. A value may also be a file attachment.',
-    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417', items: ['apples', 'pears'] },
+    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
   })
   @IsOptional()
   @IsObject()

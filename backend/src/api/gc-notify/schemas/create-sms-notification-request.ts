@@ -24,7 +24,7 @@ export class CreateSmsNotificationRequest {
 
   @ApiPropertyOptional({
     description: 'Values for the template placeholders.',
-    example: { appointmentTime: '09:00', items: ['apples', 'pears'] },
+    example: { appointmentTime: '09:00' },
   })
   @IsOptional()
   @IsObject()
