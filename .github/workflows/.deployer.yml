@@ -246,8 +246,10 @@ jobs:
               --values ${{ inputs.values }} \
               ./${{ github.event.repository.name }}-${{ steps.pr.outputs.pr || steps.vars.outputs.version }}.tgz
 
-            # Helm release history
-            helm history ${{ steps.vars.outputs.release }}
+            # Helm release history (informational only — the deploy + readiness
+            # gate is `helm upgrade --wait` above). Guard it so a transient cluster-API
+            # blip on this cosmetic call can't fail an already-successful deploy.
+            helm history ${{ steps.vars.outputs.release }} || true
 
             # Completed pod cleanup
             oc delete po --field-selector=status.phase==Succeeded || true

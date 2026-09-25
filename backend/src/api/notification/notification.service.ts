@@ -14,6 +14,8 @@ import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -28,6 +30,10 @@ const notificationListQueryConfig: QueryableFieldsConfig = {
     createdAt: 'notification.createdAt',
     updatedAt: 'notification.updatedAt',
     status: 'notification.status',
+    // The Sent Date column renders delayedSendTime ?? createdAt, so it has to sort on the same
+    // COALESCE. It is selected as sent_date in findAll: TypeORM rewrites a paginated join query
+    // into a distinct subquery, and only a column path or a select alias survives that rewrite.
+    delayedSendTime: 'sent_date',
   },
   filterableFields: {
     status: {
@@ -61,6 +67,10 @@ export class NotificationService {
   private readonly smsMaxBodyLength: number
   private readonly msgAppMaxRecipients: number
   private readonly msgAppMaxBodyLength: number
+
+  // Stateless helper, instantiated rather than injected so the constructor signature (and every
+  // spec that builds this service) stays put.
+  private readonly phoneNumberService = new PhoneNumberService()
 
   constructor(
     @InjectRepository(NotificationRequest)
@@ -234,13 +244,23 @@ export class NotificationService {
    * every row's email address must be well-formed. Returns a bounded list of error strings
    * (empty when valid), mirroring validateBusinessRules so the caller can throw a 422.
    */
-  async validateMailMergeRules(tenantId: string, dto: NotifySimpleRequest): Promise<string[]> {
+  async validateMailMergeRules(
+    tenantId: string,
+    dto: NotifySimpleRequest,
+    channel: NotificationChannel = NotificationChannel.EMAIL,
+  ): Promise<string[]> {
     const errors: string[] = []
 
-    const email = dto.email
-    const mergeArray = email?.recipients?.mergeArray ?? []
-    const templateId = email?.content?.templateId
-    const hasInlineContent = !!(email?.content && (email.content.subject || email.content.body))
+    const isSms = channel === NotificationChannel.SMS
+    const channelPayload = isSms ? dto.sms : dto.email
+    const mergeArray = channelPayload?.recipients?.mergeArray ?? []
+    const templateId = channelPayload?.content?.templateId
+    const content = channelPayload?.content
+    // An SMS has no subject, so inline content means a body.
+    const hasInlineContent = !!(
+      content &&
+      (content.body || (!isSms && (content as { subject?: string }).subject))
+    )
 
     const tenant = await this.tenantsService.findOne(tenantId)
     if (!tenant) {
@@ -260,15 +280,17 @@ export class NotificationService {
       const template = await this.templatesRepository.findById(tenantId, templateId)
       if (!template) {
         errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)
-      } else if (template.channelCode !== 'EMAIL') {
-        errors.push(`Template '${templateId}' is not an EMAIL template`)
+      } else if (template.channelCode !== channel) {
+        errors.push(`Template '${templateId}' is not a ${channel} template`)
       }
     } else if (!hasInlineContent) {
-      errors.push('Request must provide either a templateId or inline content (subject/body)')
+      errors.push(
+        `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`,
+      )
     }
 
-    if (email?.delayedSend) {
-      const scheduledTime = new Date(email.delayedSend).getTime()
+    if (channelPayload?.delayedSend) {
+      const scheduledTime = new Date(channelPayload.delayedSend).getTime()
       const now = Date.now()
       if (scheduledTime <= now) {
         errors.push(`delayedSend must be in the future`)
@@ -292,17 +314,23 @@ export class NotificationService {
         break
       }
       const address = (mergeArray[i]?.[0] ?? '').trim()
+      // SMS rows are keyed by their E.164 form, so the same number written two ways is still a
+      // duplicate; email rows are keyed case-insensitively.
+      const normalised = isSms ? this.phoneNumberService.normalize(address) : address.toLowerCase()
+
       if (!address) {
-        errors.push(`Row ${i}: email address is missing`)
-      } else if (!isEmail(address)) {
-        errors.push(`Row ${i}: "${address}" is not a valid email address`)
+        errors.push(`Row ${i}: ${isSms ? 'phone number' : 'email address'} is missing`)
+      } else if (isSms ? normalised === null : !isEmail(address)) {
+        errors.push(
+          `Row ${i}: "${address}" is not a valid ${isSms ? 'phone number' : 'email address'}`,
+        )
       } else {
-        const normalised = address.toLowerCase()
-        const firstSeen = seen.get(normalised)
+        const key = normalised as string
+        const firstSeen = seen.get(key)
         if (firstSeen !== undefined) {
           errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
         } else {
-          seen.set(normalised, i)
+          seen.set(key, i)
         }
       }
     }
@@ -314,17 +342,28 @@ export class NotificationService {
    * Parse the mergeArray into per-recipient data. Returns one entry per data row containing
    * the recipient address (from the "to" column) and any extra columns as template params.
    * Per-recipient params take precedence over global params when rendering.
+   *
+   * SMS addresses are normalised to E.164 here, through the same PhoneNumberService the non-merge
+   * path uses in the ingestion worker. This is the single point every downstream consumer reads
+   * from - segment counting, the safelist check, the per-recipient detail rows and the send itself
+   * - so normalising once here keeps them all consistent. Without it a spreadsheet cell like
+   * "2507447721" reached the transport unchanged, and ACS rejects anything that is not E.164.
    */
   parseMailMergeRecipients(
     mergeArray: string[][],
+    channel: NotificationChannel = NotificationChannel.EMAIL,
   ): Array<{ address: string; params: Record<string, unknown> }> {
     const header = mergeArray[0] ?? []
+    const isSms = channel === NotificationChannel.SMS
     return mergeArray.slice(1).map((row) => {
-      const address = (row[0] ?? '').trim()
+      const raw = (row[0] ?? '').trim()
+      // Falls back to the raw value if it will not normalise; validateMailMergeRules has already
+      // rejected those, so this only guards the ordering of the two calls.
+      const address = isSms ? (this.phoneNumberService.normalize(raw) ?? raw) : raw
       const params: Record<string, unknown> = {}
       for (let i = 1; i < header.length; i++) {
         const key = (header[i] ?? '').trim()
-        if (key) params[key] = row[i] ?? ''
+        if (key) setMergeParam(params, key, row[i] ?? '')
       }
       return { address, params }
     })
@@ -378,6 +417,8 @@ export class NotificationService {
       .createQueryBuilder('notification')
       .leftJoinAndSelect('notification.tenant', 'tenant')
       .leftJoinAndSelect('notification.statusCode', 'statusCode')
+      // Backs the delayedSendTime sort; see notificationListQueryConfig.
+      .addSelect('COALESCE(notification.delayed_send_time, notification.created_at)', 'sent_date')
       .where('notification.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('notification.isInternal = :isInternal', { isInternal: false })
 
@@ -495,6 +536,7 @@ export class NotificationService {
     const validateChannelTemplate = async (
       templateId: string,
       expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
+      channelParams?: Record<string, unknown>,
     ): Promise<void> => {
       try {
         const template = await this.templatesRepository.findById(tenantId, templateId)
@@ -507,7 +549,15 @@ export class NotificationService {
             `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
           )
         } else if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
-          await this.templatesService.renderTemplateContent(template as any, request.params ?? {})
+          // Channel params override request params, matching the delivery workers. The
+          // /notifysimple/email and /notifysimple/sms shorthands post a bare channel object, so
+          // everything the caller sent — params included — arrives under the channel and there is
+          // no top-level params at all; reading only request.params reports every placeholder as
+          // missing and rejects the send before it is ever queued.
+          await this.templatesService.renderTemplateContent(template as any, {
+            ...request.params,
+            ...channelParams,
+          })
         }
       } catch (error) {
         if (error instanceof BadRequestException) {
@@ -523,9 +573,11 @@ export class NotificationService {
     const smsTemplateId = request.sms?.content?.templateId
     const msgAppTemplateId = request.msgApp?.content?.templateId
 
-    if (emailTemplateId) await validateChannelTemplate(emailTemplateId, 'EMAIL')
-    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS')
-    if (msgAppTemplateId) await validateChannelTemplate(msgAppTemplateId, 'MSGAPP')
+    if (emailTemplateId)
+      await validateChannelTemplate(emailTemplateId, 'EMAIL', request.email?.params)
+    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS', request.sms?.params)
+    if (msgAppTemplateId)
+      await validateChannelTemplate(msgAppTemplateId, 'MSGAPP', request.msgApp?.params)
 
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.to?.length ?? 0
@@ -708,5 +760,47 @@ export class NotificationService {
     await this.notificationPubSubService.publish(updated.tenantId, this.mapToDto(updated))
 
     return updated
+  }
+}
+
+/** Keys that would reach Object.prototype if written blindly into a nested object. */
+const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
+
+/**
+ * Write one mail-merge cell into the params object, expanding a dotted column name into the nested
+ * shape the renderer expects.
+ *
+ * A column called `alert.id` has to become `{ alert: { id: value } }`: Handlebars reads `{{alert.id}}`
+ * as a path, so a literal `"alert.id"` key would never bind and the placeholder would render empty.
+ * It also satisfies the personalisation check, which looks for the root key `alert`.
+ *
+ * A segment that collides with a non-object value already written (`a` and `a.b` both present) keeps
+ * the first value rather than replacing it with an object - the file is contradictory either way,
+ * and validation reports it before this runs.
+ */
+function setMergeParam(params: Record<string, unknown>, key: string, value: string): void {
+  const segments = key.split('.')
+
+  if (segments.some((segment) => !segment || UNSAFE_PARAM_SEGMENTS.has(segment))) {
+    return
+  }
+
+  let target = params
+  for (let i = 0; i < segments.length - 1; i++) {
+    const segment = segments[i]
+    const existing = target[segment]
+
+    if (existing === undefined) {
+      target[segment] = {}
+    } else if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) {
+      return
+    }
+
+    target = target[segment] as Record<string, unknown>
+  }
+
+  const leaf = segments[segments.length - 1]
+  if (!(leaf in target)) {
+    target[leaf] = value
   }
 }

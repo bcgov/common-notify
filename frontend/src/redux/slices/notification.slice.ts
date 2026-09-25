@@ -4,6 +4,8 @@ import { fetchNotifications } from '../thunks/notification.thunks'
 import { MAX_NOTIFICATION_RESULTS_PER_PAGE } from '@/config/notification'
 import type { RootState } from '../store'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
+import { selectTenant } from './tenant.slice'
+import { isStaleResponse } from '../utils/latestRequest'
 
 interface NotificationState {
   items: NotificationRequest[]
@@ -17,6 +19,8 @@ interface NotificationState {
   isLoading: boolean
   hasLoaded: boolean
   error: string | null
+  /** Request id of the fetch currently being awaited; see utils/latestRequest. */
+  currentRequestId: string | null
 }
 
 const initialState: NotificationState = {
@@ -31,6 +35,7 @@ const initialState: NotificationState = {
   isLoading: false,
   hasLoaded: false,
   error: null,
+  currentRequestId: null,
 }
 
 export const notificationSlice = createSlice({
@@ -79,13 +84,23 @@ export const notificationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchNotifications.pending, (state) => {
+      // Notification requests are tenant-scoped, so a tenant switch invalidates the
+      // rows, the paging and the filters that produced them. Resetting clears hasLoaded
+      // too, which is what puts the table back into its loading state instead of showing
+      // the previous tenant's requests until the refetch lands.
+      // Every page holding this data refetches on tenant change, so the reset marks the
+      // slice as loading rather than briefly rendering an empty table between the two.
+      .addCase(selectTenant, () => ({ ...initialState, isLoading: true }))
+      .addCase(fetchNotifications.pending, (state, action) => {
         state.isLoading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.isLoading = false
         state.hasLoaded = true
+        state.currentRequestId = null
         state.items = action.payload.data
         state.count = action.payload.count
         state.page = action.payload.page
@@ -93,7 +108,9 @@ export const notificationSlice = createSlice({
         state.totalPages = action.payload.totalPages
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.isLoading = false
+        state.currentRequestId = null
         state.error = (action.payload as string) ?? 'Failed to load notifications'
       })
   },

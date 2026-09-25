@@ -11,6 +11,9 @@ export class TenantSettings {
   @Column({ type: 'varchar', nullable: true, length: 320, name: 'alert_email' })
   alertEmail: string | null
 
+  @Column({ type: 'uuid', nullable: true, name: 'email_logo_id' })
+  emailLogoId: string | null
+
   @Column({ type: 'varchar', nullable: true, length: 64, name: 'default_sender_email' })
   defaultSenderEmail: string | null
 

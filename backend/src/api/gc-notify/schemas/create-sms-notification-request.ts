@@ -1,5 +1,7 @@
-import { IsString, IsOptional, IsObject, IsUUID, Matches, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
+import { IsFutureDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class CreateSmsNotificationRequest {
   @ApiProperty({
@@ -7,9 +9,8 @@ export class CreateSmsNotificationRequest {
     example: '+1234567890',
   })
   @IsString()
-  @MaxLength(15, { message: 'Phone number must not exceed 15 characters' })
-  @Matches(/^\+[1-9]\d{1,14}$/, {
-    message: 'Phone number must be in E.164 format',
+  @IsNormalizablePhoneNumber({
+    message: 'Phone number must be resolvable to E.164 format',
   })
   phone_number: string
 
@@ -22,30 +23,39 @@ export class CreateSmsNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description: 'Variables to substitute in the template',
+    description:
+      'Values for the template placeholders. A value may also be a list, which renders as ' +
+      '"a, b and c".',
+    example: { appointmentTime: '09:00', items: ['apples', 'pears'] },
   })
   @IsOptional()
   @IsObject()
-  personalisation?: Record<string, string>
+  personalisation?: Record<string, string | string[]>
 
   @ApiPropertyOptional({
-    description: 'Optional reference identifier',
+    description: 'Your own identifier for this send, echoed back on status lookups.',
+    example: 'appointment-48219',
   })
   @IsOptional()
   @IsString()
   reference?: string
 
   @ApiPropertyOptional({
-    description: 'Schedule notification for future delivery',
-    format: 'date-time',
+    description:
+      'Hold the message until this time instead of sending immediately. A timezone is required - ' +
+      'use a `Z` suffix or a numeric offset such as `-07:00`. A local time with no zone is ' +
+      'rejected rather than guessed at.',
+    format: 'date-time A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsString()
+  @IsFutureDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({
-    description: 'ID of the SMS sender to use',
+    description: 'Sender identity to send from, when the tenant has more than one configured.',
     format: 'uuid',
+    example: 'e2f7a0d5-8c31-4b92-a7de-1f6b4c0e9a52',
   })
   @IsOptional()
   @IsUUID()

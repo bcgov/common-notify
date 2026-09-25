@@ -1,10 +1,12 @@
 import { IsEmail, IsString, IsOptional, IsObject, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { FileAttachment } from './file-attachment'
+import { IsFutureDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class CreateEmailNotificationRequest {
   @ApiPropertyOptional({
-    description: 'Optional reference identifier',
+    description: 'Your own identifier for this send, echoed back on status lookups.',
+    example: 'permit-BC-2026-00417',
   })
   @IsOptional()
   @IsString()
@@ -26,23 +28,31 @@ export class CreateEmailNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description: 'Variables to substitute in the template and optional file attachments',
+    description:
+      'Values for the template placeholders. A value may also be a list, which renders as bullets ' +
+      'in the email body and as "a, b and c" in the subject, or a file attachment.',
+    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417', items: ['apples', 'pears'] },
   })
   @IsOptional()
   @IsObject()
-  personalisation?: Record<string, string | FileAttachment>
+  personalisation?: Record<string, string | string[] | FileAttachment>
 
   @ApiPropertyOptional({
-    description: 'Schedule notification for future delivery',
-    format: 'date-time',
+    description:
+      'Hold the message until this time instead of sending immediately. A timezone is required - ' +
+      'use a `Z` suffix or a numeric offset such as `-07:00`. A local time with no zone is ' +
+      'rejected rather than guessed at.',
+    format: 'date-time A time in the past is rejected rather than sent immediately.',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsString()
+  @IsFutureDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({
-    description: 'ID of the reply-to address to use',
+    description: 'Reply-to address to use, when the tenant has more than one configured.',
     format: 'uuid',
+    example: 'e2f7a0d5-8c31-4b92-a7de-1f6b4c0e9a52',
   })
   @IsOptional()
   @IsUUID()

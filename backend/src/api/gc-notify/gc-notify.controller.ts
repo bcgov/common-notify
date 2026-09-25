@@ -16,11 +16,10 @@ import {
   ApiOperation,
   ApiResponse,
   ApiQuery,
-  ApiHeader,
+  ApiSecurity,
   ApiExtraModels,
 } from '@nestjs/swagger'
 import * as express from 'express'
-import { GcNotifyApiClient } from './gc-notify-api.client'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
 import { CreateSmsNotificationRequest } from './schemas/create-sms-notification-request'
 import { NotificationResponse } from './schemas/notification-response'
@@ -35,36 +34,34 @@ import { TemplatesListResponse } from './schemas/templates-list-response'
 import { FileAttachment } from './schemas/file-attachment'
 import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guard'
 import { GcNotifyExceptionFilter } from './gc-notify-exception.filter'
-import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
-import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { extractRequestRoute } from '../../common/utils/extract-request-route'
 
 interface GcNotifyRequest extends express.Request {
-  gcNotifyAuthHeader: string
   tenantId: string
   tenantExternalId: string
+  apiKeyConsumerId?: string
 }
 
 @ApiTags('GC Notify')
+// A security scheme, not @ApiHeader: OpenAPI ignores header parameters named
+// Authorization, so Swagger UI would never send the key.
+@ApiSecurity('gc-notify-api-key')
 @ApiExtraModels(EmailContent, SmsContent, FileAttachment)
 @UseGuards(GcNotifyServiceGuard)
 @UseFilters(GcNotifyExceptionFilter)
 @Controller('gcnotify/v2')
 export class GcNotifyController {
   constructor(
-    private readonly gcNotifyApiClient: GcNotifyApiClient,
-    private readonly gcNotifyRoutingService: GcNotifyRoutingService,
     private readonly gcNotifyInternalExecutionService: GcNotifyInternalExecutionService,
   ) {}
 
   @Get('notifications')
-  @ApiOperation({ summary: 'Get list of notifications' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'List notifications',
+    description:
+      'GC Notify-compatible listing of notifications sent by this tenant. Response shape matches ' +
+      'GC Notify so an existing integration works unchanged.',
   })
   @ApiQuery({ name: 'template_type', required: false, enum: ['sms', 'email'] })
   @ApiQuery({
@@ -104,27 +101,21 @@ export class GcNotifyController {
       include_jobs: includeJobs,
     }
 
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_NOTIFICATIONS,
+    return this.gcNotifyInternalExecutionService.getNotifications(
+      query,
       req.tenantId,
+      req.tenantExternalId,
     )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.getNotifications(
-          query,
-          req.tenantId,
-          req.tenantExternalId,
-        )
-      : this.gcNotifyApiClient.getNotifications(query, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/email')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send an email notification' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'Send an email',
+    description:
+      'GC Notify-compatible email send. Accepts the GC Notify request shape (`email_address`, ' +
+      '`template_id`, `personalisation`) and delivers through Notify. Returns the GC Notify ' +
+      'response shape, so a migrating integration only changes its base URL and key.',
   })
   @ApiResponse({
     status: 201,
@@ -135,27 +126,21 @@ export class GcNotifyController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async sendEmail(@Body() body: CreateEmailNotificationRequest, @Req() req: GcNotifyRequest) {
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_EMAIL,
+    return this.gcNotifyInternalExecutionService.sendEmail(
+      body,
       req.tenantId,
+      req.apiKeyConsumerId,
+      extractRequestRoute(req),
     )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.sendEmail(
-          body,
-          req.tenantId,
-          extractRequestRoute(req),
-        )
-      : this.gcNotifyApiClient.sendEmail(body, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/sms')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send an SMS notification' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'Send an SMS',
+    description:
+      'GC Notify-compatible SMS send, taking `phone_number`, `template_id` and ' +
+      '`personalisation`. Requires the sms_notifications feature flag for the tenant.',
   })
   @ApiResponse({
     status: 201,
@@ -166,23 +151,22 @@ export class GcNotifyController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async sendSms(@Body() body: CreateSmsNotificationRequest, @Req() req: GcNotifyRequest) {
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_SMS,
+    return this.gcNotifyInternalExecutionService.sendSms(
+      body,
       req.tenantId,
+      req.apiKeyConsumerId,
+      extractRequestRoute(req),
     )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.sendSms(body, req.tenantId, extractRequestRoute(req))
-      : this.gcNotifyApiClient.sendSms(body, req.gcNotifyAuthHeader)
   }
 
   @Post('notifications/bulk')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send a batch of notifications' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'Send a batch of notifications',
+    description:
+      'GC Notify-compatible bulk send: one template applied to many recipients, supplied as rows ' +
+      'where the first row is the header. Accepted as a single request and delivered ' +
+      'asynchronously.',
   })
   @ApiResponse({
     status: 201,
@@ -193,17 +177,20 @@ export class GcNotifyController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async sendBulk(@Body() body: PostBulkRequest, @Req() req: GcNotifyRequest) {
-    // Bulk send is passthrough-only; a native mail-merge job runner is being built separately.
-    return this.gcNotifyApiClient.sendBulk(body, req.gcNotifyAuthHeader)
+    return this.gcNotifyInternalExecutionService.sendBulk(
+      body,
+      req.tenantId,
+      req.apiKeyConsumerId,
+      extractRequestRoute(req),
+    )
   }
 
   @Get('notifications/:notificationId')
-  @ApiOperation({ summary: 'Get notification by ID' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'Get a notification',
+    description:
+      'GC Notify-compatible status lookup for one notification, using the id returned when it ' +
+      'was accepted.',
   })
   @ApiResponse({
     status: 200,
@@ -215,24 +202,17 @@ export class GcNotifyController {
     @Param('notificationId') notificationId: string,
     @Req() req: GcNotifyRequest,
   ) {
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_GET_NOTIFICATION,
-      req.tenantId,
-    )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.getNotificationById(notificationId, req.tenantId)
-      : this.gcNotifyApiClient.getNotificationById(notificationId, req.gcNotifyAuthHeader)
+    return this.gcNotifyInternalExecutionService.getNotificationById(notificationId, req.tenantId)
   }
 
   @Get('templates')
-  @ApiOperation({ summary: 'Get list of templates' })
-  @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'List templates',
+    description:
+      'GC Notify-compatible template listing for this tenant. The ids returned can be used as ' +
+      '`template_id` on the send endpoints.',
   })
+  @ApiQuery({ name: 'type', required: false, enum: ['sms', 'email'] })
   @ApiResponse({
     status: 200,
     description: 'Successfully retrieved templates',
@@ -240,22 +220,13 @@ export class GcNotifyController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getTemplates(@Query('type') type?: 'sms' | 'email', @Req() req?: GcNotifyRequest) {
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_LIST_TEMPLATES,
-      req!.tenantId,
-    )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.getTemplates(type, req!.tenantId)
-      : this.gcNotifyApiClient.getTemplates(type, req!.gcNotifyAuthHeader)
+    return this.gcNotifyInternalExecutionService.getTemplates(type, req!.tenantId)
   }
 
   @Get('template/:templateId')
-  @ApiOperation({ summary: 'Get template by ID' })
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'API key in format: ApiKey-v1 {api-key}',
-    example: 'ApiKey-v1 your-api-key-here',
+  @ApiOperation({
+    summary: 'Get a template',
+    description: 'GC Notify-compatible lookup of one template, including its subject and body.',
   })
   @ApiResponse({
     status: 200,
@@ -264,12 +235,6 @@ export class GcNotifyController {
   })
   @ApiResponse({ status: 404, description: 'Template not found' })
   async getTemplate(@Param('templateId') templateId: string, @Req() req: GcNotifyRequest) {
-    const useInternal = await this.gcNotifyRoutingService.shouldExecuteInternally(
-      FeatureFlagCode.GC_NOTIFY_ROUTE_GET_TEMPLATE,
-      req.tenantId,
-    )
-    return useInternal
-      ? this.gcNotifyInternalExecutionService.getTemplate(templateId, req.tenantId)
-      : this.gcNotifyApiClient.getTemplate(templateId, req.gcNotifyAuthHeader)
+    return this.gcNotifyInternalExecutionService.getTemplate(templateId, req.tenantId)
   }
 }

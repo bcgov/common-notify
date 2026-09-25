@@ -20,10 +20,11 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
-import { SsoRole } from '../../enum/sso-role.enum'
+import { CstarRole } from '../../enum/cstar-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
 import { SafelistEntryDto, SafelistListResponseDto } from './schemas/safelist-entry.dto'
@@ -32,11 +33,18 @@ import { SafelistService } from './safelist.service'
 /**
  * Tenant-facing management of the recipient safelist, surfaced on the Settings page.
  *
+ * Gated on CSTAR roles, not the SSO NOTIFY_ADMIN role: this is a per-tenant screen, and the
+ * people who run a tenant hold NOTIFY_OPERATIONS_ADMIN ("Tenant Administrator") rather than the
+ * platform-wide Keycloak role. Any member of the tenant may read the list; only a tenant
+ * administrator may change who can be sent to. Mirrors TenantSettingsController.
+ *
  * Reading the safelist works in every environment so administrators can see what is configured;
  * whether it is *enforced* is an environment-level question answered by `enforced` on the list
  * response (the `recipient_safelist` feature flag).
  */
 @ApiTags('safelist')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/safelist')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
@@ -45,7 +53,11 @@ export class SafelistController {
 
   @Version('1')
   @Get()
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(
+    CstarRole.NOTIFY_VIEWER,
+    CstarRole.NOTIFY_TEMPLATE_EDITOR,
+    CstarRole.NOTIFY_OPERATIONS_ADMIN,
+  )
   @ApiOperation({ summary: 'List safelisted recipients for the authenticated tenant' })
   @ApiQuery({ name: 'channel', required: false, enum: ['EMAIL', 'SMS'] })
   @ApiOkResponse({ type: SafelistListResponseDto })
@@ -64,7 +76,7 @@ export class SafelistController {
 
   @Version('1')
   @Post()
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Add a recipient to the tenant safelist' })
   @ApiCreatedResponse({ type: SafelistEntryDto })
   add(@Req() req: Request, @Body() dto: CreateSafelistEntryDto): Promise<SafelistEntryDto> {
@@ -76,7 +88,7 @@ export class SafelistController {
   @Version('1')
   @Delete(':id')
   @HttpCode(204)
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Remove a recipient from the tenant safelist' })
   @ApiNoContentResponse()
   remove(@Req() req: Request, @Param('id') id: string): Promise<void> {

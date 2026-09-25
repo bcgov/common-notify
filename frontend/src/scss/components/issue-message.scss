@@ -1,0 +1,17 @@
+@import '../variables.scss';
+
+// Title over description, stacked inside a table cell.
+.issue-message {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+
+  &__title {
+    font-weight: 700;
+  }
+
+  &__detail {
+    color: $text-secondary;
+    font-size: $font-size-sm;
+  }
+}

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import EmailSettings from './EmailSettings'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
-import { updateEmailSettings } from '@/redux/thunks/settings.thunks'
+import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { CstarRole } from '@/enum/cstar-role.enum'
 
@@ -16,6 +17,7 @@ vi.mock('@/redux/hooks', () => ({
 }))
 
 vi.mock('@/redux/thunks/settings.thunks', () => ({
+  fetchApprovedEmailLogos: vi.fn(() => ({ type: 'emailSettings/fetchApprovedLogos' })),
   updateEmailSettings: vi.fn((payload) => ({ type: 'emailSettings/update', payload })),
 }))
 
@@ -43,6 +45,26 @@ vi.mock('@bcgov/design-system-react-components', () => ({
       {...props}
     />
   ),
+  RadioGroup: ({ children, description, isDisabled, label, onChange, value }: any) => (
+    <fieldset
+      data-value={value}
+      disabled={isDisabled}
+      onChange={(event) => {
+        const target = event.target as unknown as HTMLInputElement
+        if (target.type === 'radio') onChange(target.value)
+      }}
+    >
+      <legend>{label}</legend>
+      {description && <span>{description}</span>}
+      {children}
+    </fieldset>
+  ),
+  Radio: ({ children, value }: { children: ReactNode; value: string }) => (
+    <label>
+      <input name="email-logo" type="radio" value={value} />
+      {children}
+    </label>
+  ),
   // BCDS TextField hands onChange the value, not the event.
   TextField: ({
     onChange,
@@ -68,10 +90,24 @@ vi.mock('@bcgov/design-system-react-components', () => ({
 }))
 
 const SAVED_EMAIL = {
+  emailLogoId: 'logo-1',
   emailNotificationsEnabled: true,
   replyToEmail: 'noreply',
   emailAttachmentsEnabled: true,
 }
+
+const APPROVED_LOGOS = [
+  {
+    id: 'logo-1',
+    name: 'Primary logo',
+    imageUrl: 'https://gateway.example.test/logos/logo-1/image',
+  },
+  {
+    id: 'logo-2',
+    name: 'Alternate logo',
+    imageUrl: 'https://gateway.example.test/logos/logo-2/image',
+  },
+]
 
 function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
   state = {
@@ -79,7 +115,12 @@ function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN
       isLoading: false,
       usage: { channels: [{ channel: 'EMAIL', dailyLimit: 500, annualLimit: 1000500 }] },
     },
-    emailSettings: { ...SAVED_EMAIL, saving: false },
+    emailSettings: {
+      ...SAVED_EMAIL,
+      approvedLogos: APPROVED_LOGOS,
+      approvedLogosLoading: false,
+      saving: false,
+    },
     user: { current: { cstarRoles: roles } },
   }
   return render(<EmailSettings />)
@@ -113,8 +154,51 @@ describe('EmailSettings section', () => {
     renderWithRoles()
 
     expect(fetchApiKeyUsage).toHaveBeenCalledTimes(1)
+    expect(fetchApprovedEmailLogos).toHaveBeenCalledTimes(1)
     expect(screen.getByText('500 emails/day')).toBeInTheDocument()
     expect(screen.getByText('1,000,500 emails/year')).toBeInTheDocument()
+  })
+
+  it('renders approved logo thumbnails using the API-provided public image URLs', () => {
+    renderWithRoles()
+
+    expect(screen.getByRole('group', { name: 'Email logo' })).toHaveAttribute(
+      'data-value',
+      'logo-1',
+    )
+    const primaryImage = screen.getByText('Primary logo').closest('label')?.querySelector('img')
+    expect(primaryImage).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
+    expect(screen.getByText('Primary logo')).toBeInTheDocument()
+    expect(screen.getByText('Alternate logo')).toBeInTheDocument()
+  })
+
+  it('saves a newly selected logo with the existing email settings payload', async () => {
+    renderWithRoles()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Alternate logo' }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => {
+      expect(updateEmailSettings).toHaveBeenCalledWith({
+        emailLogoId: 'logo-2',
+        emailNotificationsEnabled: true,
+        emailAttachmentsEnabled: true,
+        replyToEmail: 'noreply',
+      })
+    })
+  })
+
+  it('allows clearing the selected logo', async () => {
+    renderWithRoles()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'No logo' }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => {
+      expect(updateEmailSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ emailLogoId: null }),
+      )
+    })
   })
 
   it('keeps Save disabled until a value changes', () => {
@@ -180,6 +264,7 @@ describe('EmailSettings section', () => {
 
     await waitFor(() => {
       expect(updateEmailSettings).toHaveBeenCalledWith({
+        emailLogoId: 'logo-1',
         emailNotificationsEnabled: false,
         emailAttachmentsEnabled: true,
         replyToEmail: 'support',

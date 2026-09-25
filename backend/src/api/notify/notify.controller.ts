@@ -19,14 +19,17 @@ import {
 import Bull from 'bull'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
+import { HtmlBodyTypeFeatureFlagGuard } from '../../common/guards/html-body-type-feature-flag.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { MailMergeUiLimitsGuard } from '../../common/guards/mail-merge-ui-limits.guard'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
+import { MAIL_MERGE_MAX_RECIPIENTS } from './schemas/mail-merge.constants'
 import {
   CancelNotificationDto,
   RescheduleNotificationDto,
@@ -48,6 +51,15 @@ import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { WebhookService } from '../webhook/webhook.service'
 import {
+  ApiBody,
+  ApiExcludeController,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger'
+import {
   CallbackRegistrationRequest,
   CallbackRegistrationResponse,
   CallbackRegistrationUpdateRequest,
@@ -62,8 +74,10 @@ import {
 //
 // Uses NotifyServiceGuard for service-to-service calls that require x-tenant-id header
 // and valid client_id + tenant_id mapping in the database.
+@ApiTags('Send')
+@ApiSecurity('api-key')
 @Controller('notifysimple')
-@UseGuards(NotifyServiceGuard)
+@UseGuards(NotifyServiceGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -85,6 +99,83 @@ export class NotifySimpleController {
   @Version('1')
   @Post()
   @HttpCode(202)
+  @ApiOperation({
+    summary: 'Send a notification',
+    description:
+      'Accepts a notification for delivery on one or more channels and returns immediately with a ' +
+      'notifyId; delivery happens asynchronously, so a 202 means accepted, not sent. Track the ' +
+      'outcome with GET /api/v1/notification_request/{id}/request_details.\n\n' +
+      'Supply at least one channel (`email`, `sms` or `msgApp`). Within a channel, give either a ' +
+      '`content.templateId` or inline `content` - not both. Top-level `params` apply to every ' +
+      "channel and are overridden by a channel's own `params`.",
+  })
+  @ApiBody({
+    type: NotifySimpleRequest,
+    examples: {
+      inline: {
+        summary: 'Email with inline content',
+        value: {
+          email: {
+            recipients: { to: ['citizen@example.com'] },
+            content: {
+              subject: 'Your permit application',
+              body: '# Hello {{firstName}}\n\nYour application has been received.',
+              bodyType: 'markdown',
+              renderer: 'handlebars',
+            },
+          },
+          params: { firstName: 'Alice' },
+        },
+      },
+      template: {
+        summary: 'Email from a stored template',
+        value: {
+          email: {
+            recipients: { to: ['citizen@example.com'], cc: ['caseworker@example.com'] },
+            content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          },
+          params: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
+        },
+      },
+      multiChannel: {
+        summary: 'Email and SMS in one request',
+        value: {
+          email: {
+            recipients: { to: ['citizen@example.com'] },
+            content: { subject: 'Appointment reminder', body: 'See you tomorrow at 09:00.' },
+          },
+          sms: {
+            recipients: { to: ['+12505550123'] },
+            content: { body: 'Reminder: your appointment is tomorrow at 09:00.' },
+          },
+        },
+      },
+      scheduled: {
+        summary: 'Scheduled for later delivery',
+        value: {
+          email: {
+            recipients: { to: ['citizen@example.com'] },
+            content: { subject: 'Renewal due', body: 'Your permit expires next week.' },
+            delayedSend: '2026-06-01T16:00:00Z',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Accepted for delivery. The notifyId identifies this request from here on.',
+    type: NotificationAcceptanceResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Malformed request, or no channel supplied.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 403, description: 'The API key is not bound to the requested tenant.' })
+  @ApiResponse({
+    status: 422,
+    description:
+      'The request is well formed but cannot be accepted - for example both a templateId and ' +
+      'inline content, an unknown templateId, or a recipient blocked by the safelist.',
+  })
   @UseGuards(SmsChannelFeatureFlagGuard)
   @Queueable(QueueName.INGESTION)
   simpleSend(
@@ -99,6 +190,106 @@ export class NotifySimpleController {
   @Version('1')
   @Post('email')
   @HttpCode(202)
+  @ApiOperation({
+    summary: 'Send an email',
+    description:
+      'Email-only shorthand for POST /api/v1/notifysimple: the body is the email channel object ' +
+      'itself rather than being nested under `email`. Use `recipients.mergeArray` to send a ' +
+      'personalised message per row in one request (mail merge).',
+  })
+  @ApiBody({
+    type: NotifyEmailChannel,
+    examples: {
+      simple: {
+        summary: 'One message to several recipients',
+        value: {
+          recipients: { to: ['citizen@example.com'], bcc: ['records@example.com'] },
+          content: {
+            subject: 'Your permit application',
+            body: 'Your application has been received.',
+            bodyType: 'markdown',
+          },
+        },
+      },
+      template: {
+        summary: 'From a stored template, with placeholder values',
+        description:
+          'The template supplies the subject and body, so no inline `content` is sent - give a ' +
+          '`templateId` or inline content, never both. Each `{{placeholder}}` in the template is ' +
+          'filled from the matching key in `params`; a placeholder with no matching key is ' +
+          'rejected. Every recipient receives the same rendered message.',
+        value: {
+          recipients: { to: ['citizen@example.com'], cc: ['caseworker@example.com'] },
+          content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          params: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
+        },
+      },
+      templateMailMerge: {
+        summary: 'Mail merge from a stored template - a different message per row',
+        description:
+          'A stored template rendered once per recipient. The first row of `mergeArray` is the ' +
+          'header and must contain a "to" column; every other column supplies that recipient\'s ' +
+          'own value for the matching template placeholder. Top-level `params` fill placeholders ' +
+          'the header does not cover, and are overridden by a row where both supply the same key.',
+        value: {
+          recipients: {
+            mergeArray: [
+              ['to', 'firstName', 'permitNumber'],
+              ['alice@example.com', 'Alice', 'BC-2026-00417'],
+              ['bob@example.com', 'Bob', 'BC-2026-00418'],
+            ],
+          },
+          content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          params: { officeName: 'Victoria permit office' },
+        },
+      },
+      mailMerge: {
+        summary: 'Mail merge with inline content - one personalised message per row',
+        description:
+          'The first row is the header and must contain a "to" column. Every other column ' +
+          'becomes a template parameter for that recipient only.',
+        value: {
+          recipients: {
+            mergeArray: [
+              ['to', 'firstName', 'permitNumber'],
+              ['alice@example.com', 'Alice', 'BC-2026-00417'],
+              ['bob@example.com', 'Bob', 'BC-2026-00418'],
+            ],
+          },
+          content: {
+            subject: 'Permit {{permitNumber}}',
+            body: 'Hello {{firstName}}, permit {{permitNumber}} is ready.',
+            bodyType: 'markdown',
+            renderer: 'handlebars',
+          },
+        },
+      },
+      withAttachment: {
+        summary: 'With an attachment',
+        value: {
+          recipients: { to: ['citizen@example.com'] },
+          content: { subject: 'Your permit', body: 'The permit is attached.' },
+          attachments: [
+            {
+              filename: 'permit.pdf',
+              mimeType: 'application/pdf',
+              content: 'JVBERi0xLjQKJcfsj6IK...',
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 202,
+    description:
+      'Accepted for delivery. For a mail merge, recipientCount reports how many recipients were ' +
+      'accepted.',
+    type: NotificationAcceptanceResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Malformed request.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 422, description: 'Valid JSON that cannot be accepted; see the message.' })
   @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,
@@ -110,9 +301,101 @@ export class NotifySimpleController {
   @Version('1')
   @Post('sms')
   @HttpCode(202)
+  @ApiOperation({
+    summary: 'Send an SMS',
+    description:
+      'Sends the `sms` channel of the request. Recipient numbers are normalised to E.164, so ' +
+      '"250 555 0123" and "+12505550123" are equivalent. Long messages are split into multiple ' +
+      'segments and billed per segment.\n\n' +
+      'Requires the `sms_notifications` feature flag for the tenant; without it this returns 404.',
+  })
+  @ApiBody({
+    type: NotifySimpleRequest,
+    examples: {
+      sms: {
+        summary: 'Plain SMS',
+        value: {
+          sms: {
+            recipients: { to: ['+12505550123'] },
+            content: { body: 'Your appointment is confirmed for 09:00 tomorrow.' },
+          },
+        },
+      },
+      templated: {
+        summary: 'SMS from a template',
+        value: {
+          sms: {
+            recipients: { to: ['+12505550123', '2505550124'] },
+            content: { templateId: '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33' },
+          },
+          params: { appointmentTime: '09:00' },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Accepted for delivery.',
+    type: NotificationAcceptanceResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Malformed request, or an unusable phone number.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 404, description: 'SMS is not enabled for this tenant.' })
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
   @Queueable(QueueName.INGESTION)
+  @ApiOperation({
+    summary: 'Send an SMS notification, to one list of recipients or as a mail merge',
+    description: [
+      'Accepts an SMS send and returns immediately. Delivery happens asynchronously, so a 202 means',
+      'the request was accepted and persisted - not that any message has been sent. Track delivery',
+      'with the returned notifyId via GET /api/v1/notify/status/{notifyId}.',
+      '',
+      'Two shapes of send are supported, chosen by what `sms.recipients` contains:',
+      '',
+      '- `to`: a list of phone numbers. Every recipient receives the same body.',
+      '- `mergeArray`: a mail merge. The first row is a header whose first column must be `to`;',
+      "  every following row is one recipient, and the remaining columns become that recipient's",
+      '  template params. Each recipient therefore receives a different message.',
+      '',
+      'Exactly one of the two must be present. Phone numbers may be given in any format that',
+      'normalises to E.164 (Canadian numbers are assumed when no country code is supplied); a number',
+      'that cannot be normalised is rejected with the row it appeared on.',
+      '',
+      'Billing note: SMS is charged in segments, and a body longer than a single segment is sent as',
+      'several concatenated messages. For a merge, every row is rendered and costed individually, so',
+      'the accepted request can consume more of the tenant allowance than it has recipients. The',
+      'response reports both numbers.',
+      '',
+      `Limits: at most ${MAIL_MERGE_MAX_RECIPIENTS.toLocaleString()} recipients per merge. Daily and`,
+      'annual send limits are enforced per API key before the request is accepted. This route is',
+      'gated by the `sms_notifications` feature flag and returns 404 for a tenant without it.',
+    ].join('\n'),
+  })
+  @ApiResponse({
+    status: 202,
+    description:
+      'Request accepted for delivery. `recipientCount` is the number of accepted recipients; for a merge, `billableMessageCount` is the total SMS segments those recipients will consume.',
+    type: NotificationAcceptanceResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'The request body failed validation - for example both `to` and `mergeArray` were supplied, a phone number could not be normalised to E.164, or a merge row had a different column count to its header.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'The `sms_notifications` feature flag is not enabled for this tenant.',
+  })
+  @ApiResponse({
+    status: 422,
+    description:
+      'The request was well-formed but its contents were rejected. The body carries an `errors` array naming each problem, row by row for a merge (missing number, invalid number, duplicate).',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'This send would exceed the daily or annual SMS limit for the calling API key.',
+  })
   simpleSendSms(
     @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
@@ -125,6 +408,39 @@ export class NotifySimpleController {
   @Version('1')
   @Patch(':notificationId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Cancel or reschedule a scheduled notification',
+    description:
+      'Only a notification that has not been sent yet can be changed. Send `{"action":"cancel"}` ' +
+      'to cancel it, or `{"scheduledTime":"..."}` with a future timestamp to move it. A request ' +
+      'that has already been picked up for delivery returns 422.',
+  })
+  @ApiParam({
+    name: 'notificationId',
+    format: 'uuid',
+    description: 'The notifyId returned when the notification was accepted.',
+    example: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  })
+  @ApiBody({
+    schema: {
+      oneOf: [
+        { $ref: '#/components/schemas/CancelNotificationDto' },
+        { $ref: '#/components/schemas/RescheduleNotificationDto' },
+      ],
+    },
+    examples: {
+      cancel: { summary: 'Cancel', value: { action: 'cancel' } },
+      reschedule: { summary: 'Reschedule', value: { scheduledTime: '2026-06-01T16:00:00Z' } },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The updated notification request.',
+    type: NotificationRequestDto,
+  })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 404, description: 'No such notification for this tenant.' })
+  @ApiResponse({ status: 422, description: 'Already sent, or the new time is in the past.' })
   @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
   async cancelOrRescheduleNotification(
     @Req() req: Request,
@@ -248,8 +564,10 @@ export class NotifySimpleController {
  * rules based on client type (internal service vs frontend application).
  * Both controllers delegate to the same service for consistency.
  */
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/notifysimple')
-@UseGuards(NotifyFrontendRoleGuard)
+@UseGuards(NotifyFrontendRoleGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleFrontendController {
   private readonly queueMap: Map<QueueName, Bull.Queue>
 
@@ -266,6 +584,58 @@ export class NotifySimpleFrontendController {
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
+  }
+
+  /**
+   * Ad-hoc email send from the UI, used by the mail merge screen: the recipient list and the
+   * per-recipient template values both come from `recipients.mergeArray`.
+   *
+   * The bare email-channel body is wrapped into a NotifySimpleRequest by @Queueable, so this shares
+   * the merge validation, safelist filtering and fan-out with NotifySimpleController.simpleSendEmail.
+   * Open to template editors as well as operations admins — the same pair as `canEdit` on the
+   * frontend, which gates the Send button on the Bulk Notifications screen.
+   *
+   * Guarded by the same BULK_NOTIFICATIONS flag the frontend hides the screen behind, so a tenant
+   * without the feature cannot reach the send by calling the API directly. FeatureFlagGuard is
+   * listed first so a disabled tenant is refused before the row cap is even measured; it reads the
+   * tenant from `request.tenant`, which the controller-level NotifyFrontendRoleGuard has already
+   * set by the time route guards run.
+   */
+  @Version('1')
+  @Post()
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard, MailMergeUiLimitsGuard)
+  @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
+  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
+  sendEmail(
+    @Req() _req: any,
+    @Body() _body: NotifyEmailChannel,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable
+    return undefined as any
+  }
+
+  /**
+   * The SMS counterpart of sendEmail, gated on both flags: BULK_NOTIFICATIONS for the screen and
+   * SMS_NOTIFICATIONS for the channel, so a tenant needs the channel as well as the feature.
+   *
+   * Takes a full NotifySimpleRequest rather than a bare channel body, matching the service SMS
+   * route so the two request shapes stay identical.
+   */
+  @Version('1')
+  @Post('sms')
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard, SmsChannelFeatureFlagGuard, MailMergeUiLimitsGuard)
+  @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
+  @Queueable(QueueName.INGESTION)
+  sendSms(
+    @Req() _req: any,
+    @Body() _body: NotifySimpleRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    // Implementation provided by @Queueable
+    return undefined as any
   }
 
   @Version('1')
@@ -306,6 +676,9 @@ export class NotifySimpleFrontendController {
   }
 }
 
+// Not implemented - every operation below returns 501 - so it is kept out of the published
+// spec until it does something. Remove this when the endpoints land.
+@ApiExcludeController()
 @Controller('notifyevent')
 @UseGuards(NotifyServiceGuard)
 export class NotifyEventController {
@@ -340,44 +713,30 @@ export class NotifyEventController {
   }
 }
 
+@ApiTags('Webhooks')
+@ApiSecurity('api-key')
 @Controller('notify')
 @UseGuards(NotifyServiceGuard)
 export class NotifyController {
-  constructor(
-    private readonly notifyService: NotifyService,
-    private readonly webhookService: WebhookService,
-  ) {}
-
-  @Version('1')
-  @Get()
-  @HttpCode(501)
-  listNotifications(
-    @Query('limit') _limit?: string,
-    @Query('cursor') _cursor?: string,
-    @Query('status') _status?: string,
-    @Query('startDate') _startDate?: string,
-    @Query('endDate') _endDate?: string,
-  ) {
-    return this.notifyService.notImplemented()
-  }
-
-  @Version('1')
-  @Delete()
-  @HttpCode(501)
-  cancelNotification(@Query('notifyId') _notifyId: string) {
-    return this.notifyService.notImplemented()
-  }
-
-  @Version('1')
-  @Get('status/:notifyId')
-  @HttpCode(501)
-  getNotificationStatus(@Param('notifyId') _notifyId: string) {
-    return this.notifyService.notImplemented()
-  }
+  constructor(private readonly webhookService: WebhookService) {}
 
   @Version('1')
   @Post('registerCallback')
   @HttpCode(201)
+  @ApiOperation({
+    summary: 'Register a delivery webhook',
+    description:
+      'Registers a URL that Notify calls when a notification changes state, so you do not have to ' +
+      'poll for status. Deliveries are retried with exponential backoff. If a signing secret is ' +
+      'supplied it is used to sign each call, letting you verify the request came from Notify.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The registered callback.',
+    type: CallbackRegistrationResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Malformed request, or an unreachable URL.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   registerCallback(
     @Req() _req: any,
     @Body() body: CallbackRegistrationRequest,
@@ -392,6 +751,23 @@ export class NotifyController {
   @Version('1')
   @Patch('registerCallback/:callbackId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Update a registered webhook',
+    description:
+      'Changes the URL, the events subscribed to, the signing secret, or its enabled state.',
+  })
+  @ApiParam({
+    name: 'callbackId',
+    format: 'uuid',
+    description: 'ID returned when the webhook was registered.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The updated callback.',
+    type: CallbackRegistrationResponse,
+  })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 404, description: 'No such callback for this tenant.' })
   updateCallback(
     @Req() _req: any,
     @Param('callbackId') callbackId: string,
@@ -407,6 +783,18 @@ export class NotifyController {
   @Version('1')
   @Delete('registerCallback/:callbackId')
   @HttpCode(204)
+  @ApiOperation({
+    summary: 'Delete a registered webhook',
+    description: 'Stops delivery callbacks for this tenant. Notifications are unaffected.',
+  })
+  @ApiParam({
+    name: 'callbackId',
+    format: 'uuid',
+    description: 'ID returned when the webhook was registered.',
+  })
+  @ApiResponse({ status: 204, description: 'Deleted.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({ status: 404, description: 'No such callback for this tenant.' })
   deleteCallback(@Req() _req: any, @Param('callbackId') callbackId: string): Promise<void> {
     const tenantId = _req?.tenant?.id || null
     if (!tenantId) {
@@ -416,6 +804,8 @@ export class NotifyController {
   }
 }
 
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('ches/api/v1/email')
 @UseGuards(NotifyServiceGuard)
 export class ChesEmailController {

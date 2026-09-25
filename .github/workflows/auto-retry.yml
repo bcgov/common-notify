@@ -1,0 +1,64 @@
+name: Auto Retry Failed Jobs
+
+# Band-aid for intermittent Silver cluster-API IP rejections. GitHub-hosted
+# runners occasionally get their egress IP blocked at the OpenShift API
+# (reputation-based), so `oc login` / cluster calls fail with a network
+# timeout even though the deploy itself is fine. This re-runs the failed
+# jobs up to 3 times.
+#
+# Unlike a blanket retry, this only re-runs when the failure logs match a
+# transient network/login signature. A genuine deploy failure (helm timeout,
+# failed migration, bad image, test failure) is NOT retried, so we don't burn
+# CI looping on real breakage. See the connectivity-signature grep below.
+
+on:
+  workflow_run:
+    workflows:
+      - "Merge"
+      - "PR"
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  retry-on-transient-network-failure:
+    runs-on: ubuntu-24.04
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'failure'
+          && github.event.workflow_run.run_attempt < 3 }}
+    permissions:
+      actions: write
+    steps:
+      - name: Retry only if the failure looks like a Silver IP rejection / cluster-API timeout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          echo "Inspecting failed logs for run ${RUN_ID} (attempt ${{ github.event.workflow_run.run_attempt }})..."
+
+          # Pull the failed logs. `gh run view --log-failed` prints only the
+          # steps that failed, which is exactly the region we want to classify.
+          LOG="$(gh run view "${RUN_ID}" --log-failed 2>/dev/null || true)"
+
+          if [ -z "${LOG}" ]; then
+            echo "No failed-step logs retrievable yet; not retrying (avoids blind re-run)."
+            exit 0
+          fi
+
+          # Signatures of the transient Silver API IP-rejection / connectivity blip.
+          # Kept deliberately specific to network/login failures so genuine
+          # deploy failures fall through and are NOT retried.
+          SIGNATURE='dial tcp .*:6443|i/o timeout|connection refused|TLS handshake timeout|Unable to connect to the server|error: You must be logged in to the server|couldn'\''t get current server API group list|the server has asked for the client to provide credentials|Client.Timeout exceeded while awaiting headers|net/http: request canceled'
+
+          if echo "${LOG}" | grep -qiE "${SIGNATURE}"; then
+            echo "::notice::Transient cluster-API / IP-rejection signature detected — re-running failed jobs."
+            echo "Matched lines:"
+            echo "${LOG}" | grep -iE "${SIGNATURE}" | head -5
+            gh run rerun "${RUN_ID}" --failed
+          else
+            echo "::notice::Failure does not match a transient network signature — treating as a genuine failure, not retrying."
+            exit 0
+          fi

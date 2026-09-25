@@ -14,6 +14,9 @@ import { NotifyModule } from '../notify/notify.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
+import { TenantSettingsModule } from '../tenant-settings/tenant-settings.module'
+import { EmailLogoModule } from '../email-logo/email-logo.module'
+import { EmailTemplateLayoutService } from './email-template-layout.service'
 
 /**
  * Feature Module for Templates
@@ -30,10 +33,17 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
     RenderingModule,
     CstarModule,
     ApiKeysModule,
+    TenantSettingsModule,
+    EmailLogoModule,
     forwardRef(() => NotifyModule),
   ],
   controllers: [TemplatesController, TemplatesFrontendController],
-  providers: [TemplatesService, TemplatesRepository, NotifyFrontendRoleGuard],
+  providers: [
+    TemplatesService,
+    TemplatesRepository,
+    EmailTemplateLayoutService,
+    NotifyFrontendRoleGuard,
+  ],
   exports: [TemplatesService, TemplatesRepository],
 })
 export class TemplatesModule {}

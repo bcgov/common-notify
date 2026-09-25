@@ -10,7 +10,14 @@ import {
   UseGuards,
   Param,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { NotificationService } from './notification.service'
 import {
   NotificationRequestDetailService,
@@ -48,6 +55,8 @@ import { ListQueryDto } from '../../common/query/list-query.dto'
  * these controllers can be consolidated.
  */
 @ApiTags('notification_request')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/notification_request')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()

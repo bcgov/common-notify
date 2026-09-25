@@ -8,44 +8,60 @@ export class Template {
   })
   id: string
 
-  @ApiProperty({ description: 'Template name' })
+  @ApiProperty({ description: 'Name given to the template.', example: 'Permit approved' })
   name: string
 
-  @ApiPropertyOptional({ description: 'Template description' })
+  @ApiPropertyOptional({
+    description: 'What the template is used for.',
+    example: 'Sent when a permit application is approved',
+  })
   description?: string
 
   @ApiProperty({
-    description: 'Type of notification this template is for',
+    description: 'The channel this template is for.',
     enum: ['sms', 'email'],
+    example: 'email',
   })
   type: 'sms' | 'email'
 
-  @ApiPropertyOptional({ description: 'Subject template (for email)' })
+  @ApiPropertyOptional({
+    description: 'Subject line, with placeholders. Email only.',
+    example: 'Permit {{permitNumber}} approved',
+  })
   subject?: string
 
-  @ApiProperty({ description: 'Message body template' })
+  @ApiProperty({
+    description: 'Message body, with placeholders.',
+    example: 'Hello {{firstName}}, permit {{permitNumber}} has been approved.',
+  })
   body: string
 
   @ApiPropertyOptional({
-    description: 'Variables to substitute in the template',
+    description: 'The placeholders this template expects, with sample values.',
+    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
   })
   personalisation?: Record<string, string>
 
-  @ApiProperty({ description: 'Whether the template is active' })
+  @ApiProperty({
+    description: 'False once the template has been retired; it can no longer be used to send.',
+    example: true,
+  })
   active: boolean
 
   @ApiProperty({
-    description: 'Timestamp when template was created',
+    description: 'When the template was created.',
     format: 'date-time',
+    example: '2026-01-04T18:22:11.000Z',
   })
   created_at: string
 
   @ApiPropertyOptional({
-    description: 'Timestamp when template was last updated',
+    description: 'When the template last changed.',
     format: 'date-time',
+    example: '2026-04-22T09:14:03.000Z',
   })
   updated_at?: string
 
-  @ApiPropertyOptional({ description: 'User who created the template' })
+  @ApiPropertyOptional({ description: 'Who created it.', example: 'permits-service' })
   created_by?: string
 }

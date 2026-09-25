@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
+import { BadRequestException } from '@nestjs/common'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { vi } from 'vitest'
 import { TenantSettingsService } from './tenant-settings.service'
 import { TenantSettings } from './entities/tenant-settings.entity'
+import { EmailLogoService } from '../email-logo/email-logo.service'
 
 describe('TenantSettingsService', () => {
   let service: TenantSettingsService
@@ -11,6 +14,7 @@ describe('TenantSettingsService', () => {
     id: 'settings-uuid-1',
     tenantId: 'tenant-uuid-1',
     alertEmail: 'alerts@example.com',
+    emailLogoId: null,
     defaultSenderEmail: 'noreply',
     emailNotificationsEnabled: true,
     replyToEmail: null,
@@ -32,6 +36,11 @@ describe('TenantSettingsService', () => {
     create: vi.fn(),
     save: vi.fn(),
   }
+  const mockEmailLogoService = {
+    findByIdIfApproved: vi.fn().mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+    }),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,6 +49,21 @@ describe('TenantSettingsService', () => {
         {
           provide: getRepositoryToken(TenantSettings),
           useValue: mockRepository,
+        },
+        {
+          provide: EmailLogoService,
+          useValue: mockEmailLogoService,
+        },
+        {
+          // Supplies the domain appended to the stored local part of a sender address.
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              ({
+                'events.senderEmailDomain': 'gov.bc.ca',
+                'ches.from': 'notify_noreply@gov.bc.ca',
+              })[key],
+          },
         },
       ],
     }).compile()
@@ -66,6 +90,54 @@ describe('TenantSettingsService', () => {
       const result = await service.findByTenantId('tenant-uuid-1')
 
       expect(result).toBeNull()
+    })
+  })
+
+  describe('getSenderAddress', () => {
+    it('appends the domain to the stored local part', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('returns null when the tenant has no sender configured', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the stored value is blank', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: '  ' })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the tenant has no settings row at all', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+  })
+
+  describe('resolveSenderAddress', () => {
+    it('prefers the tenant sender', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('falls back to the service-wide address when the tenant has no sender', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe(
+        'notify_noreply@gov.bc.ca',
+      )
     })
   })
 
@@ -156,6 +228,7 @@ describe('TenantSettingsService', () => {
 
   describe('upsertEmailSettings', () => {
     const emailDto = {
+      emailLogoId: '11111111-1111-4111-8111-111111111111',
       emailNotificationsEnabled: false,
       replyToEmail: 'noreply',
       emailAttachmentsEnabled: false,
@@ -187,6 +260,7 @@ describe('TenantSettingsService', () => {
       const result = await service.upsertEmailSettings('tenant-uuid-1', emailDto, 'updater-guid')
 
       expect(existingSettings.emailNotificationsEnabled).toBe(false)
+      expect(existingSettings.emailLogoId).toBe(emailDto.emailLogoId)
       expect(existingSettings.replyToEmail).toBe('noreply')
       expect(existingSettings.emailAttachmentsEnabled).toBe(false)
       expect(existingSettings.updatedBy).toBe('updater-guid')
@@ -206,6 +280,29 @@ describe('TenantSettingsService', () => {
       expect(existingSettings.replyToEmail).toBeNull()
       expect(mockRepository.save).toHaveBeenCalledWith(existingSettings)
       expect(result).toEqual(savedSettings)
+    })
+
+    it('should clear emailLogoId without an approval lookup', async () => {
+      const existingSettings = { ...mockTenantSettings, emailLogoId: emailDto.emailLogoId }
+      const dto = { ...emailDto, emailLogoId: null }
+      mockRepository.findOne.mockResolvedValue(existingSettings)
+      mockRepository.save.mockResolvedValue(existingSettings)
+
+      await service.upsertEmailSettings('tenant-uuid-1', dto, 'updater-guid')
+
+      expect(existingSettings.emailLogoId).toBeNull()
+      expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
+    })
+
+    it('should reject an emailLogoId that is not approved', async () => {
+      mockEmailLogoService.findByIdIfApproved.mockResolvedValueOnce(null)
+
+      await expect(
+        service.upsertEmailSettings('tenant-uuid-1', emailDto, 'updater-guid'),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(mockRepository.findOne).not.toHaveBeenCalled()
+      expect(mockRepository.save).not.toHaveBeenCalled()
     })
 
     it('should leave the tenant tab fields untouched', async () => {

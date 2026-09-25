@@ -30,13 +30,22 @@ export function ColumnHeaderDropdown({
   const [pendingValues, setPendingValues] = useState<string[]>(activeFilterValues)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const [ascLabel, descLabel] =
-    sortType === 'text' ? ['A to Z', 'Z to A'] : ['Oldest to Newest', 'Newest to Oldest']
+  // Numeric columns previously fell through to the date wording, which reads oddly next to a row
+  // number or a count.
+  const SORT_LABELS: Record<string, [string, string]> = {
+    text: ['A to Z', 'Z to A'],
+    numeric: ['Low to High', 'High to Low'],
+    date: ['Oldest to Newest', 'Newest to Oldest'],
+  }
+  const [ascLabel, descLabel] = SORT_LABELS[sortType ?? 'date'] ?? SORT_LABELS.date
 
-  // Sync pending values when active filters change externally
+  // Sync pending values when active filters change externally. Keyed on the joined string, not the
+  // array: the table rebuilds that array every render, which would clear ticked checkboxes.
+  const activeFilterKey = activeFilterValues.join(',')
   useEffect(() => {
     setPendingValues(activeFilterValues)
-  }, [activeFilterValues])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilterKey])
 
   // Close on outside click
   useEffect(() => {
@@ -150,12 +159,6 @@ export function ColumnHeaderDropdown({
               )}
             </div>
           )}
-          <div
-            className="data-table__dropdown-item data-table__dropdown-item--submenu"
-            role="menuitem"
-          >
-            <span>Column settings</span>
-          </div>
         </div>
       )}
     </div>

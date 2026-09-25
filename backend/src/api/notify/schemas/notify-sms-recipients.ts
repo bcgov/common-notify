@@ -1,10 +1,83 @@
-import { IsArray, IsString, ArrayMinSize } from 'class-validator'
-import { ApiProperty } from '@nestjs/swagger'
+import {
+  IsArray,
+  IsString,
+  IsOptional,
+  ArrayMaxSize,
+  ArrayMinSize,
+  ValidationArguments,
+} from 'class-validator'
+import { ApiSchema, ApiPropertyOptional, PickType } from '@nestjs/swagger'
+import { IsNormalizablePhoneNumber } from './validators/normalizable-phone-number.validator'
+import { PhoneNumberService } from '../services/phone-number.service'
+import { MAIL_MERGE_MAX_ROWS } from './mail-merge.constants'
+import { IsValidMergeArray } from './validators/merge-array.validator'
 
+const phoneNumberService = new PhoneNumberService()
+
+function e164RecipientMessage(args: ValidationArguments): string {
+  const recipients = Array.isArray(args.value) ? args.value : [args.value]
+  const invalidRecipients = recipients
+    .map((value, index) => ({ value, index }))
+    .filter(
+      ({ value }) => typeof value !== 'string' || phoneNumberService.normalize(value) === null,
+    )
+    .map(({ value, index }) => `${args.property}[${index}] '${String(value)}'`)
+
+  return `${invalidRecipients.join(', ')} is not a valid phone number`
+}
+
+@ApiSchema({
+  description: 'SMS recipients: a "to" list, or a mergeArray for a mail-merge send.',
+})
 export class NotifySmsRecipients {
-  @ApiProperty({ type: [String], description: 'Phone number recipients' })
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Phone number recipients. Every recipient receives the same body. Normalised to E.164, so ' +
+      '"250 555 0123" and "+12505550123" are equivalent. Mutually exclusive with "mergeArray".',
+    example: ['+12505550123', '+16045550147'],
+  })
+  @IsOptional()
   @IsArray()
+  // Optional because a merge supplies recipients instead - but an empty list is still a mistake.
   @ArrayMinSize(1)
   @IsString({ each: true })
-  to: string[]
+  @IsNormalizablePhoneNumber({ each: true, message: e164RecipientMessage })
+  to?: string[]
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'array', items: { type: 'string' } },
+    description:
+      'Mail-merge rows. The first row is the header and its first column must be "to" (the recipient phone number); each following row is one recipient. Extra columns become that recipient\'s template params, so every recipient can receive a different message. Mutually exclusive with "to".',
+    example: [
+      ['to', 'firstName', 'appointmentTime'],
+      ['+12505550123', 'Alice', '9:00 AM'],
+      ['+16045550147', 'Bob', '10:30 AM'],
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAIL_MERGE_MAX_ROWS)
+  @IsValidMergeArray()
+  mergeArray?: string[][]
 }
+
+/**
+ * The two shapes `recipients` may take, for documentation only - see the email equivalents. The
+ * runtime DTO stays NotifySmsRecipients, with ValidateRecipientsOrMerge enforcing the choice.
+ */
+@ApiSchema({
+  name: 'SmsRecipients',
+  description: 'Address the message directly. Mutually exclusive with a mail-merge send.',
+})
+export class NotifySmsAddressRecipients extends PickType(NotifySmsRecipients, ['to'] as const) {}
+
+@ApiSchema({
+  name: 'SmsMailMerge',
+  description:
+    'Mail-merge: one message per row, personalised from the row. Mutually exclusive with to.',
+})
+export class NotifySmsMergeRecipients extends PickType(NotifySmsRecipients, [
+  'mergeArray',
+] as const) {}

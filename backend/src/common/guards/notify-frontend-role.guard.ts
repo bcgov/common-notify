@@ -130,6 +130,14 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
       if (error instanceof UnauthorizedException) {
         throw error
       }
+      // Log the cause before flattening it. Everything that is not a deliberate
+      // Forbidden/Unauthorized lands here — CSTAR being slow, rate-limiting a burst of
+      // requests, or unreachable — and they are indistinguishable to the caller, who
+      // only ever sees "Failed to verify tenant access".
+      this.logger.error(
+        `[NotifyFrontendRoleGuard] CSTAR tenant check failed for tenant ${xTenantId}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      )
       throw new UnauthorizedException('Failed to verify tenant access')
     }
 

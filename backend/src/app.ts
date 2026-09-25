@@ -11,6 +11,7 @@ import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
 import { JwtGuard } from './common/guards/auth.jwt-guard'
+import { applyNotifySchemaConstraints } from './api/notify/schemas/schema-constraints'
 
 /**
  *
@@ -68,8 +69,13 @@ export async function bootstrap() {
   // changing just the hostname would.
   app.setGlobalPrefix('api', {
     exclude: [
+      // Email logo images are not API surface: buildPublicImageUrl bakes this path into
+      // the <img src> of every email sent, where recipients' mail clients fetch it for as
+      // long as they keep the message. It sits outside /api/v1 because a versioned path
+      // implies a v2 someday, and this one can never move without breaking the logo in
+      // mail already delivered.
+      { path: 'logos/(.*)', method: RequestMethod.ALL },
       { path: 'gcnotify/v2/(.*)', method: RequestMethod.ALL },
-      { path: 'gcnotify-passthrough/v2/(.*)', method: RequestMethod.ALL },
     ],
   })
   app.enableVersioning({
@@ -78,12 +84,79 @@ export async function bootstrap() {
   })
   const config = new DocumentBuilder()
     .setTitle('Notify API')
-    .setDescription('The Notify API for sending notifications via email and SMS')
+    .setDescription(
+      [
+        'Multi-tenanted unified notification API which covers everything from simple single-channel sends ' +
+          'to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides ' +
+          'comprehensive defaults through the use of configurable event-types, which free calling applications ' +
+          'from the burden of managing recipients, content, channels and subscriptions - however, defaults can ' +
+          'be overridden or augmented by the message payload at any time if required. ' +
+          'Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends, ' +
+          'maintenance console and integration with subscription services. ' +
+          'CHES and GC Notify interfaces are supported for legacy applications. ' +
+          'Defaults are configured through an administrative UI.',
+        '',
+        'Your API key identifies who the messages are sent for - a program, a project, an ' +
+          'application, a team. Notify calls that a tenant, and it decides which templates, ' +
+          'sender addresses and send limits apply. A key belongs to exactly one tenant.',
+        '',
+        '### Getting started',
+        '',
+        '1. Go to CSTAR and create your tenant.',
+        '2. Log into Notify and navigate to the settings page to generate an API key.',
+        '3. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
+        '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
+          'register a webhook so Notify calls you instead.',
+        '',
+        '### Authentication',
+        '',
+        'Every request goes through the API gateway and carries your key in the `X-API-KEY` ' +
+          'header. There is no tenant identifier to send - the key already says who you are. ' +
+          'The gateway also rate-limits per key. The GC Notify-compatible endpoints instead take ' +
+          'the key the way GC Notify does: `Authorization: ApiKey-v1 {api-key}`.',
+        '',
+        '### Sending is asynchronous',
+        '',
+        'A send returns `202 Accepted` with a `notifyId` once the request is accepted - not once ' +
+          'the message is delivered. Delivery happens afterwards, and its outcome is reported per ' +
+          'recipient on the notification status endpoints.',
+        '',
+        '### Templates and parameters',
+        '',
+        'Message content can be sent inline or stored as a template and referenced by ' +
+          '`templateId`. Either way, placeholders such as `{{firstName}}` are filled from the ' +
+          '`params` supplied with the send. Give a channel a `templateId` or inline `content`, ' +
+          'never both.',
+      ].join('\n'),
+    )
     .setVersion('1.0')
-    .addTag('notify')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'X-API-KEY',
+        in: 'header',
+        description: 'API key issued for the gateway and bound to your tenant.',
+      },
+      'api-key',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'Authorization',
+        in: 'header',
+        description:
+          'GC Notify-compatible endpoints only. Enter `ApiKey-v1 {api-key}`, prefix included.',
+      },
+      'gc-notify-api-key',
+    )
+    .addTag('Send', 'Submit a notification for delivery')
+    .addTag('Notification status', 'Find out what happened to a notification')
+    .addTag('Templates', 'Reusable message content')
+    .addTag('Webhooks', 'Be called when a notification changes state')
+    .addTag('Service', 'Availability')
     .build()
 
-  const document = SwaggerModule.createDocument(app, config)
+  const document = applyNotifySchemaConstraints(SwaggerModule.createDocument(app, config))
   SwaggerModule.setup('/api/docs', app, document)
   return app
 }

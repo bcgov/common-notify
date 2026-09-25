@@ -11,13 +11,12 @@ import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
-import { ChesModule } from './ches/ches.module'
 import { QueueModule } from './queue/queue.module'
 import { NotificationModule } from './api/notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
 import { GcNotifyModule } from './api/gc-notify/gc-notify.module'
-import { ClamavService } from './services/clamav.service'
+import { ClamavModule } from './services/clamav.module'
 import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
 import { LoggerModule } from './common/logger'
 
@@ -35,14 +34,14 @@ import { LoggerModule } from './common/logger'
     AdminModule,
     ApiModule,
     AuthModule,
-    ChesModule,
     NotificationModule,
     FeatureFlagModule,
     AdaptersModule.forRoot(),
     GcNotifyModule.forRoot(),
+    ClamavModule,
   ],
   controllers: [AppController, MetricsController, HealthController],
-  providers: [AppService, ClamavService],
+  providers: [AppService],
 })
 export class AppModule {
   // let's add a middleware on all routes

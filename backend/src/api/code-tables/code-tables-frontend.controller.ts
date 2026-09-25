@@ -1,5 +1,11 @@
 import { Controller, Get, Version, Logger, UseGuards } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
@@ -25,6 +31,8 @@ import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
  * Using JwtGuard (not NotifyFrontendRoleGuard) to avoid x-tenant-id dependency.
  */
 @ApiTags('code-tables')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/code-tables')
 @UseGuards(JwtGuard)
 @ApiBearerAuth()

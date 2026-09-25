@@ -1,63 +1,44 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate configuration for common-notify with batched updates and auto-merge",
+  "description": "Renovate configuration for common-notify: all updates consolidated into a single manually-reviewed PR",
   "extends": ["github>bcgov/renovate-config#2025.10.1"],
   "schedule": ["before 4am on Monday"],
-  "prConcurrentLimit": 3,
+  "prConcurrentLimit": 1,
+  "prHourlyLimit": 0,
   "packageRules": [
     {
-      "description": "Batch all npm patch and minor updates together",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["patch", "minor"],
-      "groupName": "npm non-breaking updates",
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": true
-    },
-    {
-      "description": "Batch all Docker patch and minor updates together",
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["patch", "minor"],
-      "groupName": "Docker non-breaking updates",
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": true
-    },
-    {
-      "description": "Batch all GitHub Actions minor updates together",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "GitHub Actions non-breaking updates",
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": true
-    },
-    {
-      "description": "Batch all Helm chart minor and patch updates together",
-      "matchManagers": ["helm-values", "helmv3"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Helm non-breaking updates",
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": true
-    },
-    {
-      "description": "Group all major updates separately and don't auto-merge",
-      "matchUpdateTypes": ["major"],
-      "groupName": "major dependency updates",
-      "automerge": false
-    },
-    {
-      "description": "Separate security updates for visibility",
-      "matchDatasources": ["npm", "docker"],
-      "matchUpdateTypes": ["patch"],
-      "vulnerabilityAlerts": {
-        "enabled": true
-      },
-      "groupName": "security updates",
+      "description": "Consolidate every update (all managers, all update types incl. major) into a single PR; always reviewed manually, never auto-merged",
+      "matchManagers": [
+        "npm",
+        "dockerfile",
+        "docker-compose",
+        "github-actions",
+        "helm-values",
+        "helmv3"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "bump"
+      ],
+      "groupName": "all dependencies",
       "automerge": false
     }
   ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "groupName": "all dependencies",
+    "automerge": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "groupName": "all dependencies",
+    "automerge": false
+  },
   "helm-values": {
     "enabled": true,
     "managerFilePatterns": ["/charts/.+/values\\.ya?ml$/"]
@@ -65,10 +46,5 @@
   "helmv3": {
     "enabled": true,
     "managerFilePatterns": ["/charts/.+/Chart\\.ya?ml$/"]
-  },
-  "vulnerabilityAlerts": {
-    "enabled": true,
-    "labels": ["security"],
-    "automerge": false
   }
 }

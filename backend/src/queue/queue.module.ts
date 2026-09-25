@@ -18,20 +18,24 @@ import { NotificationService } from '../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
+import { TenantSettingsService } from '../api/tenant-settings/tenant-settings.service'
 import { TemplatesService } from '../api/templates/templates.service'
 import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
+import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
 import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
 import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
 import { ClamavService } from '../services/clamav.service'
+import { ClamavModule } from '../services/clamav.module'
 import { AttachmentModule } from '../api/attachment/attachment.module'
 import { AttachmentService } from '../api/attachment/attachment.service'
 import { StructuredLoggerService } from '../common/logger'
+import { PhoneNumberService } from '../api/notify/services/phone-number.service'
 
 /**
  * Queue Module
@@ -52,8 +56,10 @@ import { StructuredLoggerService } from '../common/logger'
     TypeOrmModule.forFeature([NotificationRequest, NotificationRequestDetail]),
     TenantsModule,
     TemplatesModule,
+    TenantSettingsModule,
     WebhookModule,
     AttachmentModule,
+    ClamavModule,
     forwardRef(() => NotifyModule),
   ],
   providers: [
@@ -61,7 +67,7 @@ import { StructuredLoggerService } from '../common/logger'
     NotificationService,
     NotificationRequestDetailService,
     NotificationPubSubService,
-    ClamavService,
+    PhoneNumberService,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -171,7 +177,9 @@ export class QueueModule implements OnModuleInit {
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly notificationRequestDetailService?: NotificationRequestDetailService,
+    private readonly tenantSettingsService?: TenantSettingsService,
     private readonly clamavService?: ClamavService,
+    private readonly phoneNumberService?: PhoneNumberService,
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
@@ -208,6 +216,7 @@ export class QueueModule implements OnModuleInit {
         this.clamavService,
         concurrency,
         this.attachmentService,
+        this.phoneNumberService,
       )
       this.logger.debug('Ingestion worker initialization started')
 
@@ -229,6 +238,7 @@ export class QueueModule implements OnModuleInit {
         this.notificationRequestDetailService,
         emailConcurrency,
         this.structuredLogger,
+        this.tenantSettingsService,
       )
       this.logger.log('Email delivery worker initialization started')
 

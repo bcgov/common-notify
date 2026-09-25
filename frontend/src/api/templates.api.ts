@@ -33,6 +33,18 @@ export interface TemplateResponse {
   createdAt: string
   updatedBy: string
   updatedAt: string
+  placeholders?: TemplatePlaceholders
+}
+
+/**
+ * What a bulk (CSV) send needs to know about a template's placeholders. Returned by
+ * `getTemplateById` only - the list endpoint does not compute it.
+ */
+export interface TemplatePlaceholders {
+  /** Full dotted paths a person fills in, one spreadsheet column each. */
+  paths: string[]
+  /** Placeholders that repeat or re-scope, which a flat file cannot supply. */
+  unsupported: string[]
 }
 
 export interface GetTemplatesResponse {
@@ -120,10 +132,20 @@ export interface PreviewTemplateBodyResponse {
   subject?: string
   body: string
   bodyType: 'text' | 'markdown' | 'html'
+  /**
+   * The body as HTML, produced by the same converter the email transport uses at send time.
+   * Absent for plain-text bodies, which carry no markup.
+   */
+  html?: string
 }
 
 export interface PreviewTemplateResponse extends PreviewTemplateBodyResponse {
   templateId: string
+  /**
+   * The address the send would actually come from. Resolved server-side the same way the email
+   * transport resolves it, so the preview cannot show a sender the send will not use.
+   */
+  from?: string
 }
 
 /**
@@ -136,11 +158,17 @@ export interface PreviewTemplateResponse extends PreviewTemplateBodyResponse {
  */
 export async function previewTemplate(
   templateId: string,
-  params?: Record<string, string>,
+  params?: Record<string, unknown>,
 ): Promise<PreviewTemplateResponse> {
   try {
     const apiParams = generateApiParameters(`/api/v1/frontend/templates/${templateId}/preview`)
-    return await post<PreviewTemplateResponse>({ ...apiParams, data: { params } })
+    return await post<PreviewTemplateResponse>({
+      ...apiParams,
+      // The preview modal renders its own progress indicator; the app-wide overlay on top of it
+      // would be a second spinner for the same wait.
+      skipGlobalLoading: true,
+      data: { params },
+    })
   } catch (error) {
     const axiosError = error as AxiosError
 

@@ -13,9 +13,16 @@ export interface SmsSettingsValues {
 
 /** The Email tab fields, which are also the PATCH payload for the email settings route. */
 export interface EmailSettingsValues {
+  emailLogoId: string | null
   emailNotificationsEnabled: boolean
   replyToEmail: string | null
   emailAttachmentsEnabled: boolean
+}
+
+export interface ApprovedEmailLogo {
+  id: string
+  name: string | null
+  imageUrl: string
 }
 
 /** The whole tenant_settings row, as returned by GET /api/v1/frontend/tenant-settings. */

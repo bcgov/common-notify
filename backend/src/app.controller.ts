@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Request } from '@nestjs/common'
+import { Controller, Get } from '@nestjs/common'
+import { ApiExcludeEndpoint } from '@nestjs/swagger'
 import { AppService } from './app.service'
 import { Public } from './common/decorators/public.decorator'
 
@@ -6,6 +7,8 @@ import { Public } from './common/decorators/public.decorator'
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // No Kong route: reachable only by hitting the backend directly.
+  @ApiExcludeEndpoint()
   @Get()
   @Public()
   getHello() {
@@ -16,19 +19,5 @@ export class AppController {
   @Public()
   health() {
     return { status: 'ok' }
-  }
-
-  @Get('/api/v1/test/api-key')
-  @Post('/api/v1/test/api-key')
-  testApiKey(@Request() req: any) {
-    // Kong API Key authentication is handled by the key-auth plugin
-    // This endpoint verifies that the API key authentication is working
-    const apiKey = req.headers['x-api-key'] || req.query.apikey
-    return {
-      status: 'success',
-      message: 'API key authentication is working',
-      authenticated: !!apiKey,
-      timestamp: new Date().toISOString(),
-    }
   }
 }

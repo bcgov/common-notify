@@ -1,6 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { SafelistEntry } from '@/interfaces/safelist.interface'
 import { addSafelistEntry, fetchSafelist, removeSafelistEntry } from '../thunks/safelist.thunks'
+import { selectTenant } from './tenant.slice'
+import { isStaleResponse } from '../utils/latestRequest'
 
 interface SafelistState {
   entries: SafelistEntry[]
@@ -9,7 +11,11 @@ interface SafelistState {
   maxEntries: number
   loading: boolean
   saving: boolean
+  /** True once a list response has been applied. Distinguishes "unknown" from "not enforced". */
+  hasLoaded: boolean
   error?: string
+  /** Request id of the fetch currently being awaited; see utils/latestRequest. */
+  currentRequestId: string | null
 }
 
 const initialState: SafelistState = {
@@ -18,6 +24,8 @@ const initialState: SafelistState = {
   maxEntries: 0,
   loading: false,
   saving: false,
+  hasLoaded: false,
+  currentRequestId: null,
 }
 
 const sortEntries = (entries: SafelistEntry[]): SafelistEntry[] =>
@@ -33,19 +41,31 @@ export const safelistSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchSafelist.pending, (state) => {
+      // The safelist is per-tenant; drop the previous tenant's recipients rather than
+      // leaving them on screen under the new tenant while the refetch is in flight.
+      // Every page holding this data refetches on tenant change, so the reset marks the
+      // slice as loading rather than briefly rendering an empty table between the two.
+      .addCase(selectTenant, () => ({ ...initialState, loading: true }))
+      .addCase(fetchSafelist.pending, (state, action) => {
         state.loading = true
         state.error = undefined
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchSafelist.fulfilled, (state, action) => {
+        // Also stops a slow load from clobbering an add/remove that has already applied.
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.entries = action.payload?.entries ?? []
         state.enforced = action.payload?.enforced ?? false
         state.maxEntries = action.payload?.maxEntries ?? 0
         state.loading = false
+        state.hasLoaded = true
+        state.currentRequestId = null
       })
       .addCase(fetchSafelist.rejected, (state, action) => {
+        if (isStaleResponse(state.currentRequestId, action)) return
         state.loading = false
         state.error = action.payload ?? 'Failed to load the safelist'
+        state.currentRequestId = null
       })
       .addCase(addSafelistEntry.pending, (state) => {
         state.saving = true

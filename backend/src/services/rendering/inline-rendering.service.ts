@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { RenderedEmail, RenderedSms, TemplateDefinition } from '../../adapters/interfaces'
 import type { NotifyContent } from '../../api/notify/schemas/notify-content'
+import { sanitizeEmailHtml } from './sanitize-email-html'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
 
 /**
@@ -42,13 +43,25 @@ export class InlineRenderingService {
     }
 
     // Convert params to strings (template renderers expect string values)
-    const stringParams = this.normalizeParams(params)
+    const stringParams = this.normalizeParams(params, content.renderer)
 
-    return renderer.renderEmail({
+    const rendered = await renderer.renderEmail({
       template: inlineTemplate,
       personalisation: stringParams,
       defaultSubject: 'Notification',
     })
+
+    // The boundary sanitiser on NotifyContent.body ran before this, so it saw the template rather
+    // than the values substituted into it: Handlebars and Mustache escape `{{value}}` but not
+    // `{{{value}}}`, and the legacy engine escapes nothing. Sanitising the finished body closes
+    // that. The pass is idempotent, so markup the boundary already accepted survives unchanged,
+    // and inline content never gets the email layout wrapper - what comes back from the renderer
+    // is the caller's own markup and nothing of ours.
+    //
+    // The subject is not HTML: it reaches the recipient as a header, where markup is literal text.
+    return content.bodyType === 'html'
+      ? { ...rendered, body: sanitizeEmailHtml(rendered.body) }
+      : rendered
   }
 
   /**
@@ -77,7 +90,7 @@ export class InlineRenderingService {
     }
 
     // Convert params to strings (template renderers expect string values)
-    const stringParams = this.normalizeParams(params)
+    const stringParams = this.normalizeParams(params, content.renderer)
 
     return renderer.renderSms({
       template: inlineTemplate,
@@ -102,13 +115,21 @@ export class InlineRenderingService {
   /**
    * Normalize params by converting all values to strings
    * Template engines work with string values for interpolation
+   *
+   * The legacy GC Notify engine is the exception: it renders an array as a list, so arrays are
+   * passed through to it rather than stringified. The other engines keep today's behaviour.
    */
-  private normalizeParams(params: Record<string, unknown>): Record<string, string> {
-    const normalized: Record<string, string> = {}
+  private normalizeParams(
+    params: Record<string, unknown>,
+    renderer: NotifyContent['renderer'],
+  ): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(params)) {
       if (value === null || value === undefined) {
         normalized[key] = ''
       } else if (typeof value === 'string') {
+        normalized[key] = value
+      } else if (Array.isArray(value) && renderer === 'legacy_gc_notify') {
         normalized[key] = value
       } else if (typeof value === 'object') {
         normalized[key] = JSON.stringify(value)

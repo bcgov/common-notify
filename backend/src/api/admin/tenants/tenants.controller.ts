@@ -17,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { TenantsService } from './tenants.service'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
@@ -25,6 +26,8 @@ import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole as SsoRoleEnum } from '../../../enum/sso-role.enum'
 
+// Tenant administration, not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @ApiTags('tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
 @UseGuards(NotifyAdminGuard)

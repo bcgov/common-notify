@@ -18,6 +18,12 @@ vi.mock('@/redux/thunks/settings.thunks', () => ({
   updateTenantSettings: vi.fn((payload) => ({ type: 'tenantSettings/update', payload })),
 }))
 
+// The API key block owns its own fetch, slice and dialogs and is covered by
+// ApiKeyField.spec.tsx. Stubbing it keeps this spec about the settings form.
+vi.mock('./ApiKeyField', () => ({
+  default: () => <div data-testid="api-key-field" />,
+}))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),
@@ -63,11 +69,19 @@ function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN
       saving: false,
     },
     user: { current: { cstarRoles: roles } },
+    tenant: { selectedTenant: { id: 'tenant-1' } },
   }
   return render(<TenantSettings />)
 }
 
 const saveButton = () => screen.getByRole('button', { name: 'Save tenant settings' })
+
+describe('API key field', () => {
+  it('renders for every environment — all of them issue through gw-fe8c5', () => {
+    renderWithRoles()
+    expect(screen.getByTestId('api-key-field')).toBeInTheDocument()
+  })
+})
 
 describe('TenantSettings section', () => {
   beforeEach(() => {

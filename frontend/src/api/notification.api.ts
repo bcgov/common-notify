@@ -7,7 +7,7 @@ import type {
   PaginatedNotificationDetailResponse,
 } from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
-
+//
 export interface ListNotificationsOptions {
   page?: number
   limit?: number

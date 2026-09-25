@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
-import {
-  Button,
-  SvgInfoIcon,
-  Switch,
-  Tooltip,
-  TooltipTrigger,
-} from '@bcgov/design-system-react-components'
+import { Button, SvgInfoIcon, Switch, Tooltip } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -94,7 +89,6 @@ const SmsSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About SMS notifications"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -123,7 +117,6 @@ const SmsSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About including the tenant name in SMS"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -167,7 +160,6 @@ const SmsSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the daily limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -191,7 +183,6 @@ const SmsSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the annual limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"

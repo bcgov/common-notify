@@ -1,0 +1,235 @@
+@import '../variables.scss';
+
+// The design system's Modal sizes itself to its content, so the width has to be set on the wrapper
+// rather than on our own root - the same override the template preview uses.
+$preview-pane-height: 70vh;
+$preview-gutter: $spacing-xl * 1.5;
+
+.bcds-react-aria-Modal:has(.notification-preview) {
+  width: 1140px;
+  max-width: calc(100vw - #{$preview-gutter});
+}
+
+.notification-preview {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  // Without this the panes below spill past the modal's rounded corners.
+  overflow: hidden;
+}
+
+.notification-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $border-default;
+}
+
+.notification-preview__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.notification-preview__body {
+  display: flex;
+  min-width: 0;
+  // A fixed pane height keeps the modal from growing with the email; each pane scrolls its own
+  // content instead.
+  height: $preview-pane-height;
+}
+
+.notification-preview__data {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  width: 340px;
+  flex-shrink: 0;
+  padding: $spacing-lg;
+  overflow-y: auto;
+  border-right: 1px solid $border-default;
+}
+
+.notification-preview__stepper {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+  padding-bottom: $spacing-sm;
+  border-bottom: 1px solid $border-default;
+}
+
+.notification-preview__position {
+  font-weight: 700;
+  margin-right: auto;
+}
+
+// Icon buttons, not links: these step between messages rather than navigating away.
+.notification-preview__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xs;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: $dark-text;
+  cursor: pointer;
+
+  // The icons ship at 20px; the design shows them larger than the surrounding text.
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  &:hover:not(:disabled) {
+    background: $light-bg;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $border-active;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
+.notification-preview__heading {
+  margin: 0;
+  font-weight: 700;
+}
+
+.notification-preview__intro {
+  margin: 0;
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+.notification-preview__fields {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.notification-preview__field-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.notification-preview__data-footer {
+  padding-top: $spacing-sm;
+}
+
+.notification-preview__output-pane {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  flex: 1 1 auto;
+  // Flex items refuse to shrink below their content without this, which is what let the rendered
+  // email push its way out of the modal.
+  min-width: 0;
+  padding: $spacing-lg;
+  overflow: auto;
+}
+
+.notification-preview__envelope {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin: 0;
+  padding-bottom: $spacing-md;
+  border-bottom: 1px solid $border-default;
+}
+
+.notification-preview__envelope-row {
+  display: flex;
+  gap: $spacing-sm;
+
+  dt {
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}
+
+// The rendered email. Sized generously because it is the point of the screen.
+.notification-preview__frame {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  // A definite height: an iframe has no intrinsic size to grow to, and letting it flex made it
+  // overflow the pane instead.
+  height: 100%;
+  min-height: 320px;
+  flex: 1 1 auto;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $white;
+}
+
+.notification-preview__text {
+  margin: 0;
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $white;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notification-preview__error {
+  margin: 0;
+  color: $danger-color;
+}
+
+.notification-preview__placeholder {
+  margin: 0;
+  color: $text-secondary;
+}
+
+.notification-preview__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-md;
+  flex: 1 1 auto;
+  min-height: 240px;
+}
+
+.notification-preview__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  border-top: 1px solid $border-default;
+}
+
+@media (max-width: $breakpoint-md) {
+  .notification-preview__body {
+    flex-direction: column;
+  }
+
+  .notification-preview__data {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid $border-default;
+  }
+
+  .notification-preview__body {
+    height: auto;
+    max-height: $preview-pane-height;
+    overflow-y: auto;
+  }
+}

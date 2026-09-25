@@ -8,7 +8,14 @@ import { ValidateTemplateOrContent } from './validators/template-or-content.vali
 
 @ValidateTemplateOrContent()
 export class NotifySimpleRequest {
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      "Values substituted into template placeholders, applied to every channel. A channel's own " +
+      'params take precedence.',
+    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
+  })
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
