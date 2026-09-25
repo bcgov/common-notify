@@ -77,6 +77,19 @@ jobs:
             helm repo add grafana https://grafana.github.io/helm-charts || true
             helm repo update
 
+            # Provision the Loki ruler alert rules BEFORE the helm install.
+            # values-tools.yaml mounts a ConfigMap named `loki-alert-rules` into
+            # the ruler's rules dir (/var/loki/rules/common-notify), but nothing
+            # created it — so the log-based rules never actually loaded and the
+            # file drifted from git. Create it here so the mount is populated on
+            # first boot. (Previously applied by hand via
+            # monitoring/deploy-dashboards-alerts.sh.)
+            echo "🔔 Provisioning Loki ruler alert rules..."
+            oc create configmap loki-alert-rules \
+              --from-file=alert-rules.yaml=monitoring/grafana-stack/loki/alert-rules.yaml \
+              --namespace ${NAMESPACE} \
+              --dry-run=client -o yaml | oc apply -f -
+
             # Deploy Loki using tools-specific values
             helm upgrade --install loki grafana/loki \
               --namespace ${NAMESPACE} \
@@ -85,6 +98,11 @@ jobs:
               --timeout 10m
 
             echo "✅ Loki deployed successfully"
+
+            # If Loki was already running, restart it so the ruler picks up any
+            # change to the alert-rules ConfigMap (mounted files refresh, but the
+            # ruler only reloads rules on start unless enable_api reload is used).
+            oc rollout restart statefulset/loki -n ${NAMESPACE} 2>/dev/null || true
 
             # Apply NetworkPolicies
             echo "🔒 Applying Loki NetworkPolicies..."
@@ -285,6 +303,35 @@ jobs:
               --values monitoring/grafana-stack/grafana/values-tools-sso.yaml \
               --wait \
               --timeout 10m
+
+            # -----------------------------------------------------------------
+            # Provision Grafana-managed alert rules + dashboards.
+            # The Grafana sidecar (see values-tools-sso.yaml) watches this
+            # namespace for ConfigMaps labelled grafana_alert=1 (alert rules)
+            # and grafana_dashboard=1 (dashboards) and hot-loads them — no
+            # Grafana restart needed. Previously these were applied by hand via
+            # monitoring/deploy-dashboards-alerts.sh and drifted from git; this
+            # makes the pipeline the single source of truth.
+            echo "🔔 Provisioning Grafana-managed alert rules (grafana_alert=1)..."
+            oc create configmap cn-infra-alert-rules \
+              --from-file=infra-alert-rules.yaml=monitoring/grafana-stack/grafana/infra-alert-rules.yaml \
+              --namespace ${NAMESPACE} \
+              --dry-run=client -o yaml | oc apply -f -
+            oc label configmap cn-infra-alert-rules grafana_alert=1 \
+              --namespace ${NAMESPACE} --overwrite
+
+            echo "📊 Provisioning Grafana dashboards (grafana_dashboard=1)..."
+            for dash in monitoring/dashboards/*.json; do
+              [ -f "$dash" ] || continue
+              name="cn-dashboard-$(basename "$dash" .json)"
+              oc create configmap "$name" \
+                --from-file="$(basename "$dash")=$dash" \
+                --namespace ${NAMESPACE} \
+                --dry-run=client -o yaml | oc apply -f -
+              oc label configmap "$name" grafana_dashboard=1 \
+                --namespace ${NAMESPACE} --overwrite
+            done
+            echo "✅ Alert rules and dashboards provisioned"
 
             # Create OpenShift Route
             echo "🌐 Creating OpenShift Route..."
