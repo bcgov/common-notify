@@ -19,27 +19,35 @@ import { MAIL_MERGE_UI_MAX_RECIPIENTS } from '../../api/notify/schemas/mail-merg
  *
  * Guards run before the ValidationPipe, so the body here is raw. Anything that is not a merge is
  * passed straight through for the pipe to reject or accept on its own terms.
+ *
+ * Two body shapes reach this guard. The email route takes a bare channel body, so the merge sits
+ * at `recipients.mergeArray`; the SMS route takes a full NotifySimpleRequest, so it sits one level
+ * down under `sms`. Both are checked - reading only the bare shape silently skipped the cap on
+ * every wrapped request.
  */
 @Injectable()
 export class MailMergeUiLimitsGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest()
-    const mergeArray = request?.body?.recipients?.mergeArray
+    const body = context.switchToHttp().getRequest()?.body
 
-    if (!Array.isArray(mergeArray)) {
-      return true
-    }
+    for (const channel of [body, body?.email, body?.sms]) {
+      const mergeArray = channel?.recipients?.mergeArray
 
-    // Row 0 is the header, so it does not count against the recipient cap.
-    const recipientCount = Math.max(0, mergeArray.length - 1)
+      if (!Array.isArray(mergeArray)) {
+        continue
+      }
 
-    if (recipientCount > MAIL_MERGE_UI_MAX_RECIPIENTS) {
-      throw new UnprocessableEntityException({
-        message: 'Request validation failed',
-        errors: [
-          `This list has ${recipientCount.toLocaleString()} recipients. The limit is ${MAIL_MERGE_UI_MAX_RECIPIENTS.toLocaleString()} per send.`,
-        ],
-      })
+      // Row 0 is the header, so it does not count against the recipient cap.
+      const recipientCount = Math.max(0, mergeArray.length - 1)
+
+      if (recipientCount > MAIL_MERGE_UI_MAX_RECIPIENTS) {
+        throw new UnprocessableEntityException({
+          message: 'Request validation failed',
+          errors: [
+            `This list has ${recipientCount.toLocaleString()} recipients. The limit is ${MAIL_MERGE_UI_MAX_RECIPIENTS.toLocaleString()} per send.`,
+          ],
+        })
+      }
     }
 
     return true

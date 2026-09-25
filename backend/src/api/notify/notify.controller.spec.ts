@@ -23,7 +23,6 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -52,10 +51,6 @@ const mockAuthGuard: CanActivate = {
     request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
-}
-
-const mockChesApiClient = {
-  sendEmail: vi.fn(),
 }
 
 const mockConfigService = {
@@ -182,7 +177,6 @@ describe('Notify Controllers', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
-        { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
@@ -595,11 +589,27 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 422 when no channel is provided', async () => {
+      // An empty body fails DTO validation now that ValidateTemplateOrContent actually runs, so it
+      // is rejected at the pipe with a 400 rather than reaching the business-rule check. 400 for a
+      // malformed request and 422 for a business-rule failure is the split ValidationExceptionFilter
+      // already assumes.
+      it('should return 400 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      })
+
+      it('should return 422 when a well-formed request fails a business rule', async () => {
         mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
           'At least one recipient is required (email, SMS, or msgApp)',
         ])
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
+          .expect(422)
       })
 
       it('should return 202 with status "accepted" for immediate send', async () => {
@@ -636,8 +646,11 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
-        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+      // A past delayedSend used to be accepted and sent immediately, because the delay is computed
+      // as Math.max(0, when - now). Scheduling into the past is never what a caller meant, so it is
+      // rejected now.
+      it('should return 400 for a delayedSend in the past', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString()
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
@@ -647,11 +660,7 @@ describe('Notify Controllers', () => {
               delayedSend: pastDate,
             },
           })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Notification scheduled for delivery')
-          })
+          .expect(400)
       })
 
       it('should return 400 and not persist when attachment validation fails', async () => {
@@ -708,6 +717,27 @@ describe('Notify Controllers', () => {
 
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('hands the email shorthand params to validation under the channel, not top level', async () => {
+        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // Everything the caller sent lands under email — so validateBusinessRules sees no
+        // top-level params and must read the channel's own params to resolve placeholders.
+        const templateId = '12345678-1234-4234-8234-123456789012'
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send({
+            recipients: { to: ['test@example.com'] },
+            content: { templateId },
+            params: { firstName: 'Alice' },
+          })
+          .expect(202)
+
+        const [, validatedPayload] =
+          mockNotificationService.validateBusinessRules.mock.calls.at(-1)!
+        expect(validatedPayload.params).toBeUndefined()
+        expect(validatedPayload.email.params).toEqual({ firstName: 'Alice' })
       })
 
       it('should return a clear DTO error when attachment content is missing', async () => {
@@ -920,6 +950,103 @@ describe('Notify Controllers', () => {
             .expect(400)
 
           expect(mockNotificationService.create).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
+        const validSmsMerge = {
+          sms: {
+            content: { templateId: '12345678-1234-4234-8234-123456789012' },
+            recipients: {
+              mergeArray: [
+                ['to', 'firstName'],
+                ['+12505550123', 'Alice'],
+                ['+16045550147', 'Bob'],
+              ],
+            },
+          },
+        }
+
+        it('should accept an SMS merge and report the recipient count', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.channels).toEqual(['sms'])
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.message).toContain('SMS merge send accepted with 2 recipient(s)')
+            })
+        })
+
+        it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
+          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
+          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
+          mockSmsSegmentService.countSegmentsPerRecipient
+            .mockResolvedValueOnce(3)
+            .mockResolvedValueOnce(1)
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.billableMessageCount).toBe(4)
+            })
+        })
+
+        it('should enforce limits on segments, not on recipients', async () => {
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockApiKeyConsumerId = 'consumer-1'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-1', [
+            { channel: 'SMS', count: 8 },
+          ])
+        })
+
+        it('should return 422 with the row that failed validation', async () => {
+          mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+            'Row 2: "not-a-number" is not a valid phone number',
+          ])
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.errors).toContain('Row 2: "not-a-number" is not a valid phone number')
+            })
+        })
+
+        it('should return 400 when both to and mergeArray are given', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({
+              sms: {
+                ...validSmsMerge.sms,
+                recipients: {
+                  to: ['+12505550123'],
+                  mergeArray: [['to'], ['+16045550147']],
+                },
+              },
+            })
+            .expect(400)
+        })
+
+        it('should still reject an empty to list', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({ sms: { ...validSmsMerge.sms, recipients: { to: [] } } })
+            .expect(400)
         })
       })
 

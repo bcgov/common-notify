@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { FeatureFlag } from './entities/feature-flag.entity'
 import { FeatureFlagCode } from './entities/feature-flag-code.entity'
@@ -21,7 +21,8 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
     TypeOrmModule.forFeature([FeatureFlag, FeatureFlagCode, Tenant]),
     TenantsModule,
     CstarModule,
-    ApiKeysModule,
+    // Mutually recursive with ApiKeysModule; see the note there.
+    forwardRef(() => ApiKeysModule),
   ],
   providers: [FeatureFlagService, NotifyAdminGuard, NotifyFrontendRoleGuard, NotifyServiceGuard],
   controllers: [

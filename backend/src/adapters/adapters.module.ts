@@ -68,7 +68,8 @@ export class AdaptersModule {
             configService: ConfigService,
           ): IEmailTransport => {
             const key = configService.get<string>('delivery.email') ?? 'ches'
-            // Passthrough keys use GcNotifyApiClient/ChesPassthroughClient, not IEmailTransport; fallback for DI
+            // A `:passthrough` suffix names no IEmailTransport of its own; fall back so DI still
+            // resolves. Nothing forwards to GC Notify any more, so this only guards a stale value.
             if (key?.includes(':passthrough')) {
               return map['ches'] ?? map['nodemailer']
             }
@@ -83,13 +84,13 @@ export class AdaptersModule {
             map: Record<string, ISmsTransport>,
             configService: ConfigService,
           ): ISmsTransport => {
-            const key = configService.get<string>('delivery.sms') ?? 'twilio'
-            // Passthrough keys use GcNotifyApiClient, not ISmsTransport; fallback for DI
+            const key = configService.get<string>('delivery.sms') ?? 'acs'
+            // As above: a `:passthrough` suffix names no ISmsTransport, so fall back for DI.
             if (key?.includes(':passthrough')) {
-              return map['twilio']
+              return map['acs']
             }
             const provider = key?.includes(':') ? key.split(':')[0] : key
-            return map[provider] ?? map['twilio']
+            return map[provider] ?? map['acs']
           },
           inject: [SMS_ADAPTER_MAP, ConfigService],
         },

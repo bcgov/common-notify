@@ -18,7 +18,7 @@ const TenantError: FC<Props> = ({ title = 'Failed to Load Tenants', error, onRet
         <h2>{title}</h2>
         <p className="error-message">{error}</p>
         <div className="error-actions">
-          <Button onClick={onRetry} className="retry-button">
+          <Button onClick={onRetry} variant="primary">
             Try Again
           </Button>
         </div>

@@ -184,7 +184,6 @@ const EmailSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About email notifications"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -241,7 +240,6 @@ const EmailSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About allowing email attachments"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -269,7 +267,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the daily limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -293,7 +290,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the annual limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"

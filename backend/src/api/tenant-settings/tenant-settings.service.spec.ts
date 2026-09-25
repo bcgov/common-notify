@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
 import { BadRequestException } from '@nestjs/common'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { vi } from 'vitest'
@@ -53,6 +54,17 @@ describe('TenantSettingsService', () => {
           provide: EmailLogoService,
           useValue: mockEmailLogoService,
         },
+        {
+          // Supplies the domain appended to the stored local part of a sender address.
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              ({
+                'events.senderEmailDomain': 'gov.bc.ca',
+                'ches.from': 'notify_noreply@gov.bc.ca',
+              })[key],
+          },
+        },
       ],
     }).compile()
 
@@ -78,6 +90,54 @@ describe('TenantSettingsService', () => {
       const result = await service.findByTenantId('tenant-uuid-1')
 
       expect(result).toBeNull()
+    })
+  })
+
+  describe('getSenderAddress', () => {
+    it('appends the domain to the stored local part', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('returns null when the tenant has no sender configured', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the stored value is blank', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: '  ' })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the tenant has no settings row at all', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+  })
+
+  describe('resolveSenderAddress', () => {
+    it('prefers the tenant sender', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('falls back to the service-wide address when the tenant has no sender', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe(
+        'notify_noreply@gov.bc.ca',
+      )
     })
   })
 

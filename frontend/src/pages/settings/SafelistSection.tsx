@@ -24,7 +24,7 @@ import type { CreateSafelistEntry, SafelistEntry } from '@/interfaces/safelist.i
 const SafelistSection: FC = () => {
   const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const { entries, enforced, maxEntries, loading, saving, error } = useAppSelector(
+  const { entries, enforced, maxEntries, loading, saving, hasLoaded, error } = useAppSelector(
     (state) => state.safelist,
   )
 
@@ -61,7 +61,14 @@ const SafelistSection: FC = () => {
     <section className="mt-5" aria-label="Recipient safelist">
       <PageSubHeading title="Recipient safelist" />
 
-      {!enforced ? (
+      {error && <Alert variant="danger">{error}</Alert>}
+
+      {!hasLoaded ? (
+        // Say nothing about enforcement until the list has actually loaded. `enforced` starts
+        // false, so announcing it early tells an enforcing environment it is unenforced - and
+        // keeps saying it if the request failed outright.
+        loading && <p className="text-muted">Loading safelist...</p>
+      ) : !enforced ? (
         // Nothing below this is shown when the safelist has no effect: a list of recipients that
         // does not gate anything invites the reader to believe it does.
         <Alert variant="info">This environment does not enforce the safelist.</Alert>
@@ -71,8 +78,6 @@ const SafelistSection: FC = () => {
             This environment only sends to safelisted recipients. Notifications addressed to anyone
             else are rejected, and a tenant with an empty safelist cannot send at all.
           </Alert>
-
-          {error && <Alert variant="danger">{error}</Alert>}
 
           <SafelistForm onSubmit={handleAdd} isSubmitting={saving} isFull={isFull} />
 

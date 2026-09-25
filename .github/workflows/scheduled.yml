@@ -23,8 +23,11 @@ jobs:
       - name: Clean up Helm Releases
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_token: ${{ secrets.oc_token }}
+          # OC_NAMESPACE/OC_TOKEN exist only as DEV environment secrets, and this job
+          # declares no environment, so they resolve empty here. Use the repo-level pair
+          # that pr-close.yml already uses for the same namespace.
+          oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
+          oc_token: ${{ secrets.OC_DEV_TOKEN }}
           oc_server: ${{ vars.oc_server }}
           commands: |
             # Catch errors, unset variables, and pipe failures (e.g. grep || true )
@@ -36,7 +39,10 @@ jobs:
 
             # Before date, list of releases
             BEFORE=$(date +%s -d "${{ env.CUTOFF }}")
-            RELEASES=$(helm ls -aq | grep ${{ github.event.repository.name }} || :)
+            # Anchor on a numeric suffix so only PR releases (common-notify-<PR#>) match.
+            # A bare name grep also matches common-notify-dev, which shares this namespace
+            # and would be uninstalled after a week with no merges to main.
+            RELEASES=$(helm ls -aq | grep -E "^${{ github.event.repository.name }}-[0-9]+$" || :)
 
             # If releases, then iterate
             [ -z "${RELEASES}" ]|| for r in ${RELEASES[@]}; do
@@ -74,6 +80,7 @@ jobs:
   zap:
     name: ZAP Scans
     permissions:
+      contents: read
       issues: write
     runs-on: ubuntu-24.04
     strategy:
@@ -84,11 +91,15 @@ jobs:
             path: api
           - name: frontend
     steps:
+      # The action reads rules_file_name out of the workspace, so the repo has
+      # to be on disk before it runs.
+      - uses: actions/checkout@v6
       - name: ZAP Scan
         uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
         with:
           allow_issue_writing: true
           artifact_name: ${{ matrix.name }}
           issue_title: "ZAP Security Report: ${{ matrix.name }}"
+          rules_file_name: .zap/rules.tsv
           token: ${{ secrets.GITHUB_TOKEN }}
           target: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca/${{ matrix.path }}

@@ -63,4 +63,37 @@ describe('MailMergeUiLimitsGuard', () => {
     expect(guard.canActivate(contextFor({}))).toBe(true)
     expect(guard.canActivate(contextFor({ recipients: { mergeArray: 'nope' } }))).toBe(true)
   })
+
+  // The SMS route takes a full NotifySimpleRequest, so its merge sits under `sms` rather than at
+  // the root. Reading only the root shape let every wrapped request past the cap.
+  describe('wrapped NotifySimpleRequest bodies', () => {
+    it('rejects an SMS merge over the cap', () => {
+      const body = { sms: mergeOf(MAIL_MERGE_UI_MAX_RECIPIENTS + 1) }
+      expect(() => guard.canActivate(contextFor(body))).toThrow(UnprocessableEntityException)
+    })
+
+    it('allows an SMS merge at the cap', () => {
+      const body = { sms: mergeOf(MAIL_MERGE_UI_MAX_RECIPIENTS) }
+      expect(guard.canActivate(contextFor(body))).toBe(true)
+    })
+
+    it('rejects a wrapped email merge over the cap', () => {
+      const body = { email: mergeOf(MAIL_MERGE_UI_MAX_RECIPIENTS + 1) }
+      expect(() => guard.canActivate(contextFor(body))).toThrow(UnprocessableEntityException)
+    })
+
+    it('rejects when either channel of a mixed request is over the cap', () => {
+      const body = {
+        email: mergeOf(1),
+        sms: mergeOf(MAIL_MERGE_UI_MAX_RECIPIENTS + 1),
+      }
+      expect(() => guard.canActivate(contextFor(body))).toThrow(UnprocessableEntityException)
+    })
+
+    it('passes through a wrapped send that is not a merge', () => {
+      expect(guard.canActivate(contextFor({ sms: { recipients: { to: ['+12505550199'] } } }))).toBe(
+        true,
+      )
+    })
+  })
 })

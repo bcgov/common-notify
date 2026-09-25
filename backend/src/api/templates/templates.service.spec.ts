@@ -10,6 +10,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { EmailTemplateLayoutService } from './email-template-layout.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -98,6 +99,10 @@ describe('TemplatesService', () => {
     findAll: vi.fn(),
   }
 
+  const mockTenantSettingsService = {
+    resolveSenderAddress: vi.fn().mockResolvedValue('noreply@gov.bc.ca'),
+  }
+
   const mockEmailTemplateLayoutService = {
     apply: vi.fn(),
   }
@@ -120,11 +125,16 @@ describe('TemplatesService', () => {
           useValue: mockEmailTemplateLayoutService,
         },
         {
-          // The preview reports the address a send would use, resolved from config.
+          // The preview reports the address a send would use: the tenant's sender when set,
+          // otherwise this config value.
           provide: ConfigService,
           useValue: {
             get: (key: string) => (key === 'ches.from' ? 'noreply@gov.bc.ca' : undefined),
           },
+        },
+        {
+          provide: TenantSettingsService,
+          useValue: mockTenantSettingsService,
         },
       ],
     }).compile()
@@ -346,6 +356,23 @@ describe('TemplatesService', () => {
       const result = await service.renderTemplateContent(template, { status: null })
 
       expect(result.body).toBe('Status: ')
+    })
+
+    it('should pass Legacy GC Notify list values through as arrays, not "a,b" strings', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Order ((items))',
+        body: 'Your order contains:\n\n((items))',
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        items: ['apples', 'pears', 'plums'],
+      })
+
+      // Bullets in the body, an inline sentence in the subject. String(["a","b"]) would have
+      // flattened both to "apples,pears,plums".
+      expect(result.body).toBe('Your order contains:\n\n\n\n* apples\n* pears\n* plums')
+      expect(result.subject).toBe('Order apples, pears and plums')
     })
 
     it('should throw a clean error when personalisation is null and placeholders are required', async () => {
@@ -851,6 +878,18 @@ describe('TemplatesService', () => {
       expect(result.body).toContain('# Welcome John')
       expect(result.body).toContain('**bold**')
       expect(result.bodyType).toBe('markdown')
+    })
+
+    it('previews the same from address delivery will resolve for this tenant', async () => {
+      mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
+      mockTenantSettingsService.resolveSenderAddress.mockResolvedValueOnce('permits@gov.bc.ca')
+
+      const result = await service.previewTemplate('tenant-123', 'template-123', {
+        params: { userName: 'John', siteName: 'MyApp' },
+      })
+
+      expect(mockTenantSettingsService.resolveSenderAddress).toHaveBeenCalledWith('tenant-123')
+      expect(result.from).toBe('permits@gov.bc.ca')
     })
   })
 

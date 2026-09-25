@@ -1,5 +1,6 @@
 import type { NotificationRequest, NotificationRequestDetail } from './NotificationRequest'
 import type { TemplateResponse } from '@/api/templates.api'
+import type { EventResponse } from '@/api/events.api'
 
 export interface PaginatedResponse<T> {
   data: T[]
@@ -12,3 +13,4 @@ export interface PaginatedResponse<T> {
 export type PaginatedNotificationResponse = PaginatedResponse<NotificationRequest>
 export type PaginatedNotificationDetailResponse = PaginatedResponse<NotificationRequestDetail>
 export type PaginatedTemplateResponse = PaginatedResponse<TemplateResponse>
+export type PaginatedEventResponse = PaginatedResponse<EventResponse>

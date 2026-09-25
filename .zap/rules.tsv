@@ -1,0 +1,19 @@
+# ZAP full-scan rule configuration, wired into the zap job in
+# .github/workflows/scheduled.yml via rules_file_name.
+#
+# Tab separated: rule id, action, note. IGNORE drops the rule from the scan
+# and from the GitHub issue the action opens. Only findings that cannot be
+# acted on belong here.
+#
+# Two alerts from the last scan are deliberately NOT ignored:
+#   10055  CSP. script-src is fixed, style-src still carries 'unsafe-inline'
+#          because emotion, react-toastify and react-aria all require it (see
+#          frontend/Caddyfile). One rule id covers both, so ignoring it would
+#          also hide a script-src regression.
+#   10027  Suspicious Comments. Fixed in frontend/index.html; kept active to
+#          catch the next comment that trips it.
+
+10049	IGNORE	(Non-Storable Content - the SPA shell and /static/config.js are no-store on purpose; hashed assets are cached, see frontend/Caddyfile)
+10096	IGNORE	(Timestamp Disclosure Unix - matches a long numeric literal in a minified bundle, not a timestamp)
+10104	IGNORE	(User Agent Fuzzer - informational; reports that responses differ when the scanner varies the User-Agent)
+10109	IGNORE	(Modern Web Application - informational; this is a React SPA by design)

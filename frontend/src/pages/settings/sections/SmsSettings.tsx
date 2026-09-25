@@ -89,7 +89,6 @@ const SmsSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About SMS notifications"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -118,7 +117,6 @@ const SmsSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About including the tenant name in SMS"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -162,7 +160,6 @@ const SmsSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the daily limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -186,7 +183,6 @@ const SmsSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the annual limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
