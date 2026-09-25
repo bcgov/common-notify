@@ -75,8 +75,7 @@ export class PostBulkRequest {
   rows?: string[][]
 
   @ApiPropertyOptional({
-    description:
-      'Schedule for future send (up to 4 days), ISO 8601 format UTC',
+    description: 'Schedule for future send (up to 4 days), ISO 8601 format UTC',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()

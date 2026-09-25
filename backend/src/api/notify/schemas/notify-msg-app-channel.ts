@@ -32,8 +32,7 @@ export class NotifyMsgAppChannel {
   @ApiPropertyOptional() @IsOptional() @IsString() msgAppId?: string
 
   @ApiPropertyOptional({
-    description:
-      'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
+    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()

@@ -43,8 +43,7 @@ export class NotifyContent {
 
   @ApiPropertyOptional({
     enum: ['text', 'markdown', 'html'],
-    description:
-      'How to interpret the body: plain text, markdown converted to HTML, or raw HTML.',
+    description: 'How to interpret the body: plain text, markdown converted to HTML, or raw HTML.',
     default: 'markdown',
     example: 'markdown',
   })

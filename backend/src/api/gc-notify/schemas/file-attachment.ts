@@ -3,8 +3,7 @@ import { IsString, IsIn } from 'class-validator'
 
 export class FileAttachment {
   @ApiProperty({
-    description:
-      'File contents, base64 encoded.',
+    description: 'File contents, base64 encoded.',
     example: 'JVBERi0xLjQKJcfsj6IK...',
   })
   @IsString()

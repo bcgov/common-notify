@@ -23,8 +23,7 @@ export class CreateSmsNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description:
-      'Values for the template placeholders.',
+    description: 'Values for the template placeholders.',
     example: { appointmentTime: '09:00', items: ['apples', 'pears'] },
   })
   @IsOptional()
@@ -40,8 +39,7 @@ export class CreateSmsNotificationRequest {
   reference?: string
 
   @ApiPropertyOptional({
-    description:
-      'Hold the message until this time instead of sending immediately.',
+    description: 'Hold the message until this time instead of sending immediately.',
     format: 'date-time A time in the past is rejected rather than sent immediately.',
     example: '2027-06-01T16:00:00Z',
   })

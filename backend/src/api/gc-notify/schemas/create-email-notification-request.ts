@@ -28,8 +28,7 @@ export class CreateEmailNotificationRequest {
   template_id: string
 
   @ApiPropertyOptional({
-    description:
-      'Values for the template placeholders. A value may also be a file attachment.',
+    description: 'Values for the template placeholders. A value may also be a file attachment.',
     example: { firstName: 'Alice', permitNumber: 'BC-2026-00417', items: ['apples', 'pears'] },
   })
   @IsOptional()
@@ -37,8 +36,7 @@ export class CreateEmailNotificationRequest {
   personalisation?: Record<string, string | string[] | FileAttachment>
 
   @ApiPropertyOptional({
-    description:
-      'Hold the message until this time instead of sending immediately.',
+    description: 'Hold the message until this time instead of sending immediately.',
     format: 'date-time A time in the past is rejected rather than sent immediately.',
     example: '2027-06-01T16:00:00Z',
   })
