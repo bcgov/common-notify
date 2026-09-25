@@ -23,7 +23,21 @@ describe('readGatewayCredentialHeaders', () => {
       consumerUsername: 'ENV123-APP456',
       consumerCustomId: 'ENV123-APP456',
       consumerId: 'kong-consumer-uuid',
+      consumerGroups: [],
     })
+  })
+
+  it('splits the ACL groups Kong joined together', () => {
+    const headers = readGatewayCredentialHeaders({
+      'x-consumer-groups': 'cstar-guid, ENV123',
+    })
+
+    expect(headers.consumerGroups).toEqual(['cstar-guid', 'ENV123'])
+  })
+
+  it('treats a consumer in no groups as no groups', () => {
+    // Kong emits the header even when the consumer belongs to nothing.
+    expect(readGatewayCredentialHeaders({ 'x-consumer-groups': '' }).consumerGroups).toEqual([])
   })
 
   it('ignores empty and non-string header values', () => {
@@ -39,8 +53,8 @@ describe('readGatewayCredentialHeaders', () => {
 
 describe('describeGatewayHeaders', () => {
   it('reports every injected header, including ones we do not consume', () => {
-    // x-consumer-groups is the point: it is where a tenant id would arrive on a
-    // kong-api-key-acl environment, and nothing reads it yet.
+    // Logs every injected header, not just the ones resolution consumes, so the line
+    // still shows anything the gateway starts sending that we do not yet read.
     const described = describeGatewayHeaders({
       'x-credential-identifier': 'cred-1',
       'x-consumer-username': 'ENV123-APP456',
@@ -146,20 +160,54 @@ describe('resolveApiKeyConsumer', () => {
     )
   })
 
-  it('logs the gateway headers at info on a key\u2019s first use', async () => {
-    // Deployed environments run at info, so a debug line would leave the evidence
-    // only on a developer's laptop. This fires once per key.
+  it('recovers a key whose stored credential identifier is stale', async () => {
+    // Regenerating on the Portal mints a new Kong credential and tells Notify nothing,
+    // so the stored identifier points at one that no longer exists. Before the tenant
+    // arrived in a header this was unrecoverable: the credential lookup misses and the
+    // unqualified clientId match refuses a binding that has already been used.
+    const binding = {
+      id: 'binding-1',
+      clientId: 'ENV123-APP456',
+      credentialIdentifier: 'stale-cred',
+      tenant: { externalId: 'cstar-guid' },
+    }
+    repository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(binding)
+
+    const result = await resolve({
+      credentialIdentifier: 'rotated-cred',
+      consumerUsername: 'ENV123-APP456',
+      consumerGroups: ['cstar-guid', 'ENV123'],
+    })
+
+    expect(result).toBe(binding)
+    expect(repository.findOne).toHaveBeenLastCalledWith({
+      where: {
+        clientId: In(['ENV123-APP456']),
+        tenant: { externalId: In(['cstar-guid', 'ENV123']) },
+      },
+      relations: ['tenant'],
+    })
+    // The rotated identifier is recorded, so the next request takes the fast path.
+    expect(binding.credentialIdentifier).toBe('rotated-cred')
+  })
+
+  it('falls back to the unqualified clientId when the gateway forwards no groups', async () => {
+    // Consumers issued before ACL groups existed carry none, so there is no tenant to
+    // narrow the match to and the never-used restriction still applies.
     const binding = { id: 'binding-1', clientId: 'ENV123-APP456', credentialIdentifier: null }
     repository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(binding)
 
-    await resolve(
-      { credentialIdentifier: 'cred-1', consumerUsername: 'ENV123-APP456' },
-      { 'x-consumer-username': 'ENV123-APP456', 'x-consumer-groups': 'ENV123, cstar-guid' },
-    )
+    const result = await resolve({
+      credentialIdentifier: 'cred-1',
+      consumerUsername: 'ENV123-APP456',
+      consumerGroups: [],
+    })
 
-    const logged = (logger.log as unknown as ReturnType<typeof vi.fn>).mock.calls.flat().join(' ')
-    expect(logged).toMatch(/First authenticated request/)
-    expect(logged).toMatch(/x-consumer-groups=ENV123, cstar-guid/)
+    expect(result).toBe(binding)
+    expect(repository.findOne).toHaveBeenLastCalledWith({
+      where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
+      relations: ['tenant'],
+    })
   })
 
   it('backfills the credential identifier so later requests take the fast path', async () => {
