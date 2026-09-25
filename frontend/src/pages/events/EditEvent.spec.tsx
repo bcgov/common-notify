@@ -49,6 +49,10 @@ vi.mock('@/api/settings.api', async () => {
   return { ...actual, getSettings: vi.fn(), getApprovedEmailLogos: vi.fn() }
 })
 
+vi.mock('@/api/cstar.api', () => ({
+  cstarApi: { fetchTenantGroups: vi.fn().mockResolvedValue([]) },
+}))
+
 vi.mock('@/api/templates.api', async () => {
   const actual = await vi.importActual<typeof TemplatesApi>('@/api/templates.api')
   return {
@@ -89,6 +93,9 @@ const configuredEmail = {
   to: ['alice@gov.bc.ca'],
   cc: [],
   bcc: [],
+  cstarGroupIdsTo: [],
+  cstarGroupIdsCc: [],
+  cstarGroupIdsBcc: [],
   useCustomHeader: false,
   headerLogoId: null,
   headerTitle: null,
@@ -315,6 +322,9 @@ describe('EditEvent', () => {
           to: ['alice@gov.bc.ca'],
           cc: [],
           bcc: [],
+          cstarGroupIdsTo: [],
+          cstarGroupIdsCc: [],
+          cstarGroupIdsBcc: [],
           useCustomHeader: false,
           headerLogoId: null,
           headerTitle: null,

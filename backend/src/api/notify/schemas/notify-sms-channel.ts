@@ -14,7 +14,7 @@ import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.vali
 import { NotifySmsContent, NotifySmsInlineContent, NotifyTemplateContent } from './notify-content'
 
 @ApiSchema({
-  description: 'Send by SMS. Requires the sms_notifications feature flag for the tenant.',
+  description: 'Send by SMS. SMS must be enabled for the tenant.',
 })
 @ValidateTemplateOrRenderer()
 @ApiExtraModels(
@@ -27,6 +27,7 @@ export class NotifySmsChannel {
   // Mirrors ValidateRecipientsOrMerge exactly; the keywords that make the branches mutually
   // exclusive are in schema-constraints.ts - see NotifyEmailChannel.
   @ApiOneOf({
+    description: 'SMS recipients',
     oneOf: [
       { $ref: getSchemaPath(NotifySmsAddressRecipients) },
       { $ref: getSchemaPath(NotifySmsMergeRecipients) },
@@ -39,6 +40,7 @@ export class NotifySmsChannel {
 
   // Mirrors the two constraints that actually run - see NotifyEmailChannel.
   @ApiOneOfOptional({
+    description: 'SMS content (body, renderer, encoding, etc.)',
     oneOf: [
       { $ref: getSchemaPath(NotifyTemplateContent) },
       { $ref: getSchemaPath(NotifySmsInlineContent) },
@@ -58,12 +60,7 @@ export class NotifySmsChannel {
 
   @ApiPropertyOptional({
     description:
-      'Hold the message until this time. Omit to send as soon as possible. ' +
-      '**A timezone is required.** Use a `Z` suffix (`2026-06-01T16:00:00Z`), a numeric offset ' +
-      'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
-      'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
-      'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
-      'compact offset (`-0700`) are all rejected. A time in the past is rejected rather than sent immediately.',
+      'Hold the message until this time. Omit to send as soon as possible. Accepts ISO 8601 and other common date formats.',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()

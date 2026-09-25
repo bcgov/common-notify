@@ -31,6 +31,7 @@ export class NotifyEmailChannel {
   // or the other. The keywords that make the branches mutually exclusive are in
   // schema-constraints.ts, so each branch stays a bare $ref that Swagger UI labels by name.
   @ApiOneOf({
+    description: 'Email recipients: to/cc/bcc or a mergeArray for mail-merge',
     oneOf: [
       { $ref: getSchemaPath(NotifyEmailAddressRecipients) },
       { $ref: getSchemaPath(NotifyEmailMergeRecipients) },
@@ -46,6 +47,7 @@ export class NotifyEmailChannel {
   // Neither rule requires a channel to carry content at all - the request-level rule only asks that
   // *some* channel renders something - so the inline branch deliberately requires nothing.
   @ApiOneOfOptional({
+    description: 'Email content (subject, body, etc.)',
     oneOf: [
       { $ref: getSchemaPath(NotifyTemplateContent) },
       { $ref: getSchemaPath(NotifyEmailInlineContent) },
@@ -65,12 +67,7 @@ export class NotifyEmailChannel {
 
   @ApiPropertyOptional({
     description:
-      'Hold the message until this time. Omit to send as soon as possible. ' +
-      '**A timezone is required.** Use a `Z` suffix (`2026-06-01T16:00:00Z`), a numeric offset ' +
-      'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
-      'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
-      'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
-      'compact offset (`-0700`) are all rejected. A time in the past is rejected rather than sent immediately.',
+      'Hold the message until this time. Omit to send as soon as possible. Accepts ISO 8601 and other common date formats.',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()

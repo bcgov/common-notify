@@ -10,7 +10,11 @@ export class TemplateResponseDto {
    * Template ID (UUID)
    * @example "550e8400-e29b-41d4-a716-446655440000"
    */
-  @ApiProperty({ format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiProperty({
+    description: 'Unique identifier for the template.',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   id: string
 
   /**
@@ -27,14 +31,21 @@ export class TemplateResponseDto {
    * Optional description
    * @example "Email sent to applicants when funding is approved"
    */
-  @ApiPropertyOptional({ example: 'Email sent to applicants when funding is approved' })
+  @ApiPropertyOptional({
+    description: 'What this template is for.',
+    example: 'Email sent to applicants when funding is approved',
+  })
   description?: string
 
   /**
    * Notification channel type
    * @example "email"
    */
-  @ApiProperty({ enum: NotificationChannel, example: NotificationChannel.EMAIL })
+  @ApiProperty({
+    description: 'Channel this template sends on.',
+    enum: NotificationChannel,
+    example: NotificationChannel.EMAIL,
+  })
   channelCode: NotificationChannel
 
   /**
@@ -51,21 +62,32 @@ export class TemplateResponseDto {
    * Template body with placeholders
    * @example "Dear {{firstName}} {{lastName}}, your funding of ${{amount}} has been approved."
    */
-  @ApiProperty({ example: 'Dear {{firstName}}, your funding of ${{amount}} has been approved.' })
+  @ApiProperty({
+    description: 'Template body with placeholders, before personalisation is applied.',
+    example: 'Dear {{firstName}}, your funding of ${{amount}} has been approved.',
+  })
   body: string
 
   /**
    * Body content type
    * @example "markdown"
    */
-  @ApiPropertyOptional({ enum: ['markdown'], example: 'markdown' })
+  @ApiPropertyOptional({
+    description: 'Stored body content type.',
+    enum: ['markdown'],
+    example: 'markdown',
+  })
   bodyType?: 'markdown'
 
   /**
    * Template rendering engine
    * @example "handlebars"
    */
-  @ApiProperty({ enum: TemplateEngine, example: TemplateEngine.HANDLEBARS })
+  @ApiProperty({
+    description: 'Engine used to render this template.',
+    enum: TemplateEngine,
+    example: TemplateEngine.HANDLEBARS,
+  })
   engineCode: TemplateEngine
 
   /**
@@ -89,28 +111,42 @@ export class TemplateResponseDto {
    * User who created this template
    * @example "user@example.com"
    */
-  @ApiProperty({ example: 'a4d9e0c2-71bf-4a3e-9d18-2c8f5b6e4a70' })
+  @ApiProperty({
+    description: 'User who created this template.',
+    example: 'a4d9e0c2-71bf-4a3e-9d18-2c8f5b6e4a70',
+  })
   createdBy: string
 
   /**
    * Timestamp when template was created
    * @example "2024-05-01T12:00:00Z"
    */
-  @ApiProperty({ type: String, format: 'date-time' })
+  @ApiProperty({
+    description: 'When this template was created.',
+    type: String,
+    format: 'date-time',
+  })
   createdAt: Date
 
   /**
    * User who last updated this template
    * @example "user@example.com"
    */
-  @ApiProperty({ example: 'a4d9e0c2-71bf-4a3e-9d18-2c8f5b6e4a70' })
+  @ApiProperty({
+    description: 'User who last updated this template.',
+    example: 'a4d9e0c2-71bf-4a3e-9d18-2c8f5b6e4a70',
+  })
   updatedBy: string
 
   /**
    * Timestamp when template was last updated
    * @example "2024-05-01T12:30:00Z"
    */
-  @ApiProperty({ type: String, format: 'date-time' })
+  @ApiProperty({
+    description: 'When this template was last updated.',
+    type: String,
+    format: 'date-time',
+  })
   updatedAt: Date
 
   /**
