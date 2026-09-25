@@ -19,6 +19,7 @@ import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
+import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -26,6 +27,11 @@ import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
+
+// Shown by both guards on these settings: the route blocker below, and the page's own guard on
+// the tab bar, which is not routing and so has to intercept the switch itself.
+export const UNSAVED_EMAIL_CHANGES_MESSAGE =
+  'You have unsaved changes to your email notification settings. If you leave this page, your changes will be lost.'
 
 // Tenant default_sender_email stores only the local part (before @gov.bc.ca); matches the
 // suffix shown on the Settings > Email tab. The backend holds an event's sender to this same
@@ -93,6 +99,11 @@ type EventsEmailTabProps = {
   tenantEmailLogoId?: string | null
   /** Selected tenant's name, used as the default header title. */
   tenantName?: string | null
+  /**
+   * Reports whether there are edits that a save has not persisted yet. The tab bar above is not
+   * routing, so the blocker below cannot see it - the page owns that guard and needs to be told.
+   */
+  onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void
 }
 
 const EventsEmailTab: FC<EventsEmailTabProps> = ({
@@ -105,6 +116,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   approvedLogos = [],
   tenantEmailLogoId,
   tenantName,
+  onUnsavedChangesChange,
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
@@ -238,6 +250,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const activeChanged = channelActive !== values.active
   const isSaveDisabled =
     isFormDisabled || (!settingsChanged && !activeChanged) || recipientsHaveError
+  const hasUnsavedChanges = settingsChanged || activeChanged
+
+  useEffect(() => {
+    onUnsavedChangesChange?.(hasUnsavedChanges)
+  }, [hasUnsavedChanges, onUnsavedChangesChange])
 
   // Turning the channel on only unlocks the fields - it isn't persisted until the settings it
   // depends on are applied. Turning it off takes effect immediately, so it asks first.
@@ -259,6 +276,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     // Only an active channel has to be complete, matching what the backend enforces.
     if (hasValidationError || (channelActive && isIncomplete)) {
       setValidationAttempted(true)
+      showErrorToast(
+        'Required fields missing',
+        'Settings not saved. Complete all required fields before saving.',
+      )
       return
     }
 
@@ -310,6 +331,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         isBusy={isDeactivating}
         onCancel={cancelDeactivate}
         onConfirm={confirmDeactivate}
+      />
+
+      {/** Prompts the user if they attempt to navigate away from the page with unsaved changes */}
+      <UnsavedChanges
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={saving}
+        modalMessage={UNSAVED_EMAIL_CHANGES_MESSAGE}
       />
 
       {showFields && (
