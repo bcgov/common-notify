@@ -10,6 +10,8 @@ import {
   HttpCode,
   Version,
   UseGuards,
+  UseInterceptors,
+  SetMetadata,
   Inject,
   BadRequestException,
   Logger,
@@ -26,6 +28,7 @@ import { MailMergeUiLimitsGuard } from '../../common/guards/mail-merge-ui-limits
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
+import { NOTIFY_PREVIEW_BODY, NotifyPreviewInterceptor } from './notify-preview.interceptor'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
@@ -55,6 +58,7 @@ import {
   ApiExcludeController,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiSecurity,
   ApiTags,
@@ -177,6 +181,15 @@ export class NotifySimpleController {
       'inline content, an unknown templateId, or a recipient blocked by the safelist.',
   })
   @UseGuards(SmsChannelFeatureFlagGuard)
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifySimpleRequest)
+  @UseInterceptors(NotifyPreviewInterceptor)
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description: 'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+  })
+  @ApiResponse({ status: 200, description: 'Preview: rendered content and unchanged recipients, keyed by channel.' })
   @Queueable(QueueName.INGESTION)
   simpleSend(
     @Req() _req: any,
@@ -290,6 +303,15 @@ export class NotifySimpleController {
   @ApiResponse({ status: 400, description: 'Malformed request.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 422, description: 'Valid JSON that cannot be accepted; see the message.' })
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifyEmailChannel)
+  @UseInterceptors(NotifyPreviewInterceptor)
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description: 'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+  })
+  @ApiResponse({ status: 200, description: 'Preview: rendered content and unchanged recipients in an email entry.' })
   @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,

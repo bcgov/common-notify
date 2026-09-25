@@ -14,6 +14,8 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewInterceptor } from './notify-preview.interceptor'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
@@ -53,6 +55,8 @@ import { SafelistModule } from '../safelist/safelist.module'
     ChesEmailController,
   ],
   providers: [
+    NotifyPreviewInterceptor,
+    NotifyPreviewService,
     NotifyService,
     NotifyFrontendRoleGuard,
     NotifyServiceGuard,

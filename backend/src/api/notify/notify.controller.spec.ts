@@ -18,6 +18,7 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
@@ -169,6 +170,7 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [
+        { provide: NotifyPreviewService, useValue: {} },
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
