@@ -197,6 +197,12 @@ export default () => {
       pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
 
+    // Identical sends (same tenant, recipients and content) within this window are answered with
+    // the original notifyId instead of being sent again. 0 disables. See NotificationDedupService.
+    dedup: {
+      windowSeconds: parseInt(process.env.NOTIFICATION_DEDUP_WINDOW_SECONDS || '300', 10),
+    },
+
     // Encryption
     encryption: {
       key: process.env.WEBHOOK_ENCRYPTION_KEY,

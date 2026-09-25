@@ -39,6 +39,7 @@ import { NotificationRequestDetailService } from '../../api/notification/notific
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { NotificationDedupService } from './services/notification-dedup.service'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -139,6 +140,14 @@ const mockSmsSegmentService = {
   countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
 }
 
+// Disabled unless a test opts in, so every other send test runs the undeduplicated path.
+const mockNotificationDedupService = {
+  enabled: false,
+  fingerprint: vi.fn().mockReturnValue('fingerprint-1'),
+  findDuplicate: vi.fn().mockResolvedValue(null),
+  claim: vi.fn(),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -158,6 +167,9 @@ describe('Notify Controllers', () => {
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
     mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
+    mockNotificationDedupService.enabled = false
+    mockNotificationDedupService.fingerprint.mockReturnValue('fingerprint-1')
+    mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -199,6 +211,7 @@ describe('Notify Controllers', () => {
           provide: SmsSegmentService,
           useValue: mockSmsSegmentService,
         },
+        { provide: NotificationDedupService, useValue: mockNotificationDedupService },
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -514,6 +527,170 @@ describe('Notify Controllers', () => {
             },
           ],
         })
+      })
+    })
+
+    describe('deduplication', () => {
+      const CLAIMED_ID = '0b7c6f1e-2d4a-4c8e-9f10-3a5b7c9d1e2f'
+      const ORIGINAL_ID = '6f1e0b7c-4a2d-4e8c-8f10-9d1e2f3a5b7c'
+      const originalCreatedAt = '2026-09-25T10:00:00.000Z'
+      const body = {
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Hello' },
+        },
+      }
+      const mergeBody = {
+        content: { templateId: '12345678-1234-4234-8234-123456789012' },
+        recipients: { mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']] },
+      }
+      const original = {
+        notifyId: ORIGINAL_ID,
+        status: 'completed',
+        channels: ['email'],
+        createdAt: new Date(originalCreatedAt),
+      }
+      const release = vi.fn().mockResolvedValue(undefined)
+
+      beforeEach(() => {
+        mockNotificationDedupService.enabled = true
+        mockNotificationDedupService.claim.mockResolvedValue({
+          kind: 'proceed',
+          notifyId: CLAIMED_ID,
+          release,
+        })
+        mockNotificationService.create.mockImplementation(async (dto: { id?: string }) => ({
+          id: dto.id ?? 'db-generated-id',
+        }))
+        mockApiKeyConsumerId = 'consumer-1'
+      })
+
+      const expectNothingAccepted = () => {
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      }
+
+      it('creates the row with the claimed notifyId', async () => {
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(mockNotificationDedupService.claim).toHaveBeenCalledWith(
+          'test-tenant-id',
+          'fingerprint-1',
+        )
+        expect(mockNotificationService.create).toHaveBeenCalledWith(
+          expect.objectContaining({ id: CLAIMED_ID }),
+        )
+        expect(response.body.notifyId).toBe(CLAIMED_ID)
+        expect(response.body.duplicate).toBeUndefined()
+      })
+
+      it('answers a known duplicate with the original before uploading or counting anything', async () => {
+        mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(response.body).toMatchObject({
+          notifyId: ORIGINAL_ID,
+          status: 'completed',
+          channels: ['email'],
+          createdAt: originalCreatedAt,
+          duplicate: true,
+        })
+        expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+        expect(mockApiKeyUsageService.assertWithinLimits).not.toHaveBeenCalled()
+        expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+        expectNothingAccepted()
+      })
+
+      it('answers a duplicate that won the claim race with the original', async () => {
+        mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(response.body.notifyId).toBe(ORIGINAL_ID)
+        expect(response.body.duplicate).toBe(true)
+        expectNothingAccepted()
+      })
+
+      it('claims only after the limit check, so a rejected send holds no claim', async () => {
+        mockApiKeyUsageService.assertWithinLimits.mockRejectedValueOnce(
+          new BadRequestException('over limit'),
+        )
+
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(400)
+
+        expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+      })
+
+      it('releases the claim when the row cannot be created', async () => {
+        mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
+
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(500)
+
+        expect(release).toHaveBeenCalledTimes(1)
+      })
+
+      it('fingerprints the same shape whether the email is posted wrapped or bare', async () => {
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(202)
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(body.email)
+          .expect(202)
+
+        const [wrapped, bare] = mockNotificationDedupService.fingerprint.mock.calls.map(
+          ([payload]) => JSON.parse(JSON.stringify(payload)),
+        )
+        expect(bare).toEqual(wrapped)
+      })
+
+      it('answers a duplicate mail merge before validating or rendering its rows', async () => {
+        mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(202)
+
+        expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+        expect(mockNotificationService.validateMailMergeRules).not.toHaveBeenCalled()
+        expectNothingAccepted()
+      })
+
+      it('creates a mail merge with the claimed notifyId and releases it on failure', async () => {
+        const accepted = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(202)
+        expect(accepted.body.notifyId).toBe(CLAIMED_ID)
+
+        mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(500)
+        expect(release).toHaveBeenCalledTimes(1)
+      })
+
+      it('deduplicates frontend sends through the same path', async () => {
+        mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(mergeBody)
+          .expect(202)
+
+        expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+        expectNothingAccepted()
       })
     })
 

@@ -23,15 +23,11 @@ export class NotificationAcceptanceResponse {
   templateId?: string
 
   @ApiProperty({
-    enum: [
-      NotificationStatus.PENDING,
-      NotificationStatus.ACCEPTED,
-      NotificationStatus.QUEUED,
-      NotificationStatus.SCHEDULED,
-    ],
+    enum: NotificationStatus,
     description:
       'ACCEPTED once acknowledged, QUEUED once handed to the delivery queue, SCHEDULED when ' +
-      'delayedSend is in the future, PENDING when acknowledged but not yet queued.',
+      'delayedSend is in the future, PENDING when acknowledged but not yet queued. For a ' +
+      "duplicate, the original request's current status, which may be further along.",
     example: 'QUEUED',
   })
   status: NotificationStatus
@@ -77,4 +73,13 @@ export class NotificationAcceptanceResponse {
     example: '1 recipient was not on the safelist and was not sent to.',
   })
   blockedMessage?: string
+
+  @ApiPropertyOptional({
+    description:
+      'True when an identical request (same recipients and content) was already accepted within ' +
+      'the deduplication window. Nothing new is sent: notifyId, status and createdAt are the ' +
+      "original request's. Omitted for a new request.",
+    example: true,
+  })
+  duplicate?: boolean
 }
