@@ -86,27 +86,36 @@ export async function bootstrap() {
     .setTitle('Notify API')
     .setDescription(
       [
-        'Multi-tenanted unified notification API which covers everything from simple single-channel sends ' +
-          'to complex multi-channel sends (including email, SMS and 3rd-party messaging apps). It provides ' +
-          'comprehensive defaults through the use of configurable event-types, which free calling applications ' +
-          'from the burden of managing recipients, content, channels and subscriptions - however, defaults can ' +
-          'be overridden or augmented by the message payload at any time if required. ' +
-          'Features include callback registration, message preview, test sends, templating, bulk sends, delayed sends, ' +
-          'maintenance console and integration with subscription services. ' +
-          'CHES and GC Notify interfaces are supported for legacy applications. ' +
-          'Defaults are configured through an administrative UI.',
+        'The Notify API sends email and SMS for your application. You supply recipients and message ' +
+          'content, either inline or by reference to a stored template. Notify renders the content, ' +
+          'attempts delivery, retries when appropriate, and records the outcome for each recipient.',
         '',
-        'Your API key identifies who the messages are sent for - a program, a project, an ' +
-          'application, a team. Notify calls that a tenant, and it decides which templates, ' +
-          'sender addresses and send limits apply. A key belongs to exactly one tenant.',
+        'You need an API key linked to your notification tenant: the space for your templates, ' +
+          'sender settings and send limits. A key belongs to exactly one tenant. Tenants and teams ' +
+          'are managed in [CSTAR](https://bcgov.github.io/tenant-management-system/). Tenant ' +
+          'administrators configure Notify settings and obtain API keys through the Notify UI.',
         '',
         '### Getting started',
         '',
-        '1. Go to CSTAR and create your tenant.',
-        '2. Log into Notify and navigate to the settings page to generate an API key.',
-        '3. Send with `POST /api/v1/notifysimple` (or the `/email` and `/sms` shorthands).',
+        '1. Ensure you have a tenant and an administrator has configured its Notify settings.',
+        '2. Ask a tenant administrator to obtain an API key from the Notify UI.',
+        '3. Add the key to the `X-API-KEY` header and send with `POST /api/v1/notifysimple` ' +
+          "(or the `/email` and `/sms` shorthands). SMS requires the tenant's `sms_notifications` feature flag.",
         '4. Follow the outcome with `GET /api/v1/notification_request/{id}/request_details`, or ' +
           'register a webhook so Notify calls you instead.',
+        '',
+        '### Try it out from here',
+        '',
+        '1. Click **Authorize** and enter your API key in the `api-key` scheme.',
+        '2. Open `POST /api/v1/notifysimple/email` under **Send** and click **Try it out**.',
+        '3. Choose **One message to several recipients** from the examples dropdown.',
+        '4. Replace the example recipients with your own addresses and edit the subject and body.',
+        '5. Set `preview` to `true` to render without sending, or omit it to send, then click **Execute**.',
+        '6. The response section shows the curl command, request URL and server response. ' +
+          'A successful preview returns `200`; an accepted send returns `202`.',
+        '7. After a send, copy the returned `notifyId`. Under **Notification status**, open ' +
+          '`GET /api/v1/notification_request/{id}/request_details`, click **Try it out**, ' +
+          'and enter that ID to check delivery.',
         '',
         '### Authentication',
         '',
@@ -117,7 +126,7 @@ export async function bootstrap() {
         '',
         '### Sending is asynchronous',
         '',
-        'A send returns `202 Accepted` with a `notifyId` once the request is accepted - not once ' +
+        'A `/notifysimple` send returns `202 Accepted` with a `notifyId` once the request is accepted - not once ' +
           'the message is delivered. Delivery happens afterwards, and its outcome is reported per ' +
           'recipient on the notification status endpoints.',
         '',
@@ -125,8 +134,26 @@ export async function bootstrap() {
         '',
         'Message content can be sent inline or stored as a template and referenced by ' +
           '`templateId`. Either way, placeholders such as `{{firstName}}` are filled from the ' +
-          '`params` supplied with the send. Give a channel a `templateId` or inline `content`, ' +
+          '`params` supplied with the send. Give a channel `content.templateId` or inline content, ' +
           'never both.',
+        '',
+        '### Preview before sending',
+        '',
+        'On `POST /api/v1/notifysimple` and `POST /api/v1/notifysimple/email`, use `preview`: ' +
+          'set to true to enable a preview of what would be sent, including template rendering, ' +
+          'parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
+        '',
+        'Preview returns rendered content and the submitted recipients, grouped by channel. ' +
+          'Recipients are echoed unchanged. Authentication, feature flags and request validation still apply. ' +
+          'Preview does not create notification requests, enqueue delivery, consume send limits or check safelists.',
+        '',
+        '### Feature availability',
+        '',
+        'Delivery webhooks are available under **Webhooks**. GC Notify-compatible endpoints are ' +
+          'available under `/gcnotify/v2`, using the authentication scheme described above. ' +
+          'Notification-event sending, subscription-based recipient resolution, third-party message-app ' +
+          'delivery and the CHES compatibility endpoint are not implemented. Message-app inline content ' +
+          'can be rendered in preview; this does not imply delivery support.',
       ].join('\n'),
     )
     .setVersion('1.0')

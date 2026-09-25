@@ -189,7 +189,7 @@ export class NotifySimpleController {
     required: false,
     type: Boolean,
     description:
-      'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+      'set to true to enable a preview of what would be sent, including template rendering, parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
   })
   @ApiResponse({
     status: 200,
@@ -315,7 +315,7 @@ export class NotifySimpleController {
     required: false,
     type: Boolean,
     description:
-      'Set true to render without sending, storing a notification, consuming send limits or checking the safelist. Attachments and mergeArray are not supported in preview.',
+      'set to true to enable a preview of what would be sent, including template rendering, parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
   })
   @ApiResponse({
     status: 200,
