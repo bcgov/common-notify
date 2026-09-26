@@ -1,5 +1,10 @@
 # Notify Service
 
+[![Merge](https://github.com/bcgov/common-notify/actions/workflows/merge.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/merge.yml)
+[![Analysis](https://github.com/bcgov/common-notify/actions/workflows/analysis.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/analysis.yml)
+[![Scheduled](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml)
+[![License](https://img.shields.io/github/license/bcgov/common-notify)](LICENSE)
+
 **_View and test live Swagger API Spec [here](https://notify.digital.gov.bc.ca/api/docs)_**
 **_Download OpenApi YAML  [here](https://notify.digital.gov.bc.ca/api/docs-yaml)_**
 
