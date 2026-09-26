@@ -95,12 +95,10 @@ export default () => {
       // requires the scope to be requested explicitly.
       scope: process.env.APS_TOKEN_SCOPE,
       timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
-      // Shared ACL group every issued credential joins, alongside the tenant's own
-      // CSTAR id. Unset by default, and unset means no ACL controls are sent at all:
-      // gw-fe8c5's Environments are kong-api-key-only and the generated routes carry no
-      // acl plugin, so the groups would authorize nothing and only risk the gateway
-      // rejecting a control its flow does not support. Set this when an Environment
-      // moves to the kong-api-key-acl flow and the routes gain an allow-list.
+      // Optional shared ACL group every issued credential joins, alongside the tenant's
+      // own CSTAR id. Unset by default, and unset is fine: the tenant's group is what
+      // carries identity upstream and is always sent. A shared group is only needed if
+      // a route's acl plugin ever gains an allow-list to name.
       aclGroup: process.env.APS_ACL_GROUP,
     },
 

@@ -55,9 +55,7 @@ export class PostBulkRequest {
     minItems: 2,
     maxItems: BULK_MAX_ROWS,
     description:
-      'Rows of the send, as an array of arrays. The first row is the header: a recipient column ' +
-      'named "email address" or "phone number", plus one column per template placeholder. Each ' +
-      'row after it is one recipient. 1-50,000 recipients. Supply either rows or csv, not both.',
+      'Array of arrays. First line is header (email address/phone number + placeholder columns). 1-50,000 recipients. One of rows or csv is required.',
     example: [
       ['email address', 'name'],
       ['alice@example.com', 'Alice'],
@@ -77,9 +75,7 @@ export class PostBulkRequest {
   rows?: string[][]
 
   @ApiPropertyOptional({
-    description:
-      'Hold the job until this time instead of sending immediately. A timezone is required - use ' +
-      'a `Z` suffix or a numeric offset such as `-07:00`. A time in the past is rejected rather than sent immediately.',
+    description: 'Schedule for future send (up to 4 days), ISO 8601 format UTC',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()

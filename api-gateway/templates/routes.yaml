@@ -1295,8 +1295,9 @@ plugins:
   # every other route in this file) before key-auth's access phase runs - pre-function
   # plugins run first by Kong's plugin priority ordering. The original Authorization
   # header is left untouched so passthrough mode can still forward it to real GC
-  # Notify. NOT YET VALIDATED against a live Kong instance - confirm this works
-  # against the BC Gov-managed gateway (plugin availability/ordering) before merging.
+  # Notify. Verified on the BC Gov-managed gateway: a request carrying only the
+  # Authorization header reaches the backend with x-consumer-username populated, so
+  # key-auth validated the extracted key.
   - name: pre-function
     tags: [${CONFIG_TAG}]
     protocols: [http, https]

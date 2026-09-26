@@ -10,6 +10,8 @@ import {
   HttpCode,
   Version,
   UseGuards,
+  UseInterceptors,
+  SetMetadata,
   Inject,
   BadRequestException,
   Logger,
@@ -26,6 +28,7 @@ import { MailMergeUiLimitsGuard } from '../../common/guards/mail-merge-ui-limits
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
+import { NOTIFY_PREVIEW_BODY, NotifyPreviewInterceptor } from './notify-preview.interceptor'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotifyEmailChannel } from './schemas/notify-email-channel'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
@@ -54,8 +57,10 @@ import { WebhookService } from '../webhook/webhook.service'
 import {
   ApiBody,
   ApiExcludeController,
+  ApiExtraModels,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiSecurity,
   ApiTags,
@@ -179,6 +184,19 @@ export class NotifySimpleController {
       'inline content, an unknown templateId, or a recipient blocked by the safelist.',
   })
   @UseGuards(SmsChannelFeatureFlagGuard)
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifySimpleRequest)
+  @UseInterceptors(NotifyPreviewInterceptor)
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description:
+      'set to true to enable a preview of what would be sent, including template rendering, parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview: rendered content and unchanged recipients, keyed by channel.',
+  })
   @Queueable(QueueName.INGESTION)
   simpleSend(
     @Req() _req: any,
@@ -292,6 +310,19 @@ export class NotifySimpleController {
   @ApiResponse({ status: 400, description: 'Malformed request.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 422, description: 'Valid JSON that cannot be accepted; see the message.' })
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifyEmailChannel)
+  @UseInterceptors(NotifyPreviewInterceptor)
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description:
+      'set to true to enable a preview of what would be sent, including template rendering, parameter substitution and recipients. No messages are sent. Attachments and mergearrays are not supported',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview: rendered content and unchanged recipients in an email entry.',
+  })
   @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
     @Req() _req: any,
@@ -309,7 +340,7 @@ export class NotifySimpleController {
       'Sends the `sms` channel of the request. Recipient numbers are normalised to E.164, so ' +
       '"250 555 0123" and "+12505550123" are equivalent. Long messages are split into multiple ' +
       'segments and billed per segment.\n\n' +
-      'Requires the `sms_notifications` feature flag for the tenant; without it this returns 404.',
+      'SMS must be enabled for the tenant; without it this returns 403.',
   })
   @ApiBody({
     type: NotifySimpleRequest,
@@ -342,10 +373,11 @@ export class NotifySimpleController {
   })
   @ApiResponse({ status: 400, description: 'Malformed request, or an unusable phone number.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'SMS is not enabled for this tenant.' })
+  @ApiResponse({ status: 403, description: 'SMS is not enabled for this tenant.' })
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.SMS_NOTIFICATIONS)
-  @Queueable(QueueName.INGESTION)
+  @SetMetadata(NOTIFY_PREVIEW_BODY, NotifySimpleRequest)
+  @UseInterceptors(NotifyPreviewInterceptor)
   @ApiOperation({
     summary: 'Send an SMS notification, to one list of recipients or as a mail merge',
     description: [
@@ -371,7 +403,7 @@ export class NotifySimpleController {
       '',
       `Limits: at most ${MAIL_MERGE_MAX_RECIPIENTS.toLocaleString()} recipients per merge. Daily and`,
       'annual send limits are enforced per API key before the request is accepted. This route is',
-      'gated by the `sms_notifications` feature flag and returns 404 for a tenant without it.',
+      'only available when SMS is enabled for the tenant, and returns 403 otherwise.',
     ].join('\n'),
   })
   @ApiResponse({
@@ -386,8 +418,8 @@ export class NotifySimpleController {
       'The request body failed validation - for example both `to` and `mergeArray` were supplied, a phone number could not be normalised to E.164, or a merge row had a different column count to its header.',
   })
   @ApiResponse({
-    status: 404,
-    description: 'The `sms_notifications` feature flag is not enabled for this tenant.',
+    status: 403,
+    description: 'SMS is not enabled for this tenant.',
   })
   @ApiResponse({
     status: 422,
@@ -398,6 +430,28 @@ export class NotifySimpleController {
     status: 429,
     description: 'This send would exceed the daily or annual SMS limit for the calling API key.',
   })
+  @ApiQuery({
+    name: 'preview',
+    required: false,
+    type: Boolean,
+    description:
+      'Set to true to render without sending, persisting or consuming limits. SMS recipients are normalised to E.164. Attachments and mergeArray are not supported.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Preview: sms contains recipients.to (E.164 numbers), content ({ body }) and segmentsPerRecipient (billable segments of the rendered body for each recipient).',
+    schema: {
+      example: {
+        sms: {
+          recipients: { to: ['+12505550123'] },
+          content: { body: 'Your appointment is confirmed.' },
+          segmentsPerRecipient: 1,
+        },
+      },
+    },
+  })
+  @Queueable(QueueName.INGESTION)
   simpleSendSms(
     @Req() _req: any,
     @Body() _body: NotifySimpleRequest,
@@ -423,6 +477,7 @@ export class NotifySimpleController {
     description: 'The notifyId returned when the notification was accepted.',
     example: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   })
+  @ApiExtraModels(CancelNotificationDto, RescheduleNotificationDto)
   @ApiBody({
     schema: {
       oneOf: [
