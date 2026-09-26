@@ -80,7 +80,7 @@
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="ion ion-key"></i>
-                            <h3 class="box-title">51 Foreign Key Constraints</h3>
+                            <h3 class="box-title">53 Foreign Key Constraints</h3>
                             <div class="box-tools pull-right">
                                 <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
                                 <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
@@ -546,6 +546,54 @@
                                             </table>
                                         </td>
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_event_channel_cstar_group_kind</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a><span>.channel_code</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a><span>.kind</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/channel_recipient_kind.html'>channel_recipient_kind</a><span>.channel_code</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/channel_recipient_kind.html'>channel_recipient_kind</a><span>.kind_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_event_channel_cstar_group_setting</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a><span>.channel_setting_id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_setting.html'>event_channel_setting</a><span>.id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/event_channel_setting.html'>event_channel_setting</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>fk_template_engine</td>
@@ -1121,6 +1169,16 @@
                                         <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a></td>
                                         <td>chk_provisioned_phone_number_e164</td>
                                         <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a></td>
+                                        <td>chk_event_channel_cstar_group_email</td>
+                                        <td>((channel_code)::text &#61; &#39;EMAIL&#39;::text)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a></td>
+                                        <td>chk_event_channel_cstar_group_id</td>
+                                        <td>((cstar_group_id)::text ~ &#39;^[A-Za-z0-9_-]{1,128}$&#39;::text)</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/api_key_limit.html'>api_key_limit</a></td>

@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>notification_event - default.notify</title>
+        <title>event_channel_cstar_group - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>notification_event</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>event_channel_cstar_group</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>A tenant-owned, named notification definition. Per-channel configuration lives in notify.event_channel_setting, and its recipients in notify.event_channel_recipient.</p>
+                            <p>CSTAR groups an event channel is addressed to, one row per group per recipient list. Only the group ID is stored; the members behind it are resolved from CSTAR at send time, so a group gaining or losing people needs no change here. A list may hold any number of groups, and may hold groups alongside the manually entered addresses in notify.event_channel_recipient.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -130,21 +130,16 @@
                                     <td>gen_random_uuid()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="event_channel_setting.event_id references notification_event.id via fk_event_channel_setting_event"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.event_id</span></td>
-                                                <td class="constraint detail">fk_event_channel_setting_event</td>
-                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
-                                            </tr>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Unique identifier for the event.</p></td>
+                                    <td><p>Unique identifier for the group row.</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_setting_id">channel_setting_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -157,16 +152,65 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="notification_event.tenant_id references tenant.id via fk_notification_event_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
-                                                <td class="constraint detail">fk_notification_event_tenant</td>
+                                                <td title="event_channel_cstar_group.[channel_setting_id, channel_code] references event_channel_setting.[id, channel_code] via fk_event_channel_cstar_group_setting"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_setting</td>
                                                 <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
                                             </tr>
                                         </table>
                                     </td>
-                                    <td><p>Tenant that owns this event. Cascade deleted with the tenant.</p></td>
+                                    <td><p>Channel setting this group belongs to. Cascade deleted with it.</p></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="name">name</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="event_channel_cstar_group.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_cstar_group_kind"><a href='channel_recipient_kind.html'>channel_recipient_kind</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_kind</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td title="event_channel_cstar_group.[channel_setting_id, channel_code] references event_channel_setting.[id, channel_code] via fk_event_channel_cstar_group_setting"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_setting</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Channel of the parent setting, held identical to it by the composite foreign key to event_channel_setting. Stored here so (channel_code, kind) can reference notify.channel_recipient_kind. Always EMAIL for now.</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="kind">kind</span></td>
+                                    <td>varchar</td>
+                                    <td>3</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="event_channel_cstar_group.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_cstar_group_kind"><a href='channel_recipient_kind.html'>channel_recipient_kind</a><span class='relatedKey'>.kind_code</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_kind</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Which recipient list the group is addressed through, from notify.event_recipient_kind_code. Paired with channel_code against notify.channel_recipient_kind.</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="cstar_group_id">cstar_group_id</span></td>
                                     <td>varchar</td>
                                     <td>200</td>
                                     <td title=''></td>
@@ -180,24 +224,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Event name entered on the Event settings tab. Unique per tenant, case insensitive, among non-deleted events.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="description">description</span></td>
-                                    <td>text</td>
-                                    <td>2147483647</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Free-text description of what the event is for. Optional.</p></td>
+                                    <td><p>Identifier of the CSTAR group. Not a foreign key: groups are owned by CSTAR and have no table in this database, so the application validates that every ID belongs to the event&rsquo;s tenant before writing it. VARCHAR rather than UUID to match how CSTAR-owned identifiers are already stored here (notify_user.external_id, tenant.external_id); the CHECK constraint holds it to the character set the CSTAR client will put in a URL path.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="created_at">created_at</span></td>
@@ -214,7 +241,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp with timezone when the event was created.</p></td>
+                                    <td><p>Timestamp with timezone when the group was added.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="created_by">created_by</span></td>
@@ -231,7 +258,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Identifier of the user or process that created this event.</p></td>
+                                    <td><p>Identifier of the user or process that added this group.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="updated_at">updated_at</span></td>
@@ -248,7 +275,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp with timezone when the event was last updated. Maintained by trg_notification_event_updated_at.</p></td>
+                                    <td><p>Timestamp with timezone when the group row was last updated. Maintained by trg_event_channel_cstar_group_updated_at.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="updated_by">updated_by</span></td>
@@ -265,7 +292,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Identifier of the user or process that last updated this event.</p></td>
+                                    <td><p>Identifier of the user or process that last updated this group.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="is_deleted">is_deleted</span></td>
@@ -282,7 +309,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Soft delete flag. Deleted events are hidden from the UI and are never dispatched.</p></td>
+                                    <td><p>Soft delete flag. Removing a group sets this rather than deleting the row, so the history table keeps the removal.</p></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -315,22 +342,28 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_notification_event</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_event_channel_cstar_group</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
                                     <td>id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_notification_event_tenant</td>
+                                    <td title='Indexed'>idx_event_channel_cstar_group_group</td>
                                     <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td>cstar_group_id</td>
                                 </tr>
                                 <tr>
-                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_notification_event_tenant_name</td>
-                                    <td>Must be unique</td>
+                                    <td title='Indexed'>idx_event_channel_cstar_group_setting</td>
+                                    <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td>channel_setting_id</td>
+                                </tr>
+                                <tr>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_event_channel_cstar_group_active</td>
+                                    <td>Must be unique</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>channel_setting_id + kind + cstar_group_id</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -361,8 +394,12 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_notification_event_name</td>
-                                    <td>(length(btrim((name)::text)) &gt; 0)</td>
+                                    <td>chk_event_channel_cstar_group_email</td>
+                                    <td>((channel_code)::text &#61; &#39;EMAIL&#39;::text)</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_event_channel_cstar_group_id</td>
+                                    <td>((cstar_group_id)::text ~ &#39;^[A-Za-z0-9_-]{1,128}$&#39;::text)</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -387,35 +424,26 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="568,5,825,269">
-<area shape="rect" id="node2" href="notification_event.html" target="_top" title="notification_event" alt="" coords="191,32,524,365">
-<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="5,64,147,240">
+<area shape="rect" id="node1" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="313,115,716,477">
+<area shape="rect" id="node2" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="5,287,269,433">
+<area shape="rect" id="node3" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="9,5,266,269">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_event.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/event_channel_cstar_group.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="670,1445,895,1533">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="357,949,499,1125">
-<area shape="rect" id="node16" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1010,240,1098">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="696,285,869,373">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="652,741,913,829">
-<area shape="rect" id="node5" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="1295,449,1589,537">
-<area shape="rect" id="node6" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="993,364,1251,628">
-<area shape="rect" id="node8" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="284,74,572,162">
-<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="616,390,949,724">
-<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="632,952,933,1040">
-<area shape="rect" id="node11" href="email_logo.html" target="_top" title="email_logo" alt="" coords="701,1057,865,1145">
-<area shape="rect" id="node12" href="template.html" target="_top" title="template" alt="" coords="707,74,859,162">
-<area shape="rect" id="node7" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1305,344,1579,432">
-<area shape="rect" id="node13" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="695,846,870,934">
-<area shape="rect" id="node14" href="notification_request.html" target="_top" title="notification_request" alt="" coords="662,1340,903,1428">
-<area shape="rect" id="node15" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="675,180,891,268">
-<area shape="rect" id="node17" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="1020,1090,1224,1178">
-<area shape="rect" id="node18" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="679,1198,887,1286">
-<area shape="rect" id="node19" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="995,1266,1249,1354">
+<area shape="rect" id="node1" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="683,423,947,569">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,147,293,235">
+<area shape="rect" id="node3" href="event_recipient_kind_code.html" target="_top" title="event_recipient_kind_code" alt="" coords="343,499,633,587">
+<area shape="rect" id="node4" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="991,75,1393,437">
+<area shape="rect" id="node5" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="686,107,943,371">
+<area shape="rect" id="node7" href="notification_event.html" target="_top" title="notification_event" alt="" coords="375,5,601,93">
+<area shape="rect" id="node8" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="337,252,639,340">
+<area shape="rect" id="node9" href="email_logo.html" target="_top" title="email_logo" alt="" coords="406,357,570,445">
+<area shape="rect" id="node10" href="template.html" target="_top" title="template" alt="" coords="412,147,564,235">
+<area shape="rect" id="node6" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1055,455,1329,543">
 </map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_event.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/event_channel_cstar_group.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

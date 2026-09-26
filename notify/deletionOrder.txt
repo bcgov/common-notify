@@ -7,8 +7,10 @@ mime_type_code
 flyway_schema_history
 event_channel_setting_history
 event_channel_recipient_history
+event_channel_cstar_group_history
 configuration
 event_channel_recipient
+event_channel_cstar_group
 api_key_limit_alert_log
 webhook_delivery_log
 template_version
@@ -23,9 +25,9 @@ api_key_limit
 client_tenant_mapping
 attachment
 webhook_config
+notification_request
 event_channel_setting
 channel_recipient_kind
-notification_request
 api_key_consumer
 provisioned_phone_number
 notification_event

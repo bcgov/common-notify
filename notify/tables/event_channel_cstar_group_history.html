@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>notification_event - default.notify</title>
+        <title>event_channel_cstar_group_history - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>notification_event</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>event_channel_cstar_group_history</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>A tenant-owned, named notification definition. Per-channel configuration lives in notify.event_channel_setting, and its recipients in notify.event_channel_recipient.</p>
+                            <p>Immutable audit log of changes to event_channel_cstar_group - which groups were added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -122,7 +122,7 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="id">id</span></td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="h_id">h_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -130,21 +130,16 @@
                                     <td>gen_random_uuid()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="event_channel_setting.event_id references notification_event.id via fk_event_channel_setting_event"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.event_id</span></td>
-                                                <td class="constraint detail">fk_event_channel_setting_event</td>
-                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
-                                            </tr>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Unique identifier for the event.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="target_row_id">target_row_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -156,124 +151,17 @@
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="notification_event.tenant_id references tenant.id via fk_notification_event_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
-                                                <td class="constraint detail">fk_notification_event_tenant</td>
-                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
-                                            </tr>
                                         </table>
                                     </td>
-                                    <td><p>Tenant that owns this event. Cascade deleted with the tenant.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="name">name</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Event name entered on the Event settings tab. Unique per tenant, case insensitive, among non-deleted events.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="description">description</span></td>
-                                    <td>text</td>
-                                    <td>2147483647</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Free-text description of what the event is for. Optional.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="created_at">created_at</span></td>
-                                    <td>timestamptz</td>
-                                    <td>35,6</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>now()</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp with timezone when the event was created.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="created_by">created_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Identifier of the user or process that created this event.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_at">updated_at</span></td>
-                                    <td>timestamptz</td>
-                                    <td>35,6</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>now()</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp with timezone when the event was last updated. Maintained by trg_notification_event_updated_at.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_by">updated_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Identifier of the user or process that last updated this event.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="is_deleted">is_deleted</span></td>
-                                    <td>bool</td>
+                                    <td><span id="operation_type">operation_type</span></td>
+                                    <td>bpchar</td>
                                     <td>1</td>
                                     <td title=''></td>
                                     <td title=''></td>
-                                    <td>false</td>
+                                    <td>null</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
@@ -282,7 +170,58 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Soft delete flag. Deleted events are hidden from the UI and are never dispatched.</p></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="operation_user">operation_user</span></td>
+                                    <td>varchar</td>
+                                    <td>200</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>CURRENT_USER</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_executed_at">operation_executed_at</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>now()</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="data_after_operation">data_after_operation</span></td>
+                                    <td>jsonb</td>
+                                    <td>2147483647</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -315,58 +254,26 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_notification_event</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> event_channel_cstar_group_history_pkey</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>id</td>
+                                    <td>h_id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_notification_event_tenant</td>
+                                    <td title='Indexed'>idx_event_channel_cstar_group_history_target_row</td>
                                     <td>Performance</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td>target_row_id</td>
                                 </tr>
                                 <tr>
-                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_notification_event_tenant_name</td>
-                                    <td>Must be unique</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td title='Indexed'>idx_event_channel_cstar_group_history_timestamp</td>
+                                    <td>Performance</td>
+                                    <td><span title='Descending'>Desc</span></td>
+                                    <td>operation_executed_at</td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div><!-- /.box-body -->
-                    </div>
-                    <div class="box box-primary">
-                        <div class="box-header with-border">
-                            <i class="fa fa-sitemap"></i>
-                            <h3 class="box-title">Check Constraints</h3>
-                            <div class="box-tools pull-right">
-                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
-                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
-                            </div>
-                        </div>
-                        <div class="box-body">
-                            <table
-                                    id="check_table"
-                                    class="table table-bordered table-striped dataTable"
-                                    role="grid"
-                                    data-paging="true"
-                                    data-page-length="10"
-                                    data-length-change="false">
-                                <thead align='left'>
-                                <tr>
-                                    <th>Constraint Name</th>
-                                    <th>Constraint</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr>
-                                    <td>chk_notification_event_name</td>
-                                    <td>(length(btrim((name)::text)) &gt; 0)</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
@@ -382,40 +289,13 @@
                                 <h5>Close relationships within degrees of separation</h5>
                                 <ul class="nav nav-tabs pull-left ui-sortable-handle">
                                     <li class="active"><a href="#oneDegreeImg-chart" data-toggle="tab" aria-expanded="true">One</a></li>
-                                    <li class=""><a href="#twodegreesDegreeImg-chart" data-toggle="tab" aria-expanded="true">Two degrees</a></li>
                                 </ul>
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="568,5,825,269">
-<area shape="rect" id="node2" href="notification_event.html" target="_top" title="notification_event" alt="" coords="191,32,524,365">
-<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="5,64,147,240">
+<area shape="rect" id="node1" href="event_channel_cstar_group_history.html" target="_top" title="event_channel_cstar_group_history" alt="" coords="5,5,476,251">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/notification_event.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
-                                    </div>
-                                    <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
-                                        <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="670,1445,895,1533">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="357,949,499,1125">
-<area shape="rect" id="node16" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1010,240,1098">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="696,285,869,373">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="652,741,913,829">
-<area shape="rect" id="node5" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="1295,449,1589,537">
-<area shape="rect" id="node6" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="993,364,1251,628">
-<area shape="rect" id="node8" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="284,74,572,162">
-<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="616,390,949,724">
-<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="632,952,933,1040">
-<area shape="rect" id="node11" href="email_logo.html" target="_top" title="email_logo" alt="" coords="701,1057,865,1145">
-<area shape="rect" id="node12" href="template.html" target="_top" title="template" alt="" coords="707,74,859,162">
-<area shape="rect" id="node7" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1305,344,1579,432">
-<area shape="rect" id="node13" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="695,846,870,934">
-<area shape="rect" id="node14" href="notification_request.html" target="_top" title="notification_request" alt="" coords="662,1340,903,1428">
-<area shape="rect" id="node15" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="675,180,891,268">
-<area shape="rect" id="node17" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="1020,1090,1224,1178">
-<area shape="rect" id="node18" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="679,1198,887,1286">
-<area shape="rect" id="node19" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="995,1266,1249,1354">
-</map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/notification_event.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/event_channel_cstar_group_history.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

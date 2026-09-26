@@ -16,9 +16,9 @@ template
 notification_event
 provisioned_phone_number
 api_key_consumer
-notification_request
 channel_recipient_kind
 event_channel_setting
+notification_request
 webhook_config
 attachment
 client_tenant_mapping
@@ -33,8 +33,10 @@ notification_request_detail
 template_version
 webhook_delivery_log
 api_key_limit_alert_log
+event_channel_cstar_group
 event_channel_recipient
 configuration
+event_channel_cstar_group_history
 event_channel_recipient_history
 event_channel_setting_history
 flyway_schema_history

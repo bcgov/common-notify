@@ -78,7 +78,7 @@
                         <div class="col-md-12">
                             <div class="callout callout-info">
                                 <h4>SchemaSpy Analysis of default.notify</h4>
-                                <p>Generated on Sat Sep 19 11:11 GMT 2026</p>
+                                <p>Generated on Sat Sep 26 11:12 GMT 2026</p>
                             </div>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
                                 <span class="info-box-icon bg-aqua"><i class="fa fa-table"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">TABLES</span>
-                                    <span class="info-box-number">46</span>
+                                    <span class="info-box-number">48</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -118,7 +118,7 @@
                                 <span class="info-box-icon bg-green"><span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">COLUMNS</span>
-                                    <span class="info-box-number">426</span>
+                                    <span class="info-box-number">442</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -130,7 +130,7 @@
                                 <span class="info-box-icon bg-yellow"><i class="ion ion-key"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Constraints</span>
-                                    <span class="info-box-number">51</span>
+                                    <span class="info-box-number">53</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -216,7 +216,7 @@
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/event_channel_setting.html">event_channel_setting</a></td>
-                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">4</td>
                                         <td class="detail" align="right">5</td>
                                         <td class="detail" align="right">15</td>
                                         <td class="detail" align="right">-1</td>
@@ -278,15 +278,6 @@
                                         <td class="comment detail" style="display: table-cell;"></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/email_logo.html">email_logo</a></td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">11</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Email logo metadata for system-provided and tenant-provided logos.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/email_logo_status_code.html">email_logo_status_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
@@ -294,6 +285,15 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for email logo approval statuses.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/email_logo.html">email_logo</a></td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Email logo metadata for system-provided and tenant-provided logos.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/notification_event_type_code.html">notification_event_type_code</a></td>
@@ -321,6 +321,15 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Lookup table for notification request statuses</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_cstar_group.html">event_channel_cstar_group</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">4</td>
+                                        <td class="detail" align="right">10</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>CSTAR groups an event channel is addressed to, one row per group per recipient list. Only the group ID is stored; the members behind it are resolved from CSTAR at send time, so a group gaining or losing people needs no change here. A list may hold any number of groups, and may hold groups alongside the manually entered addresses in notify.event_channel_recipient.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/email_logo_source_code.html">email_logo_source_code</a></td>
@@ -476,6 +485,15 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_recipient - who was added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_cstar_group_history.html">event_channel_cstar_group_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_cstar_group - which groups were added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/provisioned_phone_number_history.html">provisioned_phone_number_history</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">0</td>
@@ -513,7 +531,7 @@
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/channel_recipient_kind.html">channel_recipient_kind</a></td>
-                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">4</td>
                                         <td class="detail" align="right">2</td>
                                         <td class="detail" align="right">6</td>
                                         <td class="detail" align="right">-1</td>

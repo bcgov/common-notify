@@ -131,6 +131,11 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
+                                                <td title="event_channel_cstar_group.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_cstar_group_kind"><a href='event_channel_cstar_group.html'>event_channel_cstar_group</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_kind</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
                                                 <td title="event_channel_recipient.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_recipient_kind"><a href='event_channel_recipient.html'>event_channel_recipient</a><span class='relatedKey'>.channel_code</span></td>
                                                 <td class="constraint detail">fk_event_channel_recipient_kind</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
@@ -157,6 +162,11 @@
                                     <td>null</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="event_channel_cstar_group.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_cstar_group_kind"><a href='event_channel_cstar_group.html'>event_channel_cstar_group</a><span class='relatedKey'>.kind</span></td>
+                                                <td class="constraint detail">fk_event_channel_cstar_group_kind</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
                                             <tr>
                                                 <td title="event_channel_recipient.[channel_code, kind] references channel_recipient_kind.[channel_code, kind_code] via fk_event_channel_recipient_kind"><a href='event_channel_recipient.html'>event_channel_recipient</a><span class='relatedKey'>.kind</span></td>
                                                 <td class="constraint detail">fk_event_channel_recipient_kind</td>
@@ -302,10 +312,11 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="339,71,711,316">
-<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="6,5,294,152">
-<area shape="rect" id="node3" href="event_recipient_kind_code.html" target="_top" title="event_recipient_kind_code" alt="" coords="5,169,295,287">
-<area shape="rect" id="node4" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="755,15,1028,249">
+<area shape="rect" id="node1" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="339,188,711,433">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="6,123,294,269">
+<area shape="rect" id="node3" href="event_recipient_kind_code.html" target="_top" title="event_recipient_kind_code" alt="" coords="5,287,295,404">
+<area shape="rect" id="node4" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="755,5,1049,240">
+<area shape="rect" id="node5" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="765,257,1039,492">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/channel_recipient_kind.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
@@ -318,12 +329,13 @@
 <area shape="rect" id="node5" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="388,427,580,515">
 <area shape="rect" id="node6" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="675,709,1047,955">
 <area shape="rect" id="node7" href="event_recipient_kind_code.html" target="_top" title="event_recipient_kind_code" alt="" coords="339,745,629,863">
-<area shape="rect" id="node8" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1091,560,1364,795">
-<area shape="rect" id="node9" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="732,499,989,587">
-<area shape="rect" id="node10" href="template.html" target="_top" title="template" alt="" coords="408,568,560,656">
-<area shape="rect" id="node11" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="337,880,631,968">
-<area shape="rect" id="node12" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="376,5,592,93">
-<area shape="rect" id="node13" href="template_version.html" target="_top" title="template_version" alt="" coords="751,604,970,692">
+<area shape="rect" id="node8" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="1091,419,1385,653">
+<area shape="rect" id="node9" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="732,496,989,584">
+<area shape="rect" id="node11" href="template.html" target="_top" title="template" alt="" coords="408,568,560,656">
+<area shape="rect" id="node10" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1101,671,1375,905">
+<area shape="rect" id="node12" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="337,880,631,968">
+<area shape="rect" id="node13" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="376,5,592,93">
+<area shape="rect" id="node14" href="template_version.html" target="_top" title="template_version" alt="" coords="751,603,970,691">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/channel_recipient_kind.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
