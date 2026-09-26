@@ -15,7 +15,7 @@ import {
   BulkNotificationsValidationError,
 } from '@/api/bulkNotifications.api'
 import { useAppSelector } from '@/redux/hooks'
-import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import { showErrorToast, showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -191,8 +191,13 @@ const BulkNotifications: FC = () => {
         recipientCount: response.recipientCount ?? rowCount,
         blockedRecipientCount: response.blockedRecipientCount,
         blockedMessage: response.blockedMessage,
+        duplicate: response.duplicate,
       })
-      showSuccessToast('Notifications queued.')
+      if (response.duplicate) {
+        showInfoToast('Already sent. Nothing new was sent.')
+      } else {
+        showSuccessToast('Notifications queued.')
+      }
       csv.reset()
     } catch (error) {
       if (error instanceof BulkNotificationsValidationError) {

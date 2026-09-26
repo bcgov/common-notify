@@ -22,6 +22,11 @@ export interface BulkNotificationsSendResponse {
   /** Present only when the tenant safelist dropped recipients (non-production environments). */
   blockedRecipientCount?: number
   blockedMessage?: string
+  /**
+   * An identical send was accepted within the deduplication window, so nothing new went out.
+   * notifyId and status are the original request's, and recipientCount is absent.
+   */
+  duplicate?: boolean
 }
 
 /** Validation failures the API reports per row, e.g. `Row 3: "x" is not a valid email address`. */

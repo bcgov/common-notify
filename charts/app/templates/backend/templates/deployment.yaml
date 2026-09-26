@@ -119,6 +119,8 @@ spec:
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            - name: NOTIFICATION_DEDUP_WINDOW_SECONDS
+              value: {{ .Values.backend.dedupWindowSeconds | quote }}
             - name: CLAMAV_HOST
               value: {{ .Values.backend.clamav.host | default (printf "%s-clamav" .Release.Name) | quote }}
             - name: CLAMAV_PORT

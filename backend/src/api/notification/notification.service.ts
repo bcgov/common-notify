@@ -219,6 +219,7 @@ export class NotificationService {
       : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
+      ...(dto.id && { id: dto.id }),
       tenantId: dto.tenantId,
       status: dto.status ?? NotificationStatus.QUEUED,
       createdBy: dto.createdBy,

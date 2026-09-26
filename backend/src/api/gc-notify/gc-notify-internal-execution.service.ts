@@ -30,7 +30,9 @@ import type { FileAttachment } from './schemas/file-attachment'
 import Papa from 'papaparse'
 import { UnprocessableEntityException } from '@nestjs/common'
 import {
+  claimSend,
   enforceLimits,
+  findDuplicateSend,
   handleMerge,
   recordAcceptedUsage,
   resolveSmsSegments,
@@ -43,6 +45,7 @@ import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import { NotificationDedupService } from '../notify/services/notification-dedup.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
@@ -179,6 +182,7 @@ export class GcNotifyInternalExecutionService {
     private readonly bulkValidationService: GcNotifyBulkValidationService,
     private readonly apiKeyUsageService: ApiKeyUsageService,
     private readonly smsSegmentService: SmsSegmentService,
+    private readonly notificationDedupService: NotificationDedupService,
   ) {}
 
   async sendEmail(
@@ -199,7 +203,15 @@ export class GcNotifyInternalExecutionService {
     // never sees. gc_notify_default_from_email is not consulted: nothing in the delivery path
     // reads it.
     const fromEmail = await this.tenantSettingsService.resolveSenderAddress(tenantId)
-    const attachments = await this.storeAttachments(files, tenantId)
+
+    // Fingerprinted from the GC Notify body, not the notifyRequest built below: storing the
+    // attachments gives each file a new id, so that would never match. Checked before storing
+    // them so a duplicate uploads nothing.
+    const { fingerprint, duplicate } = await findDuplicateSend(this.queueableContext(), tenantId, {
+      email: { recipients: { to: [body.email_address] } },
+      gcNotify: { ...body, email_address: undefined, templateVersion: template.version },
+    })
+    const attachments = duplicate ? [] : await this.storeAttachments(files, tenantId)
     // No top-level templateId: the delivery worker has two modes — template mode
     // (re-renders at delivery time when request.templateId is set) and pre-rendered
     // mode (uses request.email.content directly). GC Notify's 201 response already
@@ -229,26 +241,27 @@ export class GcNotifyInternalExecutionService {
     // One email_address per request, so one message. Checked before the send is accepted and
     // recorded after, the same order the @Queueable path uses.
     const usage = [{ channel: NotificationChannel.EMAIL, count: 1 }]
-    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
-
-    const notificationRecord = await this.createAndEnqueue(
-      tenantId,
-      notifyRequest,
-      body.scheduled_for,
-      requestRoute,
-    )
-
-    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
+    const { id } = duplicate
+      ? { id: duplicate.notifyId }
+      : await this.acceptSend(
+          tenantId,
+          notifyRequest,
+          body.scheduled_for,
+          requestRoute,
+          fingerprint,
+          apiKeyConsumerId,
+          usage,
+        )
 
     return {
-      id: notificationRecord.id,
+      id,
       reference: body.reference ?? null,
       content: {
         from_email: fromEmail,
         body: content.responseBody,
         subject: content.subject,
       },
-      uri: `/gcnotify/v2/notifications/${notificationRecord.id}`,
+      uri: `/gcnotify/v2/notifications/${id}`,
       template: {
         id: template.id,
         version: template.version,
@@ -269,6 +282,12 @@ export class GcNotifyInternalExecutionService {
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
     const fromNumber = await this.resolveDefaultSender('gc_notify_default_sms_sender')
 
+    // Before segment counting, which renders the body.
+    const { fingerprint, duplicate } = await findDuplicateSend(this.queueableContext(), tenantId, {
+      sms: { recipients: { to: [body.phone_number] } },
+      gcNotify: { ...body, phone_number: undefined, templateVersion: template.version },
+    })
+
     const notifyRequest = {
       params: personalisation,
       reference: body.reference,
@@ -284,27 +303,31 @@ export class GcNotifyInternalExecutionService {
 
     // An SMS is billed per segment, not per message: a long body is concatenated and the carrier
     // charges for each part. resolveSmsSegments fails open at 1 rather than failing the send.
-    const segments = await resolveSmsSegments(this.queueableContext(), tenantId, notifyRequest)
-    const usage = [{ channel: NotificationChannel.SMS, count: segments }]
-    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
-
-    const notificationRecord = await this.createAndEnqueue(
-      tenantId,
-      notifyRequest,
-      body.scheduled_for,
-      requestRoute,
-    )
-
-    await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
+    const { id } = duplicate
+      ? { id: duplicate.notifyId }
+      : await this.acceptSend(
+          tenantId,
+          notifyRequest,
+          body.scheduled_for,
+          requestRoute,
+          fingerprint,
+          apiKeyConsumerId,
+          [
+            {
+              channel: NotificationChannel.SMS,
+              count: await resolveSmsSegments(this.queueableContext(), tenantId, notifyRequest),
+            },
+          ],
+        )
 
     return {
-      id: notificationRecord.id,
+      id,
       reference: body.reference,
       content: {
         body: rendered.body,
         from_number: fromNumber,
       },
-      uri: `/gcnotify/v2/notifications/${notificationRecord.id}`,
+      uri: `/gcnotify/v2/notifications/${id}`,
       template: {
         id: template.id,
         version: template.version,
@@ -375,7 +398,8 @@ export class GcNotifyInternalExecutionService {
         id: accepted.notifyId,
         template: template.id,
         job_status: 'pending',
-        notification_count: accepted.recipientCount,
+        // A duplicate carries no count; an identical request has the same rows.
+        notification_count: accepted.recipientCount ?? mergeArray.length - 1,
         original_file_name: body.name,
         template_version: template.version,
         template_type: channel === NotificationChannel.SMS ? 'sms' : 'email',
@@ -466,6 +490,7 @@ export class GcNotifyInternalExecutionService {
       notificationRequestDetailService: this.notificationRequestDetailService,
       apiKeyUsageService: this.apiKeyUsageService,
       smsSegmentService: this.smsSegmentService,
+      notificationDedupService: this.notificationDedupService,
       queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Bull.Queue]]),
     }
   }
@@ -684,6 +709,35 @@ export class GcNotifyInternalExecutionService {
   }
 
   /**
+   * A single send in the @Queueable order: limits checked before accepting, usage recorded
+   * after. A send that turns out to be a duplicate at the claim is neither created nor counted.
+   */
+  private async acceptSend(
+    tenantId: string,
+    notifyRequest: Record<string, unknown>,
+    scheduledFor: string | undefined,
+    requestRoute: string | undefined,
+    fingerprint: string | undefined,
+    apiKeyConsumerId: string | undefined,
+    usage: Array<{ channel: string; count: number }>,
+  ): Promise<{ id: string }> {
+    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
+
+    const accepted = await this.createAndEnqueue(
+      tenantId,
+      notifyRequest,
+      scheduledFor,
+      requestRoute,
+      fingerprint,
+    )
+
+    if (!accepted.duplicate) {
+      await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
+    }
+    return accepted
+  }
+
+  /**
    * Mirrors the create-then-enqueue pattern from @Queueable: synchronously create
    * a durable notification_request record (PENDING), then enqueue the ingestion
    * job asynchronously so the response isn't blocked on queue availability.
@@ -693,18 +747,32 @@ export class GcNotifyInternalExecutionService {
     notifyRequest: Record<string, unknown>,
     scheduledFor: string | undefined,
     requestRoute: string | undefined,
-  ): Promise<{ id: string; createdAt: Date }> {
+    fingerprint: string | undefined,
+  ): Promise<{ id: string; duplicate: boolean }> {
     // Non-production guardrail, enforced at this single choke point so any future send method
     // routed through here is covered too. No-op in PROD, where the safelist is not enforced.
     await this.enforceSafelist(tenantId, notifyRequest)
 
-    const notificationRecord = await this.notificationService.create({
-      tenantId,
-      status: NotificationStatus.PENDING,
-      createdBy: tenantId,
-      payload: notifyRequest,
-      requestRoute,
-    })
+    // Last before the create, so nothing that can still reject the send runs after the claim.
+    const claim = await claimSend(this.queueableContext(), tenantId, fingerprint)
+    if (claim.kind === 'duplicate') {
+      return { id: claim.original.notifyId, duplicate: true }
+    }
+
+    let notificationRecord
+    try {
+      notificationRecord = await this.notificationService.create({
+        ...(claim.notifyId && { id: claim.notifyId }),
+        tenantId,
+        status: NotificationStatus.PENDING,
+        createdBy: tenantId,
+        payload: notifyRequest,
+        requestRoute,
+      })
+    } catch (error) {
+      await claim.release()
+      throw error
+    }
 
     const hasDelayedSend = !!scheduledFor
     const delayMs = hasDelayedSend
@@ -755,7 +823,7 @@ export class GcNotifyInternalExecutionService {
       }
     })
 
-    return notificationRecord
+    return { id: notificationRecord.id, duplicate: false }
   }
 
   // ----------------------------------------------------------------------
