@@ -32,10 +32,6 @@ vi.mock('@/hooks/useCstarRoles', () => ({
   useCstarRoles: () => ({ primaryRole: 'NOTIFY_USER' }),
 }))
 
-vi.mock('@/components/PageHeading', () => ({
-  default: ({ title }: { title: string }) => <h1>{title}</h1>,
-}))
-
 vi.mock('./TemplatePreviewModal', () => ({
   default: () => null,
 }))

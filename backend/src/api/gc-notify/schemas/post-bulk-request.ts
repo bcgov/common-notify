@@ -10,6 +10,7 @@ import {
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { BULK_MAX_ROWS } from '../constants'
+import { IsFutureDateString } from '../../notify/schemas/validators/date-string.validator'
 
 export class PostBulkRequest {
   @ApiProperty({
@@ -46,6 +47,13 @@ export class PostBulkRequest {
   csv?: string
 
   @ApiPropertyOptional({
+    // string[][], so the items are themselves arrays. Declared explicitly because the reflected
+    // type is just `Array` - published as a flat string[], a generated client gets the wrong type
+    // and a spec-driven validator rejects every valid bulk send.
+    type: 'array',
+    items: { type: 'array', items: { type: 'string' } },
+    minItems: 2,
+    maxItems: BULK_MAX_ROWS,
     description:
       'Array of arrays. First line is header (email address/phone number + placeholder columns). 1-50,000 recipients. One of rows or csv is required.',
     example: [
@@ -57,6 +65,9 @@ export class PostBulkRequest {
   @ValidateIf((o: PostBulkRequest) => !o.csv)
   @IsDefined({ message: 'You should specify either rows or csv' })
   @IsArray()
+  // Each row is itself an array. Without this a flat string[] passes validation and only fails
+  // later in GcNotifyBulkValidationService, as "a phone number column could not be identified".
+  @IsArray({ each: true })
   @ArrayMinSize(2, {
     message: 'rows must have at least a header row and one data row (1-50,000 recipients)',
   })
@@ -65,10 +76,10 @@ export class PostBulkRequest {
 
   @ApiPropertyOptional({
     description: 'Schedule for future send (up to 4 days), ISO 8601 format UTC',
-    example: '2025-06-25T15:15:00Z',
+    example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
-  @IsString()
+  @IsFutureDateString()
   scheduled_for?: string
 
   @ApiPropertyOptional({

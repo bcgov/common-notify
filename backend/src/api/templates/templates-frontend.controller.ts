@@ -14,7 +14,14 @@ import {
   Req,
   BadRequestException,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import * as express from 'express'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -49,6 +56,8 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
  * these controllers can be consolidated.
  */
 @ApiTags('templates')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller('frontend/templates')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()

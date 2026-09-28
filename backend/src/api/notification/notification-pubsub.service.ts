@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 import { Observable, Subject } from 'rxjs'
 import { NotificationRequestDto } from './schemas/notification-request'
+import { attachRedisErrorLogging } from '../../common/redis/redis-error.util'
 
 /**
  * Broadcasts notification_request row changes to SSE subscribers via Redis pub/sub.
@@ -30,9 +31,13 @@ export class NotificationPubSubService implements OnModuleDestroy {
       db: redisConfig?.db ?? 0,
     }
 
-    // Create a subscriber and publisher in each backend pod
+    // Create a subscriber and publisher in each backend pod. Both get an error listener: an
+    // ioredis client without one prints the raw error - which carries the AUTH command's
+    // arguments, i.e. the Redis password - to stderr. See common/redis/redis-error.util.
     this.subscriber = new Redis(options)
     this.publisher = new Redis(options)
+    attachRedisErrorLogging(this.subscriber, `${NotificationPubSubService.name}[subscriber]`)
+    attachRedisErrorLogging(this.publisher, `${NotificationPubSubService.name}[publisher]`)
 
     // Subscribe to all notification:changed events
     this.subscriber.psubscribe('notification:changed:*', (err) => {

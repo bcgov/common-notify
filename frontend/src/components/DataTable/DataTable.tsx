@@ -54,6 +54,8 @@ export interface TableProps<T> {
   // Styling
   variant?: 'striped' | 'bordered' | 'plain'
   size?: 'sm' | 'md' | 'lg'
+  /** Top-align and wrap cells, for rows whose cells stack content over more than one line. */
+  multiline?: boolean
   className?: string
   // Footer
   footerContent?: ReactNode
@@ -89,6 +91,7 @@ export function DataTable<T extends object>({
   label,
   variant = 'striped',
   size = 'md',
+  multiline = false,
   className = '',
   footerContent,
   activeFilters,
@@ -168,7 +171,13 @@ export function DataTable<T extends object>({
       <div aria-live="polite" aria-atomic="true" className="visually-hidden">
         {statusMessage}
       </div>
-      <Table variant={variant} size={size} className={className} aria-label={label}>
+      <Table
+        variant={variant}
+        size={size}
+        multiline={multiline}
+        className={className}
+        aria-label={label}
+      >
         <TableHeader>
           <TableRow>
             {columns.map((col) => (

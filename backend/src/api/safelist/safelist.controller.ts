@@ -1,0 +1,99 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+  Request,
+  UseGuards,
+  Version,
+} from '@nestjs/common'
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiExcludeController,
+} from '@nestjs/swagger'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { CstarRole } from '../../enum/cstar-role.enum'
+import type { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
+import { SafelistEntryDto, SafelistListResponseDto } from './schemas/safelist-entry.dto'
+import { SafelistService } from './safelist.service'
+
+/**
+ * Tenant-facing management of the recipient safelist, surfaced on the Settings page.
+ *
+ * Gated on CSTAR roles, not the SSO NOTIFY_ADMIN role: this is a per-tenant screen, and the
+ * people who run a tenant hold NOTIFY_OPERATIONS_ADMIN ("Tenant Administrator") rather than the
+ * platform-wide Keycloak role. Any member of the tenant may read the list; only a tenant
+ * administrator may change who can be sent to. Mirrors TenantSettingsController.
+ *
+ * Reading the safelist works in every environment so administrators can see what is configured;
+ * whether it is *enforced* is an environment-level question answered by `enforced` on the list
+ * response (the `recipient_safelist` feature flag).
+ */
+@ApiTags('safelist')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
+@Controller('frontend/safelist')
+@UseGuards(NotifyFrontendRoleGuard)
+@ApiBearerAuth()
+export class SafelistController {
+  constructor(private readonly safelistService: SafelistService) {}
+
+  @Version('1')
+  @Get()
+  @Roles(
+    CstarRole.NOTIFY_VIEWER,
+    CstarRole.NOTIFY_TEMPLATE_EDITOR,
+    CstarRole.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOperation({ summary: 'List safelisted recipients for the authenticated tenant' })
+  @ApiQuery({ name: 'channel', required: false, enum: ['EMAIL', 'SMS'] })
+  @ApiOkResponse({ type: SafelistListResponseDto })
+  async list(
+    @Req() req: Request,
+    @Query('channel') channel?: string,
+  ): Promise<SafelistListResponseDto> {
+    const tenant = (req as any).tenant as Tenant
+    const [entries, enforced, maxEntries] = await Promise.all([
+      this.safelistService.listByTenant(tenant.id, channel),
+      this.safelistService.isEnforced(),
+      this.safelistService.getMaxEntries(),
+    ])
+    return { entries, enforced, maxEntries }
+  }
+
+  @Version('1')
+  @Post()
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({ summary: 'Add a recipient to the tenant safelist' })
+  @ApiCreatedResponse({ type: SafelistEntryDto })
+  add(@Req() req: Request, @Body() dto: CreateSafelistEntryDto): Promise<SafelistEntryDto> {
+    const tenant = (req as any).tenant as Tenant
+    const userGuid = (req as any).userGuid as string | undefined
+    return this.safelistService.add(tenant.id, dto, userGuid)
+  }
+
+  @Version('1')
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({ summary: 'Remove a recipient from the tenant safelist' })
+  @ApiNoContentResponse()
+  remove(@Req() req: Request, @Param('id') id: string): Promise<void> {
+    const tenant = (req as any).tenant as Tenant
+    const userGuid = (req as any).userGuid as string | undefined
+    return this.safelistService.remove(tenant.id, id, userGuid)
+  }
+}

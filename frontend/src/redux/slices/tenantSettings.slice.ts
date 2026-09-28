@@ -1,16 +1,22 @@
 import { createSlice } from '@reduxjs/toolkit'
-import { fetchTenantSettings, updateTenantSettings } from '../thunks/tenantSettings.thunks'
+import { fetchSettings, updateTenantSettings } from '../thunks/settings.thunks'
+import type { TenantSettingsValues } from '@/interfaces/tenant-settings.interface'
 
-interface TenantSettingsState {
-  alertEmail: string | null
-  loading: boolean
+/** Used until a settings row exists for the tenant. */
+export const defaultTenantSettings: TenantSettingsValues = {
+  alertEmail: null,
+  defaultSenderEmail: null,
+}
+
+interface TenantSettingsState extends TenantSettingsValues {
+  /** True while a tenant-tab PATCH is in flight. Loading is owned by Settings.tsx. */
   saving: boolean
+  /** Save error only; load errors are surfaced by Settings.tsx. */
   error?: string
 }
 
 const initialState: TenantSettingsState = {
-  alertEmail: null,
-  loading: false,
+  ...defaultTenantSettings,
   saving: false,
 }
 
@@ -20,17 +26,17 @@ export const tenantSettingsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchTenantSettings.pending, (state) => {
-        state.loading = true
+      // A new load starts: drop the previous tenant's values and any stale save error, so
+      // the section can only ever mount against data for the tenant now on screen.
+      .addCase(fetchSettings.pending, (state) => {
+        state.alertEmail = defaultTenantSettings.alertEmail
+        state.defaultSenderEmail = defaultTenantSettings.defaultSenderEmail
         state.error = undefined
       })
-      .addCase(fetchTenantSettings.fulfilled, (state, action) => {
-        state.alertEmail = action.payload?.alertEmail ?? null
-        state.loading = false
-      })
-      .addCase(fetchTenantSettings.rejected, (state, action) => {
-        state.loading = false
-        state.error = action.payload ?? 'Failed to load tenant settings'
+      .addCase(fetchSettings.fulfilled, (state, action) => {
+        state.alertEmail = action.payload?.alertEmail ?? defaultTenantSettings.alertEmail
+        state.defaultSenderEmail =
+          action.payload?.defaultSenderEmail ?? defaultTenantSettings.defaultSenderEmail
       })
       .addCase(updateTenantSettings.pending, (state) => {
         state.saving = true
@@ -38,6 +44,7 @@ export const tenantSettingsSlice = createSlice({
       })
       .addCase(updateTenantSettings.fulfilled, (state, action) => {
         state.alertEmail = action.payload.alertEmail
+        state.defaultSenderEmail = action.payload.defaultSenderEmail
         state.saving = false
       })
       .addCase(updateTenantSettings.rejected, (state, action) => {

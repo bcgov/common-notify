@@ -1,10 +1,21 @@
 import { Controller, Get, Version, UseGuards, Logger } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiExcludeEndpoint,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 
-@ApiTags('code-tables')
+// Guarded by JwtGuard, so a service holding an API key cannot call it. The published spec is
+// the API-key surface, and documenting an endpoint the reader cannot reach is worse than
+// omitting it.
+@ApiExcludeController()
+@ApiTags('Reference data')
 @Controller('code-tables')
 @UseGuards(JwtGuard)
 @ApiBearerAuth()
@@ -76,6 +87,8 @@ export class CodeTablesController {
    * Get feature flag codes
    */
   @Version('1')
+  // Feature gating is internal; kept out of the published spec.
+  @ApiExcludeEndpoint()
   @Get('feature-flags')
   @ApiOperation({
     summary: 'Get feature flag codes',

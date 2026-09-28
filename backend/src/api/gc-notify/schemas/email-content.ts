@@ -8,9 +8,15 @@ export class EmailContent {
   })
   from_email: string
 
-  @ApiProperty({ description: 'Email body content' })
+  @ApiProperty({
+    description: 'The rendered email body.',
+    example: 'Hello Alice, permit BC-2026-00417 has been approved.',
+  })
   body: string
 
-  @ApiProperty({ description: 'Email subject line' })
+  @ApiProperty({
+    description: 'The rendered subject line.',
+    example: 'Permit BC-2026-00417 approved',
+  })
   subject: string
 }

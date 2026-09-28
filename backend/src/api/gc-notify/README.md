@@ -1,26 +1,25 @@
-# GC Notify Passthrough
+# GC Notify-compatible API
 
-A thin proxy between Common Notify clients and the
-[GC Notify API](https://documentation.notification.canada.ca).
+This module exposes GC Notify-compatible endpoints through `GcNotifyController` while tenants
+migrate to Common Notify's internal delivery pipeline.
 
-## How it works
+## Execution model
 
-```
-Client
-  │  X-GC-Notify-Api-Key header + Kong/JWT credentials
-  ▼
-TenantGuard        — validates caller identity (Kong headers or JWT Bearer token)
-  ▼
-GcNotifyController — validates request body, extracts GC Notify API key
-  ▼
-GcNotifyApiClient  — forwards request to GC Notify, maps response
-  ▼
-GC Notify API      (https://api.notification.canada.ca)
-```
+Requests arrive through Kong with `Authorization: ApiKey-v1 <key>` and an authenticated
+`x-credential-identifier`. `GcNotifyServiceGuard` resolves that credential to a tenant and retains
+the authorization header for operations that still use the upstream fallback.
 
-Callers supply their own GC Notify API key via `X-GC-Notify-Api-Key`. It is forwarded as
-`Authorization: ApiKey-v1 <key>` and never stored. `uri` fields and pagination links in responses
-are rewritten to the local proxy path.
+For each supported operation, `GcNotifyRoutingService` checks the tenant's routing feature flag:
+
+- Enabled operations execute through `GcNotifyInternalExecutionService` and the Common Notify
+  pipeline.
+- Disabled operations use `GcNotifyApiClient`, which forwards the request to the upstream
+  [GC Notify API](https://documentation.notification.canada.ca) and maps its response to the local
+  GC Notify-compatible shape.
+- Bulk sends currently always use `GcNotifyApiClient`.
+
+When the upstream fallback is used, response resource URIs and pagination links are rewritten to the
+local `/gcnotify/v2` paths.
 
 ## Endpoints
 
@@ -38,6 +37,6 @@ All routes are mounted under `/gcnotify/v2`.
 
 ## Configuration
 
-| Environment variable | Description            | Example                              |
-| -------------------- | ---------------------- | ------------------------------------ |
-| `GC_NOTIFY_BASE_URL` | GC Notify API base URL | `https://api.notification.canada.ca` |
+| Environment variable | Description                                   | Example                              |
+| -------------------- | --------------------------------------------- | ------------------------------------ |
+| `GC_NOTIFY_BASE_URL` | Upstream base URL used by fallback operations | `https://api.notification.canada.ca` |

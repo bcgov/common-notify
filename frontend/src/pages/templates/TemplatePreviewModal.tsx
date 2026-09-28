@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import {
-  Button,
-  Dialog,
-  Modal,
-  Switch,
-  TextArea,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@bcgov/design-system-react-components'
-import { previewTemplateBody, NotificationChannel, TemplateEngine } from '@/api/templates.api'
+import { Button, ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
+import NotificationPreviewModal from '@/components/NotificationPreviewModal'
+import type { TemplateEngine } from '@/api/templates.api'
+import { previewTemplateBody, NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { setPreviewValues } from '@/redux/slices/templates.slice'
+import { detectVariables } from '@/utils/templateVariables'
 import '@/scss/components/templates.scss'
 
 interface TemplatePreviewModalProps {
@@ -22,99 +16,6 @@ interface TemplatePreviewModalProps {
   subject?: string
   channelCode: NotificationChannel
   engineCode: TemplateEngine
-}
-
-type VariableType = 'text' | 'boolean'
-
-interface DetectedVariable {
-  name: string
-  type: VariableType
-}
-
-// Matches a single identifier (e.g. firstName).
-const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
-
-/**
- * Parse a template body and detect the variables it references, so the user can
- * supply sample values. Variables used in a conditional (e.g. handlebars
- * {{#if x}} or a mustache section {{#x}}) are surfaced as boolean toggles;
- * everything else is a free-text value.
- */
-export function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
-  const found = new Map<string, VariableType>()
-  const addVar = (name: string, type: VariableType) => {
-    const existing = found.get(name)
-    if (existing === undefined) {
-      found.set(name, type)
-    } else if (type === 'boolean' && existing !== 'boolean') {
-      // A variable used in a condition wins the boolean treatment
-      found.set(name, 'boolean')
-    }
-  }
-
-  if (engine === TemplateEngine.LEGACY_GC_NOTIFY) {
-    // Legacy GC Notify syntax:
-    //   ((var))            plain interpolation -> free-text value
-    //   ((var??content))   conditional: `content` shows when `var` is truthy,
-    //                      so `var` is a boolean toggle. The content may span
-    //                      multiple lines and contain parentheses, so match
-    //                      lazily up to the closing `))` with the dotAll flag.
-    const re = /\(\(\s*([\s\S]+?)\s*\)\)/g
-    let match: RegExpExecArray | null
-    while ((match = re.exec(body)) !== null) {
-      const inner = match[1]
-      const condIndex = inner.indexOf('??')
-      if (condIndex !== -1) {
-        const name = inner.slice(0, condIndex).trim()
-        if (IDENTIFIER.test(name)) addVar(name, 'boolean')
-      } else if (IDENTIFIER.test(inner.trim())) {
-        addVar(inner.trim(), 'text')
-      }
-    }
-    return [...found].map(([name, type]) => ({ name, type }))
-  }
-
-  // Handlebars / Mustache / MJML syntax: {{ var }} and {{{ var }}}
-  const re = /\{\{\{?\s*([^}]+?)\s*\}?\}\}/g
-  let match: RegExpExecArray | null
-  while ((match = re.exec(body)) !== null) {
-    const inner = match[1].trim()
-    if (!inner) continue
-
-    const lead = inner[0]
-    if (lead === '/' || lead === '!' || lead === '>') continue // close / comment / partial
-    if (inner === 'else') continue
-
-    if (lead === '#' || lead === '^') {
-      // Block open: {{#if x}}, {{#unless x}}, {{#each x}}, {{#with x}} or section {{#x}}
-      const tokens = inner.slice(1).trim().split(/\s+/)
-      const helper = tokens[0]
-      if (['if', 'unless', 'each', 'with'].includes(helper) && tokens.length > 1) {
-        const name = tokens[tokens.length - 1]
-        const type: VariableType = helper === 'if' || helper === 'unless' ? 'boolean' : 'text'
-        if (IDENTIFIER.test(name)) addVar(name, type)
-      } else {
-        // Mustache section / inverted section: the token itself is the variable
-        const name = helper.replace(/^&/, '')
-        if (IDENTIFIER.test(name)) addVar(name, 'boolean')
-      }
-      continue
-    }
-
-    // Plain interpolation, possibly a helper call: {{x}}, {{& x}}, {{formatDate x}}
-    const tokens = inner.replace(/^&\s*/, '').split(/\s+/)
-    if (tokens.length === 1) {
-      if (IDENTIFIER.test(tokens[0])) addVar(tokens[0], 'text')
-    } else {
-      // Helper invocation — treat the arguments as variables
-      for (const token of tokens.slice(1)) {
-        const arg = token.replace(/^&/, '')
-        if (IDENTIFIER.test(arg)) addVar(arg, 'text')
-      }
-    }
-  }
-
-  return [...found].map(([name, type]) => ({ name, type }))
 }
 
 const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
@@ -133,6 +34,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [values, setValues] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<'rendered' | 'raw'>('rendered')
   const [rendered, setRendered] = useState<string>('')
+  const [renderedHtml, setRenderedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Whether a valid render has been generated; when false the Rendered tab
@@ -169,6 +71,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         params,
       })
       setRendered(result.body)
+      setRenderedHtml(result.html)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to render preview')
     } finally {
@@ -192,6 +95,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     if (missing) {
       setHasApplied(false)
       setRendered('')
+      setRenderedHtml(undefined)
       setError(null)
     } else {
       setHasApplied(true)
@@ -206,167 +110,76 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   }
 
   return (
-    <Modal
+    <NotificationPreviewModal
       isOpen={isOpen}
-      isDismissable
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-    >
-      <Dialog aria-labelledby="template-preview-title">
-        <div className="template-preview">
-          <div className="template-preview__header">
-            <h5 className="template-preview__title" id="template-preview-title">
-              Email Notification Preview
-            </h5>
-          </div>
-
-          <div className="template-preview__body">
-            {/* Left pane: variable inputs */}
-            <div className="template-preview__data">
-              <h6 className="template-preview__heading">Preview data</h6>
-              <p className="template-preview__intro">
-                Enter values for all variables to view the rendered template.
-              </p>
-
-              {variables.length === 0 ? (
-                <p className="template-preview__intro">No variables found.</p>
-              ) : (
-                <div className="template-preview__fields">
-                  {variables.map((variable) =>
-                    variable.type === 'boolean' ? (
-                      <div key={variable.name} className="template-preview__field-switch">
-                        <span className="template-preview__switch-label">{variable.name}</span>
-                        <Switch
-                          isSelected={(values[variable.name] ?? 'true') === 'true'}
-                          onChange={(isSelected) =>
-                            handleValueChange(variable.name)(isSelected ? 'true' : 'false')
-                          }
-                        >
-                          {(values[variable.name] ?? 'true') === 'true' ? 'True' : 'False'}
-                        </Switch>
-                      </div>
-                    ) : (
-                      // Wrap rather than pass `className` to TextField: the DS
-                      // spreads props over its own `bcds-react-aria-TextField`
-                      // class, so a className here would strip it and break the
-                      // `[data-invalid]` red border.
-                      <div key={variable.name} className="template-preview__field-text">
-                        <TextField
-                          label={variable.name}
-                          value={values[variable.name] ?? ''}
-                          onChange={handleValueChange(variable.name)}
-                          isRequired
-                          isInvalid={showErrors && isMissing(variable.name)}
-                          errorMessage="Enter a value to generate the preview"
-                          // The DS TextField omits `placeholder` from its types, but
-                          // react-aria's useTextField still forwards it to the input.
-                          {...({ placeholder: `Enter text...` } as { placeholder?: string })}
-                        />
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
-
-              <div className="template-preview__apply">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onPress={() => {
-                    setActiveTab('rendered')
-                    if (hasMissing) {
-                      // Surface field errors and keep the preview unavailable.
-                      setShowErrors(true)
-                      setHasApplied(false)
-                    } else {
-                      setShowErrors(false)
-                      setHasApplied(true)
-                      void runPreview(values)
-                    }
-                  }}
-                  isDisabled={loading || !canApply}
-                >
-                  {loading ? 'Applying...' : 'Apply to Preview'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Right pane: preview output */}
-            <div className="template-preview__preview">
-              <div className="template-preview__preview-main">
-                <h6 className="template-preview__heading">Show preview</h6>
-                <p className="template-preview__intro">
-                  Preview how your template will appear using the provided values.
-                </p>
-
-                <div className="template-preview__tabs">
-                  <ToggleButtonGroup
-                    aria-label="Preview mode"
-                    selectionMode="single"
-                    disallowEmptySelection
-                    selectedKeys={[activeTab]}
-                    size="small"
-                    onSelectionChange={(keys) => {
-                      const [selected] = keys
-                      if (selected != null) {
-                        setActiveTab(selected as 'rendered' | 'raw')
-                      }
-                    }}
-                  >
-                    <ToggleButton id="rendered" size="small">
-                      Rendered Preview
-                    </ToggleButton>
-                    <ToggleButton id="raw" size="small">
-                      Raw Template
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                </div>
-
-                {activeTab === 'raw' ? (
-                  // Read-only textarea so the raw template can be selected and
-                  // scrolled; it sizes itself to its content and can still be
-                  // resized by hand. Wrapped (not given `className`) so the DS
-                  // base class survives — see the __field-text note above.
-                  <div className="template-preview__raw">
-                    <TextArea aria-label="Raw template" value={body} isReadOnly />
-                  </div>
-                ) : !hasApplied || error || loading ? (
-                  <div
-                    className={
-                      !hasApplied
-                        ? 'template-preview__output template-preview__output--disabled'
-                        : 'template-preview__output'
-                    }
-                  >
-                    {!hasApplied ? (
-                      <span className="template-preview__unavailable">
-                        <span className="template-preview__unavailable-title">
-                          Preview unavailable.
-                        </span>
-                        <span className="template-preview__unavailable-desc">
-                          Provide values for all variables to view the rendered template.
-                        </span>
-                      </span>
-                    ) : error ? (
-                      <span className="template-preview__error">{error}</span>
-                    ) : (
-                      <span className="template-preview__placeholder">Rendering preview...</span>
-                    )}
-                  </div>
-                ) : (
-                  // Rendered output uses the same read-only, self-sizing textarea
-                  // as the Raw Template tab.
-                  <div className="template-preview__raw">
-                    <TextArea aria-label="Rendered preview" value={rendered} isReadOnly />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </Dialog>
-    </Modal>
+      onClose={onClose}
+      title="Email Notification Preview"
+      variables={variables.map((variable) => ({
+        name: variable.name,
+        value: values[variable.name] ?? '',
+        type: variable.type,
+        isInvalid: showErrors && variable.type !== 'boolean' && isMissing(variable.name),
+        errorMessage: 'Enter a value to generate the preview',
+      }))}
+      variablesIntro="Enter values for all variables in your template."
+      isEditable
+      onVariableChange={(name, value) => handleValueChange(name)(value)}
+      variablesFooter={
+        <Button
+          type="button"
+          variant="secondary"
+          onPress={() => {
+            setActiveTab('rendered')
+            if (hasMissing) {
+              // Surface field errors and keep the preview unavailable.
+              setShowErrors(true)
+              setHasApplied(false)
+            } else {
+              setShowErrors(false)
+              setHasApplied(true)
+              void runPreview(values)
+            }
+          }}
+          isDisabled={loading || !canApply}
+        >
+          {loading ? 'Applying...' : 'Apply to Preview'}
+        </Button>
+      }
+      subject={channelCode === NotificationChannel.EMAIL ? subject : undefined}
+      bodyHtml={activeTab === 'rendered' && hasApplied ? renderedHtml : undefined}
+      bodyText={activeTab === 'rendered' ? rendered : body}
+      bodyOverride={
+        activeTab === 'rendered' && !hasApplied && !loading ? (
+          <p className="notification-preview__placeholder">
+            Preview unavailable. Provide values for all variables to view the rendered template.
+          </p>
+        ) : undefined
+      }
+      outputHeader={
+        <ToggleButtonGroup
+          aria-label="Preview mode"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={[activeTab]}
+          size="small"
+          onSelectionChange={(keys) => {
+            const [selected] = keys
+            if (selected != null) {
+              setActiveTab(selected as 'rendered' | 'raw')
+            }
+          }}
+        >
+          <ToggleButton id="rendered" size="small">
+            Rendered Preview
+          </ToggleButton>
+          <ToggleButton id="raw" size="small">
+            Raw Template
+          </ToggleButton>
+        </ToggleButtonGroup>
+      }
+      isLoading={loading && activeTab === 'rendered'}
+      error={activeTab === 'rendered' ? error : null}
+    />
   )
 }
 

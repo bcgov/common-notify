@@ -18,12 +18,12 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -38,6 +38,7 @@ import { WebhookService } from '../../api/webhook/webhook.service'
 import { ValidationExceptionFilter } from '../../common/filters/validation.filter'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
+import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
@@ -51,10 +52,6 @@ const mockAuthGuard: CanActivate = {
     request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
-}
-
-const mockChesApiClient = {
-  sendEmail: vi.fn(),
 }
 
 const mockConfigService = {
@@ -119,6 +116,15 @@ const mockWebhookService = {
 
 const mockNotificationRequestDetailService = {
   createPending: vi.fn().mockResolvedValue(undefined),
+  createBlocked: vi.fn().mockResolvedValue(undefined),
+}
+
+// Safelist enforcement is off unless a test opts in, matching PROD and keeping every existing
+// send test unaffected by the guardrail.
+const mockSafelistService = {
+  isEnforced: vi.fn().mockResolvedValue(false),
+  findBlocked: vi.fn().mockResolvedValue([]),
+  appliesTo: (channel: string) => channel === 'EMAIL' || channel === 'SMS',
 }
 
 const mockApiKeyUsageService = {
@@ -150,6 +156,8 @@ describe('Notify Controllers', () => {
     mockApiKeyUsageService.recordUsage.mockResolvedValue([])
     mockApiKeyUsageService.assertWithinLimits.mockResolvedValue(undefined)
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
+    mockSafelistService.isEnforced.mockResolvedValue(false)
+    mockSafelistService.findBlocked.mockResolvedValue([])
     mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
 
     const module: TestingModule = await Test.createTestingModule({
@@ -162,6 +170,7 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [
+        { provide: NotifyPreviewService, useValue: {} },
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -170,7 +179,6 @@ describe('Notify Controllers', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
-        { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
@@ -184,6 +192,10 @@ describe('Notify Controllers', () => {
         {
           provide: LimitAlertNotificationService,
           useValue: mockLimitAlertNotificationService,
+        },
+        {
+          provide: SafelistService,
+          useValue: mockSafelistService,
         },
         {
           provide: SmsSegmentService,
@@ -227,6 +239,28 @@ describe('Notify Controllers', () => {
   })
 
   describe('NotifySimpleController', () => {
+    it.each([
+      ['', ''],
+      ['', '?preview=false'],
+      ['', '?preview=TRUE'],
+      ['/email', ''],
+      ['/email', '?preview=false'],
+      ['/email', '?preview=1'],
+    ])('keeps real sends active on %s%s', async (path, query) => {
+      mockApiKeyConsumerId = 'consumer-standard'
+      const channel = {
+        recipients: { to: ['test@example.com'] },
+        content: { subject: 'Test', body: 'Hello' },
+      }
+      await request(app.getHttpServer())
+        .post(`/api/v1/notifysimple${path}${query}`)
+        .send(path ? channel : { email: channel })
+        .expect(202)
+      expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
+      expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
+      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+    })
+
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()
@@ -508,6 +542,56 @@ describe('Notify Controllers', () => {
     })
 
     describe('POST /api/v1/notifysimple', () => {
+      it('returns a 400 identifying an unresolvable SMS recipient index and value', async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            sms: {
+              recipients: { to: ['+12505550123', '12345', '+12505550124'] },
+              content: { body: 'Hello' },
+            },
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body).toEqual({
+              statusCode: 400,
+              message: 'Validation failed',
+              errors: ["'12345' is not a valid phone number"],
+              fieldErrors: {
+                'sms.recipients.to[1]': "'12345' is not a valid phone number",
+              },
+            })
+          })
+
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('accepts a normalizable SMS recipient for downstream ingestion normalization', async () => {
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            sms: {
+              recipients: { to: ['250-555-1234'] },
+              content: { body: 'Hello' },
+            },
+          })
+          .expect(202)
+
+        await vi.waitFor(() => {
+          expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            expect.objectContaining({
+              request: expect.objectContaining({
+                sms: expect.objectContaining({
+                  recipients: { to: ['250-555-1234'] },
+                }),
+              }),
+            }),
+            expect.any(Object),
+          )
+        })
+      })
+
       it('should return 201 status with a valid email payload', async () => {
         mockEmailAdapter.send.mockResolvedValue({
           messageId: 'ches-123456',
@@ -529,11 +613,27 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 422 when no channel is provided', async () => {
+      // An empty body fails DTO validation now that ValidateTemplateOrContent actually runs, so it
+      // is rejected at the pipe with a 400 rather than reaching the business-rule check. 400 for a
+      // malformed request and 422 for a business-rule failure is the split ValidationExceptionFilter
+      // already assumes.
+      it('should return 400 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      })
+
+      it('should return 422 when a well-formed request fails a business rule', async () => {
         mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
           'At least one recipient is required (email, SMS, or msgApp)',
         ])
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
+          .expect(422)
       })
 
       it('should return 202 with status "accepted" for immediate send', async () => {
@@ -570,8 +670,11 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
-        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+      // A past delayedSend used to be accepted and sent immediately, because the delay is computed
+      // as Math.max(0, when - now). Scheduling into the past is never what a caller meant, so it is
+      // rejected now.
+      it('should return 400 for a delayedSend in the past', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString()
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
@@ -581,11 +684,7 @@ describe('Notify Controllers', () => {
               delayedSend: pastDate,
             },
           })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Notification scheduled for delivery')
-          })
+          .expect(400)
       })
 
       it('should return 400 and not persist when attachment validation fails', async () => {
@@ -642,6 +741,27 @@ describe('Notify Controllers', () => {
 
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('hands the email shorthand params to validation under the channel, not top level', async () => {
+        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // Everything the caller sent lands under email — so validateBusinessRules sees no
+        // top-level params and must read the channel's own params to resolve placeholders.
+        const templateId = '12345678-1234-4234-8234-123456789012'
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send({
+            recipients: { to: ['test@example.com'] },
+            content: { templateId },
+            params: { firstName: 'Alice' },
+          })
+          .expect(202)
+
+        const [, validatedPayload] =
+          mockNotificationService.validateBusinessRules.mock.calls.at(-1)!
+        expect(validatedPayload.params).toBeUndefined()
+        expect(validatedPayload.email.params).toEqual({ firstName: 'Alice' })
       })
 
       it('should return a clear DTO error when attachment content is missing', async () => {
@@ -712,6 +832,268 @@ describe('Notify Controllers', () => {
 
         expect(mockAttachmentValidationService.validateAttachments).not.toHaveBeenCalled()
         expect(mockNotificationService.create).not.toHaveBeenCalled()
+      })
+
+      describe('recipient safelist enforcement (non-production environments)', () => {
+        const standardBody = {
+          email: {
+            recipients: { to: ['stranger@example.com'] },
+            content: { subject: 'Test', body: 'Hello' },
+          },
+        }
+
+        it('rejects a send to a non-safelisted recipient with 400 and persists nothing', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['stranger@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(400)
+            .expect((res) => {
+              expect(JSON.stringify(res.body)).toContain('stranger@example.com')
+              expect(JSON.stringify(res.body)).toContain('safelist')
+            })
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+          expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+          expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+        })
+
+        it('checks cc and bcc, not just to', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send({
+              email: {
+                recipients: {
+                  to: ['allowed@gov.bc.ca'],
+                  cc: ['cc@example.com'],
+                  bcc: ['bcc@example.com'],
+                },
+                content: { subject: 'Test', body: 'Hello' },
+              },
+            })
+            .expect(202)
+
+          expect(mockSafelistService.findBlocked).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.arrayContaining([
+              { address: 'allowed@gov.bc.ca', channel: 'EMAIL' },
+              { address: 'cc@example.com', channel: 'EMAIL' },
+              { address: 'bcc@example.com', channel: 'EMAIL' },
+            ]),
+          )
+        })
+
+        it('accepts the send when every recipient is safelisted', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple')
+            .send(standardBody)
+            .expect(202)
+
+          expect(mockNotificationService.create).toHaveBeenCalled()
+        })
+
+        it('drops blocked recipients from a mail merge and records them as blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com'])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.message).toContain('1 recipient(s)')
+              expect(res.body.blockedRecipientCount).toBe(1)
+            })
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
+        it('records a repeated blocked address once', async () => {
+          // findBlocked echoes one entry per candidate, so a merge listing the same address on
+          // two rows reports it twice; only one detail row may be written for it.
+          mockSafelistService.findBlocked.mockResolvedValue(['bob@example.com', 'bob@example.com'])
+          mockNotificationService.parseMailMergeRecipients.mockReturnValue(
+            ['alice@example.com', 'bob@example.com', 'bob@example.com'].map((address) => ({
+              address,
+              params: {},
+            })),
+          )
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [
+                  ['to'],
+                  ['alice@example.com'],
+                  ['bob@example.com'],
+                  ['bob@example.com'],
+                ],
+              },
+            })
+            .expect(202)
+            .expect((res) => expect(res.body.blockedRecipientCount).toBe(1))
+
+          expect(mockNotificationRequestDetailService.createBlocked).toHaveBeenCalledWith(
+            'mock-notification-id',
+            [{ address: 'bob@example.com', channel: 'EMAIL' }],
+            expect.stringContaining('safelist'),
+            expect.any(String),
+          )
+        })
+
+        it('rejects a mail merge whose every recipient is blocked', async () => {
+          mockSafelistService.findBlocked.mockResolvedValue([
+            'alice@example.com',
+            'bob@example.com',
+          ])
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: {
+                mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']],
+              },
+            })
+            .expect(400)
+
+          expect(mockNotificationService.create).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        it.each(['', '?preview=false'])(
+          'keeps ordinary SMS sends unchanged with query %s',
+          async (query) => {
+            const body = {
+              sms: { recipients: { to: ['250 555 0123'] }, content: { body: 'Hello' } },
+            }
+            await request(app.getHttpServer())
+              .post(`/api/v1/notifysimple/sms${query}`)
+              .send(body)
+              .expect(202)
+              .expect((res) => {
+                expect(res.body.notifyId).toBeDefined()
+                expect(res.body.status).toBe('accepted')
+                expect(res.body.channels).toEqual(['sms'])
+                expect(res.body.sms).toBeUndefined()
+              })
+            expect(mockNotificationService.create).toHaveBeenCalled()
+            expect(mockIngestionQueue.add).toHaveBeenCalled()
+            expect(mockNotificationService.validateBusinessRules).toHaveBeenCalled()
+          },
+        )
+
+        // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
+        const validSmsMerge = {
+          sms: {
+            content: { templateId: '12345678-1234-4234-8234-123456789012' },
+            recipients: {
+              mergeArray: [
+                ['to', 'firstName'],
+                ['+12505550123', 'Alice'],
+                ['+16045550147', 'Bob'],
+              ],
+            },
+          },
+        }
+
+        it('should accept an SMS merge and report the recipient count', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.channels).toEqual(['sms'])
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.message).toContain('SMS merge send accepted with 2 recipient(s)')
+            })
+        })
+
+        it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
+          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
+          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
+          mockSmsSegmentService.countSegmentsPerRecipient
+            .mockResolvedValueOnce(3)
+            .mockResolvedValueOnce(1)
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.billableMessageCount).toBe(4)
+            })
+        })
+
+        it('should enforce limits on segments, not on recipients', async () => {
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockApiKeyConsumerId = 'consumer-1'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-1', [
+            { channel: 'SMS', count: 8 },
+          ])
+        })
+
+        it('should return 422 with the row that failed validation', async () => {
+          mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+            'Row 2: "not-a-number" is not a valid phone number',
+          ])
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.errors).toContain('Row 2: "not-a-number" is not a valid phone number')
+            })
+        })
+
+        it('should return 400 when both to and mergeArray are given', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({
+              sms: {
+                ...validSmsMerge.sms,
+                recipients: {
+                  to: ['+12505550123'],
+                  mergeArray: [['to'], ['+16045550147']],
+                },
+              },
+            })
+            .expect(400)
+        })
+
+        it('should still reject an empty to list', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({ sms: { ...validSmsMerge.sms, recipients: { to: [] } } })
+            .expect(400)
+        })
       })
 
       describe('POST /api/v1/notifysimple/email (mail-merge)', () => {
@@ -974,6 +1356,87 @@ describe('Notify Controllers', () => {
     })
   })
 
+  describe('NotifySimpleFrontendController', () => {
+    // The mail merge screen posts here. Same pipeline as /api/v1/notifysimple/email, different
+    // guard - so these cover the wiring, not the merge rules (covered above).
+    describe('POST /api/v1/frontend/notifysimple (mail merge)', () => {
+      const validMergeBody = {
+        content: { templateId: '12345678-1234-4234-8234-123456789012' },
+        recipients: {
+          mergeArray: [
+            ['to', 'firstname'],
+            ['alice@example.com', 'Alice'],
+            ['bob@example.com', 'Bob'],
+          ],
+        },
+      }
+
+      it('should return 202 and report the accepted recipient count', async () => {
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.notifyId).toBeDefined()
+            expect(res.body.status).toBe('accepted')
+            expect(res.body.recipientCount).toBe(2)
+            expect(res.body.channels).toEqual(['email'])
+          })
+      })
+
+      it('should report recipients dropped by the safelist alongside the accepted count', async () => {
+        mockSafelistService.findBlocked.mockResolvedValueOnce(['bob@example.com'])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(202)
+          .expect((res) => {
+            expect(res.body.recipientCount).toBe(1)
+            expect(res.body.blockedRecipientCount).toBe(1)
+            expect(res.body.blockedMessage).toContain('safelist')
+          })
+      })
+
+      it('should return 422 with the row-level errors when merge validation fails', async () => {
+        mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+          'Row 2: "not-an-email" is not a valid email address',
+        ])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(422)
+          .expect((res) => {
+            expect(res.body.message).toBe('Request validation failed')
+            expect(res.body.errors).toContain('Row 2: "not-an-email" is not a valid email address')
+          })
+      })
+
+      it('should return 400 when every recipient is blocked by the safelist', async () => {
+        mockSafelistService.findBlocked.mockResolvedValueOnce([
+          'alice@example.com',
+          'bob@example.com',
+        ])
+
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(validMergeBody)
+          .expect(400)
+          .expect(() => {
+            expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+          })
+      })
+
+      it('should return 400 when the mergeArray header has no "to" column', async () => {
+        return request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send({ ...validMergeBody, recipients: { mergeArray: [['name'], ['Alice']] } })
+          .expect(400)
+      })
+    })
+  })
+
   describe('NotifyEventController', () => {
     it('should be defined', () => {
       const controller = app.get(NotifyEventController)
@@ -1033,27 +1496,11 @@ describe('Notify Controllers', () => {
       expect(controller).toBeDefined()
     })
 
+    // The list, cancel and status endpoints were removed; notification listing and status
+    // live on /api/v1/notification_request.
     describe('GET /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify').expect(501)
-      })
-
-      it('should accept query parameters', async () => {
-        return request(app.getHttpServer())
-          .get('/api/v1/notify?limit=20&status=sent&startDate=2025-01-01')
-          .expect(501)
-      })
-    })
-
-    describe('DELETE /api/v1/notify', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).delete('/api/v1/notify?notifyId=notify-123').expect(501)
-      })
-    })
-
-    describe('GET /api/v1/notify/status/:notifyId', () => {
-      it('should return 501 status', async () => {
-        return request(app.getHttpServer()).get('/api/v1/notify/status/notify-123').expect(501)
+      it('is no longer routed', async () => {
+        return request(app.getHttpServer()).get('/api/v1/notify').expect(404)
       })
     })
 

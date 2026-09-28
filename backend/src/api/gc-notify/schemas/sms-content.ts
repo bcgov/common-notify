@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger'
 
 export class SmsContent {
-  @ApiProperty({ description: 'SMS message body' })
+  @ApiProperty({
+    description: 'The rendered message text.',
+    example: 'Reminder: your appointment is at 09:00 tomorrow.',
+  })
   body: string
 
   @ApiProperty({

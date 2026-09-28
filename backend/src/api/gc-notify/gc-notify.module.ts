@@ -1,8 +1,6 @@
 import { DynamicModule, Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { GcNotifyApiClient } from './gc-notify-api.client'
 import { GcNotifyController } from './gc-notify.controller'
-import { GcNotifyPassthroughController } from './gc-notify-passthrough.controller'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
@@ -10,16 +8,24 @@ import { TemplatesModule } from '../templates/templates.module'
 import { NotificationModule } from '../notification/notification.module'
 import { QueueModule } from '../../queue/queue.module'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { MimeTypeCode } from '../notification/entities/mime-type-code.entity'
 import { GcNotifyServiceGuard } from '../../common/guards/gc-notify-service.guard'
-import { ApiKeyGuard } from '../../common/guards/api-key.guard'
-import { GcNotifyRoutingService } from './gc-notify-routing.service'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
+import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import { PhoneNumberService } from '../notify/services/phone-number.service'
+import { AttachmentModule } from '../attachment/attachment.module'
+import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
+import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
+import { SafelistModule } from '../safelist/safelist.module'
+import { NotifyModule } from '../notify/notify.module'
+import { TenantSettingsModule } from '../tenant-settings/tenant-settings.module'
 
 /** Reserved for future options. */
 export type GcNotifyModuleOptions = Record<string, never>
 
 /**
- * GC Notify module - provides GcNotifyApiClient and registers the GC Notify passthrough controller.
+ * GC Notify module - registers the GC Notify-compatible controller. Every operation is served
+ * by our own pipeline; nothing is forwarded to the real GC Notify API.
  */
 @Module({})
 export class GcNotifyModule {
@@ -33,18 +39,22 @@ export class GcNotifyModule {
         FeatureFlagModule,
         TemplatesModule,
         NotificationModule,
-        TypeOrmModule.forFeature([NotifyConfiguration]),
+        AttachmentModule,
+        TypeOrmModule.forFeature([NotifyConfiguration, MimeTypeCode]),
+        SafelistModule,
+        TenantSettingsModule,
+        forwardRef(() => NotifyModule),
         forwardRef(() => QueueModule),
       ],
-      controllers: [GcNotifyController, GcNotifyPassthroughController],
+      controllers: [GcNotifyController],
       providers: [
-        GcNotifyApiClient,
         GcNotifyServiceGuard,
-        ApiKeyGuard,
-        GcNotifyRoutingService,
         GcNotifyInternalExecutionService,
+        GcNotifyBulkValidationService,
+        PhoneNumberService,
+        AttachmentValidationService,
+        AttachmentProcessingService,
       ],
-      exports: [GcNotifyApiClient],
     }
   }
 }

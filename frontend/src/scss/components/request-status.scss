@@ -1,56 +1,8 @@
 @import '../variables.scss';
 
-.request-status-page {
-  padding: 0 0 2rem;
-}
-
-// Breadcrumb + page title
-.request-status-page__header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 35px;
-  width: 100%;
-}
-
-.request-status-page__title {
-  margin: 0;
-  font-family: $font-family-sans-serif;
-  font-style: normal;
-  font-weight: 700;
-  font-size: 24px;
-  line-height: 1.5;
-  color: $dark-text;
-}
-
-.request-status-page__request-id {
-  margin: 5px 0 0;
-  font-family: $font-family-sans-serif;
-  font-weight: 700;
-  font-size: 16px;
-  color: $dark-text;
-}
-
-.request-status-page__subtitle {
-  margin: 25px 0 0;
-  font-family: $font-family-sans-serif;
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1.5;
-  color: $dark-text;
-}
-
-.request-status-page__search {
-  margin-top: 15px;
-
-  .search-field {
-    margin: 0;
-  }
-}
-
+// The page frame (heading, gutters, block spacing) comes from `.page` in page.scss;
+// only the summary bar and the table sizing are specific to this page.
 .request-status-page__table {
-  margin-top: 29px;
-
   // Cap the table at the summary bar's width and honour the fixed column widths
   // so the table edges align with the summary bar in both sidebar states.
   .data-table {
@@ -72,7 +24,7 @@
   gap: 25px;
   max-width: 1110px;
   padding: 16px 25px;
-  margin: 25px 0 0;
+  margin: 0;
   border-radius: 4px;
   border: 1px solid var(--surface-color-border-base, #{$border-default});
 

@@ -5,6 +5,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiBearerAuth,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { UsersService } from './users.service'
 import { UpsertUserDto } from './schemas/upsert-user.dto'
@@ -19,6 +20,8 @@ import type Express from 'express'
  * Users are upserted on first login (from JWT claims) and can be queried by authenticated users.
  */
 @ApiTags('users')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller({ path: 'frontend/users', version: '1' })
 @UseGuards(JwtGuard)
 @ApiBearerAuth()

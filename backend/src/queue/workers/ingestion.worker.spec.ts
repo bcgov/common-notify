@@ -6,6 +6,7 @@ import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { AttachmentService } from '../../api/attachment/attachment.service'
+import { FAILED_JOB_RETENTION } from '../job-retention'
 
 describe('IngestionWorker', () => {
   let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
@@ -26,7 +27,7 @@ describe('IngestionWorker', () => {
 
     mockRequestDetailService = {
       createPending: vi.fn().mockResolvedValue(undefined),
-      createEmailMergePending: vi.fn().mockResolvedValue(undefined),
+      createMergePending: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -183,6 +184,53 @@ describe('IngestionWorker', () => {
         expect.objectContaining({
           jobId: 'notify-456_SMS',
         }),
+      )
+    })
+
+    it('normalizes an SMS recipient once before persistence and delivery fan-out', async () => {
+      await IngestionWorker.initialize(
+        mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockRequestDetailService,
+        mockConfigService,
+        mockClamavService,
+      )
+
+      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        data: {
+          notifyId: 'notify-normalized-sms',
+          tenantId: 'tenant-456',
+          request: {
+            sms: {
+              recipients: { to: ['250-555-1234'] },
+              content: { body: 'SMS test' },
+            },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await processHandler(job as Bull.Job<IngestionJobPayload>)
+
+      expect(mockRequestDetailService.createPending).toHaveBeenCalledWith(
+        'notify-normalized-sms',
+        expect.objectContaining({
+          sms: expect.objectContaining({
+            recipients: { to: ['+12505551234'] },
+          }),
+        }),
+        'tenant-456',
+      )
+      expect(mockSmsQueue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request: expect.objectContaining({
+            sms: expect.objectContaining({ recipients: { to: ['+12505551234'] } }),
+          }),
+          payload: expect.objectContaining({ recipients: { to: ['+12505551234'] } }),
+        }),
+        expect.any(Object),
       )
     })
 
@@ -573,7 +621,7 @@ describe('IngestionWorker', () => {
             delay: 2000,
           },
           removeOnComplete: true,
-          removeOnFail: false,
+          removeOnFail: FAILED_JOB_RETENTION,
         }),
       )
     })
@@ -779,11 +827,12 @@ describe('IngestionWorker', () => {
         const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(1)
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledWith(
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
           ['alice@example.com', 'bob@example.com'],
+          'EMAIL',
           'tenant-bulk',
         )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
@@ -799,7 +848,7 @@ describe('IngestionWorker', () => {
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
             removeOnComplete: true,
-            removeOnFail: false,
+            removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
             backoff: {
               type: 'exponential',
@@ -852,7 +901,7 @@ describe('IngestionWorker', () => {
 
         // 3 addresses, batchSize=2 → 2 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
-        expect(mockRequestDetailService.createEmailMergePending).toHaveBeenCalledTimes(2)
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           expect.objectContaining({

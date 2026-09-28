@@ -19,8 +19,14 @@
 		`
 	}
 
-	# Proxy requests to API Gateway (Kong)
-	reverse_proxy /api* {$VITE_API_GATEWAY_NOTIFY_URL} {
+	# Proxy requests to API Gateway (Kong): the Notify API under /api, and the GC
+	# Notify-compatible API under /gcnotify, which has no /api prefix (see backend/src/app.ts).
+	# On PR deploys GATEWAY_PATH_PREFIX is "/pr-<n>" so requests are proxied to the
+	# PR-specific Kong routes (/pr-<n>/api/*, /pr-<n>/gcnotify/*). It is empty on dev/test/prod, which
+	# makes the rewrite an identity no-op. {uri} preserves the query string.
+	@gateway path /api* /gcnotify/*
+	reverse_proxy @gateway {$VITE_API_GATEWAY_NOTIFY_URL} {
+		rewrite {$GATEWAY_PATH_PREFIX:}{uri}
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
 	}
@@ -33,22 +39,22 @@ window.VITE_KEYCLOAK_REALM="{$VITE_KEYCLOAK_REALM}";
 window.VITE_KEYCLOAK_CLIENT_ID="{$VITE_KEYCLOAK_CLIENT_ID}";
 window.VITE_API_GATEWAY_NOTIFY_URL="{$VITE_API_GATEWAY_NOTIFY_URL}";
 window.VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE="{$VITE_MAX_NOTIFICATION_RESULTS_PER_PAGE}";
-window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";`
+window.VITE_CSTAR_API_URL="{$VITE_CSTAR_API_URL}";
+window.VITE_CSTAR_TENANT_SETUP_URL="{$VITE_CSTAR_TENANT_SETUP_URL}";`
 	}
 
-	# Serve API documentation (OpenAPI/Swagger)
-	handle_path /api-docs* {
-		root * /srv/api-docs
-		encode zstd gzip
-		file_server browse
-	}
+	# Nest generates the API spec from the controllers and serves it at
+	# /api/docs, which the gateway proxy above forwards to Kong. These keep
+	# links to the older /api-docs path working.
+	redir /api-docs /api/docs permanent
+	redir /api-docs/* /api/docs permanent
 
 	root * /srv
 	encode zstd gzip
 	file_server
 	@spa_router {
 		not path /api*
-		not path /api-docs*
+		not path /gcnotify/*
 		not path /static/config.js
 		file {
 			try_files {path} /index.html

@@ -9,6 +9,8 @@ import { NotificationService } from '../../api/notification/notification.service
 import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
 import { AttachmentService } from '../../api/attachment/attachment.service'
+import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+import { FAILED_JOB_RETENTION } from '../job-retention'
 
 /**
  * Ingestion Worker
@@ -24,6 +26,26 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
  */
 export class IngestionWorker {
   private readonly logger = new Logger(IngestionWorker.name)
+
+  private static normalizeSmsRecipients(
+    request: IngestionJobPayload['request'],
+    phoneNumberService: PhoneNumberService,
+  ): IngestionJobPayload['request'] {
+    if (!request.sms?.recipients?.to) return request
+
+    return {
+      ...request,
+      sms: {
+        ...request.sms,
+        recipients: {
+          ...request.sms.recipients,
+          to: request.sms.recipients.to.map(
+            (recipient) => phoneNumberService.normalize(recipient) ?? recipient,
+          ),
+        },
+      },
+    } as IngestionJobPayload['request']
+  }
 
   private static hasAttachmentReferences(
     attachments: unknown,
@@ -59,6 +81,7 @@ export class IngestionWorker {
     clamavService?: ClamavService,
     concurrency: number = 1,
     attachmentService?: AttachmentService,
+    phoneNumberService: PhoneNumberService = new PhoneNumberService(),
   ): Promise<void> {
     const logger = new Logger(IngestionWorker.name)
 
@@ -91,15 +114,20 @@ export class IngestionWorker {
         if (!request || typeof request !== 'object') {
           throw new Error('Invalid request: request payload is missing or invalid')
         }
+        let processedRequest
 
         // Mail merge email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
         if (job.data.mailMerge && job.data.mailMergeData) {
           const { content, params, recipients } = job.data.mailMergeData
           const batchSize = configService?.get<number>('queue.batchSize') || 100
+          // Older jobs queued before SMS merge existed carry no channel and are email.
+          const mergeChannel = job.data.mailMergeChannel ?? NotificationChannel.EMAIL
+          const isSmsMerge = mergeChannel === NotificationChannel.SMS
+          const mergeQueue = isSmsMerge ? smsQueue : emailQueue
 
           logger.log(
-            `[${notifyId}] Processing mail merge email job: ${recipients.length} recipient(s), batchSize=${batchSize}`,
+            `[${notifyId}] Processing ${mergeChannel} merge job: ${recipients.length} recipient(s), batchSize=${batchSize}`,
           )
 
           let batchIndex = 0
@@ -107,19 +135,20 @@ export class IngestionWorker {
             const chunk = recipients.slice(start, start + batchSize)
             // Format: {notification_request id}-{channel}-{index}; reused as the delivery jobId
             // so a failed batch is easy to identify and retry.
-            const batchId = `${notifyId}-${NotificationChannel.EMAIL}-${batchIndex}`
+            const batchId = `${notifyId}-${mergeChannel}-${batchIndex}`
 
-            await requestDetailService.createEmailMergePending(
+            await requestDetailService.createMergePending(
               notifyId,
               batchId,
               chunk.map((r) => r.address),
+              mergeChannel,
               tenantId,
             )
 
             const deliveryPayload: DeliveryJobPayload = {
               notifyId,
               tenantId,
-              channel: NotificationChannel.EMAIL,
+              channel: mergeChannel,
               request,
               payload: {} as any,
               attempt: 0,
@@ -128,10 +157,10 @@ export class IngestionWorker {
               mailMergeData: { content, params, recipients: chunk },
             }
 
-            await emailQueue.add(deliveryPayload, {
+            await mergeQueue.add(deliveryPayload, {
               jobId: batchId,
               removeOnComplete: true,
-              removeOnFail: false,
+              removeOnFail: FAILED_JOB_RETENTION,
               attempts: 3,
               backoff: { type: 'exponential', delay: 2000 },
             })
@@ -150,14 +179,16 @@ export class IngestionWorker {
           logger.log(`[${notifyId}] Mail merge email job fanned out into ${batchIndex} batch(es)`)
           return { success: true, deliveryJobsQueued: batchIndex }
         } else {
+          processedRequest = IngestionWorker.normalizeSmsRecipients(request, phoneNumberService)
+
           // Create notification request detail entries for regular notification request
-          await requestDetailService.createPending(notifyId, request, tenantId)
+          await requestDetailService.createPending(notifyId, processedRequest, tenantId)
         }
 
         const channelAttachments = [
-          ...(request.email?.attachments ?? []),
-          ...(request.sms?.attachments ?? []),
-          ...(request.msgApp?.attachments ?? []),
+          ...(processedRequest.email?.attachments ?? []),
+          ...(processedRequest.sms?.attachments ?? []),
+          ...(processedRequest.msgApp?.attachments ?? []),
         ]
 
         if (channelAttachments.length > 0) {
@@ -258,22 +289,22 @@ export class IngestionWorker {
         }> = []
 
         // Email channel
-        if (request.email) {
+        if (processedRequest.email) {
           logger.log(`[${notifyId}] Adding email delivery job`)
           deliveryJobs.push({
             queue: emailQueue,
             channel: NotificationChannel.EMAIL,
-            payload: request.email,
+            payload: processedRequest.email,
           })
         }
 
         // SMS channel
-        if (request.sms) {
+        if (processedRequest.sms) {
           logger.log(`[${notifyId}] Adding SMS delivery job`)
           deliveryJobs.push({
             queue: smsQueue,
             channel: NotificationChannel.SMS,
-            payload: request.sms,
+            payload: processedRequest.sms,
           })
         }
 
@@ -291,7 +322,7 @@ export class IngestionWorker {
             notifyId,
             tenantId,
             channel,
-            request, // Include original request so delivery workers can resolve templates
+            request: processedRequest,
             payload,
             attempt: 0,
           }
@@ -308,7 +339,7 @@ export class IngestionWorker {
             jobId: jobKey,
             delay: Math.max(0, delay), // BullMQ ignores negative delays
             removeOnComplete: true,
-            removeOnFail: false, // Keep failed jobs for debugging
+            removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3, // Retry up to 3 times
             backoff: {
               type: 'exponential',

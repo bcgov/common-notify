@@ -1,5 +1,6 @@
 import React from 'react'
 import type { FC, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@bcgov/design-system-react-components'
 
 interface GenericModalProps {
@@ -104,7 +105,17 @@ const GenericModal: FC<GenericModalProps> = ({
   const sizeClass =
     size === 'sm' ? 'modal-sm' : size === 'lg' ? 'modal-lg' : size === 'xl' ? 'modal-xl' : ''
 
-  return (
+  // Rendered into document.body rather than inline.
+  //
+  // A modal invoked from inside a <form> would otherwise put this component's own <form>
+  // inside that one, and browsers refuse to submit a form nested in another form — the
+  // submit button silently does nothing, firing neither handler. (jsdom does not
+  // implement that rule, so it only shows up in a real browser.) Portalling also keeps
+  // the fixed-position dialog out of any ancestor's stacking or overflow context.
+  //
+  // React portals still propagate events through the React tree, so onSubmit/onClose and
+  // any surrounding context behave exactly as before.
+  const modal = (
     <>
       {isOpen && <div className="modal-backdrop fade show" style={{ zIndex: 1040 }} />}
       <div
@@ -124,7 +135,18 @@ const GenericModal: FC<GenericModalProps> = ({
             </div>
             <div className="modal-body">
               {onSubmit ? (
-                <form onSubmit={onSubmit} className="d-flex flex-column gap-3">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    // React portals propagate events through the React tree, not the DOM
+                    // tree, so without this a modal opened from inside a form would submit
+                    // that form too — silently saving whatever the user had half-edited
+                    // behind the dialog.
+                    event.stopPropagation()
+                    return onSubmit(event)
+                  }}
+                  className="d-flex flex-column gap-3"
+                >
                   {children}
                   <div className="d-flex gap-2 justify-content-end">
                     <Button
@@ -156,6 +178,8 @@ const GenericModal: FC<GenericModalProps> = ({
       </div>
     </>
   )
+
+  return createPortal(modal, document.body)
 }
 
 export default GenericModal

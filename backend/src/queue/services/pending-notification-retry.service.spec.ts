@@ -6,6 +6,7 @@ import { NotificationRequest } from '../../api/notification/entities/notificatio
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { QueueName } from '../../enum/queue-name.enum'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
 
 describe('PendingNotificationRetryService', () => {
   let service: PendingNotificationRetryService
@@ -13,11 +14,21 @@ describe('PendingNotificationRetryService', () => {
   let mockRepository: any
   let mockNotificationService: any
   let mockQueue: any
+  let mockRedisClient: any
 
   beforeEach(async () => {
     mockRepository = { find: vi.fn() }
     mockNotificationService = { update: vi.fn() }
-    mockQueue = { add: vi.fn().mockResolvedValue({ id: 'job-123' }), name: 'ingestion' }
+    // The sweep takes a lock through the queue's own Redis connection; 'OK' means acquired.
+    mockRedisClient = {
+      set: vi.fn().mockResolvedValue('OK'),
+      eval: vi.fn().mockResolvedValue(1),
+    }
+    mockQueue = {
+      add: vi.fn().mockResolvedValue({ id: 'job-123' }),
+      name: 'ingestion',
+      client: mockRedisClient,
+    }
 
     module = await Test.createTestingModule({
       providers: [
@@ -46,6 +57,8 @@ describe('PendingNotificationRetryService', () => {
       await service.retryPendingNotifications()
       expect(mockRepository.find).toHaveBeenCalledWith({
         where: { status: NotificationStatus.PENDING },
+        order: { createdAt: 'ASC' },
+        take: 100,
       })
       expect(mockQueue.add).not.toHaveBeenCalled()
     })
@@ -201,6 +214,73 @@ describe('PendingNotificationRetryService', () => {
     })
   })
 
+  describe('sweep lock', () => {
+    // Every pod runs this timer, so without the lock three to seven replicas pull the same
+    // PENDING rows every 30 seconds and race to queue them.
+    it('does not sweep when another pod holds the lock', async () => {
+      mockRedisClient.set.mockResolvedValue(null)
+
+      await service.retryPendingNotifications()
+
+      expect(mockRepository.find).not.toHaveBeenCalled()
+      expect(mockQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('takes the lock with NX and a TTL, so a dead holder cannot block the sweep forever', async () => {
+      mockRepository.find.mockResolvedValue([])
+
+      await service.retryPendingNotifications()
+
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'notify:pending-retry:lock',
+        expect.any(String),
+        'PX',
+        60000,
+        'NX',
+      )
+    })
+
+    it('releases the lock after sweeping', async () => {
+      mockRepository.find.mockResolvedValue([])
+
+      await service.retryPendingNotifications()
+
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.stringContaining('redis.call("del", KEYS[1])'),
+        1,
+        'notify:pending-retry:lock',
+        expect.any(String),
+      )
+    })
+
+    it('releases the lock even when the sweep throws', async () => {
+      mockRepository.find.mockRejectedValue(new Error('database gone'))
+
+      await service.retryPendingNotifications()
+
+      expect(mockRedisClient.eval).toHaveBeenCalled()
+    })
+
+    it('releases only its own lock, so an overrun does not free another pod', async () => {
+      mockRepository.find.mockResolvedValue([])
+
+      await service.retryPendingNotifications()
+
+      const [script, , , heldBy] = mockRedisClient.eval.mock.calls[0]
+      expect(script).toContain('redis.call("get", KEYS[1]) == ARGV[1]')
+      expect(heldBy).toBe(mockRedisClient.set.mock.calls[0][1])
+    })
+
+    it('skips the pass when Redis cannot be reached', async () => {
+      // Queueing needs the same Redis, so there is nothing useful to do this pass.
+      mockRedisClient.set.mockRejectedValue(new Error('ECONNREFUSED'))
+
+      await service.retryPendingNotifications()
+
+      expect(mockRepository.find).not.toHaveBeenCalled()
+    })
+  })
+
   describe('job configuration', () => {
     it('should configure jobs with retry and backoff', async () => {
       const notifications = [
@@ -219,8 +299,10 @@ describe('PendingNotificationRetryService', () => {
       const jobConfig = mockQueue.add.mock.calls[0][2]
       expect(jobConfig.attempts).toBe(3)
       expect(jobConfig.backoff).toEqual({ type: 'exponential', delay: 2000 })
-      expect(jobConfig.removeOnComplete).toBe(false)
-      expect(jobConfig.removeOnFail).toBe(false)
+      // Bounded by age and count: an unbounded completed set eventually fills a Redis that
+      // is configured to reject writes rather than evict.
+      expect(jobConfig.removeOnComplete).toEqual(COMPLETED_JOB_RETENTION)
+      expect(jobConfig.removeOnFail).toEqual(FAILED_JOB_RETENTION)
     })
 
     it('should use notification id as job id', async () => {

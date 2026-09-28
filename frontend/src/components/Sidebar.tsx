@@ -6,11 +6,14 @@ import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 // import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
@@ -18,9 +21,11 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
-import { Button, Tooltip, TooltipTrigger, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
+import TooltipTrigger from '@/components/TooltipTrigger'
 
 const navItems = [
   {
@@ -34,14 +39,29 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
+    label: 'Notification Events',
+    to: '/events',
+    icon: <WorkspacesOutlinedIcon />,
+  },
+  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
   },
   {
+    label: 'Send Batch Notification',
+    to: '/bulk-notifications',
+    icon: <SendOutlinedIcon />,
+  },
+  {
     label: 'Usage & Limits',
     to: '/usage',
     icon: <SpeedOutlinedIcon />,
+  },
+  {
+    label: 'Settings',
+    to: '/settings',
+    icon: <SettingsOutlinedIcon />,
   },
 ]
 
@@ -57,10 +77,6 @@ const adminItems = {
       label: 'Usage & Limits',
       to: '/admin/usage',
     },
-    {
-      label: 'Tenant Settings',
-      to: '/admin/settings',
-    },
   ],
 } as const
 
@@ -70,8 +86,13 @@ const Sidebar: FC = () => {
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
+  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+  // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
+  const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
+  // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
+  const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -112,11 +133,16 @@ const Sidebar: FC = () => {
       {/* Top nav */}
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
+          // Keyed on the route, not the label: a label is copy and gets reworded, and keying
+          // visibility on it means a rename silently hides the link.
           const shouldShow =
-            (item.label === 'Home' && hasTenantRole) ||
-            (item.label === 'Dashboard' && hasTenantRole) ||
-            (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Usage & Limits' && showUsage)
+            (item.to === '/' && hasTenantRole) ||
+            (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/events' && hasTenantRole && eventsEnabled) ||
+            (item.to === '/templates' && hasTenantRole) ||
+            (item.to === '/bulk-notifications' && canBulkNotify) ||
+            (item.to === '/usage' && showUsage) ||
+            (item.to === '/settings' && hasTenantRole)
 
           return shouldShow ? (
             <Link
@@ -135,8 +161,10 @@ const Sidebar: FC = () => {
         })}
         {isAdmin && (
           <div className="sidebar__menu-group">
+            {/* sidebar__item styles these rows end to end so a button matches the Links
+                beside it. Passing className replaces the design system's own classes, so
+                there is deliberately no variant here — it would have no effect. */}
             <Button
-              variant="link"
               className="sidebar__item"
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
@@ -182,15 +210,6 @@ const Sidebar: FC = () => {
                     <span className="sidebar__label">Usage &amp; Limits</span>
                   </Link>
                 )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/settings"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Tenant Settings</span>
-                  </Link>
-                )}
               </div>
             )}
           </div>
@@ -202,7 +221,7 @@ const Sidebar: FC = () => {
         {/* Help */}
         {/* TODO add a link to Help page when it is created */}
         {/*
-          <Button variant="link" className="sidebar__item">
+          <Button className="sidebar__item">
             <span className="sidebar__icon" aria-hidden="true">
               <HelpOutlineOutlinedIcon />
             </span>
@@ -236,7 +255,6 @@ const Sidebar: FC = () => {
                     <TooltipTrigger>
                       <Button
                         aria-label={`About the ${CSTAR_ROLE_DISPLAY[primaryRole].label} role`}
-                        className="sidebar__role-tooltip-trigger"
                         isIconButton
                         size="xsmall"
                         type="button"
@@ -257,7 +275,6 @@ const Sidebar: FC = () => {
           {/* Logout / Login */}
           {user ? (
             <Button
-              variant="link"
               className="sidebar__item"
               onPress={handleLogout}
               aria-label={collapsed ? 'Logout' : undefined}
@@ -268,7 +285,7 @@ const Sidebar: FC = () => {
               <span className="sidebar__label">Logout</span>
             </Button>
           ) : (
-            <Button variant="link" className="sidebar__item" onPress={handleLogin}>
+            <Button className="sidebar__item" onPress={handleLogin}>
               <span className="sidebar__icon" aria-hidden="true">
                 <LoginOutlinedIcon />
               </span>

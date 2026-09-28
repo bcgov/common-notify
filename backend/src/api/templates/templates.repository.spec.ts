@@ -347,22 +347,57 @@ describe('TemplatesRepository', () => {
   describe('update', () => {
     it('should update an existing template', async () => {
       const updatedTemplate = { ...mockTemplate, name: 'Updated Name' }
-      mockTemplateRepository.save.mockResolvedValue(updatedTemplate)
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(updatedTemplate)
 
       const result = await repository.update(updatedTemplate)
 
       expect(result).toEqual(updatedTemplate)
-      expect(mockTemplateRepository.save).toHaveBeenCalledWith(updatedTemplate)
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        expect.objectContaining({ name: 'Updated Name' }),
+      )
     })
 
-    it('should handle partial updates', async () => {
-      const partialUpdate = { ...mockTemplate, description: 'Updated description' }
-      mockTemplateRepository.save.mockResolvedValue(partialUpdate)
+    it('should persist scalar foreign keys without stale eager relations', async () => {
+      const updatedTemplate = {
+        ...mockTemplate,
+        engineCode: TemplateEngine.MUSTACHE,
+        engine: { engineCode: TemplateEngine.HANDLEBARS },
+      } as Template
+      const reloadedTemplate = {
+        ...updatedTemplate,
+        engine: { engineCode: TemplateEngine.MUSTACHE },
+      } as Template
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(reloadedTemplate)
 
-      const result = await repository.update(partialUpdate)
+      const result = await repository.update(updatedTemplate)
 
-      expect(mockTemplateRepository.save).toHaveBeenCalledWith(partialUpdate)
-      expect(result.description).toBe('Updated description')
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        {
+          name: updatedTemplate.name,
+          description: updatedTemplate.description,
+          channelCode: updatedTemplate.channelCode,
+          subject: updatedTemplate.subject,
+          body: updatedTemplate.body,
+          engineCode: TemplateEngine.MUSTACHE,
+          bodyType: updatedTemplate.bodyType,
+          updatedBy: updatedTemplate.updatedBy,
+        },
+      )
+      expect(result.engineCode).toBe(TemplateEngine.MUSTACHE)
+      expect(result.engine.engineCode).toBe(TemplateEngine.MUSTACHE)
+    })
+
+    it('should fail when the tenant-owned active template was not updated', async () => {
+      mockTemplateRepository.update.mockResolvedValue({ affected: 0 })
+
+      await expect(repository.update(mockTemplate)).rejects.toThrow(
+        'Template template-123 could not be updated',
+      )
+      expect(mockTemplateRepository.findOne).not.toHaveBeenCalled()
     })
   })
 

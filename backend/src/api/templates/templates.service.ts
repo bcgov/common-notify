@@ -13,6 +13,7 @@ import { CreateTemplateDto } from './schemas/create-template.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
+import { ConfigService } from '@nestjs/config'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
@@ -22,7 +23,13 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
-import { extractTemplatePersonalisationKeys } from '../../services/rendering/template-personalisation-validation'
+import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
+import {
+  extractTemplatePersonalisationKeys,
+  describeTemplatePlaceholders,
+} from '../../services/rendering/template-personalisation-validation'
+import { toEmailHtml } from '../../services/rendering/email-body-html'
 
 /**
  * Service for template business logic
@@ -36,7 +43,17 @@ export class TemplatesService {
     private readonly rendererRegistry: ITemplateRendererRegistry,
     private readonly tenantsService: TenantsService,
     private readonly inlineRenderingService: InlineRenderingService,
+    private readonly emailTemplateLayoutService: EmailTemplateLayoutService,
+    private readonly configService: ConfigService,
+    private readonly tenantSettingsService: TenantSettingsService,
   ) {}
+
+  public applyEmailLayout(
+    template: Template,
+    rendered: RenderedEmailContent,
+  ): Promise<RenderedEmailContent> {
+    return this.emailTemplateLayoutService.apply(template, rendered)
+  }
 
   /**
    * List all active templates for a tenant
@@ -75,7 +92,9 @@ export class TemplatesService {
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
-    return this.toResponseDto(template)
+    // Only the single-template read carries the placeholder report: it is what the bulk-send screen
+    // builds its spreadsheet columns from, and parsing every template in a list would be wasted work.
+    return { ...this.toResponseDto(template), placeholders: describeTemplatePlaceholders(template) }
   }
 
   /**
@@ -232,6 +251,13 @@ export class TemplatesService {
       subject: rendered.subject,
       body: rendered.body,
       bodyType: rendered.bodyType,
+      // What the recipient's mail client would show. Produced by the same converter the CHES
+      // transport uses at send time, so the preview cannot drift from the delivered email. SMS and
+      // plain-text bodies carry no markup and are left for the caller to render as text.
+      html:
+        rendered.bodyType === 'text' ? undefined : toEmailHtml(rendered.body, rendered.bodyType),
+      // The address the send would actually use, resolved exactly as delivery resolves it.
+      from: await this.tenantSettingsService.resolveSenderAddress(tenantId),
     }
   }
 
@@ -245,6 +271,8 @@ export class TemplatesService {
     subject?: string
     body: string
     bodyType: 'text' | 'markdown' | 'html'
+    /** The body as HTML, as the recipient would receive it. Absent for plain-text bodies. */
+    html?: string
   }> {
     const content: NotifyContent = {
       body: previewDto.body,
@@ -255,11 +283,14 @@ export class TemplatesService {
 
     if (previewDto.channelCode === NotificationChannel.EMAIL) {
       const rendered = await this.inlineRenderingService.renderEmail(content, params)
+      const bodyType = previewDto.engineCode === TemplateEngine.MJML ? 'html' : 'markdown'
       return {
         channelCode: previewDto.channelCode,
         subject: rendered.subject,
         body: rendered.body,
-        bodyType: previewDto.engineCode === TemplateEngine.MJML ? 'html' : 'markdown',
+        bodyType,
+        // See previewTemplate: the same converter the CHES transport uses at send time.
+        html: toEmailHtml(rendered.body, bodyType),
       }
     }
 
@@ -289,7 +320,7 @@ export class TemplatesService {
     template: Template,
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
-  ): Promise<{ subject?: string; body: string; bodyType: 'text' | 'markdown' | 'html' }> {
+  ): Promise<RenderedEmailContent> {
     const normalizedPersonalisation = personalisation ?? {}
 
     this.validateTemplatePersonalisation(template, normalizedPersonalisation)
@@ -321,7 +352,13 @@ export class TemplatesService {
         ? Object.fromEntries(
             Object.entries(normalizedPersonalisation).map(([key, value]) => [
               key,
-              value !== null && value !== undefined ? String(value) : '',
+              // An array is a list value the legacy renderer formats itself, so it is passed
+              // through; String(["a","b"]) would flatten it to "a,b".
+              Array.isArray(value)
+                ? value
+                : value !== null && value !== undefined
+                  ? String(value)
+                  : '',
             ]),
           )
         : normalizedPersonalisation
@@ -374,6 +411,8 @@ export class TemplatesService {
     switch (engine) {
       case TemplateEngine.LEGACY_GC_NOTIFY:
         return 'legacy_gc_notify'
+      case TemplateEngine.GC_NOTIFY_NATIVE:
+        return 'gc_notify_native'
       case TemplateEngine.HANDLEBARS:
         return 'handlebars'
       case TemplateEngine.MUSTACHE:

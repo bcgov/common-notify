@@ -1,5 +1,11 @@
 import { Controller, Get, UseGuards, Req, HttpException, HttpStatus, Param } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiExcludeController,
+} from '@nestjs/swagger'
 import { BearerTokenGuard } from '../../common/guards/bearer-token.guard'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { TenantsService } from '../admin/tenants/tenants.service'
@@ -12,6 +18,8 @@ import type Express from 'express'
  * Passes JWT directly to CSTAR - let CSTAR validate the token.
  */
 @ApiTags('auth')
+// Not part of the service API; kept out of the published spec.
+@ApiExcludeController()
 @Controller({ path: 'frontend/auth', version: '1' })
 @UseGuards(BearerTokenGuard)
 @ApiBearerAuth()

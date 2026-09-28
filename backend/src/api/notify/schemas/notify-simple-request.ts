@@ -8,24 +8,37 @@ import { ValidateTemplateOrContent } from './validators/template-or-content.vali
 
 @ValidateTemplateOrContent()
 export class NotifySimpleRequest {
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      "Values substituted into template placeholders, applied to every channel. A channel's own " +
+      'params take precedence.',
+    example: { firstName: 'Alice', permitNumber: 'BC-2026-00417' },
+  })
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
 
-  @ApiPropertyOptional({ type: NotifyEmailChannel })
+  @ApiPropertyOptional({
+    description: 'Send by email. At least one channel must be present.',
+    type: NotifyEmailChannel,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyEmailChannel)
   email?: NotifyEmailChannel
 
-  @ApiPropertyOptional({ type: NotifySmsChannel })
+  @ApiPropertyOptional({
+    description: 'Send by SMS. SMS must be enabled for the tenant.',
+    type: NotifySmsChannel,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifySmsChannel)
   sms?: NotifySmsChannel
 
-  @ApiPropertyOptional({ type: NotifyMsgAppChannel })
+  @ApiPropertyOptional({ description: 'Send by messaging app.', type: NotifyMsgAppChannel })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyMsgAppChannel)

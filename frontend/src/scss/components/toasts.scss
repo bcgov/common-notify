@@ -1,71 +1,74 @@
 @import '../variables';
 
-// Override react-toastify defaults with BC Gov styling
+// react-toastify defaults are replaced with the BC Gov pattern from the designs: a light surface
+// with a semantic left border and icon, a bold headline, and optional supporting detail below.
 .Toastify__toast {
+  align-items: flex-start;
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: $spacing-lg;
-  min-height: 64px;
+  border: 1px solid $border-default;
+  border-left-width: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: $spacing-md;
+  min-height: 0;
+  color: $dark-text;
+  background-color: $white;
 }
 
-// Success toast
+.Toastify__toast-body {
+  align-items: flex-start;
+  padding: 0;
+  margin: 0;
+}
+
+.toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.toast__title {
+  font-weight: 700;
+}
+
+.toast__description {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+.Toastify__close-button {
+  color: $text-secondary;
+  opacity: 1;
+  align-self: flex-start;
+}
+
 .Toastify__toast--success {
-  background-color: $success-color;
-  color: white;
+  border-left-color: $success-color;
 
   .Toastify__toast-icon {
-    color: white;
+    color: $success-color;
   }
 }
 
-// Error toast
 .Toastify__toast--error {
-  background-color: lighten($danger-color, 35%);
-  color: $danger-color;
+  border-left-color: $danger-color;
 
   .Toastify__toast-icon {
     color: $danger-color;
   }
 }
 
-// Info toast
-.Toastify__toast--info {
-  background-color: $primary-color;
-  color: white;
-
-  .Toastify__toast-icon {
-    color: white;
-  }
-}
-
-// Warning toast
 .Toastify__toast--warning {
-  background-color: $warning-color;
-  color: #2d2d2d;
+  border-left-color: $warning-color;
 
   .Toastify__toast-icon {
-    color: #2d2d2d;
+    color: darken($warning-color, 20%);
   }
 }
 
-// Close button
-.Toastify__close-button {
-  color: inherit;
-  opacity: 0.7;
+.Toastify__toast--info {
+  border-left-color: $primary-color;
 
-  &:hover {
-    opacity: 1;
+  .Toastify__toast-icon {
+    color: $primary-color;
   }
-}
-
-// Progress bar
-.Toastify__progress-bar {
-  background: rgba(255, 255, 255, 0.7);
-}
-
-// Container positioning
-.Toastify__toast-container {
-  padding: $spacing-lg;
-  width: auto;
-  max-width: 500px;
 }

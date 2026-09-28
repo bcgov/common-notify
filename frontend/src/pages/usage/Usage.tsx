@@ -113,7 +113,7 @@ const Usage: FC = () => {
   const channels = usage?.channels ?? []
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Notification Usage & Limits" />
 
       <DataTable
@@ -124,18 +124,20 @@ const Usage: FC = () => {
         emptyMessage="No notification limits are configured for this tenant."
         label="Notification usage and limits"
       />
-      {channels.some((channel) => channel.channel.toUpperCase() === 'SMS') && (
-        <p className="text-muted small mt-2 mb-0">
-          SMS usage is counted in message segments. An SMS longer than one segment (160 characters,
-          or 70 if it contains emoji or other non-standard characters) is sent and billed as several
-          messages, and counts that many times against these limits.
-        </p>
-      )}
-      {!canEditThreshold && channels.length > 0 && (
-        <p className="text-muted small mt-2 mb-0">
-          Only users with the NOTIFY_OPERATIONS_ADMIN role can change alert thresholds.
-        </p>
-      )}
+      <div className="page__notes">
+        {channels.some((channel) => channel.channel.toUpperCase() === 'SMS') && (
+          <p className="page__note">
+            SMS usage is counted in message segments. An SMS longer than one segment (160
+            characters, or 70 if it contains emoji or other non-standard characters) is sent and
+            billed as several messages, and counts that many times against these limits.
+          </p>
+        )}
+        {!canEditThreshold && channels.length > 0 && (
+          <p className="page__note">
+            Only users with the NOTIFY_OPERATIONS_ADMIN role can change alert thresholds.
+          </p>
+        )}
+      </div>
       <EditModal
         isOpen={editingChannel !== null}
         title={

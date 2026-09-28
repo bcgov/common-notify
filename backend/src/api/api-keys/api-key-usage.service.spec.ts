@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { vi } from 'vitest'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -33,23 +33,25 @@ describe('ApiKeyUsageService.recordUsage', () => {
     const minuteStart = new Date('2026-07-29T23:59:00.000Z')
     const dayStartNearBoundary = '2026-07-29T00:00:00.000Z'
     const fiscalYearStart = new Date('2026-04-01T00:00:00.000Z')
-    apiKeyUsageRepository.query.mockResolvedValue([
-      {
-        period_type_code: UsagePeriodType.MINUTE,
-        period_start: minuteStart,
-        sent_count: '11',
-      },
-      {
-        period_type_code: UsagePeriodType.DAY,
-        period_start: dayStartNearBoundary,
-        sent_count: '85',
-      },
-      {
-        period_type_code: UsagePeriodType.YEAR,
-        period_start: fiscalYearStart,
-        sent_count: '1000',
-      },
-    ])
+    apiKeyUsageRepository.query
+      .mockResolvedValueOnce([
+        {
+          period_type_code: UsagePeriodType.MINUTE,
+          period_start: minuteStart,
+          sent_count: '11',
+        },
+        {
+          period_type_code: UsagePeriodType.DAY,
+          period_start: dayStartNearBoundary,
+          sent_count: '85',
+        },
+        {
+          period_type_code: UsagePeriodType.YEAR,
+          period_start: fiscalYearStart,
+          sent_count: '1000',
+        },
+      ])
+      .mockResolvedValueOnce([])
 
     const result = await service.recordUsage('consumer-1', 'EMAIL', 1)
 
@@ -70,9 +72,34 @@ describe('ApiKeyUsageService.recordUsage', () => {
     ])
     expect(result.every(({ periodStart }) => periodStart instanceof Date)).toBe(true)
   })
+
+  it("returns the tenant's totals across all of its keys, not just the sending key's", async () => {
+    const dayStart = new Date('2026-07-29T00:00:00.000Z')
+    const fiscalYearStart = new Date('2026-04-01T00:00:00.000Z')
+    apiKeyUsageRepository.query
+      .mockResolvedValueOnce([
+        { period_type_code: UsagePeriodType.DAY, period_start: dayStart, sent_count: '5' },
+        { period_type_code: UsagePeriodType.YEAR, period_start: fiscalYearStart, sent_count: '20' },
+      ])
+      .mockResolvedValueOnce([
+        { period_type_code: UsagePeriodType.DAY, sent_count: '42' },
+        { period_type_code: UsagePeriodType.YEAR, sent_count: '85' },
+      ])
+
+    const result = await service.recordUsage('consumer-1', 'EMAIL', 1)
+
+    const [totalsSql, totalsParams] = apiKeyUsageRepository.query.mock.calls[1]
+    expect(totalsSql).toContain('c.tenant_id')
+    expect(totalsParams).toEqual(['consumer-1', 'EMAIL', dayStart, fiscalYearStart])
+    expect(result).toEqual([
+      { periodTypeCode: UsagePeriodType.DAY, periodStart: dayStart, sentCount: 42 },
+      { periodTypeCode: UsagePeriodType.YEAR, periodStart: fiscalYearStart, sentCount: 85 },
+    ])
+  })
 })
 
 describe('ApiKeyUsageService.assertWithinLimits', () => {
+  const apiKeyConsumerRepository = { findOne: vi.fn(), find: vi.fn() }
   const apiKeyLimitRepository = { find: vi.fn() }
   const configurationRepository = { findOne: vi.fn() }
   const usageQueryBuilder = {
@@ -89,7 +116,7 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
   }
 
   const service = new ApiKeyUsageService(
-    {} as Repository<ApiKeyConsumer>,
+    apiKeyConsumerRepository as unknown as Repository<ApiKeyConsumer>,
     apiKeyLimitRepository as unknown as Repository<ApiKeyLimit>,
     {} as Repository<ApiKeyLimitAlert>,
     apiKeyUsageRepository as unknown as Repository<ApiKeyUsage>,
@@ -110,6 +137,43 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     configurationRepository.findOne.mockResolvedValue(null)
+    apiKeyConsumerRepository.findOne.mockResolvedValue({ id: 'consumer-1', tenantId: 'tenant-1' })
+    apiKeyConsumerRepository.find.mockResolvedValue([{ id: 'consumer-1' }])
+  })
+
+  it("counts every key's usage against the tenant's lowest limit, not a sum of limits", async () => {
+    // Two keys at 100/day and 300/day: the tenant's limit is 100, not 400.
+    apiKeyConsumerRepository.find.mockResolvedValue([{ id: 'consumer-1' }, { id: 'consumer-2' }])
+    apiKeyLimitRepository.find.mockResolvedValue([
+      { channelCode: 'EMAIL', dailyLimit: 100, annualLimit: 1_000_000 },
+      { channelCode: 'EMAIL', dailyLimit: 300, annualLimit: 1_000_000 },
+    ])
+    usageQueryBuilder.getRawMany.mockResolvedValue([
+      { channelCode: 'EMAIL', periodTypeCode: UsagePeriodType.DAY, total: '100' },
+      { channelCode: 'EMAIL', periodTypeCode: UsagePeriodType.YEAR, total: '100' },
+    ])
+
+    await expect(
+      service.assertWithinLimits('consumer-1', [{ channel: 'EMAIL', count: 1 }]),
+    ).rejects.toMatchObject({
+      response: { statusCode: 429, message: expect.stringContaining('Limit 100, used 100') },
+    })
+    expect(apiKeyLimitRepository.find).toHaveBeenCalledWith({
+      where: { apiKeyConsumerId: In(['consumer-1', 'consumer-2']), channelCode: In(['EMAIL']) },
+    })
+    expect(usageQueryBuilder.where).toHaveBeenCalledWith(
+      'u.api_key_consumer_id IN (:...consumerIds)',
+      { consumerIds: ['consumer-1', 'consumer-2'] },
+    )
+  })
+
+  it('fails open when the API key is not bound to a tenant', async () => {
+    apiKeyConsumerRepository.findOne.mockResolvedValue(null)
+
+    await expect(
+      service.assertWithinLimits('consumer-1', [{ channel: 'EMAIL', count: 1 }]),
+    ).resolves.toBeUndefined()
+    expect(apiKeyLimitRepository.find).not.toHaveBeenCalled()
   })
 
   it('rejects a multi-segment SMS that does not fit in the remaining allowance', async () => {

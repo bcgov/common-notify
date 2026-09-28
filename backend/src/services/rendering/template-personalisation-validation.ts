@@ -335,3 +335,178 @@ function addPlaceholder(placeholders: Set<string>, value?: string): void {
     placeholders.add(value)
   }
 }
+
+/**
+ * What a bulk (CSV) send needs to know about a template.
+ *
+ * `extractTemplatePersonalisationKeys` answers "which top-level keys must the caller supply", which
+ * is the right question for validating an API request. A spreadsheet asks a different one: it needs
+ * the *leaf* a person types into a cell (`alert.id`, not `alert`), and it needs to know when a
+ * template cannot be served from a flat file at all.
+ */
+export interface TemplatePlaceholderReport {
+  /** Full dotted paths a person fills in, one column each - e.g. `alert.id`, `recipient.firstName`. */
+  paths: string[]
+  /**
+   * Placeholders that repeat or re-scope (`{{#each x}}`, `{{#with x}}`). One spreadsheet row holds
+   * scalars, so a template that iterates a list cannot be driven from a CSV.
+   */
+  unsupported: string[]
+}
+
+/** Describe a template's placeholders for the bulk-send screen. */
+export function describeTemplatePlaceholders(template: Template): TemplatePlaceholderReport {
+  const paths = new Set<string>()
+  const unsupported = new Set<string>()
+
+  const sources = [template.body]
+  if (template.channelCode === NotificationChannel.EMAIL) {
+    sources.push(template.subject)
+  }
+
+  for (const source of sources) {
+    describePlaceholdersForEngine(template.engineCode, source, paths, unsupported)
+  }
+
+  return { paths: [...paths], unsupported: [...unsupported] }
+}
+
+function describePlaceholdersForEngine(
+  engineCode: TemplateEngine | string,
+  text: string | undefined,
+  paths: Set<string>,
+  unsupported: Set<string>,
+): void {
+  if (!text) {
+    return
+  }
+
+  switch (engineCode) {
+    case TemplateEngine.LEGACY_GC_NOTIFY:
+      // Legacy syntax has no nesting or iteration, so every placeholder is already a leaf.
+      for (const name of extractLegacyGcNotifyPlaceholders(text)) {
+        paths.add(name)
+      }
+      return
+    case TemplateEngine.HANDLEBARS:
+    case TemplateEngine.MJML:
+      describeHandlebarsNode(Handlebars.parse(text) as any, paths, unsupported, 0)
+      return
+    case TemplateEngine.MUSTACHE:
+      describeMustacheTokens(Mustache.parse(text) as MustacheToken[], paths, unsupported)
+      return
+    default:
+      return
+  }
+}
+
+function describeHandlebarsNode(
+  node: any,
+  paths: Set<string>,
+  unsupported: Set<string>,
+  scopedDepth: number,
+): void {
+  if (!node || typeof node !== 'object') {
+    return
+  }
+
+  switch (node.type) {
+    case 'Program':
+      for (const child of node.body || []) {
+        describeHandlebarsNode(child, paths, unsupported, scopedDepth)
+      }
+      return
+    case 'MustacheStatement':
+      addHandlebarsLeaf(node.path, paths, scopedDepth)
+      for (const param of node.params || []) {
+        addHandlebarsLeaf(param, paths, scopedDepth)
+      }
+      return
+    case 'BlockStatement': {
+      const helperName = getHandlebarsPathName(node.path)
+
+      if (helperName === 'each' || helperName === 'with') {
+        // The body is evaluated against each item / the scoped object, so its references cannot be
+        // mapped to spreadsheet columns. Record the iterated value and stop descending.
+        for (const param of node.params || []) {
+          const name = getHandlebarsLeafName(param)
+          if (name) unsupported.add(name)
+        }
+        return
+      }
+
+      // `if` / `unless` conditions are values a person still has to supply.
+      for (const param of node.params || []) {
+        addHandlebarsLeaf(param, paths, scopedDepth)
+      }
+      describeHandlebarsNode(node.program, paths, unsupported, scopedDepth)
+      describeHandlebarsNode(node.inverse, paths, unsupported, scopedDepth)
+      return
+    }
+    default:
+      return
+  }
+}
+
+function addHandlebarsLeaf(path: any, paths: Set<string>, scopedDepth: number): void {
+  if (!shouldCollectHandlebarsPath(path, scopedDepth)) {
+    return
+  }
+
+  const name = getHandlebarsLeafName(path)
+  if (name) {
+    paths.add(name)
+  }
+}
+
+/**
+ * The full dotted path, unlike {@link getHandlebarsPathName} which returns only its root.
+ *
+ * Helper names (`if`, `each`, ...), `this` and `@`-prefixed data variables are not values anyone
+ * supplies, so they are excluded.
+ */
+function getHandlebarsLeafName(path: any): string | undefined {
+  if (path?.type !== 'PathExpression') {
+    return undefined
+  }
+
+  const original = typeof path.original === 'string' ? path.original : ''
+  if (!original || original === 'this' || original.startsWith('@') || original.startsWith('.')) {
+    return undefined
+  }
+
+  const segments = original.split('.')
+  if (!segments.every((segment) => IDENTIFIER_REGEX.test(segment))) {
+    return undefined
+  }
+  if (segments.length === 1 && HANDLEBARS_CONTROL_NAMES.has(segments[0])) {
+    return undefined
+  }
+
+  return original
+}
+
+function describeMustacheTokens(
+  tokens: MustacheToken[],
+  paths: Set<string>,
+  unsupported: Set<string>,
+): void {
+  for (const token of tokens) {
+    const [type, value] = token
+
+    if (type === 'name' || type === '&') {
+      const segments = value.split('.')
+      if (value !== '.' && segments.every((segment) => IDENTIFIER_REGEX.test(segment))) {
+        paths.add(value)
+      }
+      continue
+    }
+
+    // A mustache section is either an iteration or a scope change; neither survives flattening.
+    if (type === '#' || type === '^') {
+      if (IDENTIFIER_REGEX.test(value.split('.')[0])) {
+        unsupported.add(value)
+      }
+    }
+  }
+}

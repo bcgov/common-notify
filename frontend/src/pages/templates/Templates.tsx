@@ -22,7 +22,7 @@ const columns: TableColumn<TemplateResponse>[] = [
       <Link
         to={`/template-edit/$templateId`}
         params={{ templateId: row.id }}
-        style={{ color: 'black' }}
+        className="data-table__cell-link"
       >
         {row.name}
       </Link>
@@ -126,10 +126,10 @@ const Templates: FC = () => {
   }
 
   return (
-    <div>
+    <div className="page">
       <PageHeading title="Notification Templates" />
 
-      <div className="templates-page__search">
+      <div className="page__toolbar">
         <SearchField
           value={searchInput}
           onChange={setSearchInput}

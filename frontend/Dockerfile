@@ -7,7 +7,7 @@ COPY . ./
 RUN npm run deploy
 
 # Build custom Caddy binary with Coraza WAF plugin
-FROM caddy:2.11.2-builder AS caddy
+FROM caddy:2.11.4-builder AS caddy
 # Install CA certificates for Go module downloads; libcap for setcap
 RUN apk add --no-cache ca-certificates libcap
 RUN xcaddy build \
@@ -28,11 +28,6 @@ COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
 COPY --from=static /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY coraza.conf /etc/caddy/coraza.conf
-
-# Copy API documentation files (self-contained Swagger UI; assets served same-origin to satisfy CSP)
-COPY docs/apis/notify.html /srv/api-docs/index.html
-COPY docs/apis/notify.yaml /srv/api-docs/notify.yaml
-COPY docs/apis/assets /srv/api-docs/assets
 
 # Set permissions for static files (OpenShift-compatible)
 # OpenShift uses random UIDs but assigns them to root group (GID 0)
