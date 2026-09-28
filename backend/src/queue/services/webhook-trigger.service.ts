@@ -7,6 +7,7 @@ import { WebhookJobPayload } from '../queue.types'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationRequestDto } from '../../api/notification/schemas/notification-request'
 import { FAILED_JOB_RETENTION } from '../job-retention'
+import { buildRedisOptions } from '../redis-connection'
 
 /**
  * Webhook Trigger Service
@@ -47,12 +48,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
       return
     }
 
-    this.subscriber = new Redis({
-      host: redisConfig.host,
-      port: redisConfig.port,
-      password: redisConfig.password as string | undefined,
-      db: redisConfig.db,
-    })
+    this.subscriber = new Redis(buildRedisOptions(redisConfig) as never)
 
     this.subscriber.psubscribe('notification:changed:*', (err) => {
       if (err) {

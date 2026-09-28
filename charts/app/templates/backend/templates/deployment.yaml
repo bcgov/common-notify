@@ -117,6 +117,12 @@ spec:
                   key: redis-password
             - name: REDIS_DB
               value: "0"
+            {{- if .Values.global.config.redisSentinels }}
+            - name: REDIS_SENTINELS
+              value: {{ .Values.global.config.redisSentinels | quote }}
+            - name: REDIS_MASTER_NAME
+              value: {{ .Values.global.config.redisMasterName | default "mymaster" | quote }}
+            {{- end }}
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
             - name: CLAMAV_HOST

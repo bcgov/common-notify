@@ -4,6 +4,7 @@ import Redis from 'ioredis'
 import { Observable, Subject } from 'rxjs'
 import { NotificationRequestDto } from './schemas/notification-request'
 import { attachRedisErrorLogging } from '../../common/redis/redis-error.util'
+import { buildRedisOptions } from '../../queue/redis-connection'
 
 /**
  * Broadcasts notification_request row changes to SSE subscribers via Redis pub/sub.
@@ -24,12 +25,15 @@ export class NotificationPubSubService implements OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     const redisConfig = configService.get('redis')
-    const options = {
+    const options = buildRedisOptions({
       host: redisConfig?.host ?? 'localhost',
       port: redisConfig?.port ?? 6379,
       password: redisConfig?.password as string | undefined,
       db: redisConfig?.db ?? 0,
-    }
+      sentinels: redisConfig?.sentinels,
+      masterName: redisConfig?.masterName,
+      sentinelPassword: redisConfig?.sentinelPassword,
+    }) as never
 
     // Create a subscriber and publisher in each backend pod. Both get an error listener: an
     // ioredis client without one prints the raw error - which carries the AUTH command's
