@@ -1,128 +1,151 @@
 # Redis configuration for job queues and caching
 # Based on BC Gov OpenShift best practices - using Sentinel architecture
 # Storage quota freed - ready for automated deployment
-redis:
+architecture: replication
+global:
+  storageClass: netapp-block-standard
+  security:
+    # The pinned tag below differs from the chart's default image, which trips
+    # the chart's image-verification guard. Allow it explicitly.
+    allowInsecureImages: true
+auth:
+  # Keep auth ENABLED. Before un-nesting, this whole block was ignored and the
+  # chart default (auth ON) applied, so a `common-notify-redis` secret with a
+  # `redis-password` key was always created. The backend REQUIRES that secret
+  # (REDIS_PASSWORD secretKeyRef, non-optional — charts/app/.../backend/deployment.yaml).
+  # Disabling auth removes the secret and breaks the backend
+  # (CreateContainerConfigError: secret "common-notify-redis" not found).
   enabled: true
-  architecture: replication
-  global:
+image:
+  # Pin by DIGEST, not a floating tag. Redis previously ran on :latest (Bitnami
+  # deleted the old numbered tags from Docker Hub, so this chart's config had been
+  # silently falling back to :latest). A floating tag let the on-disk RDB format
+  # upgrade underneath the running server, corrupting the AOF and causing
+  # "Can't handle RDB format version 15" crash loops. This digest is the image
+  # PROD is currently running (verified pullable); pinning it makes the version
+  # stable across restarts and environments.
+  registry: registry-1.docker.io
+  repository: bitnami/redis
+  tag: latest
+  digest: "sha256:23289a4f4765da46419590fb80d8803363b07e5783ef45396ff85c641db81a0e"
+master:
+  podSecurityContext:
+    enabled: true
+    fsGroup: null
+    runAsUser: null
+  containerSecurityContext:
+    enabled: true
+    runAsUser: null
+    runAsNonRoot: false
+  persistence:
+    enabled: true
+    size: 1Gi
     storageClass: netapp-block-standard
-  auth:
-    enabled: false  # Disabled per BC Gov pattern
+  # Sized for the Bull/BullMQ job queue (~67k keys) plus RediSearch + ReJSON
+  # modules and replication resync headroom. 512Mi OOM-looped in dev (CCP: redis
+  # OOMKilled x300+). maxmemory (in commonConfiguration) caps usage below the limit.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+replica:
+  shareProcessNamespace: true
+  replicaCount: 2
+  podSecurityContext:
+    enabled: true
+    fsGroup: null
+    runAsUser: null
+  containerSecurityContext:
+    enabled: true
+    runAsUser: null
+    runAsNonRoot: false
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+    whenDeleted: Delete
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: netapp-block-standard
+  # Match master sizing — replicas load the full dataset and perform full resync,
+  # which is when memory peaks. 512Mi OOM-looped in dev.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+sentinel:
+  # Sentinel is DISABLED. Every environment actually runs the replication
+  # architecture (separate redis-master + redis-replicas StatefulSets), and the
+  # app connects to `common-notify-redis-master`. This value used to say `true`,
+  # but the whole redis: block was nested and ignored, so Sentinel never ran.
+  # Enabling it now would switch to the `redis-node` topology, remove the
+  # `-redis-master` service the backend targets, and break the app. Keep it off.
+  enabled: false
+  quorum: 1
+  podSecurityContext:
+    enabled: true
+    fsGroup: null
+    runAsUser: null
+  containerSecurityContext:
+    enabled: true
+    runAsUser: null
+    runAsNonRoot: false
   image:
-    registry: docker.io
-    tag: "7.4.1-debian-12-r1"  # Pinned stable tag (avoid latest)
-  master:
-    podSecurityContext:
-      enabled: true
-      fsGroup: null
-      runAsUser: null
-    containerSecurityContext:
-      enabled: true
-      runAsUser: null
-      runAsNonRoot: false
-    persistence:
-      enabled: true
-      size: 1Gi
-      storageClass: netapp-block-standard
-    # Sized for the Bull/BullMQ job queue (~67k keys) plus RediSearch + ReJSON
-    # modules and replication resync headroom. 512Mi OOM-looped in dev (CCP: redis
-    # OOMKilled x300+). maxmemory (in commonConfiguration) caps usage below the limit.
-    resources:
-      requests:
-        cpu: 100m
-        memory: 512Mi
-      limits:
-        cpu: 500m
-        memory: 1Gi
-  replica:
-    shareProcessNamespace: true
-    replicaCount: 2
-    podSecurityContext:
-      enabled: true
-      fsGroup: null
-      runAsUser: null
-    containerSecurityContext:
-      enabled: true
-      runAsUser: null
-      runAsNonRoot: false
-    persistentVolumeClaimRetentionPolicy:
-      enabled: true
-      whenDeleted: Delete
-    persistence:
-      enabled: true
-      accessMode: ReadWriteOnce
-      size: 1Gi
-      storageClass: netapp-block-standard
-    # Match master sizing — replicas load the full dataset and perform full resync,
-    # which is when memory peaks. 512Mi OOM-looped in dev.
-    resources:
-      requests:
-        cpu: 100m
-        memory: 512Mi
-      limits:
-        cpu: 500m
-        memory: 1Gi
-  sentinel:
+    registry: artifacts.developer.gov.bc.ca/docker-remote
+  persistence:
     enabled: true
-    quorum: 1
-    podSecurityContext:
-      enabled: true
-      fsGroup: null
-      runAsUser: null
-    containerSecurityContext:
-      enabled: true
-      runAsUser: null
-      runAsNonRoot: false
-    image:
-      registry: artifacts.developer.gov.bc.ca/docker-remote
-    persistence:
-      enabled: true
-      accessMode: ReadWriteOnce
-      size: 1Gi
-      storageClass: netapp-block-standard
-    persistentVolumeClaimRetentionPolicy:
-      enabled: true
-      whenScaled: Delete
-      whenDeleted: Delete
-    resources:
-      requests:
-        cpu: 50m
-        memory: 64Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
-  # AOF persistence configuration
-  commonConfiguration: |-
-    # Enable AOF persistence
-    appendonly yes
-    appendfsync everysec
-    appendfilename "appendonly.aof"
-    # Disable RDB persistence
-    save ""
-    # Cap Redis memory BELOW the 1Gi container limit so Redis manages memory itself
-    # instead of being OOMKilled by the kernel (which caused a 300+ restart crash loop).
-    # Headroom (1Gi - 768mb) covers RediSearch/ReJSON module overhead and resync buffers.
-    maxmemory 768mb
-    # This Redis backs a durable Bull/BullMQ job queue (ingestion/email/sms), NOT a
-    # disposable cache. noeviction => reject new writes when full rather than silently
-    # dropping queued jobs. If writes start failing, raise the limit — do not switch to LRU.
-    maxmemory-policy noeviction
-  metrics:
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: netapp-block-standard
+  persistentVolumeClaimRetentionPolicy:
     enabled: true
-    podSecurityContext:
-      enabled: true
-      fsGroup: null
-      runAsUser: null
-    containerSecurityContext:
-      enabled: true
-      runAsUser: null
-      runAsNonRoot: false
-    image:
-      registry: artifacts.developer.gov.bc.ca/docker-remote
-    resources:
-      requests:
-        cpu: 50m
-        memory: 64Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
+    whenScaled: Delete
+    whenDeleted: Delete
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+# AOF persistence configuration
+commonConfiguration: |-
+  # Enable AOF persistence
+  appendonly yes
+  appendfsync everysec
+  appendfilename "appendonly.aof"
+  # Disable RDB persistence
+  save ""
+  # Cap Redis memory BELOW the 1Gi container limit so Redis manages memory itself
+  # instead of being OOMKilled by the kernel (which caused a 300+ restart crash loop).
+  # Headroom (1Gi - 768mb) covers RediSearch/ReJSON module overhead and resync buffers.
+  maxmemory 768mb
+  # This Redis backs a durable Bull/BullMQ job queue (ingestion/email/sms), NOT a
+  # disposable cache. noeviction => reject new writes when full rather than silently
+  # dropping queued jobs. If writes start failing, raise the limit — do not switch to LRU.
+  maxmemory-policy noeviction
+metrics:
+  enabled: true
+  podSecurityContext:
+    enabled: true
+    fsGroup: null
+    runAsUser: null
+  containerSecurityContext:
+    enabled: true
+    runAsUser: null
+    runAsNonRoot: false
+  image:
+    registry: artifacts.developer.gov.bc.ca/docker-remote
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
