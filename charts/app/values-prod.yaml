@@ -3,10 +3,9 @@
 # Layered on top of values.yaml (the chart's own defaults, which are the
 # DEV/PR profile — single replica, Recreate, no PDB). Only the deltas live here.
 #
-# Previously these settings were passed as scattered `--set` flags from
-# .github/workflows/merge.yml, so the deployed shape of production was invisible
-# in code review and drifted from git. Keeping them here makes the environment
-# reviewable and diffable.
+# Replica counts, rollout strategy and PDBs for production live here rather than as
+# `--set` flags in .github/workflows/merge.yml, so the deployed shape is
+# reviewable in git.
 #
 # Quota headroom (f6bc3f-prod: 4000m CPU / 16Gi memory, ~2060m CPU in use):
 #   backend  50m + 200Mi per pod, frontend 30m + 50Mi per pod
@@ -22,15 +21,13 @@ backend:
   autoscaling:
     enabled: true
     minReplicas: 5
-    #-- above minReplicas so the HPA can actually scale under load. It was
-    #-- previously pinned at 5/5, which made the HPA a fixed replica count and
-    #-- left targetCPUUtilizationPercentage (80) with nothing to act on.
+    #-- above minReplicas so the HPA can actually scale; min == max makes the
+    #-- HPA a fixed replica count and targetCPUUtilizationPercentage inert
     maxReplicas: 7
   pdb:
     enabled: true
-    #-- was 1, which let a node drain reduce production to a SINGLE pod. 2 keeps
-    #-- redundancy through a drain while staying well below minReplicas (5) so
-    #-- drains still complete.
+    #-- 2 keeps redundancy through a node drain while staying well below
+    #-- minReplicas (5) so drains still complete
     minAvailable: 2
 
 frontend:

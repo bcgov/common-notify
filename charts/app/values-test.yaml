@@ -3,10 +3,9 @@
 # Layered on top of values.yaml (the chart's own defaults, which are the
 # DEV/PR profile — single replica, Recreate, no PDB). Only the deltas live here.
 #
-# Previously these settings were passed as scattered `--set` flags from
-# .github/workflows/merge.yml, so the deployed shape of test was invisible in
-# code review and drifted from git. Keeping them here makes the environment
-# reviewable and diffable.
+# Replica counts, rollout strategy and PDBs for test live here rather than as
+# `--set` flags in .github/workflows/merge.yml, so the deployed shape is
+# reviewable in git.
 #
 # Quota headroom (f6bc3f-test: 3000m CPU / 12Gi memory):
 #   backend  50m + 200Mi per pod, frontend 30m + 50Mi per pod
@@ -27,8 +26,7 @@ backend:
     #-- HPA decorative and targetCPUUtilizationPercentage inert
     maxReplicas: 4
   pdb:
-    #-- test had no PDB while prod did, so a node drain could evict both pods
-    #-- at once
+    #-- without it a node drain can evict both pods at once
     enabled: true
     #-- must stay BELOW minReplicas or drains block forever
     minAvailable: 1
