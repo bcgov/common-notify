@@ -33,6 +33,11 @@ $preview-gutter: $spacing-xl * 1.5;
   font-weight: 700;
 }
 
+// A banner across the top of both panes, inset so it does not read as part of either.
+.notification-preview__notice {
+  padding: $spacing-md $spacing-lg 0;
+}
+
 .notification-preview__body {
   display: flex;
   min-width: 0;

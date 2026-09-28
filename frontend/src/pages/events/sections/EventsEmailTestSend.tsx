@@ -5,6 +5,8 @@ import { Button, Callout, Radio, RadioGroup } from '@bcgov/design-system-react-c
 import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
 import EventEmailPreview from '../components/EventEmailPreview'
+import EventEmailPreviewModal from '../components/EventEmailPreviewModal'
+import type { AppliedNotification } from '../components/EventEmailPreviewModal'
 import { getEventById } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
@@ -33,6 +35,11 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   const [loadError, setLoadError] = useState<string | null>(null)
   // Nothing is selected to begin with, so the review below only appears once a choice is made.
   const [recipient, setRecipient] = useState<Recipient | null>(null)
+  const [isEditValuesOpen, setEditValuesOpen] = useState(false)
+  // The values the test will be sent with, and the notification they render to. Held here rather
+  // than in the modal so they outlive it: the preview below shows the render, and the values are
+  // ready for the send once there is an endpoint to send through.
+  const [applied, setApplied] = useState<AppliedNotification | null>(null)
 
   // The page is landed on from the saved page and on a refresh, so it fetches the event itself
   // rather than being handed the settings it shows. Tenant-scoped, the same way the saved page is.
@@ -130,12 +137,10 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   </p>
                 </div>
 
-                {/* TODO: opens the test data for editing once preview variables are stored
-                    against the event. */}
                 <Button
                   size="medium"
                   variant="secondary"
-                  onPress={() => undefined}
+                  onPress={() => setEditValuesOpen(true)}
                   style={{ width: '120px' }}
                 >
                   Edit values
@@ -149,8 +154,22 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                       from: emailSettings.senderEmail ?? '',
                       to: userEmail ?? '',
                     }}
+                    rendered={applied?.rendered}
                   />
                 </div>
+
+                <EventEmailPreviewModal
+                  isOpen={isEditValuesOpen}
+                  onClose={() => setEditValuesOpen(false)}
+                  template={template}
+                  from={emailSettings.senderEmail ?? ''}
+                  to={userEmail ?? ''}
+                  values={applied?.values ?? {}}
+                  onApply={(next) => {
+                    setApplied(next)
+                    setEditValuesOpen(false)
+                  }}
+                />
               </>
             )}
 

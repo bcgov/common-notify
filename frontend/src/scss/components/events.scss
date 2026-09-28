@@ -251,6 +251,33 @@
   border-radius: 4px;
 }
 
+// The rendered email, once values have been applied. Inlined into the page rather than framed,
+// so the app's own styles reach it - these are the few that would otherwise distort an email.
+.events__preview-body {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+
+  // The card supplies the spacing around the body; the email's own first and last blocks
+  // should not add to it.
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  // Email is laid out at a fixed pixel width that the card may be narrower than.
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  table {
+    max-width: 100%;
+  }
+}
+
 .events__preview-envelope {
   display: flex;
   flex-direction: column;
@@ -282,6 +309,8 @@
 // on the element itself.
 .events__test-send-spacer {
   min-height: 320px;
+}
+
 // DS default is a white square, override this to give the rounded blue tags from the design
 .events__cstar-groups {
   .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag {

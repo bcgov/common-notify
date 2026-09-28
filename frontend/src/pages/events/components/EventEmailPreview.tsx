@@ -5,11 +5,21 @@ import type { TemplateResponse } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 
+/** A template rendered with a set of values, as the preview endpoint returns it. */
+export interface RenderedNotification {
+  subject: string
+  /** Rendered HTML. When absent, `bodyText` is shown as plain text instead. */
+  bodyHtml?: string
+  bodyText: string
+}
+
 interface EventEmailPreviewProps {
   emailSettings: EventEmailSettings
   template: TemplateResponse
   /** Envelope lines, shown where the preview is of a send to a known address. */
   envelope?: { from: string; to: string }
+  /** The template rendered with values. Without one the raw template body is shown instead. */
+  rendered?: RenderedNotification
 }
 
 /**
@@ -18,7 +28,12 @@ interface EventEmailPreviewProps {
  *
  * Shared by the saved page and the test send page so the two show the same notification.
  */
-const EventEmailPreview: FC<EventEmailPreviewProps> = ({ emailSettings, template, envelope }) => {
+const EventEmailPreview: FC<EventEmailPreviewProps> = ({
+  emailSettings,
+  template,
+  envelope,
+  rendered,
+}) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
@@ -55,7 +70,7 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({ emailSettings, template
       )}
 
       <p className="events__saved-subject">
-        <strong>Subject line:</strong> {template.subject}
+        <strong>Subject line:</strong> {rendered ? rendered.subject : template.subject}
       </p>
 
       {(headerLogo || headerTitle) && (
@@ -71,12 +86,17 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({ emailSettings, template
           {headerTitle && <span className="events__header-preview-title">{headerTitle}</span>}
         </div>
       )}
-      {/** TODO
-       *   render the template using saved preview variables once
-       *   the preview variables database table is added. For now
-       *   the preview displays the raw template body.
-       */}
-      <p className="events__saved-body">{template.body}</p>
+      {!rendered ? (
+        // Nothing has been rendered yet, so the template is shown as it was written.
+        <p className="events__saved-body">{template.body}</p>
+      ) : rendered.bodyHtml !== undefined ? (
+        <div
+          className="events__preview-body"
+          dangerouslySetInnerHTML={{ __html: rendered.bodyHtml }}
+        />
+      ) : (
+        <p className="events__saved-body">{rendered.bodyText}</p>
+      )}
     </div>
   )
 }
