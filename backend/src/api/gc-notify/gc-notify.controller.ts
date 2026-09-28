@@ -140,7 +140,7 @@ export class GcNotifyController {
     summary: 'Send an SMS',
     description:
       'GC Notify-compatible SMS send, taking `phone_number`, `template_id` and ' +
-      '`personalisation`. Requires the sms_notifications feature flag for the tenant.',
+      '`personalisation`. SMS must be enabled for the tenant.',
   })
   @ApiResponse({
     status: 201,
