@@ -159,7 +159,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               iconLeft={<SearchIcon fontSize="small" aria-hidden="true" />}
               size="medium"
               type="text"
-              {...({ placeholder: 'Search logos', role: 'combobox' } as {
+              {...({ placeholder: 'Search logo...', role: 'combobox' } as {
                 placeholder?: string
                 role?: 'combobox'
               })}
@@ -200,7 +200,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
                   aria-labelledby={sectionLabelId}
                 >
                   <div className="email-logo-menu__section-heading" id={sectionLabelId}>
-                    Approved logos
+                    Provincial Ministry Marks
                   </div>
                   {filteredLogos.map((option) => {
                     const optionIndex = filteredOptions.findIndex((item) => item.id === option.id)
