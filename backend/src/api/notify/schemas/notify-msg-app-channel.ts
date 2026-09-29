@@ -10,12 +10,12 @@ import { NotifyContent } from './notify-content'
 @ApiSchema({ description: 'Send by messaging app.' })
 @ValidateTemplateOrRenderer()
 export class NotifyMsgAppChannel {
-  @ApiProperty({ type: NotifyMsgAppRecipients })
+  @ApiProperty({ description: 'Message app recipients', type: NotifyMsgAppRecipients })
   @ValidateNested()
   @Type(() => NotifyMsgAppRecipients)
   recipients: NotifyMsgAppRecipients
 
-  @ApiProperty({ type: NotifyContent })
+  @ApiProperty({ description: 'Message app content', type: NotifyContent })
   @ValidateNested()
   @Type(() => NotifyContent)
   content: NotifyContent
@@ -32,13 +32,7 @@ export class NotifyMsgAppChannel {
   @ApiPropertyOptional() @IsOptional() @IsString() msgAppId?: string
 
   @ApiPropertyOptional({
-    description:
-      'Hold the message until this time. Omit to send as soon as possible. ' +
-      '**A timezone is required.** Use a `Z` suffix (`2026-06-01T16:00:00Z`), a numeric offset ' +
-      'with a colon (`2026-06-01T09:00:00-07:00`), or a trailing abbreviation JavaScript ' +
-      'recognises (`2026-06-01 09:00:00 PDT` - PST/PDT/GMT/UTC work, CEST does not). ' +
-      'A local time with no zone (`2026-06-01T16:00:00`), a bare date (`2026-06-01`), and a ' +
-      'compact offset (`-0700`) are all rejected. A time in the past is rejected rather than sent immediately.',
+    description: 'Datetime for delayed send (ISO 8601, RFC 2822, or other standard formats)',
     example: '2027-06-01T16:00:00Z',
   })
   @IsOptional()
