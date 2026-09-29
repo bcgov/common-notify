@@ -18,12 +18,12 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -52,10 +52,6 @@ const mockAuthGuard: CanActivate = {
     request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
-}
-
-const mockChesApiClient = {
-  sendEmail: vi.fn(),
 }
 
 const mockConfigService = {
@@ -174,6 +170,7 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [
+        { provide: NotifyPreviewService, useValue: {} },
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -182,7 +179,6 @@ describe('Notify Controllers', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
-        { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
@@ -243,6 +239,28 @@ describe('Notify Controllers', () => {
   })
 
   describe('NotifySimpleController', () => {
+    it.each([
+      ['', ''],
+      ['', '?preview=false'],
+      ['', '?preview=TRUE'],
+      ['/email', ''],
+      ['/email', '?preview=false'],
+      ['/email', '?preview=1'],
+    ])('keeps real sends active on %s%s', async (path, query) => {
+      mockApiKeyConsumerId = 'consumer-standard'
+      const channel = {
+        recipients: { to: ['test@example.com'] },
+        content: { subject: 'Test', body: 'Hello' },
+      }
+      await request(app.getHttpServer())
+        .post(`/api/v1/notifysimple${path}${query}`)
+        .send(path ? channel : { email: channel })
+        .expect(202)
+      expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
+      expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
+      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+    })
+
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()
@@ -595,11 +613,27 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 422 when no channel is provided', async () => {
+      // An empty body fails DTO validation now that ValidateTemplateOrContent actually runs, so it
+      // is rejected at the pipe with a 400 rather than reaching the business-rule check. 400 for a
+      // malformed request and 422 for a business-rule failure is the split ValidationExceptionFilter
+      // already assumes.
+      it('should return 400 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      })
+
+      it('should return 422 when a well-formed request fails a business rule', async () => {
         mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
           'At least one recipient is required (email, SMS, or msgApp)',
         ])
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
+          .expect(422)
       })
 
       it('should return 202 with status "accepted" for immediate send', async () => {
@@ -636,8 +670,11 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
-        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+      // A past delayedSend used to be accepted and sent immediately, because the delay is computed
+      // as Math.max(0, when - now). Scheduling into the past is never what a caller meant, so it is
+      // rejected now.
+      it('should return 400 for a delayedSend in the past', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString()
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
@@ -647,11 +684,7 @@ describe('Notify Controllers', () => {
               delayedSend: pastDate,
             },
           })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Notification scheduled for delivery')
-          })
+          .expect(400)
       })
 
       it('should return 400 and not persist when attachment validation fails', async () => {
@@ -945,6 +978,28 @@ describe('Notify Controllers', () => {
       })
 
       describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        it.each(['', '?preview=false'])(
+          'keeps ordinary SMS sends unchanged with query %s',
+          async (query) => {
+            const body = {
+              sms: { recipients: { to: ['250 555 0123'] }, content: { body: 'Hello' } },
+            }
+            await request(app.getHttpServer())
+              .post(`/api/v1/notifysimple/sms${query}`)
+              .send(body)
+              .expect(202)
+              .expect((res) => {
+                expect(res.body.notifyId).toBeDefined()
+                expect(res.body.status).toBe('accepted')
+                expect(res.body.channels).toEqual(['sms'])
+                expect(res.body.sms).toBeUndefined()
+              })
+            expect(mockNotificationService.create).toHaveBeenCalled()
+            expect(mockIngestionQueue.add).toHaveBeenCalled()
+            expect(mockNotificationService.validateBusinessRules).toHaveBeenCalled()
+          },
+        )
+
         // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
         const validSmsMerge = {
           sms: {

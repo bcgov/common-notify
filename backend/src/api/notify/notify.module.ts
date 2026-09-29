@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
-import { ChesModule } from '../../ches/ches.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
@@ -15,6 +14,8 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewInterceptor } from './notify-preview.interceptor'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
@@ -28,6 +29,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { PhoneNumberService } from './services/phone-number.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { SafelistModule } from '../safelist/safelist.module'
 
@@ -35,7 +37,6 @@ import { SafelistModule } from '../safelist/safelist.module'
   imports: [
     TypeOrmModule.forFeature([Tenant, MimeTypeCode, NotifyConfiguration]),
     TenantsModule,
-    ChesModule,
     NotificationModule,
     RenderingModule,
     FeatureFlagModule,
@@ -55,6 +56,9 @@ import { SafelistModule } from '../safelist/safelist.module'
     ChesEmailController,
   ],
   providers: [
+    NotifyPreviewInterceptor,
+    NotifyPreviewService,
+    PhoneNumberService,
     NotifyService,
     NotifyFrontendRoleGuard,
     NotifyServiceGuard,
