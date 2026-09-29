@@ -122,6 +122,13 @@ spec:
               value: {{ .Values.global.config.redisSentinels | quote }}
             - name: REDIS_MASTER_NAME
               value: {{ .Values.global.config.redisMasterName | default "mymaster" | quote }}
+            # The redis chart defaults auth.sentinel to true, so the Sentinels require the same
+            # password as Redis. Without it every Sentinel lookup fails and no client connects.
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.config.redisSecret | default (printf "%s-redis" .Release.Name) }}
+                  key: redis-password
             {{- end }}
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
