@@ -5,6 +5,7 @@ export interface EmailLogoMenuOption {
   id: string | null
   name: string
   imageUrl?: string
+  isRecommended?: boolean
 }
 
 interface EmailLogoMenuItemProps {

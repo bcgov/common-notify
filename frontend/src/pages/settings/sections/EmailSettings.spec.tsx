@@ -91,6 +91,11 @@ const APPROVED_LOGOS = [
     name: 'Alternate logo',
     imageUrl: 'https://gateway.example.test/logos/logo-2/image',
   },
+  {
+    id: 'logo-3',
+    name: 'Main BC Mark (horizontal)',
+    imageUrl: 'https://gateway.example.test/logos/logo-3/image',
+  },
 ]
 
 function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
@@ -154,6 +159,15 @@ describe('EmailSettings section', () => {
     const primaryOption = screen.getByRole('option', { name: 'Primary logo' })
     expect(primaryOption.querySelector('img')).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
     expect(screen.getByRole('option', { name: 'Alternate logo' })).toBeInTheDocument()
+    const recommendedOption = screen.getByRole('option', { name: 'Main BC Mark (horizontal)' })
+    expect(screen.getByRole('group', { name: 'Recommended' })).toContainElement(recommendedOption)
+    expect(screen.getByRole('group', { name: 'Provincial Ministry Marks' })).toContainElement(
+      primaryOption,
+    )
+    expect(screen.getByRole('group', { name: 'Provincial Ministry Marks' })).toContainElement(
+      screen.getByRole('option', { name: 'Alternate logo' }),
+    )
+    expect(screen.getByRole('option', { name: 'No logo' })).toBeInTheDocument()
   })
 
   it('saves a newly selected logo with the existing email settings payload', async () => {

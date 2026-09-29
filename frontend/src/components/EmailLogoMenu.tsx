@@ -20,6 +20,7 @@ interface EmailLogoMenuProps {
 }
 
 const NO_LOGO_OPTION: EmailLogoMenuOption = { id: null, name: 'No logo' }
+const RECOMMENDED_LOGO_NAME = 'Main BC Mark (horizontal)'
 
 const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   logos,
@@ -37,15 +38,19 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   const labelId = `${id}-label`
   const valueId = `${id}-value`
   const listboxId = `${id}-listbox`
-  const sectionLabelId = `${id}-approved-logos`
+  const recommendedLabelId = `${id}-recommended-logos`
+  const ministryLabelId = `${id}-ministry-logos`
 
+  const logoOptions: EmailLogoMenuOption[] = logos.map((logo) => ({
+    id: logo.id,
+    name: logo.name ?? 'Unnamed logo',
+    imageUrl: logo.imageUrl,
+    isRecommended: logo.name === RECOMMENDED_LOGO_NAME,
+  }))
   const options: EmailLogoMenuOption[] = [
+    ...logoOptions.filter((option) => option.isRecommended),
+    ...logoOptions.filter((option) => !option.isRecommended),
     NO_LOGO_OPTION,
-    ...logos.map((logo) => ({
-      id: logo.id,
-      name: logo.name ?? 'Unnamed logo',
-      imageUrl: logo.imageUrl,
-    })),
   ]
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredOptions = options.filter((option) =>
@@ -59,7 +64,12 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
       ? `${id}-option-${activeIndex}`
       : undefined
   const showsNoLogo = filteredOptions.some((option) => option.id === null)
-  const filteredLogos = filteredOptions.filter((option) => option.id !== null)
+  const filteredRecommended = filteredOptions.filter(
+    (option) => option.id !== null && option.isRecommended,
+  )
+  const filteredMinistries = filteredOptions.filter(
+    (option) => option.id !== null && !option.isRecommended,
+  )
 
   useEffect(() => {
     if (!isOpen) return
@@ -111,6 +121,22 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
     } else if (event.key === 'Tab') {
       closeMenu(false)
     }
+  }
+
+  function renderLogoOption(option: EmailLogoMenuOption) {
+    const optionIndex = filteredOptions.findIndex((item) => item.id === option.id)
+
+    return (
+      <EmailLogoMenuItem
+        key={option.id}
+        option={option}
+        optionId={`${id}-option-${optionIndex}`}
+        isActive={optionIndex === activeIndex}
+        isSelected={option.id === value}
+        onActivate={() => setActiveIndex(optionIndex)}
+        onSelect={() => selectOption(option)}
+      />
+    )
   }
 
   return (
@@ -179,44 +205,52 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
             aria-label="Email logo options"
             aria-activedescendant={activeOptionId}
           >
-            {showsNoLogo && (
-              <EmailLogoMenuItem
-                option={NO_LOGO_OPTION}
-                optionId={`${id}-option-${filteredOptions.findIndex((option) => option.id === null)}`}
-                isActive={filteredOptions.findIndex((option) => option.id === null) === activeIndex}
-                isSelected={value === null}
-                onActivate={() =>
-                  setActiveIndex(filteredOptions.findIndex((option) => option.id === null))
-                }
-                onSelect={() => selectOption(NO_LOGO_OPTION)}
-              />
+            {filteredRecommended.length > 0 && (
+              <div
+                className="email-logo-menu__group"
+                role="group"
+                aria-labelledby={recommendedLabelId}
+              >
+                <div className="email-logo-menu__section-heading" id={recommendedLabelId}>
+                  Recommended
+                </div>
+                {filteredRecommended.map(renderLogoOption)}
+              </div>
             )}
-            {filteredLogos.length > 0 && (
+            {filteredMinistries.length > 0 && (
               <>
-                {showsNoLogo && <div className="email-logo-menu__divider" role="separator" />}
+                {filteredRecommended.length > 0 && (
+                  <div className="email-logo-menu__divider" role="separator" />
+                )}
                 <div
                   className="email-logo-menu__group"
                   role="group"
-                  aria-labelledby={sectionLabelId}
+                  aria-labelledby={ministryLabelId}
                 >
-                  <div className="email-logo-menu__section-heading" id={sectionLabelId}>
+                  <div className="email-logo-menu__section-heading" id={ministryLabelId}>
                     Provincial Ministry Marks
                   </div>
-                  {filteredLogos.map((option) => {
-                    const optionIndex = filteredOptions.findIndex((item) => item.id === option.id)
-                    return (
-                      <EmailLogoMenuItem
-                        key={option.id}
-                        option={option}
-                        optionId={`${id}-option-${optionIndex}`}
-                        isActive={optionIndex === activeIndex}
-                        isSelected={option.id === value}
-                        onActivate={() => setActiveIndex(optionIndex)}
-                        onSelect={() => selectOption(option)}
-                      />
-                    )
-                  })}
+                  {filteredMinistries.map(renderLogoOption)}
                 </div>
+              </>
+            )}
+            {showsNoLogo && (
+              <>
+                {(filteredRecommended.length > 0 || filteredMinistries.length > 0) && (
+                  <div className="email-logo-menu__divider" role="separator" />
+                )}
+                <EmailLogoMenuItem
+                  option={NO_LOGO_OPTION}
+                  optionId={`${id}-option-${filteredOptions.findIndex((option) => option.id === null)}`}
+                  isActive={
+                    filteredOptions.findIndex((option) => option.id === null) === activeIndex
+                  }
+                  isSelected={value === null}
+                  onActivate={() =>
+                    setActiveIndex(filteredOptions.findIndex((option) => option.id === null))
+                  }
+                  onSelect={() => selectOption(NO_LOGO_OPTION)}
+                />
               </>
             )}
           </div>
