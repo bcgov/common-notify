@@ -9,6 +9,7 @@ import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 import { TemplateEngineCode } from './entities/template-engine-code.entity'
+import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { NotifyModule } from '../notify/notify.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
@@ -29,7 +30,15 @@ import { EmailTemplateLayoutService } from './email-template-layout.service'
 @Module({
   imports: [
     TenantsModule,
-    TypeOrmModule.forFeature([Template, TemplateVersion, TemplateEngineCode, Tenant]),
+    // EventChannelSetting, not EventsModule: that module already imports this one, and a
+    // template only needs to know which events still render with it before it is deleted.
+    TypeOrmModule.forFeature([
+      Template,
+      TemplateVersion,
+      TemplateEngineCode,
+      Tenant,
+      EventChannelSetting,
+    ]),
     RenderingModule,
     CstarModule,
     ApiKeysModule,
