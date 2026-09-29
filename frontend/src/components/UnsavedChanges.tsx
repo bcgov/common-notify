@@ -2,20 +2,33 @@ import type { FC, ReactNode } from 'react'
 import { useBlocker } from '@tanstack/react-router'
 import GenericModal from '@/components/GenericModal'
 
+type RouteGuardProps = {
+  /** Browser level: true while there are edits a save has not persisted yet. */
+  hasUnsavedChanges: boolean
+  /** A save is in flight, so the navigation it makes of its own is let through. */
+  isSaving?: boolean
+  isBlocked?: never
+  onLeave?: never
+  onStay?: never
+}
+
+type ControlledProps = {
+  /** App level: the caller has intercepted its own action and is waiting on an answer. */
+  isBlocked: boolean
+  /** Abandons the edits and carries out the action the caller is holding. */
+  onLeave: () => void
+  /** Drops that action and leaves the form as it was. */
+  onStay: () => void
+  hasUnsavedChanges?: never
+  isSaving?: never
+}
+
+// One mode per instance. Mixing them would let `isBlocked` hide a dialog the route blocker is
+// waiting on, leaving the navigation stuck with nothing on screen.
 type UnsavedChangesProps = {
   modalTitle?: string
   modalMessage?: ReactNode
-  /** Browser level: true while there are edits a save has not persisted yet. */
-  hasUnsavedChanges?: boolean
-  /** A save is in flight, so the navigation it makes of its own is let through. */
-  isSaving?: boolean
-  /** App level: the caller has intercepted its own action and is waiting on an answer. */
-  isBlocked?: boolean
-  /** Abandons the edits and carries out the action the caller is holding. Pass with `isBlocked`. */
-  onLeave?: () => void
-  /** Drops that action and leaves the form as it was. Pass with `isBlocked`. */
-  onStay?: () => void
-}
+} & (RouteGuardProps | ControlledProps)
 
 /**
  * Warns before something that would drop unsaved edits. It guards navigation at two levels:
@@ -44,7 +57,7 @@ const UnsavedChanges: FC<UnsavedChangesProps> = ({
   // Whoever opened the dialog answers it: the blocker through its own resolver, which exists
   // only while it is blocking, and an app-level guard through the handlers it passed in.
   const isRouteBlocked = blocker.status === 'blocked'
-  const isOpen = isBlocked ?? isRouteBlocked
+  const isOpen = isRouteBlocked || Boolean(isBlocked)
   const leave = isRouteBlocked ? blocker.proceed : onLeave
   const stay = isRouteBlocked ? blocker.reset : onStay
 
