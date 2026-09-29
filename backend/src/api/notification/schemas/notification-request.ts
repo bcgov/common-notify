@@ -30,10 +30,13 @@ export class NotificationRequestDto {
   })
   tenantId: string
 
-  @ApiProperty({ type: TenantDto })
+  @ApiProperty({ description: 'Tenant information including name and slug', type: TenantDto })
   tenant?: TenantDto
 
-  @ApiProperty({ type: NotificationStatusCodeDto })
+  @ApiProperty({
+    description: 'Processing status of the notification request, including code and display name',
+    type: NotificationStatusCodeDto,
+  })
   status: NotificationStatusCodeDto
 
   @ApiPropertyOptional({

@@ -13,6 +13,7 @@ import {
 import type { Relation } from 'typeorm'
 import { NotifyEvent } from './event.entity'
 import { EventChannelRecipient } from './event-channel-recipient.entity'
+import { EventChannelCstarGroup } from './event-channel-cstar-group.entity'
 import { ProvisionedPhoneNumber } from './provisioned-phone-number.entity'
 import { Template } from '../../templates/entities/template.entity'
 import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
@@ -86,6 +87,14 @@ export class EventChannelSetting {
    */
   @OneToMany(() => EventChannelRecipient, (recipient) => recipient.channelSetting)
   recipients: EventChannelRecipient[]
+
+  /**
+   * CSTAR groups this channel addresses, one row per group per list. EMAIL only. A group in the
+   * TO list satisfies the "at least one recipient" rule on its own, the same way a TO address
+   * does - enforced by EventsService, since a CHECK cannot see another table.
+   */
+  @OneToMany(() => EventChannelCstarGroup, (group) => group.channelSetting)
+  cstarGroups: EventChannelCstarGroup[]
 
   /**
    * False when the email uses the tenant's default header, true when it uses headerLogoId and

@@ -11,7 +11,7 @@ export const CREDENTIAL_ISSUER = Symbol('CREDENTIAL_ISSUER')
  * A credential minted by the gateway for one product environment.
  *
  * Which fields are populated depends on the environment's flow. Notify's gateway
- * environments use `kong-api-key-only`, so `apiKey` is the field that matters; the
+ * environments use `kong-api-key-acl`, so `apiKey` is the field that matters; the
  * OAuth fields are carried through unchanged for future client-credentials
  * environments rather than being dropped on the floor.
  */
