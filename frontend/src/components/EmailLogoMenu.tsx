@@ -158,8 +158,11 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               autoFocus
               iconLeft={<SearchIcon fontSize="small" aria-hidden="true" />}
               size="medium"
-              type="search"
-              {...({ placeholder: 'Search logos' } as { placeholder?: string })}
+              type="text"
+              {...({ placeholder: 'Search logos', role: 'combobox' } as {
+                placeholder?: string
+                role?: 'combobox'
+              })}
               value={searchQuery}
               onChange={(query) => {
                 setSearchQuery(query)
