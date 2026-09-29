@@ -133,46 +133,45 @@ const GenericModal: FC<GenericModalProps> = ({
               </h5>
               <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
             </div>
-            <div className="modal-body">
-              {onSubmit ? (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    // React portals propagate events through the React tree, not the DOM
-                    // tree, so without this a modal opened from inside a form would submit
-                    // that form too — silently saving whatever the user had half-edited
-                    // behind the dialog.
-                    event.stopPropagation()
-                    return onSubmit(event)
-                  }}
-                  className="d-flex flex-column gap-3"
-                >
-                  {children}
-                  <div className="d-flex gap-2 justify-content-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={onClose}
-                      isDisabled={isSubmitLoading}
-                    >
-                      {cancelText}
-                    </Button>
-                    <Button type="submit" variant={submitVariant} isDisabled={isSubmitLoading}>
-                      {isSubmitLoading ? `${submitText}...` : submitText}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  {children}
-                  <div className="d-flex gap-2 justify-content-end mt-3">
-                    <Button variant="primary" onClick={onClose}>
-                      {cancelText}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Buttons sit in their own footer so a divider separates them from the content,
+                matching the divider the header already has. */}
+            {onSubmit ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  // React portals propagate events through the React tree, not the DOM
+                  // tree, so without this a modal opened from inside a form would submit
+                  // that form too — silently saving whatever the user had half-edited
+                  // behind the dialog.
+                  event.stopPropagation()
+                  return onSubmit(event)
+                }}
+              >
+                <div className="modal-body d-flex flex-column gap-3">{children}</div>
+                <div className="modal-footer">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    isDisabled={isSubmitLoading}
+                  >
+                    {cancelText}
+                  </Button>
+                  <Button type="submit" variant={submitVariant} isDisabled={isSubmitLoading}>
+                    {isSubmitLoading ? `${submitText}...` : submitText}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="modal-body">{children}</div>
+                <div className="modal-footer">
+                  <Button variant="primary" onClick={onClose}>
+                    {cancelText}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

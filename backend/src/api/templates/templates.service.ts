@@ -18,6 +18,7 @@ import { InlineRenderingService } from '../../services/rendering/inline-renderin
 import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
+import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
@@ -217,15 +218,44 @@ export class TemplatesService {
   }
 
   /**
-   * Delete a template (soft delete)
+   * Events that still render with this template, which the frontend shows instead of the
+   * delete confirmation when the list is not empty.
    */
-  async deleteTemplate(tenantId: string, templateId: string): Promise<void> {
+  async getTemplateUsage(tenantId: string, templateId: string): Promise<TemplateUsageResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
 
-    await this.templatesRepository.softDelete(templateId)
+    return { events: await this.templatesRepository.findEventsUsingTemplate(tenantId, templateId) }
+  }
+
+  /**
+   * Delete a template (soft delete)
+   * @param userId User deleting the template, stamped on any channel settings it is cleared from
+   */
+  async deleteTemplate(
+    tenantId: string,
+    templateId: string,
+    userId: string = 'system',
+  ): Promise<void> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    // A switched-on event pointing at a deleted template would fail at send time, so the
+    // template has to be taken off those events first. The frontend checks before asking for
+    // confirmation; this is what makes the rule hold for every caller. Switched-off channels
+    // are not sending, so softDelete just clears the template off them.
+    const events = await this.templatesRepository.findEventsUsingTemplate(tenantId, templateId)
+    if (events.length > 0) {
+      throw new ConflictException(
+        `Template ${templateId} is in use by event(s): ${events.map((e) => e.name).join(', ')}`,
+      )
+    }
+
+    await this.templatesRepository.softDelete(tenantId, templateId, userId)
   }
 
   /**

@@ -1,7 +1,8 @@
 # Notify Service
 
 **_View and test live Swagger API Spec [here](https://notify.digital.gov.bc.ca/api/docs)_**
-**_Download OpenApi YAML  [here](https://notify.digital.gov.bc.ca/api/docs-yaml)_**
+
+**_Download OpenApi YAML [here](https://notify.digital.gov.bc.ca/api/docs-yaml)_**
 
 > [!NOTE]
 > This README explains concepts, design rationale, and end-to-end usage patterns. For the
@@ -216,6 +217,10 @@ Requests use tenant-aware internal execution when the corresponding routing feat
 otherwise fall back to the upstream GC Notify API. Bulk sends currently always use the upstream
 fallback.
 
+## Feature Flags
+
+Features can be enabled or disabled via "Feature Flags" which can only be toggled by Notify administrators. For access to beta, upcoming or early-adopter features, contact Notify support.
+
 ---
 
 ## Examples
@@ -360,48 +365,47 @@ In this case, the "to" address is substituted with "my@example.com" the subject 
 "Sample Subject" and the body with "This is an example of templating and parameter substitution"
 
 #### 2.2 Preview 2.1 
-> >[!WARNING] 🚧 Under construction - coming in Oct 2026 🚧
->
 
-> Preview the output of the previous example, no actual sending
-> 
-> **Admin UI**
-> 
-> No setup except tenant sender email address.
-> 
-> > [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
-> 
-> **API**
-> 
-> POST to /api/v1/notifysimple/email?preview=true
-> 
-> **Payload**
-> 
-> As per 2.1
-> 
-> **Return**
-> 
-> ```json
-> {
-  > "recipients" : {
-    > "to": ["me@example.com", "you@example.com"],
-    > "cc": ["copyto@example.com"],
-    > "bcc": ["blindcopyto@example.com"]
-  > }
-  > "content": {
-    > "subject": "Sample subject",
-    > "body": "This is an example of templating and parameter substitution",
-    > "renderer" : "handlebar"
-  > },
-> }
-> 
-> ```
-> 
-> > [!NOTE]
-> >
-> > - Variable substitutions are performed on templates
-> > - Variable substititions are performed on recipient fields
-> > - The result is exactly what would be sent to the SMTP email gateway or SMS API
+
+ Preview the output of the previous example, no actual sending
+ 
+ **Admin UI**
+ 
+ No setup except tenant sender email address.
+ 
+> [!NOTE] The admin UI can be used to preview emails and perform test sends as well.
+ 
+**API**
+ 
+POST to /api/v1/notifysimple/email?preview=true
+ 
+**Payload**
+ 
+As per 2.1
+ 
+**Return**
+ 
+```json
+{
+   "recipients" : {
+     "to": ["me@example.com", "you@example.com"],
+     "cc": ["copyto@example.com"],
+     "bcc": ["blindcopyto@example.com"]
+  }
+   "content": {
+     "subject": "Sample subject",
+     "body": "This is an example of templating and parameter substitution",
+     "renderer" : "handlebar"
+    },
+}
+ 
+```
+ 
+> [!NOTE]
+>
+> - Variable substitutions are performed on templates
+> - Variable substititions are performed on recipient fields
+> - The result is exactly what would be sent to the SMTP email gateway or SMS API
 
 #### 2.3 Send an email using a server template
 
