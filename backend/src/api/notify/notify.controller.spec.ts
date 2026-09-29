@@ -18,6 +18,7 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
@@ -169,6 +170,7 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [
+        { provide: NotifyPreviewService, useValue: {} },
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -237,6 +239,28 @@ describe('Notify Controllers', () => {
   })
 
   describe('NotifySimpleController', () => {
+    it.each([
+      ['', ''],
+      ['', '?preview=false'],
+      ['', '?preview=TRUE'],
+      ['/email', ''],
+      ['/email', '?preview=false'],
+      ['/email', '?preview=1'],
+    ])('keeps real sends active on %s%s', async (path, query) => {
+      mockApiKeyConsumerId = 'consumer-standard'
+      const channel = {
+        recipients: { to: ['test@example.com'] },
+        content: { subject: 'Test', body: 'Hello' },
+      }
+      await request(app.getHttpServer())
+        .post(`/api/v1/notifysimple${path}${query}`)
+        .send(path ? channel : { email: channel })
+        .expect(202)
+      expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
+      expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
+      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+    })
+
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()
@@ -954,6 +978,28 @@ describe('Notify Controllers', () => {
       })
 
       describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        it.each(['', '?preview=false'])(
+          'keeps ordinary SMS sends unchanged with query %s',
+          async (query) => {
+            const body = {
+              sms: { recipients: { to: ['250 555 0123'] }, content: { body: 'Hello' } },
+            }
+            await request(app.getHttpServer())
+              .post(`/api/v1/notifysimple/sms${query}`)
+              .send(body)
+              .expect(202)
+              .expect((res) => {
+                expect(res.body.notifyId).toBeDefined()
+                expect(res.body.status).toBe('accepted')
+                expect(res.body.channels).toEqual(['sms'])
+                expect(res.body.sms).toBeUndefined()
+              })
+            expect(mockNotificationService.create).toHaveBeenCalled()
+            expect(mockIngestionQueue.add).toHaveBeenCalled()
+            expect(mockNotificationService.validateBusinessRules).toHaveBeenCalled()
+          },
+        )
+
         // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
         const validSmsMerge = {
           sms: {

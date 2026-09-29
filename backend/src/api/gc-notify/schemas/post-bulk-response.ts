@@ -90,7 +90,7 @@ export class PostBulkJobData {
   })
   service?: string
 
-  @ApiPropertyOptional({ type: PostBulkJobCreatedBy })
+  @ApiPropertyOptional({ description: 'User who created the job', type: PostBulkJobCreatedBy })
   created_by?: PostBulkJobCreatedBy
 
   @ApiProperty({
@@ -128,7 +128,7 @@ export class PostBulkJobData {
   })
   processing_finished?: string
 
-  @ApiPropertyOptional({ type: PostBulkJobServiceName })
+  @ApiPropertyOptional({ description: 'Name of the service', type: PostBulkJobServiceName })
   service_name?: PostBulkJobServiceName
 
   @ApiPropertyOptional({
@@ -137,7 +137,7 @@ export class PostBulkJobData {
   })
   template_type?: string
 
-  @ApiPropertyOptional({ type: PostBulkJobApiKey })
+  @ApiPropertyOptional({ description: 'API key used', type: PostBulkJobApiKey })
   api_key?: PostBulkJobApiKey
 
   @ApiPropertyOptional({ description: 'Whether the job has been archived' })
@@ -148,6 +148,6 @@ export class PostBulkJobData {
 }
 
 export class PostBulkResponse {
-  @ApiProperty({ type: PostBulkJobData })
+  @ApiProperty({ description: 'Bulk job data', type: PostBulkJobData })
   data: PostBulkJobData
 }
