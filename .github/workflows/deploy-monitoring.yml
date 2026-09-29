@@ -77,19 +77,6 @@ jobs:
             helm repo add grafana https://grafana.github.io/helm-charts || true
             helm repo update
 
-            # Provision the Loki ruler alert rules BEFORE the helm install.
-            # values-tools.yaml mounts a ConfigMap named `loki-alert-rules` into
-            # the ruler's rules dir (/var/loki/rules/common-notify), but nothing
-            # created it — so the log-based rules never actually loaded and the
-            # file drifted from git. Create it here so the mount is populated on
-            # first boot. (Previously applied by hand via
-            # monitoring/deploy-dashboards-alerts.sh.)
-            echo "🔔 Provisioning Loki ruler alert rules..."
-            oc create configmap loki-alert-rules \
-              --from-file=alert-rules.yaml=monitoring/grafana-stack/loki/alert-rules.yaml \
-              --namespace ${NAMESPACE} \
-              --dry-run=client -o yaml | oc apply -f -
-
             # Deploy Loki using tools-specific values
             helm upgrade --install loki grafana/loki \
               --namespace ${NAMESPACE} \
@@ -318,6 +305,18 @@ jobs:
               --namespace ${NAMESPACE} \
               --dry-run=client -o yaml | oc apply -f -
             oc label configmap cn-infra-alert-rules grafana_alert=1 \
+              --namespace ${NAMESPACE} --overwrite
+
+            # Log-based rules, also Grafana-managed. These were previously
+            # evaluated by Loki's ruler and forwarded to an Alertmanager that is
+            # not deployed, so they never notified. Same sidecar, same label,
+            # same contact point as the metric rules above.
+            echo "🔔 Provisioning Grafana-managed log alert rules (grafana_alert=1)..."
+            oc create configmap cn-log-alert-rules \
+              --from-file=log-alert-rules.yaml=monitoring/grafana-stack/grafana/log-alert-rules.yaml \
+              --namespace ${NAMESPACE} \
+              --dry-run=client -o yaml | oc apply -f -
+            oc label configmap cn-log-alert-rules grafana_alert=1 \
               --namespace ${NAMESPACE} --overwrite
 
             echo "📊 Provisioning Grafana dashboards (grafana_dashboard=1)..."

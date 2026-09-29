@@ -27,8 +27,10 @@ datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
+      # UID "loki" is referenced by log-alert-rules.yaml's datasourceUid.
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
         url: http://loki.f6bc3f-tools.svc.cluster.local:3100
         isDefault: true
@@ -39,13 +41,6 @@ datasources:
               matcherRegex: '"notificationId":"([^"]+)"'
               name: NotificationID
               url: ''
-      - name: Loki Alerting
-        type: loki
-        access: proxy
-        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
-        jsonData:
-          manageAlerts: true
-          alertmanagerUid: alertmanager
       # Prometheus (in-namespace, deployed via monitoring/grafana-stack/prometheus).
       # Source for the metric-based pod-state / OOM alerts (infra-alert-rules.yaml).
       # UID "prometheus" is referenced by those rules' datasourceUid.

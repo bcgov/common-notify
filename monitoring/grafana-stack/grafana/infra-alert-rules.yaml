@@ -1,8 +1,8 @@
 # Grafana-managed infrastructure (pod-state / resource) alert rules
 # ---------------------------------------------------------------------------
 # WHY THIS FILE EXISTS
-#   The existing alerting (monitoring/grafana-stack/loki/alert-rules.yaml) is
-#   entirely LOG-BASED (Loki). Log rules cannot see Kubernetes pod state, so a
+#   The pre-existing alerting was entirely LOG-BASED (see the companion file
+#   log-alert-rules.yaml). Log rules cannot see Kubernetes pod state, so a
 #   CrashLoopBackOff / OOMKill / memory pressure produced NO alert — e.g. the
 #   permanent dev backend and the redis pods have crash-looped for days with
 #   hundreds of restarts and nothing fired.
