@@ -9,7 +9,15 @@ metadata:
 spec:
   strategy:
     type: {{ .Values.backend.deploymentStrategy }}
-  {{- if not .Values.backend.autoscaling.enabled }}
+  {{- /*
+    Must match hpa.yaml's condition exactly. The HPA is only created when BOTH
+    global.autoscaling AND backend.autoscaling.enabled are true, so `replicas`
+    has to be omitted under that same condition — otherwise Helm and the HPA
+    fight over the field on every deploy. Gating on backend.autoscaling.enabled
+    alone would, with the shipped defaults, render neither: Kubernetes silently
+    defaults to 1 replica and replicaCount becomes dead config.
+  */}}
+  {{- if not (and .Values.global.autoscaling .Values.backend.autoscaling.enabled) }}
   replicas: {{ .Values.backend.replicaCount }}
   {{- end }}
   selector:
