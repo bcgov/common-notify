@@ -15,6 +15,31 @@
 #
 # DATA SOURCE  (UID: loki — keep in sync with values-tools-sso.yaml)
 #
+# THRESHOLDS ARE DERIVED FROM REAL DATA, NOT GUESSED
+#   The original rules used per-second rates with thresholds of 1-50/sec. Measured
+#   against 7 days of actual logs, almost none of them could ever fire: prod
+#   backend produces ~9k lines/WEEK, and the specific patterns matched at most
+#   12 lines per 10m (QueueJobFailures), 4 (ChesDeliveryFailures) or 1
+#   (EmailSendingFailures). A ">2/sec" threshold is two orders of magnitude above
+#   anything the service emits.
+#
+#   So these rules count MATCHING LINES IN A 10 MINUTE WINDOW rather than a
+#   per-second rate — a far more meaningful unit at this volume — and the
+#   thresholds sit above observed normal with headroom. Max observed per 10m over
+#   7 days, for reference when retuning:
+#     HighErrorRate/CriticalErrorRate 5151 · QueueJobFailures 12 ·
+#     ChesDeliveryFailures 4 · EmailSendingFailures 1 · all others 0
+#
+#   The rules with 0 observed matches are set to a low but non-trivial count
+#   (5-20 per 10m) so they remain reachable when the condition actually occurs.
+#   VirusDetected and QueueNotDraining stay at >0: a single occurrence matters.
+#
+# REMOVED: LokiIngestionLag / LokiErrors
+#   Both selected {namespace="f6bc3f-tools", app="loki"}. Neither label value
+#   exists — Loki does not ship its own logs into itself, so the rules could
+#   never fire under any circumstances. Loki self-monitoring belongs on metrics
+#   (Prometheus scrapes Loki) rather than logs; tracked separately.
+#
 # CONVERSION NOTE
 #   A Loki ruler rule embeds its threshold in the expression
 #   (`... > 10`). Grafana splits this: the query returns the value, and a
@@ -45,12 +70,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [10m])) by (namespace, app)
               queryType: instant
               refId: A
           - refId: C
@@ -59,7 +84,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [10] }
+                - evaluator: { type: gt, params: [500] }
               refId: C
         labels:
           severity: "warning"
@@ -67,7 +92,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }}/{{ $labels.app }} error rate elevated"
           summary: "High error rate detected in {{ $labels.namespace }}/{{ $labels.app }}"
-          description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} over the last 5 minutes"
+          description: "{{ $value }} error/exception log lines in {{ $labels.namespace }}/{{ $labels.app }} over the last 10 minutes"
 
       - uid: cn-log-error-rate-crit
         title: CriticalErrorRate
@@ -77,12 +102,12 @@ groups:
         for: 2m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [5m])) by (namespace, app)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [10m])) by (namespace, app)
               queryType: instant
               refId: A
           - refId: C
@@ -91,7 +116,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [50] }
+                - evaluator: { type: gt, params: [2000] }
               refId: C
         labels:
           severity: "critical"
@@ -99,7 +124,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }}/{{ $labels.app }} very high error rate"
           summary: "CRITICAL: Very high error rate in {{ $labels.namespace }}/{{ $labels.app }}"
-          description: "Error rate is {{ $value }} errors/sec in {{ $labels.namespace }}/{{ $labels.app }} - immediate attention required!"
+          description: "{{ $value }} error/exception log lines in {{ $labels.namespace }}/{{ $labels.app }} over the last 10 minutes - immediate attention required!"
 
       - uid: cn-log-db-errors
         title: DatabaseConnectionErrors
@@ -109,12 +134,12 @@ groups:
         for: 3m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -123,7 +148,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [1] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
         labels:
           severity: "critical"
@@ -132,7 +157,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} database connection errors"
           summary: "Database connection errors in {{ $labels.namespace }}"
-          description: "Database connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
+          description: "{{ $value }} database connection error log lines in {{ $labels.namespace }} over the last 10 minutes"
 
       - uid: cn-log-redis-errors
         title: RedisConnectionErrors
@@ -142,12 +167,12 @@ groups:
         for: 3m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -156,7 +181,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [1] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
         labels:
           severity: "warning"
@@ -165,7 +190,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} Redis connection errors"
           summary: "Redis connection errors in {{ $labels.namespace }}"
-          description: "Redis connection errors detected ({{ $value }} errors/sec) in {{ $labels.namespace }}"
+          description: "{{ $value }} Redis connection error log lines in {{ $labels.namespace }} over the last 10 minutes"
 
       - uid: cn-log-email-failures
         title: EmailSendingFailures
@@ -175,12 +200,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -189,7 +214,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
         labels:
           severity: "warning"
@@ -198,7 +223,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} email send failures elevated"
           summary: "Email sending failures in {{ $labels.namespace }}"
-          description: "Email sending failure rate is {{ $value }} failures/sec in {{ $labels.namespace }}"
+          description: "{{ $value }} email send failure log lines in {{ $labels.namespace }} over the last 10 minutes"
 
   - orgId: 1
     name: common-notify-performance
@@ -213,12 +238,12 @@ groups:
         for: 10m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -227,7 +252,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [5] }
+                - evaluator: { type: gt, params: [20] }
               refId: C
         labels:
           severity: "warning"
@@ -246,12 +271,12 @@ groups:
         for: 10m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [5m])) by (namespace, app)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [10m])) by (namespace, app)
               queryType: instant
               refId: A
           - refId: C
@@ -260,7 +285,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [1] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
         labels:
           severity: "warning"
@@ -284,12 +309,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -298,7 +323,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [10] }
+                - evaluator: { type: gt, params: [20] }
               refId: C
         labels:
           severity: "warning"
@@ -307,7 +332,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} high auth failure rate"
           summary: "High authentication failure rate in {{ $labels.namespace }}"
-          description: "Authentication failure rate is {{ $value }} failures/sec in {{ $labels.namespace }} - possible brute force attack"
+          description: "{{ $value }} authentication failure log lines in {{ $labels.namespace }} over the last 10 minutes - possible brute force attack"
 
       - uid: cn-log-virus
         title: VirusDetected
@@ -317,12 +342,12 @@ groups:
         for: 1m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -343,76 +368,6 @@ groups:
           description: "ClamAV detected a virus in uploaded file in {{ $labels.namespace }} - immediate investigation required!"
 
   - orgId: 1
-    name: loki-operational
-    folder: Common Notify Logs
-    interval: 1m
-    rules:
-      - uid: cn-log-loki-lag
-        title: LokiIngestionLag
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 10m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: loki
-            model:
-              editorMode: code
-              expr: |
-                sum(rate({namespace="f6bc3f-tools", app="loki"} |~ "(?i)(lag|delay|backlog)" [5m]))
-              queryType: instant
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [10] }
-              refId: C
-        labels:
-          severity: "warning"
-          service: "loki"
-          component: "ingestion"
-        annotations:
-          short: "Loki ingestion lag — logs may be delayed"
-          summary: "Loki ingestion lag detected"
-          description: "Loki is experiencing ingestion lag - logs may be delayed"
-
-      - uid: cn-log-loki-errors
-        title: LokiErrors
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 5m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: loki
-            model:
-              editorMode: code
-              expr: |
-                sum(rate({namespace="f6bc3f-tools", app="loki"} |~ "(?i)(error|fail)" [5m]))
-              queryType: instant
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [5] }
-              refId: C
-        labels:
-          severity: "warning"
-          service: "loki"
-        annotations:
-          short: "Loki reporting errors — log aggregation impacted"
-          summary: "Loki errors detected"
-          description: "Loki is reporting errors ({{ $value }} errors/sec) - log aggregation may be impacted"
-
-  - orgId: 1
     name: common-notify-delivery
     folder: Common Notify Logs
     interval: 1m
@@ -425,12 +380,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -439,7 +394,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [10] }
               refId: C
         labels:
           severity: "critical"
@@ -448,7 +403,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} repeated CHES delivery failures"
           summary: "CHES delivery failures in {{ $labels.namespace }}"
-          description: "Repeated CHES (email provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). Email delivery may be degraded."
+          description: "Repeated CHES (email provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). Email delivery may be degraded."
 
       - uid: cn-log-acs-failures
         title: AcsDeliveryFailures
@@ -458,12 +413,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -472,7 +427,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [10] }
               refId: C
         labels:
           severity: "critical"
@@ -481,7 +436,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} repeated ACS delivery failures"
           summary: "ACS delivery failures in {{ $labels.namespace }}"
-          description: "Repeated ACS (SMS provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). SMS delivery may be degraded."
+          description: "Repeated ACS (SMS provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). SMS delivery may be degraded."
 
       - uid: cn-log-sms-failures
         title: SmsSendingFailures
@@ -491,12 +446,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -505,7 +460,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [10] }
               refId: C
         labels:
           severity: "warning"
@@ -514,7 +469,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} SMS send failures elevated"
           summary: "SMS sending failures in {{ $labels.namespace }}"
-          description: "SMS sending failure log rate is {{ $value }}/sec in {{ $labels.namespace }} over 5m."
+          description: "{{ $value }} SMS send failure log lines in {{ $labels.namespace }} over the last 10 minutes."
 
       - uid: cn-log-webhook-failures
         title: WebhookDeliveryFailures
@@ -524,12 +479,12 @@ groups:
         for: 10m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -538,7 +493,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [10] }
               refId: C
         labels:
           severity: "warning"
@@ -547,7 +502,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} webhook/callback failures elevated"
           summary: "Webhook delivery failures in {{ $labels.namespace }}"
-          description: "Webhook/callback delivery failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m)."
+          description: "Webhook/callback delivery failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m)."
 
       - uid: cn-log-queue-failures
         title: QueueJobFailures
@@ -557,12 +512,12 @@ groups:
         for: 5m
         data:
           - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
+            relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: loki
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [5m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -571,7 +526,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [2] }
+                - evaluator: { type: gt, params: [25] }
               refId: C
         labels:
           severity: "warning"
@@ -580,7 +535,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} queue jobs failing"
           summary: "Queue job failures in {{ $labels.namespace }}"
-          description: "BullMQ job failures in {{ $labels.namespace }} ({{ $value }} matching log lines/sec over 5m). Check the failed/dead-letter queue."
+          description: "BullMQ job failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). Check the failed/dead-letter queue."
 
       - uid: cn-log-queue-stalled
         title: QueueNotDraining
@@ -595,7 +550,7 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(rate({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
