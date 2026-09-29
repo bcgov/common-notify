@@ -173,8 +173,9 @@ const GenericModal: FC<GenericModalProps> = ({
                 <div className="modal-footer">
                   <Button
                     type="button"
-                    variant="secondary"
-                    onClick={onClose}
+                    variant={cancelVariant}
+                    danger={cancelDanger}
+                    onClick={onCancel ?? onClose}
                     isDisabled={isSubmitLoading}
                   >
                     {cancelText}
