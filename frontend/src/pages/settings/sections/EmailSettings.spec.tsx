@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
 import EmailSettings from './EmailSettings'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
 import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
@@ -45,32 +45,13 @@ vi.mock('@bcgov/design-system-react-components', () => ({
       {...props}
     />
   ),
-  RadioGroup: ({ children, description, isDisabled, label, onChange, value }: any) => (
-    <fieldset
-      data-value={value}
-      disabled={isDisabled}
-      onChange={(event) => {
-        const target = event.target as unknown as HTMLInputElement
-        if (target.type === 'radio') onChange(target.value)
-      }}
-    >
-      <legend>{label}</legend>
-      {description && <span>{description}</span>}
-      {children}
-    </fieldset>
-  ),
-  Radio: ({ children, value }: { children: ReactNode; value: string }) => (
-    <label>
-      <input name="email-logo" type="radio" value={value} />
-      {children}
-    </label>
-  ),
   // BCDS TextField hands onChange the value, not the event.
   TextField: ({
     onChange,
     isInvalid,
     errorMessage,
     isDisabled,
+    iconLeft: _iconLeft,
     iconRight: _iconRight,
     ...props
   }: any) => (
@@ -87,6 +68,9 @@ vi.mock('@bcgov/design-system-react-components', () => ({
   Tooltip: ({ children }: any) => <span>{children}</span>,
   TooltipTrigger: ({ children }: any) => <>{children}</>,
   SvgInfoIcon: () => null,
+  SvgCheckIcon: () => null,
+  SvgChevronDownIcon: () => null,
+  SvgChevronUpIcon: () => null,
 }))
 
 const SAVED_EMAIL = {
@@ -159,23 +143,24 @@ describe('EmailSettings section', () => {
     expect(screen.getByText('1,000,500 emails/year')).toBeInTheDocument()
   })
 
-  it('renders approved logo thumbnails using the API-provided public image URLs', () => {
+  it('renders the selected logo and API-provided thumbnails in the dropdown', async () => {
     renderWithRoles()
 
-    expect(screen.getByRole('group', { name: 'Email logo' })).toHaveAttribute(
-      'data-value',
-      'logo-1',
-    )
-    const primaryImage = screen.getByText('Primary logo').closest('label')?.querySelector('img')
-    expect(primaryImage).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
-    expect(screen.getByText('Primary logo')).toBeInTheDocument()
-    expect(screen.getByText('Alternate logo')).toBeInTheDocument()
+    const trigger = screen.getByRole('button', { name: 'Email logo/brand Primary logo' })
+    expect(trigger.querySelector('img')).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
+
+    await userEvent.click(trigger)
+
+    const primaryOption = screen.getByRole('option', { name: 'Primary logo' })
+    expect(primaryOption.querySelector('img')).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
+    expect(screen.getByRole('option', { name: 'Alternate logo' })).toBeInTheDocument()
   })
 
   it('saves a newly selected logo with the existing email settings payload', async () => {
     renderWithRoles()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Alternate logo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Alternate logo' }))
     fireEvent.click(saveButton())
 
     await waitFor(() => {
@@ -191,7 +176,8 @@ describe('EmailSettings section', () => {
   it('allows clearing the selected logo', async () => {
     renderWithRoles()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'No logo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
+    await userEvent.click(screen.getByRole('option', { name: 'No logo' }))
     fireEvent.click(saveButton())
 
     await waitFor(() => {
@@ -199,6 +185,31 @@ describe('EmailSettings section', () => {
         expect.objectContaining({ emailLogoId: null }),
       )
     })
+  })
+
+  it('filters logos and supports arrow-key selection and Escape', async () => {
+    renderWithRoles()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
+    const search = screen.getByRole('combobox', { name: 'Search email logos' })
+    await userEvent.type(search, 'Alternate')
+
+    expect(screen.queryByRole('option', { name: 'Primary logo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Alternate logo' })).toBeInTheDocument()
+
+    await userEvent.keyboard('{ArrowDown}{Enter}')
+
+    const alternateTrigger = screen.getByRole('button', {
+      name: 'Email logo/brand Alternate logo',
+    })
+    expect(alternateTrigger).toHaveFocus()
+    expect(saveButton()).toBeEnabled()
+
+    await userEvent.click(alternateTrigger)
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(alternateTrigger).toHaveFocus()
   })
 
   it('keeps Save disabled until a value changes', () => {

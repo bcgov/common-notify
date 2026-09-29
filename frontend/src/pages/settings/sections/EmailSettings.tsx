@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
-  Radio,
-  RadioGroup,
   SvgInfoIcon,
   Switch,
   TextField,
   Tooltip,
 } from '@bcgov/design-system-react-components'
+import EmailLogoMenu from '@/components/EmailLogoMenu'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -28,8 +27,6 @@ const REPLY_TO_PATTERN = /^[A-Za-z0-9._-]{1,64}$/
 const normalizeReplyTo = (value: string): string | null => value.trim() || null
 
 const isValidReplyTo = (value: string): boolean => REPLY_TO_PATTERN.test(value)
-
-const NO_LOGO_VALUE = 'none'
 
 interface EmailSwitches {
   emailNotificationsEnabled: boolean
@@ -138,37 +135,13 @@ const EmailSettings: FC = () => {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="settings__field">
-        <RadioGroup
-          className="settings__logo-picker"
-          label="Email logo"
-          description="Choose a logo for outgoing emails, or select no logo."
-          value={selectedEmailLogoId ?? NO_LOGO_VALUE}
-          onChange={(value) => setSelectedEmailLogoId(value === NO_LOGO_VALUE ? null : value)}
+        <EmailLogoMenu
+          logos={approvedLogos}
+          value={selectedEmailLogoId}
+          onChange={setSelectedEmailLogoId}
           isDisabled={isFieldDisabled || approvedLogosLoading}
-        >
-          <div className="settings__logo-grid">
-            <div className="settings__logo-option">
-              <Radio value={NO_LOGO_VALUE}>
-                <span className="settings__logo-none">No logo</span>
-              </Radio>
-            </div>
-            {approvedLogos.map((logo) => (
-              <div className="settings__logo-option" key={logo.id}>
-                <Radio value={logo.id}>
-                  <span className="settings__logo-content">
-                    <img
-                      alt=""
-                      className="settings__logo-thumbnail"
-                      loading="lazy"
-                      src={logo.imageUrl}
-                    />
-                    <span>{logo.name ?? 'Unnamed logo'}</span>
-                  </span>
-                </Radio>
-              </div>
-            ))}
-          </div>
-        </RadioGroup>
+          isLoading={approvedLogosLoading}
+        />
         {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
         {approvedLogosError && (
           <p className="settings__field-error" role="alert">
