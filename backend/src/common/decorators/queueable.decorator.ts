@@ -23,6 +23,8 @@ import type { LimitAlertNotificationService } from '../../api/notify/services/li
 import type { SafelistCandidate, SafelistService } from '../../api/safelist/safelist.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
+import type { EventNotificationResolver } from '../../api/events/event-notification.resolver'
+import type { NotifyEventTestSendRequest } from '../../api/notify/schemas/notify-event-send-request'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
@@ -43,7 +45,14 @@ export interface QueueableContext {
   safelistService?: SafelistService
   notificationRequestDetailService?: NotificationRequestDetailService
   smsSegmentService?: SmsSegmentService
+  eventNotificationResolver?: EventNotificationResolver
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+export type EventSendMode = 'full' | 'test'
+
+export interface QueueableOptions {
+  eventSend?: EventSendMode
 }
 
 /**
@@ -226,6 +235,48 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
     tenant !== null &&
     typeof (tenant as Record<string, unknown>).id === 'string'
   )
+}
+
+/**
+ * Expand an event send request into the ordinary request shape.
+ *
+ * Event ID is stored in notification_request, delivery worker uses this
+ * to add the sender + header later in the pipeline.
+ */
+async function resolveEventSend(
+  ctx: QueueableContext,
+  mode: EventSendMode,
+  payload: unknown,
+  req: any,
+  tenantId: string,
+): Promise<NotifySimpleRequest> {
+  const resolver = ctx.eventNotificationResolver
+  if (!resolver) {
+    throw new InternalServerErrorException(
+      'EventNotificationResolver not injected. Ensure controller constructor includes: readonly eventNotificationResolver: EventNotificationResolver',
+    )
+  }
+
+  const request = payload as NotifyEventTestSendRequest
+  const authHeader = req?.headers?.authorization as string | undefined
+
+  if (mode === 'full') {
+    return resolver.resolveSend(tenantId, request.eventId, request.params, {
+      tenantId: req?.tenant?.externalId,
+      authHeader,
+    })
+  }
+
+  // TODO: should be using a recipients list not grabbing caller email
+  const callerEmail = req?.user?.email
+  if (typeof callerEmail !== 'string' || !callerEmail.trim()) {
+    throw new BadRequestException(
+      'Your account has no email address, so there is nowhere to send a test notification',
+    )
+  }
+
+  const to = request.to?.length ? request.to : [callerEmail]
+  return resolver.resolveTestSend(tenantId, request.eventId, request.params, to, callerEmail)
 }
 
 /**
@@ -544,6 +595,7 @@ export async function handleMerge(
 export function Queueable(
   queueName: QueueName = QueueName.INGESTION,
   channel?: NotificationChannel,
+  options?: QueueableOptions,
 ) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const logger = new Logger(`Queueable[${queueName}]`)
@@ -552,7 +604,7 @@ export function Queueable(
       try {
         // For single-channel routes the body is a bare channel; wrap it into a NotifySimpleRequest
         // so detection and downstream processing operate on the standard shape.
-        const payload: unknown =
+        let payload: unknown =
           channel && body && typeof body === 'object' ? { [channelKey(channel)]: body } : body
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
@@ -612,6 +664,19 @@ export function Queueable(
             : typeof req?.user?.id === 'string'
               ? req.user.id
               : tenantId
+
+        // Event Send: expand the event data here
+        let eventId: string | undefined
+        if (options?.eventSend) {
+          eventId = (payload as { eventId?: string })?.eventId
+          payload = await resolveEventSend(
+            this as QueueableContext,
+            options.eventSend,
+            payload,
+            req,
+            tenantId,
+          )
+        }
 
         // Email merge send: a different payload/flow that fans out into batches downstream.
         const mergeChannel = mergeRequestChannel(payload)
@@ -709,6 +774,7 @@ export function Queueable(
             createdBy: tenantId,
             payload: processedPayload, // Store sanitized request payload for retry purposes
             requestRoute,
+            eventId,
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,

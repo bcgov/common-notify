@@ -12,6 +12,11 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
 import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
+import type {
+  EventEmailSendSettings,
+  EventNotificationResolver,
+} from '../../api/events/event-notification.resolver'
+import type { EmailHeaderOverride } from '../../api/templates/email-template-layout.service'
 import { IEmailTransport } from '../../adapters'
 import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
 import { StructuredLoggerService } from '../../common/logger'
@@ -66,6 +71,41 @@ export class EmailDeliveryWorker {
   }
 
   /**
+   * The sender and header of the event this request came from, or null when it came from none.
+   */
+  private static async resolveEventSettings(
+    notifyId: string,
+    tenantId: string,
+    notificationService: NotificationService,
+    eventNotificationResolver: EventNotificationResolver | undefined,
+    logger: Logger,
+  ): Promise<EventEmailSendSettings | null> {
+    if (!eventNotificationResolver) return null
+
+    try {
+      const notification = await notificationService.findOne(notifyId, tenantId)
+      if (!notification?.eventId) return null
+
+      return await eventNotificationResolver.findEmailSendSettings(notification.eventId)
+    } catch (error) {
+      logger.warn(
+        `[${notifyId}] Could not read event send settings, falling back to the tenant's: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+      return null
+    }
+  }
+
+  private static toHeaderOverride(
+    settings: EventEmailSendSettings | null,
+  ): EmailHeaderOverride | undefined {
+    if (!settings?.useCustomHeader) return undefined
+
+    return { logoId: settings.headerLogoId, title: settings.headerTitle }
+  }
+
+  /**
    * Initialize the email delivery worker on a queue
    * @param emailQueue The BullMQ queue instance for email delivery jobs
    * @param notificationService Service for database updates
@@ -91,6 +131,7 @@ export class EmailDeliveryWorker {
     // Last, and optional, because the parameters above are passed positionally: a new one in the
     // middle silently rebinds every existing call's concurrency argument.
     tenantSettingsService?: TenantSettingsService,
+    eventNotificationResolver?: EventNotificationResolver,
   ): Promise<void> {
     const logger = new Logger(EmailDeliveryWorker.name)
     const workerContext = EmailDeliveryWorker.name
@@ -114,12 +155,10 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
-        // The tenant's configured sender, resolved once for every recipient this job sends to.
-        // Null when unset - or when the service is absent, as it is in a test context that boots
-        // the worker without the settings module - which leaves the adapter on `ches.from`.
-        const fromAddress = (await tenantSettingsService?.getSenderAddress(tenantId)) ?? null
-
-        // Mail merge batch: resolve the template once, then render + send per recipient individually.
+        // Mail merge batch: resolve the template once, then render + send per recipient
+        // individually. Taken before the event lookup below because a merge never comes from an
+        // event - there is no bulk upload on an event - so it would be a read per batch for a
+        // result that is always null.
         if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
           return await EmailDeliveryWorker.processMailMergeBatch(
             job.data.batchId,
@@ -133,9 +172,29 @@ export class EmailDeliveryWorker {
             emailAdapter,
             requestDetailService,
             notificationService,
-            fromAddress,
+            (await tenantSettingsService?.getSenderAddress(tenantId)) ?? null,
           )
         }
+
+        // An event-sourced send carries its own sender and header, which have no home on the
+        // request payload - the request records which event it came from and they are read back
+        // here. Null for every other send, which leaves the tenant's own settings in place.
+        const eventSettings = await EmailDeliveryWorker.resolveEventSettings(
+          notifyId,
+          tenantId,
+          notificationService,
+          eventNotificationResolver,
+          logger,
+        )
+
+        // The tenant's configured sender, resolved once for every recipient this job sends to.
+        // Null when unset - or when the service is absent, as it is in a test context that boots
+        // the worker without the settings module - which leaves the adapter on `ches.from`.
+        const fromAddress =
+          eventSettings?.senderEmail ??
+          (await tenantSettingsService?.getSenderAddress(tenantId)) ??
+          null
+        const headerOverride = EmailDeliveryWorker.toHeaderOverride(eventSettings)
 
         // Single delivery path: emit a structured lifecycle "start" event.
         structuredLogger?.logNotificationStart(notifyId, tenantId, 'email', workerContext)
@@ -199,7 +258,11 @@ export class EmailDeliveryWorker {
                 { ...request?.params, ...emailPayload.params },
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
-              const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
+              const rendered = await templatesService.applyEmailLayout(
+                template,
+                renderedTemplate,
+                headerOverride,
+              )
 
               emailPayload = {
                 ...emailPayload,

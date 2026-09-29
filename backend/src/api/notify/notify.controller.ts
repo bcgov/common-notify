@@ -28,6 +28,10 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyService } from './notify.service'
 import { NotifySimpleRequest } from './schemas/notify-simple-request'
 import { NotifyEmailChannel } from './schemas/notify-email-channel'
+import {
+  NotifyEventSendRequest,
+  NotifyEventTestSendRequest,
+} from './schemas/notify-event-send-request'
 import { NotificationAcceptanceResponse } from './schemas/notification-acceptance-response.dto'
 import { MAIL_MERGE_MAX_RECIPIENTS } from './schemas/mail-merge.constants'
 import {
@@ -46,6 +50,7 @@ import { AttachmentValidationService } from './services/attachment-validation.se
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -581,6 +586,7 @@ export class NotifySimpleFrontendController {
     readonly limitAlertNotificationService: LimitAlertNotificationService,
     readonly safelistService: SafelistService,
     readonly smsSegmentService: SmsSegmentService,
+    readonly eventNotificationResolver: EventNotificationResolver,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
@@ -635,6 +641,34 @@ export class NotifySimpleFrontendController {
     @Body() _body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
     // Implementation provided by @Queueable
+    return undefined as any
+  }
+
+  @Version('1')
+  @Post('event')
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard)
+  @FeatureFlag(FeatureFlagCode.EVENTS)
+  @Queueable(QueueName.INGESTION, undefined, { eventSend: 'full' })
+  sendEventNotification(
+    @Req() _req: any,
+    @Body() _body: NotifyEventSendRequest,
+  ): Promise<NotificationAcceptanceResponse> {
+    return undefined as any
+  }
+
+  @Version('1')
+  @Post('event/test')
+  @HttpCode(202)
+  @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
+  @UseGuards(FeatureFlagGuard)
+  @FeatureFlag(FeatureFlagCode.EVENTS)
+  @Queueable(QueueName.INGESTION, undefined, { eventSend: 'test' })
+  sendEventTest(
+    @Req() _req: any,
+    @Body() _body: NotifyEventTestSendRequest,
+  ): Promise<NotificationAcceptanceResponse> {
     return undefined as any
   }
 

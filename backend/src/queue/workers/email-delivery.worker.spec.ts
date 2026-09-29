@@ -539,7 +539,13 @@ describe('EmailDeliveryWorker', () => {
         { firstName: 'Test' },
         undefined,
       )
-      expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(template, renderedTemplate)
+      // No header override: this send did not come from an event, so the tenant's own header
+      // applies, which is what the third argument being undefined asks for.
+      expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(
+        template,
+        renderedTemplate,
+        undefined,
+      )
       expect(mockEmailAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
           content: expect.objectContaining({

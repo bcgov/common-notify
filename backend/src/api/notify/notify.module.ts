@@ -29,6 +29,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SmsSegmentService } from './services/sms-segment.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { SafelistModule } from '../safelist/safelist.module'
+import { EventsModule } from '../events/events.module'
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SafelistModule } from '../safelist/safelist.module'
     SafelistModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
+    forwardRef(() => EventsModule),
   ],
   controllers: [
     NotifySimpleController,

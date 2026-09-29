@@ -195,16 +195,24 @@
   gap: var(--layout-padding-xsmall);
 }
 
+// Tight above the rule and generous below it, so the header reads as one block and the message
+// as another. Matches HEADER_PADDING_BELOW_PX / HEADER_MARGIN_BELOW_PX in the backend's
+// email-template-layout.service, which is what the delivered email uses.
 .events__header-preview-row {
   display: flex;
   align-items: center;
   gap: 16px;
+  // No padding above the rule: the approved logo SVGs carry whitespace around their artwork, so
+  // the image box already supplies that gap.
+  margin-bottom: 28px;
   border-bottom: 1px solid $border-default;
 }
 
+// Kept in step with LOGO_HEIGHT_PX in the backend's email-template-layout.service, which is what
+// the delivered email uses - this preview is only honest while the two agree.
 .events__header-preview-logo {
-  height: 48px;
-  max-width: 180px;
+  height: 72px;
+  max-width: 270px;
   object-fit: contain;
   object-position: left center;
 }

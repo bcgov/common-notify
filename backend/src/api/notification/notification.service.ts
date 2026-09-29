@@ -228,6 +228,7 @@ export class NotificationService {
       recipients: recipients,
       delayedSendTime: delayedSendTime,
       requestRoute: dto.requestRoute,
+      eventId: dto.eventId,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)

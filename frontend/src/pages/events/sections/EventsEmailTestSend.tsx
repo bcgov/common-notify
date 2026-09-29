@@ -7,11 +7,12 @@ import StickyBar from '@/components/StickyBar'
 import EventEmailPreview from '../components/EventEmailPreview'
 import EventEmailPreviewModal from '../components/EventEmailPreviewModal'
 import type { AppliedNotification } from '../components/EventEmailPreviewModal'
-import { getEventById } from '@/api/events.api'
+import { getEventById, sendEventTestEmail } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { useAppSelector } from '@/redux/hooks'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/components/events.scss'
 
 interface EventsEmailTestSendProps {
@@ -40,6 +41,7 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   // than in the modal so they outlive it: the preview below shows the render, and the values are
   // ready for the send once there is an endpoint to send through.
   const [applied, setApplied] = useState<AppliedNotification | null>(null)
+  const [isSending, setSending] = useState(false)
 
   // The page is landed on from the saved page and on a refresh, so it fetches the event itself
   // rather than being handed the settings it shows. Tenant-scoped, the same way the saved page is.
@@ -86,6 +88,22 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
       active = false
     }
   }, [templateId])
+
+  const handleSend = async () => {
+    setSending(true)
+    try {
+      // The values the preview was rendered from, so what arrives is what was reviewed. Sending
+      // none is allowed: the API answers with the placeholders the template still needs.
+      await sendEventTestEmail(eventId, applied?.values ?? {})
+      showSuccessToast('Test notification queued.')
+    } catch (error) {
+      showErrorToast(
+        error instanceof Error ? error.message : 'Failed to send the test notification',
+      )
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <div className="page events">
@@ -192,10 +210,13 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
               >
                 Back to email notifications
               </Button>
-              {/* There is no test send endpoint yet, so this marks where it goes and stays
-                  disabled until there is something to call. */}
-              <Button variant="primary" type="button" isDisabled>
-                Send test email (1)
+              <Button
+                variant="primary"
+                type="button"
+                onPress={() => void handleSend()}
+                isDisabled={recipient !== 'myself' || !template || isSending}
+              >
+                {isSending ? 'Sending...' : 'Send test email (1)'}
               </Button>
             </StickyBar>
           </>

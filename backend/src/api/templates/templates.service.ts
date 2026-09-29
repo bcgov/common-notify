@@ -23,7 +23,11 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
-import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
+import {
+  EmailHeaderOverride,
+  EmailTemplateLayoutService,
+  RenderedEmailContent,
+} from './email-template-layout.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
   extractTemplatePersonalisationKeys,
@@ -51,8 +55,9 @@ export class TemplatesService {
   public applyEmailLayout(
     template: Template,
     rendered: RenderedEmailContent,
+    header?: EmailHeaderOverride,
   ): Promise<RenderedEmailContent> {
-    return this.emailTemplateLayoutService.apply(template, rendered)
+    return this.emailTemplateLayoutService.apply(template, rendered, header)
   }
 
   /**
