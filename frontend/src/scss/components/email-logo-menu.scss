@@ -10,7 +10,7 @@
   display: block;
   margin-bottom: 2px;
   color: var(--typography-color-secondary, #{$text-secondary});
-  font: var(--typography-regular-small-body, 400 14px/21px 'BC Sans', sans-serif);
+  font: var(--typography-bold-small-body, 700 14px/21px 'BC Sans', sans-serif);
 }
 
 .email-logo-menu__trigger {

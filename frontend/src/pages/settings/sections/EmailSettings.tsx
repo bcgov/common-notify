@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
+  InlineAlert,
+  Link,
   SvgInfoIcon,
   Switch,
   TextField,
   Tooltip,
 } from '@bcgov/design-system-react-components'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import EmailLogoMenu from '@/components/EmailLogoMenu'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
@@ -129,7 +132,7 @@ const EmailSettings: FC = () => {
   }
 
   return (
-    <form className="settings__form" onSubmit={handleSubmit}>
+    <form className="settings__form settings__form--email" onSubmit={handleSubmit}>
       <h2 className="settings__section-heading">Email Settings</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -142,6 +145,10 @@ const EmailSettings: FC = () => {
           isDisabled={isFieldDisabled || approvedLogosLoading}
           isLoading={approvedLogosLoading}
         />
+        <p className="settings__help">
+          Select the authoring logo displayed on notifications sent from this tenant. Can be
+          overridden at the event level.
+        </p>
         {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
         {approvedLogosError && (
           <p className="settings__field-error" role="alert">
@@ -149,6 +156,21 @@ const EmailSettings: FC = () => {
           </p>
         )}
       </div>
+
+      <InlineAlert variant="info">
+        <span className="description" id="alert-title">
+          Only approved authoring logos may be used. Contact your{' '}
+          <Link
+            href="https://intranet.gov.bc.ca/gcpe/communication-services-tools-for-ministry-partners/brand?"
+            target="_blank"
+            rel="noopener noreferrer"
+            iconRight={<OpenInNewIcon fontSize="inherit" />}
+          >
+            ministry GCPE communications office
+          </Link>{' '}
+          if you’re unsure.
+        </span>
+      </InlineAlert>
 
       <div className="settings__field">
         <div className="settings__switch-row">

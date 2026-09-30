@@ -1,14 +1,14 @@
 @import '../variables.scss';
 
+.layout-content:has(> .settings) {
+  padding-top: $spacing-xl;
+}
+
 .settings {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  padding-top: 24px;
-  // Settings keeps its own layout rather than using `.page`, so it does not pick up
-  // $page-gutter. 348px = the previous 284px plus the 64px the sidebar used to
-  // contribute as margin-right, which keeps this page exactly where it was.
-  padding-left: 348px;
+  padding: 0 $layout-gutter;
 }
 
 .settings__title {
@@ -34,6 +34,24 @@
   flex-direction: column;
   gap: 24px;
   width: 418px;
+  max-width: 100%;
+
+  &:has(.settings__form--email) {
+    width: 500px;
+  }
+}
+
+.settings__form--email .settings__field {
+  width: 418px;
+  max-width: 100%;
+}
+
+.settings__form--email .settings__field:has(.email-logo-menu) {
+  gap: 2px;
+
+  .settings__help {
+    line-height: 21px;
+  }
 }
 
 .settings__form {
