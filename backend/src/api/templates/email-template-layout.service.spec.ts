@@ -41,8 +41,8 @@ describe('EmailTemplateLayoutService', () => {
       vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue(settings as any)
       const result = await service.apply(template, rendered)
       expect(result.bodyType).toBe('html')
-      expect(result.body).toContain('width="180"')
-      expect(result.body).toContain('width:180px;max-width:100%;height:auto;')
+      expect(result.body).toContain('width="260"')
+      expect(result.body).toContain('width:260px;max-width:100%;height:auto;')
       expect(result.body).toContain('alt="Government of British Columbia"')
       expect(emailLogoService.buildPublicImageUrl).toHaveBeenCalledWith('default-logo')
     },
@@ -60,7 +60,7 @@ describe('EmailTemplateLayoutService', () => {
       expect(result).toEqual({
         subject: rendered.subject,
         body:
-          '<img src="https://gateway.example.test/logos/logo-id/image" width="180" alt="Government of British Columbia" style="display:block;width:180px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">\n' +
+          '<div style="background-color: #ffffff; max-width: 600px; margin: 0 auto;"><img src="https://gateway.example.test/logos/logo-id/image" width="260" alt="Government of British Columbia" style="display:block;width:260px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;"></div>\n' +
           '<p>Hello <strong>Ada</strong></p>\n',
         bodyType: 'html',
       })
@@ -84,7 +84,7 @@ describe('EmailTemplateLayoutService', () => {
       mjmlOutput,
     )
     expect(result.body).toBe(
-      '<!doctype html><html><body>\n<img src="https://gateway.example.test/logos/logo-id/image" width="180" alt="Government of British Columbia" style="display:block;width:180px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">Hello</body></html>',
+      '<!doctype html><html><body>\n<div style="background-color: #ffffff; max-width: 600px; margin: 0 auto;"><img src="https://gateway.example.test/logos/logo-id/image" width="260" alt="Government of British Columbia" style="display:block;width:260px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;"></div>Hello</body></html>',
     )
   })
 
@@ -99,6 +99,10 @@ describe('EmailTemplateLayoutService', () => {
     const result = await service.apply(template, rendered)
     expect(emailLogoService.findByIdIfApproved).toHaveBeenCalledWith('ministry')
     expect(result.body).toContain('role="presentation"')
+    expect(result.body).toMatch(
+      /^<div style="background-color: #ffffff; max-width: 600px; margin: 0 auto;"><table/,
+    )
+    expect(result.body).toContain('<td width="260"')
     expect(result.body).toContain('Agriculture &amp; Food &lt;AF&gt;')
     expect(result.body).not.toContain('Agriculture & Food <AF>')
     expect(result.body).toContain('<p>Hello <strong>Ada</strong></p>')

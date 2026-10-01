@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventsEmailTab from './EventsEmailTab'
@@ -105,16 +106,16 @@ type RenderOptions = {
   tenantEmailLogoId?: string | null
   tenantName?: string | null
   cstarGroups?: CstarGroup[]
-  onSave?: ReturnType<typeof vi.fn>
-  onDeactivate?: ReturnType<typeof vi.fn>
+  onSave?: Mock<(values: EmailSettingsValues) => Promise<void>>
+  onDeactivate?: Mock<() => Promise<void>>
 }
 
 function renderTab({
   values = unconfigured,
   isConfigured = false,
   isDisabled = false,
-  onSave = vi.fn().mockResolvedValue(undefined),
-  onDeactivate = vi.fn().mockResolvedValue(undefined),
+  onSave = vi.fn<(values: EmailSettingsValues) => Promise<void>>().mockResolvedValue(undefined),
+  onDeactivate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   ...rest
 }: RenderOptions = {}) {
   const view = render(
