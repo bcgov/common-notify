@@ -1,0 +1,38 @@
+@import '../variables.scss';
+
+.sms-preview {
+  width: 100%;
+  min-width: 0;
+
+  .bcds-react-aria-TextArea,
+  .bcds-react-aria-TextArea--Container {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .bcds-react-aria-TextArea--Container {
+    background: $white;
+  }
+
+  .bcds-react-aria-TextArea--Input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    height: 286px;
+    min-height: 286px;
+    max-height: none;
+    overflow-y: auto;
+    resize: vertical;
+    background: $white;
+    color: $text-secondary;
+    font-family: inherit;
+    font-size: $font-size-base;
+    line-height: 1.6875;
+  }
+}
+
+.sms-preview--final .bcds-react-aria-TextArea--Input {
+  height: 394px;
+  min-height: 394px;
+}

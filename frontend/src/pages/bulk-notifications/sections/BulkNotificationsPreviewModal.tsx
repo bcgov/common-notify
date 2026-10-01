@@ -95,9 +95,9 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
     <NotificationPreviewModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Batch Send Preview"
+      title="Batch Notification Preview"
       variables={variables}
-      variablesIntro="These values come from your CSV file."
+      variablesIntro="Provide values for all variables in your template."
       stepper={{
         label: `${channel === 'sms' ? 'SMS' : 'Email'} notification ${rowIndex + 1} of ${rowCount}`,
         onPrevious: () => setRowIndex((index) => Math.max(0, index - 1)),
