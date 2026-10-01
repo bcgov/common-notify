@@ -138,41 +138,6 @@ const EmailSettings: FC = () => {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="settings__field">
-        <EmailLogoMenu
-          logos={approvedLogos}
-          value={selectedEmailLogoId}
-          onChange={setSelectedEmailLogoId}
-          isDisabled={isFieldDisabled || approvedLogosLoading}
-          isLoading={approvedLogosLoading}
-        />
-        <p className="settings__help">
-          Select the authoring logo displayed on notifications sent from this tenant. Can be
-          overridden at the event level.
-        </p>
-        {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
-        {approvedLogosError && (
-          <p className="settings__field-error" role="alert">
-            {approvedLogosError}
-          </p>
-        )}
-      </div>
-
-      <InlineAlert variant="info">
-        <span className="description" id="alert-title">
-          Only approved authoring logos may be used. Contact your{' '}
-          <Link
-            href="https://intranet.gov.bc.ca/gcpe/communication-services-tools-for-ministry-partners/brand?"
-            target="_blank"
-            rel="noopener noreferrer"
-            iconRight={<OpenInNewIcon fontSize="inherit" />}
-          >
-            ministry GCPE communications office
-          </Link>{' '}
-          if you’re unsure.
-        </span>
-      </InlineAlert>
-
-      <div className="settings__field">
         <div className="settings__switch-row">
           <span className="settings__label">
             Email notifications
@@ -227,6 +192,41 @@ const EmailSettings: FC = () => {
           address by default. Can be overridden at the event level.
         </p>
       </div>
+
+      <div className="settings__field">
+        <EmailLogoMenu
+          logos={approvedLogos}
+          value={selectedEmailLogoId}
+          onChange={setSelectedEmailLogoId}
+          isDisabled={isFieldDisabled || approvedLogosLoading}
+          isLoading={approvedLogosLoading}
+        />
+        <p className="settings__help">
+          Select the authoring logo displayed on notifications sent from this tenant. Can be
+          overridden at the event level.
+        </p>
+        {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
+        {approvedLogosError && (
+          <p className="settings__field-error" role="alert">
+            {approvedLogosError}
+          </p>
+        )}
+      </div>
+
+      <InlineAlert variant="info">
+        <span className="description" id="alert-title">
+          Only approved authoring logos may be used. Contact your{' '}
+          <Link
+            href="https://intranet.gov.bc.ca/gcpe/communication-services-tools-for-ministry-partners/brand?"
+            target="_blank"
+            rel="noopener noreferrer"
+            iconRight={<OpenInNewIcon fontSize="inherit" />}
+          >
+            ministry GCPE communications office
+          </Link>{' '}
+          if you’re unsure.
+        </span>
+      </InlineAlert>
 
       <div className="settings__field">
         <div className="settings__switch-row">
