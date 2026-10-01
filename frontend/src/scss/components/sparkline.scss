@@ -17,6 +17,10 @@
     &--out {
       stroke: $success-color;
     }
+
+    &--failed {
+      stroke: $danger-color;
+    }
   }
 }
 
@@ -34,5 +38,9 @@
 
   &--out {
     background-color: $success-color;
+  }
+
+  &--failed {
+    background-color: $danger-color;
   }
 }

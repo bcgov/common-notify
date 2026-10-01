@@ -52,9 +52,9 @@ const RedisSection: FC<RedisSectionProps> = ({ redis }) => {
           />
           <StatTile label="Evicted keys" value={redis.evictedKeys.toLocaleString()} />
           <StatTile
-            label="Clients"
+            label="Connections"
             value={redis.connectedClients.toLocaleString()}
-            hint={`${redis.blockedClients.toLocaleString()} waiting for jobs`}
+            hint={`${redis.blockedClients.toLocaleString()} idle workers listening`}
           />
           <StatTile
             label="Rejected connections"

@@ -646,6 +646,22 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/admin/monitoring/queues/events (SSE change signals)
+  # Buffering off, as for notification-request-events: a buffered stream never reaches the page.
+  - name: ${ROUTE_PREFIX}admin-monitoring-queue-events-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/monitoring/queues/events
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: false
+    response_buffering: false
+
   # ============================================================================
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
@@ -1705,6 +1721,13 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-monitoring-queues-frontend
+    config: *jwtConfig
+
+  # Admin Monitoring Queue Events (SSE) - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-monitoring-queue-events-frontend
     config: *jwtConfig
 
   # ============================================================================

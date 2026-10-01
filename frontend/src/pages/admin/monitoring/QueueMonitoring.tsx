@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
 import { Button, Switch } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
@@ -8,16 +8,31 @@ import NotAuthorized from '@/components/NotAuthorized'
 import UserService from '@/service/user-service'
 import { SsoRole } from '@/enum/sso-role.enum'
 import { usePolling } from '@/hooks/usePolling'
-import { getQueueMonitoring } from '@/api/monitoring.api'
+import { useLiveUpdates } from '@/hooks/useLiveUpdates'
+import type { LiveStatus } from '@/hooks/useLiveUpdates'
+import { connectQueueMonitoringStream, getQueueMonitoring } from '@/api/monitoring.api'
 import type { HealthStatus } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, formatDuration, formatQueueName } from '@/utils/monitoring'
+import { HEALTH_LABELS, formatQueueName } from '@/utils/monitoring'
+import MessagesSection from './sections/MessagesSection'
+import ActiveBatchesSection from './sections/ActiveBatchesSection'
 import RedisSection from './sections/RedisSection'
 import QueuesSection from './sections/QueuesSection'
 import WorkersSection from './sections/WorkersSection'
 import RecentFailuresSection from './sections/RecentFailuresSection'
 import '@/scss/components/queue-monitoring.scss'
 
-export const REFRESH_INTERVAL_MS = 15_000
+/** Polled while the live stream is up: catches time-based changes (ages, stale heartbeats). */
+export const BACKSTOP_INTERVAL_MS = 60_000
+/** Polled while the stream is down or refused. */
+export const FALLBACK_INTERVAL_MS = 15_000
+
+const LIVE_STATUS_TEXT: Record<LiveStatus, string> = {
+  off: 'Paused',
+  connecting: 'Connecting…',
+  live: 'Live',
+  reconnecting: `Reconnecting… (updating every ${FALLBACK_INTERVAL_MS / 1000}s)`,
+  unavailable: `Live updates unavailable (updating every ${FALLBACK_INTERVAL_MS / 1000}s)`,
+}
 
 /**
  * Admin view of the Bull queues, the pods working them and the Redis instance they live in.
@@ -25,12 +40,23 @@ export const REFRESH_INTERVAL_MS = 15_000
  */
 const QueueMonitoring: FC = () => {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [liveUpdates, setLiveUpdates] = useState(true)
+
+  // The stream only says "something changed"; the snapshot still comes from the endpoint.
+  const refreshRef = useRef<() => void>(() => {})
+  const onChange = useCallback(() => {
+    refreshRef.current()
+  }, [])
+  const liveStatus = useLiveUpdates(connectQueueMonitoringStream, isAdmin && liveUpdates, onChange)
+
   const { data, error, isLoading, isRefreshing, refresh } = usePolling(getQueueMonitoring, {
-    intervalMs: REFRESH_INTERVAL_MS,
-    paused: !autoRefresh,
+    intervalMs: liveStatus === 'live' ? BACKSTOP_INTERVAL_MS : FALLBACK_INTERVAL_MS,
+    paused: !liveUpdates,
     skip: !isAdmin,
   })
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
 
   // Announce only changes in overall health, not every 15-second refresh.
   const [announcement, setAnnouncement] = useState('')
@@ -47,10 +73,12 @@ const QueueMonitoring: FC = () => {
   }
 
   const now = data ? new Date(data.generatedAt).getTime() : 0
-  const backlog = data?.queues.reduce((sum, q) => sum + q.counts.waiting + q.counts.paused, 0) ?? 0
-  const slowest = data?.queues.reduce<number | null>((longest, q) => {
-    if (q.estimatedDrainMinutes === null || q.estimatedDrainMinutes === 0) return longest
-    return Math.max(longest ?? 0, q.estimatedDrainMinutes)
+  const pendingMessages = data?.messages.reduce((sum, m) => sum + m.pending, 0) ?? 0
+  const jobsWaiting =
+    data?.queues.reduce((sum, q) => sum + q.counts.waiting + q.counts.paused, 0) ?? 0
+  const slowest = data?.messages.reduce<number | null>((longest, m) => {
+    if (m.estimatedClearMinutes === null || m.estimatedClearMinutes === 0) return longest
+    return Math.max(longest ?? 0, m.estimatedClearMinutes)
   }, null)
   const notDraining = data?.queues.filter(
     (q) => q.estimatedDrainMinutes === null && q.counts.waiting + q.counts.paused > 0,
@@ -60,7 +88,7 @@ const QueueMonitoring: FC = () => {
     <div className="page queue-monitoring">
       <PageHeading
         title="Monitoring"
-        meta="Queues, workers and Redis across every pod. Read-only."
+        meta="Messages, queues, workers and Redis across every pod. Read-only."
       />
 
       <div aria-live="polite" aria-atomic="true" className="visually-hidden">
@@ -72,7 +100,8 @@ const QueueMonitoring: FC = () => {
           {data && (
             <>
               <StatusBadge status={data.status} statusLabel={HEALTH_LABELS[data.status]} />
-              <span>{backlog.toLocaleString()} waiting</span>
+              <span>{pendingMessages.toLocaleString()} messages pending</span>
+              <span>{jobsWaiting.toLocaleString()} jobs waiting</span>
               {notDraining && notDraining.length > 0 ? (
                 <span>
                   Not draining: {notDraining.map((q) => formatQueueName(q.name)).join(', ')}
@@ -85,8 +114,11 @@ const QueueMonitoring: FC = () => {
         </div>
         <div className="queue-monitoring__controls">
           {data && <span>Updated {new Date(data.generatedAt).toLocaleTimeString()}</span>}
-          <Switch isSelected={autoRefresh} onChange={setAutoRefresh}>
-            Auto-refresh every {formatDuration(REFRESH_INTERVAL_MS)}
+          <span className="queue-monitoring__live" data-status={liveStatus}>
+            {LIVE_STATUS_TEXT[liveStatus]}
+          </span>
+          <Switch isSelected={liveUpdates} onChange={setLiveUpdates}>
+            Live updates
           </Switch>
           <Button variant="secondary" size="small" onPress={refresh} isDisabled={isRefreshing}>
             {isRefreshing ? 'Refreshing…' : 'Refresh'}
@@ -109,8 +141,10 @@ const QueueMonitoring: FC = () => {
 
       {data && (
         <>
-          <RedisSection redis={data.redis} />
+          <MessagesSection messages={data.messages} />
+          <ActiveBatchesSection batches={data.activeBatches} now={now} />
           <QueuesSection queues={data.queues} />
+          <RedisSection redis={data.redis} />
           <WorkersSection workers={data.workers} now={now} />
           <RecentFailuresSection failures={data.recentFailures} now={now} />
         </>

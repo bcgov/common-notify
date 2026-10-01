@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import QueueMonitoring, { REFRESH_INTERVAL_MS } from './QueueMonitoring'
-import { getQueueMonitoring } from '@/api/monitoring.api'
+import QueueMonitoring, { BACKSTOP_INTERVAL_MS, FALLBACK_INTERVAL_MS } from './QueueMonitoring'
+import { connectQueueMonitoringStream, getQueueMonitoring } from '@/api/monitoring.api'
+import type { QueueMonitoringStreamHandlers } from '@/api/monitoring.api'
 import UserService from '@/service/user-service'
 import type { QueueMonitoring as QueueMonitoringData } from '@/interfaces/queueMonitoring.interface'
 
-vi.mock('@/api/monitoring.api', () => ({ getQueueMonitoring: vi.fn() }))
+vi.mock('@/api/monitoring.api', () => ({
+  getQueueMonitoring: vi.fn(),
+  connectQueueMonitoringStream: vi.fn(),
+}))
 vi.mock('@/service/user-service', () => ({ default: { hasRole: vi.fn(() => true) } }))
 
 const MB = 1024 * 1024
@@ -36,6 +40,41 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
       uptimeSeconds: 7200,
       version: '7.2.4',
     },
+    messages: [
+      {
+        channel: 'EMAIL',
+        pending: 63,
+        oldestPendingAgeMs: 50_000,
+        sent: series(1),
+        failed: series(0),
+        sentPerMinute: 21,
+        failedPerMinute: 0,
+        estimatedClearMinutes: 3,
+      },
+      {
+        channel: 'SMS',
+        pending: 0,
+        oldestPendingAgeMs: null,
+        sent: series(0),
+        failed: series(0),
+        sentPerMinute: 0,
+        failedPerMinute: 0,
+        estimatedClearMinutes: 0,
+      },
+    ],
+    activeBatches: [
+      {
+        queue: 'email-delivery',
+        jobId: 'req-1-EMAIL-0',
+        notificationId: 'req-1',
+        tenantId: 't-1',
+        tenantName: 'Health Ministry',
+        sent: 37,
+        failed: 2,
+        total: 100,
+        startedAt: new Date(now - 30_000).toISOString(),
+      },
+    ],
     queues: [
       {
         name: 'email-delivery',
@@ -54,6 +93,7 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
         },
         estimatedDrainMinutes: 6,
         liveWorkerPods: 1,
+        unheldActiveJobs: 0,
       },
     ],
     workers: [
@@ -90,11 +130,21 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
 }
 
 const mockedGet = vi.mocked(getQueueMonitoring)
+const mockedConnect = vi.mocked(connectQueueMonitoringStream)
+
+/** The handlers the page passed to the most recently opened stream. */
+let stream: QueueMonitoringStreamHandlers
+let streamController: AbortController
 
 describe('QueueMonitoring', () => {
   beforeEach(() => {
     vi.mocked(UserService.hasRole).mockReturnValue(true)
     mockedGet.mockReset()
+    mockedConnect.mockReset().mockImplementation((handlers) => {
+      stream = handlers
+      streamController = new AbortController()
+      return streamController
+    })
   })
 
   afterEach(() => {
@@ -109,6 +159,44 @@ describe('QueueMonitoring', () => {
     expect(meter).toHaveAttribute('aria-valuenow', '39.1')
     expect(meter).toHaveAttribute('aria-valuetext', '300 MB of 768 MB (39.1%)')
     expect(screen.getByText('noeviction')).toBeInTheDocument()
+  })
+
+  it('counts individual messages, not just jobs', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+
+    expect(await screen.findByText('63 messages pending')).toBeInTheDocument()
+    expect(screen.getByText('120 jobs waiting')).toBeInTheDocument()
+    expect(screen.getByText('Clears in ~3 min')).toBeInTheDocument()
+
+    const table = screen.getByRole('table', { name: 'Messages' })
+    const email = within(table).getByRole('row', { name: /Email/ })
+    expect(within(email).getByText('63')).toBeInTheDocument()
+    expect(within(email).getByText('50s')).toBeInTheDocument()
+    expect(within(email).getByText('Sent 21/min')).toBeInTheDocument()
+    expect(within(email).getByText('~3 min')).toBeInTheDocument()
+    const sms = within(table).getByRole('row', { name: /SMS/ })
+    expect(within(sms).getByText('Nothing pending')).toBeInTheDocument()
+  })
+
+  it('shows per-recipient progress for a batch that is one job', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+
+    const table = await screen.findByRole('table', { name: 'Batches in progress' })
+    const meter = within(table).getByRole('meter', { name: 'Batch req-1-EMAIL-0 progress' })
+    expect(meter).toHaveAttribute('aria-valuenow', '39')
+    expect(meter).toHaveAttribute('aria-valuetext', '37 of 100 sent, 2 failed')
+    expect(within(table).getByText('Health Ministry')).toBeInTheDocument()
+  })
+
+  it('says so when no batch is sending', async () => {
+    mockedGet.mockResolvedValue(snapshot({ activeBatches: [] }))
+    render(<QueueMonitoring />)
+
+    expect(
+      (await screen.findAllByText('No batches are sending right now.')).length,
+    ).toBeGreaterThan(0)
   })
 
   it('shows each queue with its backlog, rates and drain estimate', async () => {
@@ -214,19 +302,77 @@ describe('QueueMonitoring', () => {
     expect(await screen.findByText('Queue health changed to Warning')).toBeInTheDocument()
   })
 
-  it('polls on an interval and stops when auto-refresh is turned off', async () => {
+  it('refetches when the stream signals a change', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+    await screen.findByRole('table', { name: 'Queues' })
+    act(() => stream.onOpen())
+    expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(mockedGet).toHaveBeenCalledTimes(1)
+
+    mockedGet.mockResolvedValue(snapshot({ status: 'warning' }))
+    act(() => stream.onChange())
+
+    expect(await screen.findByText('Queue health changed to Warning')).toBeInTheDocument()
+    expect(mockedGet).toHaveBeenCalledTimes(2)
+  })
+
+  it('polls slowly while live and falls back to faster polling when the stream drops', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+    await screen.findByRole('table', { name: 'Queues' })
+    act(() => stream.onOpen())
+
+    await act(() => vi.advanceTimersByTimeAsync(FALLBACK_INTERVAL_MS))
+    expect(mockedGet).toHaveBeenCalledTimes(1)
+    await act(() => vi.advanceTimersByTimeAsync(BACKSTOP_INTERVAL_MS - FALLBACK_INTERVAL_MS))
+    expect(mockedGet).toHaveBeenCalledTimes(2)
+
+    act(() => stream.onError(false))
+    expect(screen.getByText(/Reconnecting/)).toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(FALLBACK_INTERVAL_MS))
+    expect(mockedGet).toHaveBeenCalledTimes(3)
+  })
+
+  it('catches up once when the stream reconnects', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+    await screen.findByRole('table', { name: 'Queues' })
+    act(() => stream.onOpen())
+    act(() => stream.onError(false))
+
+    act(() => stream.onOpen())
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(2))
+  })
+
+  it('says when live updates are refused, and keeps polling', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<QueueMonitoring />)
+    await screen.findByRole('table', { name: 'Queues' })
+
+    act(() => stream.onError(true))
+
+    expect(screen.getByText(/Live updates unavailable/)).toBeInTheDocument()
+  })
+
+  it('closes the stream and stops polling when live updates are turned off', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     mockedGet.mockResolvedValue(snapshot())
     render(<QueueMonitoring />)
     await screen.findByRole('table', { name: 'Queues' })
+    const opened = streamController
+
+    await user.click(screen.getByRole('switch', { name: 'Live updates' }))
+
+    expect(opened.signal.aborted).toBe(true)
+    expect(screen.getByText('Paused')).toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(BACKSTOP_INTERVAL_MS * 2))
     expect(mockedGet).toHaveBeenCalledTimes(1)
 
-    await act(() => vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS))
-    expect(mockedGet).toHaveBeenCalledTimes(2)
-
-    await user.click(screen.getByRole('switch', { name: /Auto-refresh/ }))
-    await act(() => vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS * 3))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(mockedGet).toHaveBeenCalledTimes(2)
   })
 
@@ -236,5 +382,6 @@ describe('QueueMonitoring', () => {
 
     expect(screen.queryByRole('heading', { name: 'Monitoring' })).not.toBeInTheDocument()
     expect(mockedGet).not.toHaveBeenCalled()
+    expect(mockedConnect).not.toHaveBeenCalled()
   })
 })

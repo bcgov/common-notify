@@ -14,4 +14,9 @@ describe('MonitoringController', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, MonitoringController.prototype.getQueues)
     expect(roles).toEqual([SsoRole.NOTIFY_ADMIN])
   })
+
+  it('requires the NOTIFY_ADMIN SSO role for the event stream', () => {
+    const roles = Reflect.getMetadata(ROLES_KEY, MonitoringController.prototype.streamQueueEvents)
+    expect(roles).toEqual([SsoRole.NOTIFY_ADMIN])
+  })
 })

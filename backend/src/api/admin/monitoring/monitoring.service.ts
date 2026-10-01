@@ -6,6 +6,11 @@ import type Redis from 'ioredis'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { ProviderToken } from '../../../enum/provider-token.enum'
 import { Tenant } from '../tenants/entities/tenant.entity'
+import { NotificationRequestDetail } from '../../notification/entities/notification-request-detail.entity'
+import { NotificationStatus } from '../../../enum/notification-status.enum'
+import { NotificationChannel } from '../../../enum/notification-channel.enum'
+import { readBatchProgress } from '../../../queue/batch-progress'
+import type { BatchProgress } from '../../../queue/batch-progress'
 import {
   MONITORING_WINDOW_MINUTES,
   addedCounterKey,
@@ -15,6 +20,7 @@ import {
 } from '../../../queue/queue-metrics'
 import type { BullMetrics } from '../../../queue/queue-metrics'
 import {
+  HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TTL_SECONDS,
   WORKER_INDEX_KEY,
   workerHeartbeatKey,
@@ -23,14 +29,25 @@ import type { WorkerHeartbeatPayload } from '../../../queue/worker-heartbeat'
 import { MONITORING_THRESHOLDS } from './monitoring-thresholds'
 import type {
   HealthStatus,
+  MessageChannelStatsDto,
   QueueMonitoringResponseDto,
   QueueStatsDto,
-  RecentFailureDto,
   RedisStatsDto,
   WorkerPodDto,
 } from './schemas/queue-monitoring.dto'
 
 const FAILURES_PER_QUEUE = 10
+const ACTIVE_JOBS_PER_QUEUE = 50
+/**
+ * A worker's heartbeat can lag what it is doing by one interval, so an active job younger than
+ * two intervals may be held by a live worker that has not reported it yet.
+ */
+const UNHELD_GRACE_MS = HEARTBEAT_INTERVAL_MS * 2
+/** Detail statuses between acceptance and a final sent/failed. */
+const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
+/** Older in-flight rows are abandoned, not backlog, and would pin "oldest pending" forever. */
+const PENDING_LOOKBACK_MS = 24 * 60 * 60 * 1000
+const DEFAULT_MESSAGE_CHANNELS = [NotificationChannel.EMAIL, NotificationChannel.SMS]
 const RECENT_FAILURES_LIMIT = 20
 /** A failure rate over a handful of jobs is noise; below this many finished jobs it is ignored. */
 const MIN_JOBS_FOR_FAILURE_RATE = 10
@@ -141,6 +158,12 @@ export function evaluateQueue(input: QueueEvaluationInput): QueueStatsDto {
     statuses.push('warning')
     reasons.push('Queue is paused')
   }
+  if (input.unheldActiveJobs > 0) {
+    statuses.push('warning')
+    reasons.push(
+      `${input.unheldActiveJobs} active job(s) not held by any live worker (possibly stalled; Bull retries stalled jobs within about a minute)`,
+    )
+  }
   if (backlog > 0 && liveWorkerPods === 0) {
     statuses.push('critical')
     reasons.push('Jobs are waiting but no pod is processing this queue')
@@ -181,8 +204,55 @@ export function evaluateQueue(input: QueueEvaluationInput): QueueStatsDto {
 }
 
 type JobIdentifiers = { notifyId?: unknown; notificationId?: unknown; tenantId?: unknown }
+type QueuedJob = { queue: string; job: Bull.Job }
 
 const asString = (value: unknown): string | null => (typeof value === 'string' ? value : null)
+
+/** Only identifiers leave the job: its data also holds recipients and message content. */
+function jobIdentifiers(job: Bull.Job, tenantNames: Map<string, string>) {
+  const data = (job.data ?? {}) as JobIdentifiers
+  const tenantId = asString(data.tenantId)
+  return {
+    notificationId: asString(data.notifyId) ?? asString(data.notificationId),
+    tenantId,
+    tenantName: tenantId ? (tenantNames.get(tenantId) ?? null) : null,
+  }
+}
+
+/** Active jobs that report merge-batch progress; other jobs finish too fast to need a bar. */
+function activeBatches(
+  activeByQueue: Map<string, Bull.Job[]>,
+): Array<QueuedJob & { progress: BatchProgress }> {
+  return [...activeByQueue.entries()]
+    .flatMap(([queue, jobs]) =>
+      jobs.flatMap((job) => {
+        const progress = readBatchProgress(job.progress())
+        return progress ? [{ queue, job, progress }] : []
+      }),
+    )
+    .sort((a, b) => (a.job.processedOn ?? 0) - (b.job.processedOn ?? 0))
+}
+
+/**
+ * Active jobs no live worker reports holding. A job stays "active" in Redis after the pod
+ * processing it dies, until Bull's stalled-job check moves it back to waiting, so these are
+ * likely stalled. Only jobs older than UNHELD_GRACE_MS are counted, to allow for heartbeat lag.
+ */
+export function countUnheldActiveJobs(
+  queueName: string,
+  activeJobs: Bull.Job[],
+  workers: WorkerPodDto[],
+  now: number,
+): number {
+  const settled = activeJobs.filter(
+    (job) => job.processedOn && job.processedOn <= now - UNHELD_GRACE_MS,
+  ).length
+  const held = workers
+    .flatMap((pod) => pod.queues)
+    .filter((q) => q.queue === queueName)
+    .reduce((sum, q) => sum + q.active, 0)
+  return Math.max(0, settled - held)
+}
 
 /**
  * Read-only view of the Bull queues, their workers and the Redis instance behind them, for the
@@ -200,6 +270,8 @@ export class MonitoringService {
     @Optional() @Inject(QueueName.SMS_DELIVERY) smsQueue: Bull.Queue | null,
     @Optional() @Inject(QueueName.WEBHOOK_DELIVERY) webhookQueue: Bull.Queue | null,
     @InjectRepository(Tenant) private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(NotificationRequestDetail)
+    private readonly detailRepository: Repository<NotificationRequestDetail>,
   ) {
     this.queues = [ingestionQueue, emailQueue, smsQueue, webhookQueue].filter(
       (queue): queue is Bull.Queue => !!queue,
@@ -214,26 +286,55 @@ export class MonitoringService {
     }
 
     const now = Date.now()
-    const [info, workers] = await Promise.all([this.redis.info(), this.getWorkers(now)])
+    const [info, workers, messages, failedJobs, activeByQueue] = await Promise.all([
+      this.redis.info(),
+      this.getWorkers(now),
+      this.getMessageStats(now),
+      this.getRecentFailedJobs(),
+      this.getActiveJobs(),
+    ])
     const redis = buildRedisStats(parseRedisInfo(info))
     const queues = await Promise.all(
-      this.queues.map((queue) => this.getQueueStats(queue, workers, now)),
+      this.queues.map((queue) =>
+        this.getQueueStats(queue, workers, activeByQueue.get(queue.name) ?? [], now),
+      ),
     )
-    const recentFailures = await this.getRecentFailures()
+    const activeJobs = activeBatches(activeByQueue)
+    const tenantNames = await this.getTenantNames(
+      [...failedJobs, ...activeJobs].map(({ job }) =>
+        asString((job.data as JobIdentifiers)?.tenantId),
+      ),
+    )
 
     return {
       generatedAt: new Date(now).toISOString(),
       status: worstStatus([redis.status, ...queues.map((queue) => queue.status)]),
       redis,
+      messages,
       queues,
+      activeBatches: activeJobs.map(({ queue, job, progress }) => ({
+        queue,
+        jobId: String(job.id),
+        ...jobIdentifiers(job, tenantNames),
+        ...progress,
+        startedAt: job.processedOn ? new Date(job.processedOn).toISOString() : null,
+      })),
       workers,
-      recentFailures,
+      recentFailures: failedJobs.map(({ queue, job }) => ({
+        queue,
+        jobId: String(job.id),
+        ...jobIdentifiers(job, tenantNames),
+        reason: maskPersonalData(job.failedReason ?? 'No reason recorded'),
+        attemptsMade: job.attemptsMade,
+        failedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+      })),
     }
   }
 
   private async getQueueStats(
     queue: Bull.Queue,
     workers: WorkerPodDto[],
+    activeJobs: Bull.Job[],
     now: number,
   ): Promise<QueueStatsDto> {
     const [counts, isPaused, oldestWaitingAgeMs, added, completed, failed] = await Promise.all([
@@ -275,6 +376,7 @@ export class MonitoringService {
       },
       liveWorkerPods: workers.filter((pod) => pod.queues.some((q) => q.queue === queue.name))
         .length,
+      unheldActiveJobs: countUnheldActiveJobs(queue.name, activeJobs, workers, now),
     })
   }
 
@@ -327,46 +429,113 @@ export class MonitoringService {
       .sort((a, b) => a.podId.localeCompare(b.podId))
   }
 
-  private async getRecentFailures(): Promise<RecentFailureDto[]> {
+  private async getRecentFailedJobs(): Promise<QueuedJob[]> {
     const perQueue = await Promise.all(
       this.queues.map(async (queue) => {
         const jobs = await queue.getFailed(0, FAILURES_PER_QUEUE - 1)
         return jobs.filter(Boolean).map((job) => ({ queue: queue.name, job }))
       }),
     )
-
-    const failures = perQueue
+    return perQueue
       .flat()
       .sort((a, b) => (b.job.finishedOn ?? 0) - (a.job.finishedOn ?? 0))
       .slice(0, RECENT_FAILURES_LIMIT)
+  }
 
-    const tenantIds = [
-      ...new Set(
-        failures
-          .map(({ job }) => asString((job.data as JobIdentifiers)?.tenantId))
-          .filter((id): id is string => !!id),
+  private async getActiveJobs(): Promise<Map<string, Bull.Job[]>> {
+    const perQueue = await Promise.all(
+      this.queues.map(
+        async (queue) =>
+          [
+            queue.name,
+            (await queue.getActive(0, ACTIVE_JOBS_PER_QUEUE - 1)).filter(Boolean),
+          ] as const,
       ),
-    ]
-    const tenants = tenantIds.length
-      ? await this.tenantRepository.find({
-          where: { id: In(tenantIds) },
-          select: { id: true, name: true },
-        })
-      : []
-    const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
+    )
+    return new Map(perQueue)
+  }
 
-    return failures.map(({ queue, job }) => {
-      const data = (job.data ?? {}) as JobIdentifiers
-      const tenantId = asString(data.tenantId)
+  private async getTenantNames(ids: Array<string | null>): Promise<Map<string, string>> {
+    const tenantIds = [...new Set(ids.filter((id): id is string => !!id))]
+    if (tenantIds.length === 0) return new Map()
+    const tenants = await this.tenantRepository.find({
+      where: { id: In(tenantIds) },
+      select: { id: true, name: true },
+    })
+    return new Map(tenants.map((tenant) => [tenant.id, tenant.name]))
+  }
+
+  /**
+   * Recipient-level backlog and throughput per channel. Pending rows use the status index;
+   * sent/failed rows use the partial index on last_attempt_at (V72), whose predicate the
+   * status filter repeats literally so the planner can use it.
+   */
+  private async getMessageStats(now: number): Promise<MessageChannelStatsDto[]> {
+    const since = new Date((minuteOf(now) - (MONITORING_WINDOW_MINUTES - 1)) * 60_000)
+
+    const [pendingRows, finishedRows] = await Promise.all([
+      this.detailRepository
+        .createQueryBuilder('detail')
+        .innerJoin('detail.notificationRequest', 'request')
+        .select('detail.channel', 'channel')
+        .addSelect('COUNT(*)', 'pending')
+        .addSelect('MIN(detail.created_at)', 'oldest')
+        .where('detail.status IN (:...statuses)', { statuses: IN_FLIGHT_DETAIL_STATUSES })
+        .andWhere('request.status <> :scheduled', { scheduled: NotificationStatus.SCHEDULED })
+        .andWhere('detail.created_at > :pendingSince', {
+          pendingSince: new Date(now - PENDING_LOOKBACK_MS),
+        })
+        .groupBy('detail.channel')
+        .getRawMany<{ channel: string; pending: string; oldest: Date | string | null }>(),
+      this.detailRepository
+        .createQueryBuilder('detail')
+        .select('detail.channel', 'channel')
+        .addSelect('detail.status', 'status')
+        .addSelect("date_trunc('minute', detail.last_attempt_at)", 'minute')
+        .addSelect('COUNT(*)', 'count')
+        .where("detail.status IN ('sent', 'failed')")
+        .andWhere('detail.last_attempt_at >= :since', { since })
+        .groupBy('detail.channel')
+        .addGroupBy('detail.status')
+        .addGroupBy('minute')
+        .getRawMany<{ channel: string; status: string; minute: Date | string; count: string }>(),
+    ])
+
+    const channels = new Set<string>(DEFAULT_MESSAGE_CHANNELS)
+    pendingRows.forEach((row) => channels.add(row.channel))
+    finishedRows.forEach((row) => channels.add(row.channel))
+
+    const firstMinute = minuteOf(since.getTime())
+    const window = MONITORING_THRESHOLDS.rateWindowMinutes
+
+    return [...channels].map((channel) => {
+      const sent = Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
+      const failed = Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
+      for (const row of finishedRows) {
+        if (row.channel !== channel) continue
+        const index = minuteOf(new Date(row.minute).getTime()) - firstMinute
+        if (index < 0 || index >= MONITORING_WINDOW_MINUTES) continue
+        const series = row.status === 'sent' ? sent : failed
+        series[index] += Number(row.count) || 0
+      }
+
+      const pendingRow = pendingRows.find((row) => row.channel === channel)
+      const pending = Number(pendingRow?.pending ?? 0) || 0
+      const oldest = pendingRow?.oldest ? new Date(pendingRow.oldest).getTime() : null
+      const sentPerMinute = averageOfWholeMinutes(sent, window)
+      const failedPerMinute = averageOfWholeMinutes(failed, window)
+      const finishedPerMinute = sentPerMinute + failedPerMinute
+
       return {
-        queue,
-        jobId: String(job.id),
-        notificationId: asString(data.notifyId) ?? asString(data.notificationId),
-        tenantId,
-        tenantName: tenantId ? (tenantNames.get(tenantId) ?? null) : null,
-        reason: maskPersonalData(job.failedReason ?? 'No reason recorded'),
-        attemptsMade: job.attemptsMade,
-        failedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+        channel,
+        pending,
+        oldestPendingAgeMs: pending > 0 && oldest !== null ? Math.max(0, now - oldest) : null,
+        sent,
+        failed,
+        sentPerMinute,
+        failedPerMinute,
+        estimatedClearMinutes:
+          pending === 0 ? 0 : finishedPerMinute > 0 ? Math.ceil(pending / finishedPerMinute) : null,
       }
     })
   }

@@ -7,6 +7,7 @@ import {
   MonitoringService,
   averageOfWholeMinutes,
   buildRedisStats,
+  countUnheldActiveJobs,
   evaluateQueue,
   maskPersonalData,
   parseRedisInfo,
@@ -14,6 +15,7 @@ import {
 } from './monitoring.service'
 import { MONITORING_WINDOW_MINUTES } from '../../../queue/queue-metrics'
 import type { Tenant } from '../tenants/entities/tenant.entity'
+import type { NotificationRequestDetail } from '../../notification/entities/notification-request-detail.entity'
 
 const MB = 1024 * 1024
 
@@ -57,6 +59,7 @@ const baseQueue = {
     failureRatePercent: 0,
   },
   liveWorkerPods: 2,
+  unheldActiveJobs: 0,
 }
 
 describe('parseRedisInfo', () => {
@@ -154,6 +157,47 @@ describe('evaluateQueue', () => {
   })
 })
 
+describe('countUnheldActiveJobs', () => {
+  const now = 1_000_000
+  const pod = (active: number) => ({
+    podId: 'pod',
+    startedAt: '',
+    lastHeartbeatAt: '',
+    queues: [
+      {
+        queue: 'email-delivery',
+        concurrency: 2,
+        active,
+        completed: 0,
+        failed: 0,
+        lastFinishedAt: null,
+      },
+    ],
+  })
+  const job = (ageMs: number) => ({ processedOn: now - ageMs }) as unknown as Bull.Job
+
+  it('is zero when live workers report holding every active job', () => {
+    expect(countUnheldActiveJobs('email-delivery', [job(60_000)], [pod(1)], now)).toBe(0)
+  })
+
+  it('counts settled active jobs that no live worker holds', () => {
+    expect(countUnheldActiveJobs('email-delivery', [job(60_000), job(90_000)], [pod(1)], now)).toBe(
+      1,
+    )
+    expect(countUnheldActiveJobs('email-delivery', [job(60_000)], [], now)).toBe(1)
+  })
+
+  it('allows for heartbeat lag on jobs that only just started', () => {
+    expect(countUnheldActiveJobs('email-delivery', [job(5_000)], [pod(0)], now)).toBe(0)
+  })
+
+  it('warns on the queue when a job looks stalled', () => {
+    const queue = evaluateQueue({ ...baseQueue, unheldActiveJobs: 1 })
+    expect(queue.status).toBe('warning')
+    expect(queue.reasons[0]).toMatch(/not held by any live worker/)
+  })
+})
+
 describe('helpers', () => {
   it('averages whole minutes and leaves out the current partial minute', () => {
     expect(averageOfWholeMinutes([1, 2, 4, 6, 8, 10, 999], 5)).toBe(6)
@@ -193,6 +237,7 @@ describe('MonitoringService', () => {
       }),
       getJob: vi.fn().mockResolvedValue({ timestamp: now - 30_000, opts: {} }),
       getFailed: vi.fn().mockResolvedValue([]),
+      getActive: vi.fn().mockResolvedValue([]),
       client: {
         lindex: vi.fn().mockResolvedValue('job-1'),
         mget: vi.fn((...keys: string[]) => Promise.resolve(keys.map(() => null))),
@@ -212,6 +257,30 @@ describe('MonitoringService', () => {
       zrange: vi.fn().mockResolvedValue(workers.map((_, i) => `pod-${i}`)),
       mget: vi.fn().mockResolvedValue(workers.map((worker) => JSON.stringify(worker))),
     } as unknown as Redis
+  }
+
+  /** Query builders resolve in creation order: the pending query, then the finished query. */
+  function fakeDetailRepository(pendingRows: object[] = [], finishedRows: object[] = []) {
+    const results = [pendingRows, finishedRows]
+    return {
+      createQueryBuilder: vi.fn(() => {
+        const rows = results.shift() ?? []
+        const builder: Record<string, unknown> = {}
+        for (const method of [
+          'innerJoin',
+          'select',
+          'addSelect',
+          'where',
+          'andWhere',
+          'groupBy',
+          'addGroupBy',
+        ]) {
+          builder[method] = vi.fn(() => builder)
+        }
+        builder.getRawMany = vi.fn().mockResolvedValue(rows)
+        return builder
+      }),
+    } as unknown as Repository<NotificationRequestDetail>
   }
 
   const tenantRepository = {
@@ -242,6 +311,7 @@ describe('MonitoringService', () => {
       null,
       null,
       tenantRepository,
+      fakeDetailRepository(),
     )
 
     const result = await service.getQueueMonitoring()
@@ -272,6 +342,7 @@ describe('MonitoringService', () => {
       null,
       null,
       tenantRepository,
+      fakeDetailRepository(),
     )
 
     const { recentFailures } = await service.getQueueMonitoring()
@@ -300,14 +371,100 @@ describe('MonitoringService', () => {
       null,
       null,
       tenantRepository,
+      fakeDetailRepository(),
     )
 
     const { workers } = await service.getQueueMonitoring()
     expect(workers.map((worker) => worker.podId)).toEqual(['pod-0'])
   })
 
+  it('counts pending recipients and per-minute sends by channel', async () => {
+    const minuteStart = (offsetMinutes: number) =>
+      new Date((Math.floor(now / 60_000) - offsetMinutes) * 60_000)
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(
+        [{ channel: 'EMAIL', pending: '60', oldest: new Date(now - 90_000) }],
+        [
+          { channel: 'EMAIL', status: 'sent', minute: minuteStart(1), count: '20' },
+          { channel: 'EMAIL', status: 'failed', minute: minuteStart(1), count: '5' },
+          { channel: 'EMAIL', status: 'sent', minute: minuteStart(0), count: '7' },
+          // Outside the hour: ignored rather than written past the end of the series.
+          { channel: 'EMAIL', status: 'sent', minute: minuteStart(90), count: '999' },
+        ],
+      ),
+    )
+
+    const { messages } = await service.getQueueMonitoring()
+    const email = messages.find((m) => m.channel === 'EMAIL')!
+    const sms = messages.find((m) => m.channel === 'SMS')!
+
+    expect(email.pending).toBe(60)
+    expect(email.oldestPendingAgeMs).toBeGreaterThanOrEqual(90_000)
+    expect(email.sent.at(-1)).toBe(7)
+    expect(email.sent.at(-2)).toBe(20)
+    expect(email.failed.at(-2)).toBe(5)
+    expect(email.sent.reduce((a, b) => a + b, 0)).toBe(27)
+    // 25 finished in the one busy minute of the last five -> 5/min -> 60 pending clears in 12.
+    expect(email.sentPerMinute).toBe(4)
+    expect(email.failedPerMinute).toBe(1)
+    expect(email.estimatedClearMinutes).toBe(12)
+    expect(sms).toMatchObject({ pending: 0, oldestPendingAgeMs: null, estimatedClearMinutes: 0 })
+  })
+
+  it('reports progress for active merge batches and ignores other active jobs', async () => {
+    const batch = {
+      id: 'req-1-EMAIL-0',
+      processedOn: now - 20_000,
+      data: { notifyId: 'req-1', tenantId: 't-1', mailMergeData: { recipients: ['secret'] } },
+      progress: () => ({ sent: 37, failed: 2, total: 100 }),
+    }
+    const single = { id: '9', processedOn: now, data: {}, progress: () => 0 }
+    const queue = fakeQueue('email-delivery', {
+      getActive: vi.fn().mockResolvedValue([batch, single]),
+    })
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      queue,
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+    )
+
+    const { activeBatches } = await service.getQueueMonitoring()
+
+    expect(activeBatches).toEqual([
+      {
+        queue: 'email-delivery',
+        jobId: 'req-1-EMAIL-0',
+        notificationId: 'req-1',
+        tenantId: 't-1',
+        tenantName: 'Health Ministry',
+        sent: 37,
+        failed: 2,
+        total: 100,
+        startedAt: new Date(now - 20_000).toISOString(),
+      },
+    ])
+  })
+
   it('is unavailable when Redis is not configured', async () => {
-    const service = new MonitoringService(null, null, null, null, null, tenantRepository)
+    const service = new MonitoringService(
+      null,
+      null,
+      null,
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+    )
     await expect(service.getQueueMonitoring()).rejects.toBeInstanceOf(ServiceUnavailableException)
   })
 })

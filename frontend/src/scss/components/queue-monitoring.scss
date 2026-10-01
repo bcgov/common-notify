@@ -62,3 +62,35 @@
   max-width: 420px;
   word-break: break-word;
 }
+
+.queue-monitoring__progress {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-width: 200px;
+  font-size: $font-size-sm;
+}
+
+// Text carries the state; the dot only reinforces it.
+.queue-monitoring__live {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: $text-disabled;
+  }
+
+  &[data-status='live']::before {
+    background-color: $success-color;
+  }
+
+  &[data-status='reconnecting']::before,
+  &[data-status='unavailable']::before {
+    background-color: $warning-color;
+  }
+}

@@ -57,6 +57,8 @@ export interface QueueStatsDto extends StatusReason {
   /** Minutes until the backlog clears at the current rates; null when it is not shrinking. */
   estimatedDrainMinutes: number | null
   liveWorkerPods: number
+  /** Active jobs no live worker reports holding: likely stalled after a pod died. */
+  unheldActiveJobs: number
 }
 
 export interface WorkerQueueDto {
@@ -87,11 +89,43 @@ export interface RecentFailureDto {
   failedAt: string | null
 }
 
+/**
+ * Individual recipients for one channel, counted from notification_request_detail. A merge
+ * batch is one job but up to BATCH_SIZE messages, so job counts alone understate the backlog.
+ */
+export interface MessageChannelStatsDto {
+  channel: string
+  /** Recipients accepted in the last 24 hours and not yet sent or failed; scheduled sends excluded. */
+  pending: number
+  oldestPendingAgeMs: number | null
+  /** Per-minute counts, oldest first; the last entry is the current, partial minute. */
+  sent: number[]
+  failed: number[]
+  sentPerMinute: number
+  failedPerMinute: number
+  /** Minutes until pending reaches zero at the current send rate; null when nothing is sending. */
+  estimatedClearMinutes: number | null
+}
+
+export interface ActiveBatchDto {
+  queue: string
+  jobId: string
+  notificationId: string | null
+  tenantId: string | null
+  tenantName: string | null
+  sent: number
+  failed: number
+  total: number
+  startedAt: string | null
+}
+
 export interface QueueMonitoringResponseDto {
   generatedAt: string
   status: HealthStatus
   redis: RedisStatsDto
+  messages: MessageChannelStatsDto[]
   queues: QueueStatsDto[]
+  activeBatches: ActiveBatchDto[]
   workers: WorkerPodDto[]
   recentFailures: RecentFailureDto[]
 }

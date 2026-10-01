@@ -32,16 +32,27 @@ export function usePolling<T>(
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const inFlight = useRef(false)
+  const rerun = useRef(false)
 
   const load = useCallback(async () => {
-    if (inFlight.current) return
+    // A request made mid-fetch (e.g. a live-update signal) runs once more afterwards rather
+    // than being dropped, so the last change is never missed.
+    if (inFlight.current) {
+      rerun.current = true
+      return
+    }
     inFlight.current = true
     setIsRefreshing(true)
     try {
-      setData(await fetcher())
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed')
+      do {
+        rerun.current = false
+        try {
+          setData(await fetcher())
+          setError(null)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Request failed')
+        }
+      } while (rerun.current)
     } finally {
       inFlight.current = false
       setIsLoading(false)

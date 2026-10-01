@@ -41,6 +41,8 @@ export interface QueueStats {
   }
   estimatedDrainMinutes: number | null
   liveWorkerPods: number
+  /** Active jobs no live worker reports holding: likely stalled after a pod died. */
+  unheldActiveJobs: number
 }
 
 export interface WorkerPod {
@@ -68,11 +70,39 @@ export interface RecentFailure {
   failedAt: string | null
 }
 
+/** Individual recipients for one channel; a merge batch is one job but many messages. */
+export interface MessageChannelStats {
+  channel: string
+  /** Accepted in the last 24 hours and not yet sent or failed; scheduled sends excluded. */
+  pending: number
+  oldestPendingAgeMs: number | null
+  /** Per-minute counts, oldest first; the last entry is the current, partial minute. */
+  sent: number[]
+  failed: number[]
+  sentPerMinute: number
+  failedPerMinute: number
+  estimatedClearMinutes: number | null
+}
+
+export interface ActiveBatch {
+  queue: string
+  jobId: string
+  notificationId: string | null
+  tenantId: string | null
+  tenantName: string | null
+  sent: number
+  failed: number
+  total: number
+  startedAt: string | null
+}
+
 export interface QueueMonitoring {
   generatedAt: string
   status: HealthStatus
   redis: RedisStats
+  messages: MessageChannelStats[]
   queues: QueueStats[]
+  activeBatches: ActiveBatch[]
   workers: WorkerPod[]
   recentFailures: RecentFailure[]
 }

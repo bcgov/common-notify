@@ -1513,6 +1513,23 @@ describe('EmailDeliveryWorker', () => {
         )
       })
 
+      it('should report batch progress before the first send and after each recipient', async () => {
+        vi.mocked(mockEmailAdapter.send)
+          .mockResolvedValueOnce({ messageId: 'ext-1' })
+          .mockRejectedValueOnce(new Error('rejected'))
+        const progress = vi.fn().mockResolvedValue(undefined)
+        const job = { ...makeBulkJob(['alice@example.com', 'bob@example.com']), progress }
+
+        await processHandler(job as unknown as Bull.Job<DeliveryJobPayload>)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(progress.mock.calls.map(([value]) => value)).toEqual([
+          { sent: 0, failed: 0, total: 2 },
+          { sent: 1, failed: 0, total: 2 },
+          { sent: 1, failed: 1, total: 2 },
+        ])
+      })
+
       it('should render inline content per recipient when no templateId is given', async () => {
         mockInlineRenderingService.renderEmail.mockResolvedValue({
           subject: 'Hi',
