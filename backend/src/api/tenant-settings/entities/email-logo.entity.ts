@@ -8,6 +8,9 @@ export class EmailLogo {
   @Column({ type: 'varchar', nullable: true })
   name: string | null
 
+  @Column({ type: 'varchar', nullable: true, name: 'display_title' })
+  displayTitle: string | null
+
   @Column({ type: 'varchar', nullable: true, name: 'file_key' })
   fileKey: string | null
 

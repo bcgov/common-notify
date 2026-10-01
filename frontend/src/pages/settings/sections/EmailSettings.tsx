@@ -3,6 +3,8 @@ import type { FC, SubmitEvent } from 'react'
 import {
   Button,
   InlineAlert,
+  Radio,
+  RadioGroup,
   Link,
   SvgInfoIcon,
   Switch,
@@ -41,6 +43,7 @@ const EmailSettings: FC = () => {
   const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
   const {
     emailLogoId,
+    useCustomEmailHeader = false,
     emailNotificationsEnabled,
     replyToEmail,
     emailAttachmentsEnabled,
@@ -63,6 +66,7 @@ const EmailSettings: FC = () => {
   })
   const [replyToInput, setReplyToInput] = useState(replyToEmail ?? '')
   const [selectedEmailLogoId, setSelectedEmailLogoId] = useState<string | null>(emailLogoId)
+  const [showHeaderTitle, setShowHeaderTitle] = useState(useCustomEmailHeader)
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
 
   // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
@@ -70,6 +74,10 @@ const EmailSettings: FC = () => {
     dispatch(fetchApiKeyUsage())
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
+
+  const selectedLogo = approvedLogos.find((logo) => logo.id === selectedEmailLogoId) ??
+    approvedLogos.find((logo) => logo.isDefault)
+  const headerDisplayTitle = selectedLogo?.displayTitle || 'Government of British Columbia'
 
   const normalizedReplyTo = normalizeReplyTo(replyToInput)
   const validationError =
@@ -83,6 +91,7 @@ const EmailSettings: FC = () => {
     switches.emailNotificationsEnabled !== emailNotificationsEnabled ||
     switches.emailAttachmentsEnabled !== emailAttachmentsEnabled ||
     selectedEmailLogoId !== emailLogoId ||
+    showHeaderTitle !== useCustomEmailHeader ||
     normalizedReplyTo !== replyToEmail
   const isSaveDisabled = !canEdit || !settingsChanged || saving || Boolean(validationError)
   const isFieldDisabled = saving || !canEdit
@@ -112,6 +121,7 @@ const EmailSettings: FC = () => {
         updateEmailSettings({
           ...switches,
           emailLogoId: selectedEmailLogoId,
+          useCustomEmailHeader: showHeaderTitle,
           replyToEmail: normalizedReplyTo,
         }),
       ).unwrap()
@@ -122,6 +132,7 @@ const EmailSettings: FC = () => {
       })
       setReplyToInput(updatedSettings.replyToEmail ?? '')
       setSelectedEmailLogoId(updatedSettings.emailLogoId)
+      setShowHeaderTitle(updatedSettings.useCustomEmailHeader ?? false)
       setShouldShowValidation(false)
       showSuccessToast('Email settings updated successfully')
     } catch (updateError) {
@@ -194,6 +205,19 @@ const EmailSettings: FC = () => {
       </div>
 
       <div className="settings__field">
+        <RadioGroup
+          label="Email notification header"
+          orientation="vertical"
+          value={showHeaderTitle ? 'logo-and-title' : 'logo-only'}
+          onChange={(value) => setShowHeaderTitle(value === 'logo-and-title')}
+          isDisabled={isFieldDisabled}
+        >
+          <Radio value="logo-only">Use logo only (default)</Radio>
+          <Radio value="logo-and-title">Use logo and title</Radio>
+        </RadioGroup>
+      </div>
+
+      <div className="settings__field">
         <EmailLogoMenu
           logos={approvedLogos}
           value={selectedEmailLogoId}
@@ -212,6 +236,13 @@ const EmailSettings: FC = () => {
           </p>
         )}
       </div>
+
+      {showHeaderTitle && selectedLogo && (
+        <div className="settings__header-preview" role="group" aria-label="Email header preview">
+          <img src={selectedLogo.imageUrl} alt="Government of British Columbia" />
+          <span>{headerDisplayTitle}</span>
+        </div>
+      )}
 
       <InlineAlert variant="info">
         <span className="description" id="alert-title">

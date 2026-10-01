@@ -2,6 +2,11 @@ import { IsBoolean, IsUUID, Matches, ValidateIf } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class UpdateEmailSettingsDto {
+  @ApiProperty({ required: false, description: 'Show the selected logo display title beside the logo' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  useCustomEmailHeader?: boolean
+
   @ApiProperty({
     description: 'Approved email logo to use, or null to use the system default logo',
     format: 'uuid',

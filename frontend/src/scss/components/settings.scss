@@ -321,3 +321,23 @@
   color: $text-secondary;
   font-style: italic;
 }
+
+.settings__header-preview {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  color: $primary-color;
+  font-size: $font-size-lg;
+  font-weight: 700;
+
+  img {
+    width: 180px;
+    max-width: 40%;
+    height: auto;
+  }
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

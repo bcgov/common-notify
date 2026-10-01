@@ -246,10 +246,23 @@ describe('TenantSettingsService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith({
         tenantId: 'tenant-uuid-1',
         ...emailDto,
+        useCustomEmailHeader: false,
         createdBy: 'updater-guid',
       })
       expect(mockRepository.save).toHaveBeenCalledWith(createdSettings)
       expect(result).toEqual(createdSettings)
+    })
+
+    it('saves header mode and preserves it when an older client omits the field', async () => {
+      const existing = { ...mockTenantSettings, useCustomEmailHeader: false }
+      mockRepository.findOne.mockResolvedValue(existing)
+      mockRepository.save.mockResolvedValue(existing)
+      await service.upsertEmailSettings('tenant-uuid-1', { ...emailDto, useCustomEmailHeader: true })
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', emailDto)
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', { ...emailDto, useCustomEmailHeader: false })
+      expect(existing.useCustomEmailHeader).toBe(false)
     })
 
     it('should update the email fields and updatedBy when settings exist', async () => {

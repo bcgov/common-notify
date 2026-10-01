@@ -11,6 +11,7 @@ describe('EmailTemplateLayoutService', () => {
   } as unknown as TenantSettingsService
   const emailLogoService = {
     buildPublicImageUrl: vi.fn(),
+    findByIdIfApproved: vi.fn(),
     getDefault: vi.fn().mockResolvedValue({ id: 'default-logo' }),
   } as unknown as EmailLogoService
   const service = new EmailTemplateLayoutService(tenantSettingsService, emailLogoService)
@@ -40,7 +41,9 @@ describe('EmailTemplateLayoutService', () => {
       vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue(settings as any)
       const result = await service.apply(template, rendered)
       expect(result.bodyType).toBe('html')
-      expect(result.body).toContain('<img ')
+      expect(result.body).toContain('width="180"')
+      expect(result.body).toContain('width:180px;max-width:100%;height:auto;')
+      expect(result.body).toContain('alt="Government of British Columbia"')
       expect(emailLogoService.buildPublicImageUrl).toHaveBeenCalledWith('default-logo')
     },
   )
@@ -57,7 +60,7 @@ describe('EmailTemplateLayoutService', () => {
       expect(result).toEqual({
         subject: rendered.subject,
         body:
-          '<img src="https://gateway.example.test/logos/logo-id/image" alt="">\n' +
+          '<img src="https://gateway.example.test/logos/logo-id/image" width="180" alt="Government of British Columbia" style="display:block;width:180px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">\n' +
           '<p>Hello <strong>Ada</strong></p>\n',
         bodyType: 'html',
       })
@@ -81,8 +84,22 @@ describe('EmailTemplateLayoutService', () => {
       mjmlOutput,
     )
     expect(result.body).toBe(
-      '<!doctype html><html><body>\n<img src="https://gateway.example.test/logos/logo-id/image" alt="">Hello</body></html>',
+      '<!doctype html><html><body>\n<img src="https://gateway.example.test/logos/logo-id/image" width="180" alt="Government of British Columbia" style="display:block;width:180px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">Hello</body></html>',
     )
+  })
+
+  it('renders an escaped ministry title next to the selected logo only when enabled', async () => {
+    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({ emailLogoId: 'ministry', useCustomEmailHeader: true } as any)
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({ displayTitle: 'Agriculture & Food <AF>' } as any)
+    const result = await service.apply(template, rendered)
+    expect(emailLogoService.findByIdIfApproved).toHaveBeenCalledWith('ministry')
+    expect(result.body).toContain('role="presentation"')
+    expect(result.body).toContain('Agriculture &amp; Food &lt;AF&gt;')
+    expect(result.body).not.toContain('Agriculture & Food <AF>')
+    expect(result.body).toContain('<p>Hello <strong>Ada</strong></p>')
+    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({ emailLogoId: 'ministry', useCustomEmailHeader: false } as any)
+    const logoOnly = await service.apply(template, rendered)
+    expect(logoOnly.body).not.toContain('role="presentation"')
   })
 
   it('does not brand SMS', async () => {

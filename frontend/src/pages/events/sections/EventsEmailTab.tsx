@@ -106,6 +106,7 @@ type EventsEmailTabProps = {
   approvedLogos?: ApprovedEmailLogo[]
   /** Tenant's configured email logo, used as the starting selection for a custom header. */
   tenantEmailLogoId?: string | null
+  tenantShowsHeaderTitle?: boolean
   /** Selected tenant's name, used as the default header title. */
   tenantName?: string | null
   /**
@@ -126,6 +127,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   defaultSenderEmail,
   approvedLogos = [],
   tenantEmailLogoId,
+  tenantShowsHeaderTitle = false,
   tenantName,
   onUnsavedChangesChange,
   cstarGroups = [],
@@ -235,7 +237,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const previewLogoId =
     headerMode === HEADER_CUSTOM_ID ? (headerLogoId ?? defaultLogoId) : defaultLogoId
   const previewLogo = approvedLogos.find((logo) => logo.id === previewLogoId)
-  const previewTitle = headerMode === HEADER_CUSTOM_ID ? headerTitle : ''
+  const previewTitle = headerMode === HEADER_CUSTOM_ID
+    ? headerTitle
+    : tenantShowsHeaderTitle ? (previewLogo?.displayTitle || 'Government of British Columbia') : ''
 
   const trimmedSenderEmail = senderEmail.trim()
   const senderEmailFormatError = senderEmailProblem(trimmedSenderEmail)

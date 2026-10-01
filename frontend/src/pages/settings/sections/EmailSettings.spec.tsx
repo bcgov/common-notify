@@ -31,7 +31,8 @@ vi.mock('@/redux/utils/toastUtils', () => ({
   showSuccessToast: vi.fn(),
 }))
 
-vi.mock('@bcgov/design-system-react-components', () => ({
+vi.mock('@bcgov/design-system-react-components', async () => ({
+  ...await vi.importActual('@bcgov/design-system-react-components'),
   InlineAlert: ({ children }: any) => <div>{children}</div>,
   Link: ({ children, iconRight, ...props }: any) => (
     <a {...props}>
@@ -92,11 +93,13 @@ const APPROVED_LOGOS = [
   {
     id: 'logo-1',
     name: 'Primary logo',
+    displayTitle: 'Agriculture and Food (AF)',
     imageUrl: 'https://gateway.example.test/logos/logo-1/image',
   },
   {
     id: 'logo-2',
     name: 'Alternate logo',
+    displayTitle: 'Health (HLTH)',
     imageUrl: 'https://gateway.example.test/logos/logo-2/image',
   },
   {
@@ -175,6 +178,18 @@ describe('EmailSettings section', () => {
     expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
   })
 
+  it('defaults to logo only and saves an opt-in title that follows the selected logo', async () => {
+    renderWithRoles()
+    expect(screen.getByRole('radio', { name: 'Use logo only (default)' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Use logo and title' }))
+    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent('Agriculture and Food (AF)')
+    await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Alternate logo' }))
+    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent('Health (HLTH)')
+    await userEvent.click(saveButton())
+    await waitFor(() => expect(updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ useCustomEmailHeader: true, emailLogoId: 'logo-2' })))
+  })
+
   it('renders the selected logo and API-provided thumbnails in the dropdown', async () => {
     renderWithRoles()
 
@@ -207,6 +222,7 @@ describe('EmailSettings section', () => {
     await waitFor(() => {
       expect(updateEmailSettings).toHaveBeenCalledWith({
         emailLogoId: 'logo-2',
+        useCustomEmailHeader: false,
         emailNotificationsEnabled: true,
         emailAttachmentsEnabled: true,
         replyToEmail: 'noreply',
