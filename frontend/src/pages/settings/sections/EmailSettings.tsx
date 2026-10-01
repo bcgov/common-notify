@@ -249,7 +249,7 @@ const EmailSettings: FC = () => {
         <span className="description" id="alert-title">
           Only approved authoring logos may be used. Contact your{' '}
           <Link
-            href="https://intranet.gov.bc.ca/gcpe/communication-services-tools-for-ministry-partners/brand?"
+            href="https://www2.gov.bc.ca/gov/content/governments/services-for-government/policies-procedures/bc-visual-identity"
             target="_blank"
             rel="noopener noreferrer"
             iconRight={<OpenInNewIcon fontSize="inherit" />}
