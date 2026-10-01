@@ -257,11 +257,17 @@ describe('TenantSettingsService', () => {
       const existing = { ...mockTenantSettings, useCustomEmailHeader: false }
       mockRepository.findOne.mockResolvedValue(existing)
       mockRepository.save.mockResolvedValue(existing)
-      await service.upsertEmailSettings('tenant-uuid-1', { ...emailDto, useCustomEmailHeader: true })
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: true,
+      })
       expect(existing.useCustomEmailHeader).toBe(true)
       await service.upsertEmailSettings('tenant-uuid-1', emailDto)
       expect(existing.useCustomEmailHeader).toBe(true)
-      await service.upsertEmailSettings('tenant-uuid-1', { ...emailDto, useCustomEmailHeader: false })
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: false,
+      })
       expect(existing.useCustomEmailHeader).toBe(false)
     })
 

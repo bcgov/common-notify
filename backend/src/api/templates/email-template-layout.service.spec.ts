@@ -89,15 +89,23 @@ describe('EmailTemplateLayoutService', () => {
   })
 
   it('renders an escaped ministry title next to the selected logo only when enabled', async () => {
-    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({ emailLogoId: 'ministry', useCustomEmailHeader: true } as any)
-    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({ displayTitle: 'Agriculture & Food <AF>' } as any)
+    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({
+      emailLogoId: 'ministry',
+      useCustomEmailHeader: true,
+    } as any)
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      displayTitle: 'Agriculture & Food <AF>',
+    } as any)
     const result = await service.apply(template, rendered)
     expect(emailLogoService.findByIdIfApproved).toHaveBeenCalledWith('ministry')
     expect(result.body).toContain('role="presentation"')
     expect(result.body).toContain('Agriculture &amp; Food &lt;AF&gt;')
     expect(result.body).not.toContain('Agriculture & Food <AF>')
     expect(result.body).toContain('<p>Hello <strong>Ada</strong></p>')
-    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({ emailLogoId: 'ministry', useCustomEmailHeader: false } as any)
+    vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({
+      emailLogoId: 'ministry',
+      useCustomEmailHeader: false,
+    } as any)
     const logoOnly = await service.apply(template, rendered)
     expect(logoOnly.body).not.toContain('role="presentation"')
   })

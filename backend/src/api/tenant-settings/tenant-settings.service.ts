@@ -108,7 +108,8 @@ export class TenantSettingsService {
       const existing = await this.findByTenantId(tenantId)
 
       if (existing) {
-        existing.useCustomEmailHeader = dto.useCustomEmailHeader ?? existing.useCustomEmailHeader ?? false
+        existing.useCustomEmailHeader =
+          dto.useCustomEmailHeader ?? existing.useCustomEmailHeader ?? false
         existing.emailLogoId = emailLogoId
         existing.emailNotificationsEnabled = dto.emailNotificationsEnabled
         existing.replyToEmail = dto.replyToEmail
