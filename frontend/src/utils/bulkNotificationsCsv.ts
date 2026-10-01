@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 
 /**
  * Header the recipient's address goes under, as the design specifies and as the spreadsheet the
@@ -79,18 +80,12 @@ function isValidEmail(value: string): boolean {
 }
 
 /**
- * Loosely check a phone number, mirroring the server's normalisation rather than reimplementing it.
- *
- * The API normalises to E.164 and assumes Canada when no country code is given, so anything with
- * 10 digits (or 11 starting with 1) is plausible. The authoritative check is server-side; this only
- * needs to catch the typos worth showing someone a row number for.
+ * Validate the whole input, assuming Canada for national numbers as the API does.
+ * Destination support is checked separately so it gets a specific issue message.
  */
 function isValidPhone(value: string): boolean {
-  const digits = value.replace(/[^\d]/g, '')
-  if (digits.length === 10) return true
-  if (digits.length === 11 && digits.startsWith('1')) return true
-  // Any other country code, given explicitly.
-  return value.trim().startsWith('+') && digits.length >= 8 && digits.length <= 15
+  const phone = parsePhoneNumberFromString(value, { defaultCountry: 'CA', extract: false })
+  return !!phone && !phone.ext && phone.isValid()
 }
 
 /** Is this cell a usable recipient for the channel? */
@@ -270,14 +265,29 @@ export function validateCsv(
             row: rowNumber,
             column: name,
             value,
-            title: 'Invalid format',
+            title: channel === 'sms' ? 'Invalid phone number' : 'Invalid format',
             // The offending value is already in its own column, so the detail is the fix alone.
             detail:
               channel === 'sms'
-                ? 'Use a 10-digit number, or a country code after a plus sign, like +12505550199.'
+                ? 'Check the phone number.'
                 : 'Use a single @ with a domain after it, like name@example.com.',
           })
           continue
+        }
+
+        if (channel === 'sms') {
+          const phone = parsePhoneNumberFromString(value, { defaultCountry: 'CA', extract: false })!
+          if (phone.countryCallingCode !== '1') {
+            rowIssues.push({
+              row: rowNumber,
+              column: name,
+              value,
+              title: 'Unsupported destination',
+              detail:
+                'SMS is only supported for numbers with the +1 country calling code. Remove this recipient.',
+            })
+            continue
+          }
         }
 
         const normalised = recipientKey(value, channel)
