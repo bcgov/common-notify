@@ -43,7 +43,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
-  const tenantShowsHeaderTitle = useAppSelector((state) => state.emailSettings.useCustomEmailHeader ?? false)
+  const tenantShowsHeaderTitle = useAppSelector(
+    (state) => state.emailSettings.useCustomEmailHeader ?? false,
+  )
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)

@@ -26,7 +26,9 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
-  const tenantShowsHeaderTitle = useAppSelector((state) => state.emailSettings.useCustomEmailHeader ?? false)
+  const tenantShowsHeaderTitle = useAppSelector(
+    (state) => state.emailSettings.useCustomEmailHeader ?? false,
+  )
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [event, setEvent] = useState<EventResponse | null>(null)
@@ -93,12 +95,17 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   // A custom header shows its own logo and title; the tenant default shows the tenant's
   // configured logo on its own.
   const useCustomHeader = emailSettings?.useCustomHeader ?? false
-  const headerLogoId = useCustomHeader ? (emailSettings?.headerLogoId ?? tenantEmailLogoId) : tenantEmailLogoId
+  const headerLogoId = useCustomHeader
+    ? (emailSettings?.headerLogoId ?? tenantEmailLogoId)
+    : tenantEmailLogoId
   const headerLogo =
     approvedLogos.find((logo) => logo.id === headerLogoId) ??
     approvedLogos.find((logo) => logo.isDefault)
-  const headerTitle = useCustomHeader ? (emailSettings?.headerTitle ?? '')
-    : tenantShowsHeaderTitle ? (headerLogo?.displayTitle || 'Government of British Columbia') : ''
+  const headerTitle = useCustomHeader
+    ? (emailSettings?.headerTitle ?? '')
+    : tenantShowsHeaderTitle
+      ? headerLogo?.displayTitle || 'Government of British Columbia'
+      : ''
 
   function openTab(tab: EventTab) {
     navigate({ to: '/events/$eventId', params: { eventId }, search: { tab } })

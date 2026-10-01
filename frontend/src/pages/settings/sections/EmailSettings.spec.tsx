@@ -32,7 +32,7 @@ vi.mock('@/redux/utils/toastUtils', () => ({
 }))
 
 vi.mock('@bcgov/design-system-react-components', async () => ({
-  ...await vi.importActual('@bcgov/design-system-react-components'),
+  ...(await vi.importActual('@bcgov/design-system-react-components')),
   InlineAlert: ({ children }: any) => <div>{children}</div>,
   Link: ({ children, iconRight, ...props }: any) => (
     <a {...props}>
@@ -182,12 +182,20 @@ describe('EmailSettings section', () => {
     renderWithRoles()
     expect(screen.getByRole('radio', { name: 'Use logo only (default)' })).toBeChecked()
     await userEvent.click(screen.getByRole('radio', { name: 'Use logo and title' }))
-    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent('Agriculture and Food (AF)')
+    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent(
+      'Agriculture and Food (AF)',
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
     await userEvent.click(screen.getByRole('option', { name: 'Alternate logo' }))
-    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent('Health (HLTH)')
+    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent(
+      'Health (HLTH)',
+    )
     await userEvent.click(saveButton())
-    await waitFor(() => expect(updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ useCustomEmailHeader: true, emailLogoId: 'logo-2' })))
+    await waitFor(() =>
+      expect(updateEmailSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ useCustomEmailHeader: true, emailLogoId: 'logo-2' }),
+      ),
+    )
   })
 
   it('renders the selected logo and API-provided thumbnails in the dropdown', async () => {

@@ -75,7 +75,8 @@ const EmailSettings: FC = () => {
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
 
-  const selectedLogo = approvedLogos.find((logo) => logo.id === selectedEmailLogoId) ??
+  const selectedLogo =
+    approvedLogos.find((logo) => logo.id === selectedEmailLogoId) ??
     approvedLogos.find((logo) => logo.isDefault)
   const headerDisplayTitle = selectedLogo?.displayTitle || 'Government of British Columbia'
 

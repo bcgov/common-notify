@@ -237,9 +237,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const previewLogoId =
     headerMode === HEADER_CUSTOM_ID ? (headerLogoId ?? defaultLogoId) : defaultLogoId
   const previewLogo = approvedLogos.find((logo) => logo.id === previewLogoId)
-  const previewTitle = headerMode === HEADER_CUSTOM_ID
-    ? headerTitle
-    : tenantShowsHeaderTitle ? (previewLogo?.displayTitle || 'Government of British Columbia') : ''
+  const previewTitle =
+    headerMode === HEADER_CUSTOM_ID
+      ? headerTitle
+      : tenantShowsHeaderTitle
+        ? previewLogo?.displayTitle || 'Government of British Columbia'
+        : ''
 
   const trimmedSenderEmail = senderEmail.trim()
   const senderEmailFormatError = senderEmailProblem(trimmedSenderEmail)
