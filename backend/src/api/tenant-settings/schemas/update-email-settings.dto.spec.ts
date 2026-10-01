@@ -15,7 +15,7 @@ describe('UpdateEmailSettingsDto', () => {
     expect(errors).toHaveLength(0)
   })
 
-  it('accepts null to clear the selected logo', async () => {
+  it('accepts null to use the default logo', async () => {
     const errors = await validate(
       Object.assign(new UpdateEmailSettingsDto(), { ...validValues, emailLogoId: null }),
     )
@@ -29,5 +29,28 @@ describe('UpdateEmailSettingsDto', () => {
     )
 
     expect(errors.some((error) => error.property === 'emailLogoId')).toBe(true)
+  })
+
+  it.each([true, false])('accepts header mode %s without a client-supplied title', async (mode) => {
+    const errors = await validate(
+      Object.assign(new UpdateEmailSettingsDto(), {
+        ...validValues,
+        useCustomEmailHeader: mode,
+      }),
+      { whitelist: true, forbidNonWhitelisted: true },
+    )
+
+    expect(errors).toHaveLength(0)
+  })
+
+  it('rejects a non-boolean header mode', async () => {
+    const errors = await validate(
+      Object.assign(new UpdateEmailSettingsDto(), {
+        ...validValues,
+        useCustomEmailHeader: 'true',
+      }),
+    )
+
+    expect(errors.some((error) => error.property === 'useCustomEmailHeader')).toBe(true)
   })
 })
