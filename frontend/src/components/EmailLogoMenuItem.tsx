@@ -28,6 +28,7 @@ const EmailLogoMenuItem: FC<EmailLogoMenuItemProps> = ({
   <div
     id={optionId}
     role="option"
+    aria-label={option.name}
     aria-selected={isSelected}
     className={`email-logo-menu__option${isActive ? ' email-logo-menu__option--active' : ''}${
       isSelected ? ' email-logo-menu__option--selected' : ''

@@ -252,6 +252,33 @@ describe('EmailSettings section', () => {
     })
   })
 
+  it('scrolls keyboard-active logos into view without changing the selection', async () => {
+    renderWithRoles()
+    await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
+    const list = screen.getByRole('listbox')
+    const primary = screen.getByRole('option', { name: 'Primary logo' })
+    const alternate = screen.getByRole('option', { name: 'Alternate logo' })
+    const bounds = (top: number, bottom: number) =>
+      ({ top, bottom, left: 0, right: 418, width: 418, height: bottom - top }) as DOMRect
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(bounds(100, 300))
+    vi.spyOn(alternate, 'getBoundingClientRect').mockReturnValue(bounds(260, 344))
+    vi.spyOn(primary, 'getBoundingClientRect').mockReturnValue(bounds(56, 140))
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(list.scrollTop).toBe(44)
+    expect(screen.getByRole('combobox', { name: 'Search email logos' })).toHaveAttribute(
+      'aria-activedescendant',
+      alternate.id,
+    )
+    expect(primary).toHaveAttribute('aria-selected', 'true')
+    expect(alternate).toHaveAttribute('aria-label', 'Alternate logo')
+
+    await userEvent.keyboard('{ArrowUp}')
+    expect(list.scrollTop).toBe(0)
+    fireEvent.mouseMove(alternate)
+    expect(list.scrollTop).toBe(0)
+  })
+
   it('filters logos and supports arrow-key selection and Escape', async () => {
     renderWithRoles()
 

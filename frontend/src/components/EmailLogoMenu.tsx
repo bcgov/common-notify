@@ -29,6 +29,8 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   const id = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const scrollActiveOption = useRef(true)
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -69,6 +71,22 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   )
 
   useEffect(() => {
+    if (!isOpen || !activeOptionId || !scrollActiveOption.current) return
+    const list = listRef.current
+    const option = document.getElementById(activeOptionId)
+    if (!list || !option || !list.contains(option)) return
+
+    const bounds = list.getBoundingClientRect()
+    const optionBounds = option.getBoundingClientRect()
+    // Scroll only the dropdown, keeping the search input and page stationary.
+    if (optionBounds.top < bounds.top) {
+      list.scrollTop += optionBounds.top - bounds.top
+    } else if (optionBounds.bottom > bounds.bottom) {
+      list.scrollTop += optionBounds.bottom - bounds.bottom
+    }
+  }, [isOpen, activeOptionId, searchQuery])
+
+  useEffect(() => {
     if (!isOpen) return
 
     function closeOnOutsidePointer(event: PointerEvent) {
@@ -84,6 +102,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
 
   function openMenu() {
     if (isDisabled) return
+    scrollActiveOption.current = true
     setSearchQuery('')
     const selectedIndex = options.findIndex((option) => option.id === effectiveValue)
     setActiveIndex(Math.max(0, selectedIndex))
@@ -103,9 +122,11 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown') {
+      scrollActiveOption.current = true
       event.preventDefault()
       setActiveIndex((current) => Math.min(current + 1, filteredOptions.length - 1))
     } else if (event.key === 'ArrowUp') {
+      scrollActiveOption.current = true
       event.preventDefault()
       setActiveIndex((current) => Math.max(current - 1, 0))
     } else if (event.key === 'Enter') {
@@ -130,7 +151,10 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
         optionId={`${id}-option-${optionIndex}`}
         isActive={optionIndex === activeIndex}
         isSelected={option.id === effectiveValue}
-        onActivate={() => setActiveIndex(optionIndex)}
+        onActivate={() => {
+          scrollActiveOption.current = false
+          setActiveIndex(optionIndex)
+        }}
         onSelect={() => selectOption(option)}
       />
     )
@@ -188,6 +212,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               })}
               value={searchQuery}
               onChange={(query) => {
+                scrollActiveOption.current = true
                 setSearchQuery(query)
                 setActiveIndex(0)
               }}
@@ -196,6 +221,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
           </div>
           <div className="email-logo-menu__divider" role="separator" />
           <div
+            ref={listRef}
             id={listboxId}
             className="email-logo-menu__list"
             role="listbox"
