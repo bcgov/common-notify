@@ -444,6 +444,28 @@ $table-header-bg: #f1f8fe; // Table header / footer color
   }
 }
 
+/**
+ * Multi-line rows.
+ *
+ * The default cell rules keep rows on one line and centre them, which is right for a table of
+ * single values. A table whose cells stack content - a title over its description, an address
+ * over its label - reads badly that way: the one-line columns float halfway down the row, and
+ * long text widens the column instead of wrapping.
+ *
+ * The class is doubled on purpose. `.data-table--multiline tbody td` ties with the default
+ * `.data-table tbody td`, so it would win or lose on source order alone.
+ */
+.data-table.data-table--multiline {
+  tbody td {
+    vertical-align: top;
+    white-space: normal;
+  }
+
+  thead th {
+    vertical-align: top;
+  }
+}
+
 // The name cell of a table whose rows link to a detail page. Link-blue on every row reads as
 // noise when the whole column is links, so these take the body text colour and keep the
 // underline on hover/focus as the affordance. Used by the templates and events tables.

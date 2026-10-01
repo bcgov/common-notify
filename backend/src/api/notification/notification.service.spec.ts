@@ -811,6 +811,78 @@ describe('NotificationService', () => {
         )
       })
 
+      it('should use channel-level params when the request has no top-level params', async () => {
+        // The /notifysimple/email shorthand posts a bare channel, so the caller's params arrive
+        // under email, not at the top level. Reading only request.params reported every
+        // placeholder as missing and rejected the send with a 400.
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+            params: { firstName: 'Alice' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { firstName: 'Alice' },
+        )
+      })
+
+      it('should let channel params override top-level params, as the delivery worker does', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'EMAIL',
+        })
+
+        const request: any = {
+          params: { firstName: 'Alice', permitNumber: 'BC-1' },
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: 'template-123' },
+            params: { firstName: 'Bob' },
+          },
+        }
+
+        await service.validateBusinessRules('tenant-123', request)
+
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { firstName: 'Bob', permitNumber: 'BC-1' },
+        )
+      })
+
+      it('should use channel-level params for SMS', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue({
+          id: 'template-123',
+          channelCode: 'SMS',
+        })
+
+        const request: any = {
+          sms: {
+            recipients: { to: ['+12025551234'] },
+            content: { templateId: 'template-123' },
+            params: { code: '123456' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([])
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'template-123' }),
+          { code: '123456' },
+        )
+      })
+
       it('should validate SMS template params before queueing', async () => {
         mockTemplatesRepository.findById.mockResolvedValue({
           id: 'template-123',

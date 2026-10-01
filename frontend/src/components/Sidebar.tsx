@@ -6,6 +6,7 @@ import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
@@ -48,7 +49,7 @@ const navItems = [
     icon: <FolderOutlinedIcon />,
   },
   {
-    label: 'Batch Send',
+    label: 'Send Batch Notification',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
   },
@@ -88,9 +89,10 @@ const Sidebar: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+  // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
+  const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
-  const bulkNotificationsEnabled = useFeatureFlag('bulk_notifications', selectedTenant?.id)
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -131,14 +133,16 @@ const Sidebar: FC = () => {
       {/* Top nav */}
       <nav className="sidebar__nav" aria-label="Primary">
         {navItems.map((item) => {
+          // Keyed on the route, not the label: a label is copy and gets reworded, and keying
+          // visibility on it means a rename silently hides the link.
           const shouldShow =
-            (item.label === 'Home' && hasTenantRole) ||
-            (item.label === 'Dashboard' && hasTenantRole) ||
-            (item.label === 'Notification Events' && hasTenantRole && eventsEnabled) ||
-            (item.label === 'Templates' && hasTenantRole) ||
-            (item.label === 'Batch Send' && hasTenantRole && bulkNotificationsEnabled) ||
-            (item.label === 'Usage & Limits' && showUsage) ||
-            (item.label === 'Settings' && hasTenantRole)
+            (item.to === '/' && hasTenantRole) ||
+            (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/events' && hasTenantRole && eventsEnabled) ||
+            (item.to === '/templates' && hasTenantRole) ||
+            (item.to === '/bulk-notifications' && canBulkNotify) ||
+            (item.to === '/usage' && showUsage) ||
+            (item.to === '/settings' && hasTenantRole)
 
           return shouldShow ? (
             <Link

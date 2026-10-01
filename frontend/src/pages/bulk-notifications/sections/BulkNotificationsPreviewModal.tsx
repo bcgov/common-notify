@@ -5,13 +5,14 @@ import { previewTemplate } from '@/api/templates.api'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import type { PreviewVariable } from '@/components/NotificationPreviewModal'
 import { rowParams, rowRecipient, RECIPIENT_COLUMN } from '@/utils/bulkNotificationsCsv'
-import type { ParsedCsv } from '@/utils/bulkNotificationsCsv'
+import type { BulkChannel, ParsedCsv } from '@/utils/bulkNotificationsCsv'
 
 interface BulkNotificationsPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   templateId: string
   parsed: ParsedCsv
+  channel: BulkChannel
   isSending?: boolean
   onSend: () => void
 }
@@ -28,6 +29,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
   onClose,
   templateId,
   parsed,
+  channel,
   isSending = false,
   onSend,
 }) => {
@@ -45,7 +47,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
       setLoading(true)
       setError(null)
       try {
-        const response = await previewTemplate(templateId, rowParams(parsed, index))
+        const response = await previewTemplate(templateId, rowParams(parsed, index, channel))
         setSubject(response.subject ?? '')
         setFromAddress(response.from)
         setBodyHtml(response.html)
@@ -58,7 +60,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
         setLoading(false)
       }
     },
-    [parsed, templateId],
+    [parsed, templateId, channel],
   )
 
   // Re-render on open and whenever the row changes; a closed modal renders nothing.
@@ -86,7 +88,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
         type: (isBoolean ? 'boolean' : 'text') as 'boolean' | 'text',
       }
     })
-    .filter((variable) => variable.name !== RECIPIENT_COLUMN)
+    .filter((variable) => variable.name !== RECIPIENT_COLUMN[channel])
 
   return (
     <NotificationPreviewModal
@@ -96,14 +98,14 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
       variables={variables}
       variablesIntro="These values come from your CSV file."
       stepper={{
-        label: `Email notification ${rowIndex + 1} of ${rowCount}`,
+        label: `${channel === 'sms' ? 'SMS' : 'Email'} notification ${rowIndex + 1} of ${rowCount}`,
         onPrevious: () => setRowIndex((index) => Math.max(0, index - 1)),
         onNext: () => setRowIndex((index) => Math.min(rowCount - 1, index + 1)),
         hasPrevious: rowIndex > 0 && !loading,
         hasNext: rowIndex < rowCount - 1 && !loading,
       }}
       from={fromAddress}
-      to={rowRecipient(parsed, rowIndex)}
+      to={rowRecipient(parsed, rowIndex, channel)}
       subject={subject}
       bodyHtml={bodyHtml}
       bodyText={bodyText}

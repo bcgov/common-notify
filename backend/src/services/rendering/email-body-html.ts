@@ -13,7 +13,14 @@ const markdown = new MarkdownIt({
   typographer: true, // enables smart quotes and other typographic replacements
 })
 
-/** Convert a rendered body to HTML. A `text` body is returned untouched, for the caller to escape. */
+/**
+ * Convert a rendered body to HTML.
+ *
+ * Markdown is the default: an omitted `bodyType` reaches here only from inline API content that
+ * did not set one, and the API documents markdown as its default. `text` is returned untouched
+ * for the caller to escape, and `html` is the caller's own markup, gated by the
+ * `html_body_type` feature flag and delivered unchanged.
+ */
 export function toEmailHtml(body: string, bodyType?: 'text' | 'markdown' | 'html'): string {
-  return bodyType === 'markdown' ? markdown.render(body) : body
+  return bodyType === 'text' || bodyType === 'html' ? body : markdown.render(body)
 }

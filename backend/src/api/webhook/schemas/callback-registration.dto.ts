@@ -10,7 +10,9 @@ import {
   IsNotEmpty,
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { PartialType } from '@nestjs/mapped-types'
+// PartialType from @nestjs/swagger, not @nestjs/mapped-types: only this one carries the
+// @ApiProperty metadata across, without which the update DTO publishes as an empty schema.
+import { PartialType } from '@nestjs/swagger'
 import { WebhookType } from '../../../enum/webhook-type.enum'
 
 export const CHANNEL_TYPE_VALUES = ['email', 'sms', 'msgApp'] as const
@@ -95,15 +97,32 @@ export class CallbackRegistrationResponse {
   })
   callbackId: string
 
-  @ApiProperty({ format: 'uri', example: 'https://example.gov.bc.ca/hooks/notify' })
+  @ApiProperty({
+    description: 'HTTPS endpoint registered to receive delivery events.',
+    format: 'uri',
+    example: 'https://example.gov.bc.ca/hooks/notify',
+  })
   url: string
 
-  @ApiPropertyOptional({ example: { 'X-Environment': 'production' } })
+  @ApiPropertyOptional({
+    description: 'Extra headers sent with every delivery callback.',
+    example: { 'X-Environment': 'production' },
+  })
   headers?: Record<string, string>
 
-  @ApiProperty({ type: [String], enum: CHANNEL_TYPE_VALUES, example: ['email', 'sms'] })
+  @ApiProperty({
+    description: 'Channel types this registration filters on.',
+    type: [String],
+    enum: CHANNEL_TYPE_VALUES,
+    example: ['email', 'sms'],
+  })
   channelType: string[]
 
-  @ApiProperty({ type: [String], enum: TRIGGER_VALUES, example: ['success', 'failure'] })
+  @ApiProperty({
+    description: 'Status transitions that trigger delivery callbacks.',
+    type: [String],
+    enum: TRIGGER_VALUES,
+    example: ['success', 'failure'],
+  })
   trigger: string[]
 }

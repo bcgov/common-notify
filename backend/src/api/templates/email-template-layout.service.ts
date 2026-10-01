@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { TemplateEngine } from '../../enum/template-engine.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
@@ -11,12 +10,6 @@ export interface RenderedEmailContent {
   body: string
   bodyType: 'text' | 'markdown' | 'html'
 }
-
-const LAYOUT_SUPPORTED_ENGINES = new Set<TemplateEngine>([
-  TemplateEngine.HANDLEBARS,
-  TemplateEngine.MUSTACHE,
-  TemplateEngine.LEGACY_GC_NOTIFY,
-])
 
 @Injectable()
 export class EmailTemplateLayoutService {
@@ -31,32 +24,41 @@ export class EmailTemplateLayoutService {
     private readonly emailLogoService: EmailLogoService,
   ) {}
 
-  async apply(template: Template, rendered: RenderedEmailContent): Promise<RenderedEmailContent> {
+  async apply(
+    template: Pick<Template, 'tenantId' | 'channelCode'>,
+    rendered: RenderedEmailContent,
+  ): Promise<RenderedEmailContent> {
     if (template.channelCode !== NotificationChannel.EMAIL) {
       return rendered
     }
 
-    if (template.engineCode === TemplateEngine.MJML) {
-      // Deliberately do not wrap MJML output: it is a complete, self-contained HTML document,
-      // and prepending layout markup could invalidate or break that document.
-      return rendered
-    }
-
-    if (!LAYOUT_SUPPORTED_ENGINES.has(template.engineCode as TemplateEngine)) {
-      return rendered
-    }
-
     const tenantSettings = await this.tenantSettingsService.findByTenantId(template.tenantId)
-    if (!tenantSettings?.emailLogoId) {
-      return rendered
-    }
-
-    const imageUrl = this.emailLogoService.buildPublicImageUrl(tenantSettings.emailLogoId)
+    const logoId = tenantSettings?.emailLogoId ?? (await this.emailLogoService.getDefault()).id
+    const imageUrl = this.emailLogoService.buildPublicImageUrl(logoId)
     const htmlBody = this.toHtml(rendered.body, rendered.bodyType)
 
+    // Supply an HTML width as well as inline CSS for email clients with limited CSS support.
+    // Keep the intrinsic aspect ratio because approved logos have different proportions.
+    const logo = `<img src="${this.escapeHtmlAttribute(imageUrl)}" width="260" alt="Government of British Columbia" style="display:block;width:260px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">`
+    const selectedLogo = tenantSettings?.useCustomEmailHeader
+      ? await this.emailLogoService.findByIdIfApproved(logoId)
+      : null
+    const title = tenantSettings?.useCustomEmailHeader
+      ? selectedLogo?.displayTitle?.trim() || 'Government of British Columbia'
+      : null
+    // Presentation tables and inline styles work in email clients without flex/grid support.
+    // The title is real text, so it remains readable when remote images are blocked.
+    const header = title
+      ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;"><tr><td width="260" valign="middle">${logo.replace('margin:0 0 24px 0;', 'margin:0;')}</td><td valign="middle" style="padding-left:16px;font-family:Arial,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#003366;">${this.escapeHtml(title)}</td></tr></table>`
+      : logo
+    const headerContainer = `<div style="background-color: #ffffff; max-width: 600px; margin: 0 auto;">${header}</div>`
+    // Complete HTML documents (including MJML) keep their document structure.
+    const body = /<body\b[^>]*>/i.test(htmlBody)
+      ? htmlBody.replace(/<body\b[^>]*>/i, (openingTag) => `${openingTag}\n${headerContainer}`)
+      : `${headerContainer}\n${htmlBody}`
     return {
       ...rendered,
-      body: `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="">\n${htmlBody}`,
+      body,
       bodyType: 'html',
     }
   }
@@ -68,7 +70,6 @@ export class EmailTemplateLayoutService {
 
     if (bodyType === 'markdown') {
       // This pre-conversion is reached only when a logo is actually being injected.
-      // Logo-free messages retain their original body/bodyType and CHES converts them as before.
       return this.markdown.render(body)
     }
 

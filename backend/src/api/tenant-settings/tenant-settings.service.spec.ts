@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
 import { BadRequestException } from '@nestjs/common'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { vi } from 'vitest'
@@ -36,6 +37,7 @@ describe('TenantSettingsService', () => {
     save: vi.fn(),
   }
   const mockEmailLogoService = {
+    getDefault: vi.fn().mockResolvedValue({ id: 'default-logo' }),
     findByIdIfApproved: vi.fn().mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
     }),
@@ -52,6 +54,17 @@ describe('TenantSettingsService', () => {
         {
           provide: EmailLogoService,
           useValue: mockEmailLogoService,
+        },
+        {
+          // Supplies the domain appended to the stored local part of a sender address.
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              ({
+                'events.senderEmailDomain': 'gov.bc.ca',
+                'ches.from': 'notify_noreply@gov.bc.ca',
+              })[key],
+          },
         },
       ],
     }).compile()
@@ -78,6 +91,54 @@ describe('TenantSettingsService', () => {
       const result = await service.findByTenantId('tenant-uuid-1')
 
       expect(result).toBeNull()
+    })
+  })
+
+  describe('getSenderAddress', () => {
+    it('appends the domain to the stored local part', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('returns null when the tenant has no sender configured', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the stored value is blank', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: '  ' })
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+
+    it('returns null when the tenant has no settings row at all', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+
+      await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+  })
+
+  describe('resolveSenderAddress', () => {
+    it('prefers the tenant sender', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockTenantSettings,
+        defaultSenderEmail: 'permits',
+      })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe('permits@gov.bc.ca')
+    })
+
+    it('falls back to the service-wide address when the tenant has no sender', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...mockTenantSettings, defaultSenderEmail: null })
+
+      await expect(service.resolveSenderAddress('tenant-uuid-1')).resolves.toBe(
+        'notify_noreply@gov.bc.ca',
+      )
     })
   })
 
@@ -185,10 +246,29 @@ describe('TenantSettingsService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith({
         tenantId: 'tenant-uuid-1',
         ...emailDto,
+        useCustomEmailHeader: false,
         createdBy: 'updater-guid',
       })
       expect(mockRepository.save).toHaveBeenCalledWith(createdSettings)
       expect(result).toEqual(createdSettings)
+    })
+
+    it('saves header mode and preserves it when an older client omits the field', async () => {
+      const existing = { ...mockTenantSettings, useCustomEmailHeader: false }
+      mockRepository.findOne.mockResolvedValue(existing)
+      mockRepository.save.mockResolvedValue(existing)
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: true,
+      })
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', emailDto)
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: false,
+      })
+      expect(existing.useCustomEmailHeader).toBe(false)
     })
 
     it('should update the email fields and updatedBy when settings exist', async () => {
@@ -222,7 +302,7 @@ describe('TenantSettingsService', () => {
       expect(result).toEqual(savedSettings)
     })
 
-    it('should clear emailLogoId without an approval lookup', async () => {
+    it('should use the default logo when a legacy client sends null', async () => {
       const existingSettings = { ...mockTenantSettings, emailLogoId: emailDto.emailLogoId }
       const dto = { ...emailDto, emailLogoId: null }
       mockRepository.findOne.mockResolvedValue(existingSettings)
@@ -230,7 +310,7 @@ describe('TenantSettingsService', () => {
 
       await service.upsertEmailSettings('tenant-uuid-1', dto, 'updater-guid')
 
-      expect(existingSettings.emailLogoId).toBeNull()
+      expect(existingSettings.emailLogoId).toBe('default-logo')
       expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
     })
 

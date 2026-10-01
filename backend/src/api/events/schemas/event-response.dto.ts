@@ -41,6 +41,25 @@ export class EventEmailSettingsDto {
   bcc: string[]
 
   /**
+   * CSTAR groups addressed in the To field. Any number of groups; their members are resolved
+   * from CSTAR at send time, so this holds only the group IDs.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  cstarGroupIdsTo: string[]
+
+  /**
+   * CSTAR groups addressed in the CC field.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  cstarGroupIdsCc: string[]
+
+  /**
+   * CSTAR groups addressed in the BCC field.
+   * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+   */
+  cstarGroupIdsBcc: string[]
+
+  /**
    * Whether the email uses a custom header rather than the tenant's default one
    * @example false
    */
@@ -48,7 +67,7 @@ export class EventEmailSettingsDto {
 
   /**
    * Approved email logo shown in the custom header. Null when there is no custom header, or when
-   * the custom header has no logo.
+   * the tenant or system default logo is used.
    * @example "550e8400-e29b-41d4-a716-446655440000"
    */
   headerLogoId: string | null

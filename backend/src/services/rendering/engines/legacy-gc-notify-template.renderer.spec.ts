@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { Logger } from '@nestjs/common'
 import { vi } from 'vitest'
 import { LegacyGcNotifyTemplateRenderer } from './legacy-gc-notify-template.renderer'
+import { toEmailHtml } from '../email-body-html'
 import type { RenderContext } from '../../../adapters/interfaces'
 
 describe('LegacyGcNotifyTemplateRenderer', () => {
@@ -471,6 +472,176 @@ describe('LegacyGcNotifyTemplateRenderer', () => {
 
       expect(result).toBeInstanceOf(Promise)
       await result
+    })
+  })
+
+  describe('list personalisation values', () => {
+    // GC Notify has no list syntax: a placeholder becomes a list purely because the caller passed
+    // an array. The body gets bullets, the subject and an SMS get an inline sentence.
+    const emailBody = async (items: unknown): Promise<string> => {
+      const result = await renderer.renderEmail({
+        template: {
+          id: 'template-1',
+          name: 'List',
+          type: 'email',
+          subject: 'Subject',
+          body: 'Items: ((items))',
+          active: true,
+        },
+        personalisation: items === undefined ? {} : { items },
+      })
+      return result.body
+    }
+
+    const emailSubject = async (items: unknown): Promise<string> => {
+      const result = await renderer.renderEmail({
+        template: {
+          id: 'template-1',
+          name: 'List',
+          type: 'email',
+          subject: 'Items: ((items))',
+          body: 'Body',
+          active: true,
+        },
+        personalisation: items === undefined ? {} : { items },
+      })
+      return result.subject
+    }
+
+    const smsBody = async (items: unknown): Promise<string> => {
+      const result = await renderer.renderSms({
+        template: {
+          id: 'template-1',
+          name: 'List',
+          type: 'sms',
+          body: 'Items: ((items))',
+          active: true,
+        },
+        personalisation: items === undefined ? {} : { items },
+      })
+      return result.body
+    }
+
+    it('renders three items as bullets in a body and inline elsewhere', async () => {
+      expect(await emailBody(['a', 'b', 'c'])).toBe('Items: \n\n* a\n* b\n* c')
+      expect(await emailSubject(['a', 'b', 'c'])).toBe('Items: a, b and c')
+      expect(await smsBody(['a', 'b', 'c'])).toBe('Items: a, b and c')
+    })
+
+    it('joins two items with "and" and no comma', async () => {
+      expect(await emailBody(['a', 'b'])).toBe('Items: \n\n* a\n* b')
+      expect(await emailSubject(['a', 'b'])).toBe('Items: a and b')
+      expect(await smsBody(['a', 'b'])).toBe('Items: a and b')
+    })
+
+    it('renders a single item with no conjunction', async () => {
+      expect(await emailBody(['a'])).toBe('Items: \n\n* a')
+      expect(await emailSubject(['a'])).toBe('Items: a')
+      expect(await smsBody(['a'])).toBe('Items: a')
+    })
+
+    it('drops empty items', async () => {
+      expect(await emailBody(['a', '', 'b'])).toBe('Items: \n\n* a\n* b')
+      expect(await emailSubject(['a', '', 'b'])).toBe('Items: a and b')
+      expect(await smsBody(['a', '', 'b'])).toBe('Items: a and b')
+    })
+
+    it('keeps 0 and false, which are values rather than empty', async () => {
+      expect(await emailBody([0, 'a'])).toBe('Items: \n\n* 0\n* a')
+      expect(await emailSubject([0, 'a'])).toBe('Items: 0 and a')
+      expect(await smsBody([false, 'a'])).toBe('Items: false and a')
+    })
+
+    it('leaves the placeholder as-is when a list holds nothing printable', async () => {
+      expect(await emailBody(['', '', null])).toBe('Items: ((items))')
+      expect(await emailSubject(['', '', null])).toBe('Items: ((items))')
+      expect(await smsBody(['', '', null])).toBe('Items: ((items))')
+    })
+
+    it('leaves the placeholder as-is for an empty list', async () => {
+      expect(await emailBody([])).toBe('Items: ((items))')
+      expect(await emailSubject([])).toBe('Items: ((items))')
+      expect(await smsBody([])).toBe('Items: ((items))')
+    })
+
+    it('leaves the placeholder as-is when the key is absent or null', async () => {
+      expect(await emailBody(undefined)).toBe('Items: ((items))')
+      expect(await emailBody(null)).toBe('Items: ((items))')
+      expect(await emailSubject(null)).toBe('Items: ((items))')
+      expect(await smsBody(null)).toBe('Items: ((items))')
+    })
+
+    it('renders a plain string value unchanged', async () => {
+      expect(await emailBody('a')).toBe('Items: a')
+      expect(await emailSubject('a')).toBe('Items: a')
+      expect(await smsBody('a')).toBe('Items: a')
+    })
+
+    it('does not decorate items containing markup - escaping happens downstream', async () => {
+      expect(await emailBody(['<b>hi</b>'])).toBe('Items: \n\n* <b>hi</b>')
+      expect(await emailSubject(['<b>hi</b>'])).toBe('Items: <b>hi</b>')
+      expect(await smsBody(['<b>hi</b>'])).toBe('Items: <b>hi</b>')
+    })
+
+    it('treats a list with nothing printable as a falsy ??-condition', async () => {
+      const conditional = async (items: unknown): Promise<string> => {
+        const result = await renderer.renderSms({
+          template: {
+            id: 'template-1',
+            name: 'Conditional List',
+            type: 'sms',
+            body: 'A((items??-has items-))B',
+            active: true,
+          },
+          personalisation: { items },
+        })
+        return result.body
+      }
+
+      expect(await conditional([])).toBe('AB')
+      expect(await conditional(['', '', null])).toBe('AB')
+      expect(await conditional(['a'])).toBe('A-has items-B')
+    })
+
+    it('renders the worked example as a real <ul> once markdown-rendered', async () => {
+      const context: RenderContext = {
+        template: {
+          id: 'template-1',
+          name: 'Order',
+          type: 'email',
+          subject: 'Your order',
+          body: 'Hello ((first_name)),\n\nYour order contains:\n\n((items))\n\nIt ships on ((ship_date)).',
+          active: true,
+        },
+        personalisation: {
+          first_name: 'Amala',
+          items: ['apples', 'pears', 'plums'],
+          ship_date: 'March 4',
+        },
+      }
+
+      const result = await renderer.renderEmail(context)
+
+      expect(result.body).toBe(
+        'Hello Amala,\n\nYour order contains:\n\n\n\n* apples\n* pears\n* plums\n\nIt ships on March 4.',
+      )
+
+      // The leading blank line is what makes markdown parse this as a list rather than as a
+      // continuation of the sentence above it.
+      const html = toEmailHtml(result.body, 'markdown')
+      expect(html).toContain('<p>Your order contains:</p>')
+      expect(html).toContain('<li>apples</li>')
+      expect(html).toContain('<li>pears</li>')
+      expect(html).toContain('<li>plums</li>')
+      expect(html).toContain('<ul>')
+      expect(html).toContain('<p>It ships on March 4.</p>')
+    })
+
+    it('escapes markup in a bullet item once markdown-rendered', async () => {
+      const body = await emailBody(['<b>hi</b>'])
+
+      const html = toEmailHtml(body, 'markdown')
+      expect(html).toContain('<li>&lt;b&gt;hi&lt;/b&gt;</li>')
     })
   })
 

@@ -1,6 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
@@ -10,6 +10,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { EmailTemplateLayoutService } from './email-template-layout.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 
 describe('TemplatesService', () => {
   let service: TemplatesService
@@ -88,6 +89,7 @@ describe('TemplatesService', () => {
     findById: vi.fn(),
     findByName: vi.fn(),
     findByTenantId: vi.fn(),
+    findEventsUsingTemplate: vi.fn(),
     softDelete: vi.fn(),
     createVersion: vi.fn(),
   }
@@ -96,6 +98,10 @@ describe('TemplatesService', () => {
     findOne: vi.fn(),
     findByExternalId: vi.fn(),
     findAll: vi.fn(),
+  }
+
+  const mockTenantSettingsService = {
+    resolveSenderAddress: vi.fn().mockResolvedValue('noreply@gov.bc.ca'),
   }
 
   const mockEmailTemplateLayoutService = {
@@ -120,11 +126,16 @@ describe('TemplatesService', () => {
           useValue: mockEmailTemplateLayoutService,
         },
         {
-          // The preview reports the address a send would use, resolved from config.
+          // The preview reports the address a send would use: the tenant's sender when set,
+          // otherwise this config value.
           provide: ConfigService,
           useValue: {
             get: (key: string) => (key === 'ches.from' ? 'noreply@gov.bc.ca' : undefined),
           },
+        },
+        {
+          provide: TenantSettingsService,
+          useValue: mockTenantSettingsService,
         },
       ],
     }).compile()
@@ -346,6 +357,23 @@ describe('TemplatesService', () => {
       const result = await service.renderTemplateContent(template, { status: null })
 
       expect(result.body).toBe('Status: ')
+    })
+
+    it('should pass Legacy GC Notify list values through as arrays, not "a,b" strings', async () => {
+      const template: Template = {
+        ...mockLegacyTemplate,
+        subject: 'Order ((items))',
+        body: 'Your order contains:\n\n((items))',
+      }
+
+      const result = await service.renderTemplateContent(template, {
+        items: ['apples', 'pears', 'plums'],
+      })
+
+      // Bullets in the body, an inline sentence in the subject. String(["a","b"]) would have
+      // flattened both to "apples,pears,plums".
+      expect(result.body).toBe('Your order contains:\n\n\n\n* apples\n* pears\n* plums')
+      expect(result.subject).toBe('Order apples, pears and plums')
     })
 
     it('should throw a clean error when personalisation is null and placeholders are required', async () => {
@@ -852,6 +880,18 @@ describe('TemplatesService', () => {
       expect(result.body).toContain('**bold**')
       expect(result.bodyType).toBe('markdown')
     })
+
+    it('previews the same from address delivery will resolve for this tenant', async () => {
+      mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
+      mockTenantSettingsService.resolveSenderAddress.mockResolvedValueOnce('permits@gov.bc.ca')
+
+      const result = await service.previewTemplate('tenant-123', 'template-123', {
+        params: { userName: 'John', siteName: 'MyApp' },
+      })
+
+      expect(mockTenantSettingsService.resolveSenderAddress).toHaveBeenCalledWith('tenant-123')
+      expect(result.from).toBe('permits@gov.bc.ca')
+    })
   })
 
   describe('previewTemplateBody', () => {
@@ -909,6 +949,64 @@ describe('TemplatesService', () => {
       expect(result.subject).toBeUndefined()
       expect(result.body).toBe('Your code is 123456')
       expect(result.bodyType).toBe('markdown')
+    })
+  })
+
+  describe('deleteTemplate', () => {
+    it('should soft delete a template no event is using', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([])
+
+      await service.deleteTemplate('tenant-123', 'template-123')
+
+      expect(mockRepository.softDelete).toHaveBeenCalledWith('tenant-123', 'template-123', 'system')
+    })
+
+    it('should pass the acting user through, for the settings the template is cleared from', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([])
+
+      await service.deleteTemplate('tenant-123', 'template-123', 'user-123')
+
+      expect(mockRepository.softDelete).toHaveBeenCalledWith(
+        'tenant-123',
+        'template-123',
+        'user-123',
+      )
+    })
+
+    it('should refuse to delete a template an event still renders with', async () => {
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue([
+        { id: 'event-1', name: 'Air Quality 2026', channelCode: NotificationChannel.EMAIL },
+      ])
+
+      await expect(service.deleteTemplate('tenant-123', 'template-123')).rejects.toThrow(
+        ConflictException,
+      )
+      expect(mockRepository.softDelete).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getTemplateUsage', () => {
+    it('should return the events using the template', async () => {
+      const events = [
+        { id: 'event-1', name: 'Air Quality 2026', channelCode: NotificationChannel.EMAIL },
+      ]
+      mockRepository.findById.mockResolvedValue(mockTemplate)
+      mockRepository.findEventsUsingTemplate.mockResolvedValue(events)
+
+      await expect(service.getTemplateUsage('tenant-123', 'template-123')).resolves.toEqual({
+        events,
+      })
+    })
+
+    it('should throw when the template does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null)
+
+      await expect(service.getTemplateUsage('tenant-123', 'missing')).rejects.toThrow(
+        NotFoundException,
+      )
     })
   })
 })

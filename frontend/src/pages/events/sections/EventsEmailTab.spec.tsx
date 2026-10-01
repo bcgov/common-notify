@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventsEmailTab from './EventsEmailTab'
@@ -7,8 +8,27 @@ import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
+import type { CstarGroup } from '@/api/cstar.api'
 
 const getTemplatesMock = vi.fn()
+
+// The tab registers a route blocker for unsaved changes. The mock keeps hold of the options it
+// was given, so the tests can ask the same question the router would, and drives the resolver
+// the dialog is rendered from.
+let blockerOptions: {
+  shouldBlockFn: () => boolean
+  enableBeforeUnload: () => boolean
+} | null = null
+let blockerStatus: 'idle' | 'blocked' = 'idle'
+const proceedMock = vi.fn()
+const resetMock = vi.fn()
+
+vi.mock('@tanstack/react-router', () => ({
+  useBlocker: (options: { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean }) => {
+    blockerOptions = options
+    return { status: blockerStatus, proceed: proceedMock, reset: resetMock }
+  },
+}))
 
 vi.mock('@/api/templates.api', async () => {
   const actual = await vi.importActual<typeof TemplatesApi>('@/api/templates.api')
@@ -40,8 +60,18 @@ const template = {
 }
 
 const logos: ApprovedEmailLogo[] = [
-  { id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
-  { id: 'logo-2', name: 'Ministry', imageUrl: 'https://example.test/ministry.png' },
+  { isDefault: false, id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
+  {
+    isDefault: false,
+    id: 'logo-2',
+    name: 'Ministry',
+    imageUrl: 'https://example.test/ministry.png',
+  },
+]
+
+const groups: CstarGroup[] = [
+  { id: 'group-1', name: 'Wildfire Ops', description: '' },
+  { id: 'group-2', name: 'Flood Response', description: '' },
 ]
 
 const unconfigured: EmailSettingsValues = {
@@ -51,6 +81,9 @@ const unconfigured: EmailSettingsValues = {
   to: [],
   cc: [],
   bcc: [],
+  cstarGroupIdsTo: [],
+  cstarGroupIdsCc: [],
+  cstarGroupIdsBcc: [],
   useCustomHeader: false,
   headerLogoId: null,
   headerTitle: '',
@@ -72,16 +105,17 @@ type RenderOptions = {
   approvedLogos?: ApprovedEmailLogo[]
   tenantEmailLogoId?: string | null
   tenantName?: string | null
-  onSave?: ReturnType<typeof vi.fn>
-  onDeactivate?: ReturnType<typeof vi.fn>
+  cstarGroups?: CstarGroup[]
+  onSave?: Mock<(values: EmailSettingsValues) => Promise<void>>
+  onDeactivate?: Mock<() => Promise<void>>
 }
 
 function renderTab({
   values = unconfigured,
   isConfigured = false,
   isDisabled = false,
-  onSave = vi.fn().mockResolvedValue(undefined),
-  onDeactivate = vi.fn().mockResolvedValue(undefined),
+  onSave = vi.fn<(values: EmailSettingsValues) => Promise<void>>().mockResolvedValue(undefined),
+  onDeactivate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   ...rest
 }: RenderOptions = {}) {
   const view = render(
@@ -110,6 +144,8 @@ async function chooseTemplate(name = 'Permit renewal') {
 describe('EventsEmailTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    blockerOptions = null
+    blockerStatus = 'idle'
     getTemplatesMock.mockResolvedValue({
       data: [template],
       count: 1,
@@ -292,11 +328,11 @@ describe('EventsEmailTab', () => {
   })
 
   describe('recipients', () => {
-    it('offers only additional recipients; the other sources are not available yet', () => {
+    it('offers CSTAR groups and additional recipients; the subscription service is not available yet', () => {
       renderTab({ values: { ...unconfigured, active: true } })
 
       expect(screen.getByRole('checkbox', { name: 'Subscription Service' })).toBeDisabled()
-      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeDisabled()
+      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeEnabled()
       expect(screen.getByRole('checkbox', { name: 'Additional recipient(s)' })).toBeEnabled()
     })
 
@@ -347,6 +383,105 @@ describe('EventsEmailTab', () => {
       )
       expect(saveButton()).toBeDisabled()
       expect(onSave).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('CSTAR groups', () => {
+    it('opens the group fields when CSTAR groups are chosen', async () => {
+      renderTab({ values: { ...unconfigured, active: true }, cstarGroups: groups })
+
+      expect(screen.queryByRole('group', { name: 'CSTAR groups' })).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' }))
+
+      expect(screen.getByRole('group', { name: 'CSTAR groups' })).toBeInTheDocument()
+    })
+
+    it('shows the saved groups as chosen', () => {
+      renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeChecked()
+      expect(screen.getByRole('group', { name: 'CSTAR groups' })).toBeInTheDocument()
+      // Shown as one removable tag per group, in the blue the design calls for.
+      expect(screen.getByRole('row', { name: 'Wildfire Ops' })).toHaveClass('blue')
+    })
+
+    it('saves the groups picked in each field', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: /To CSTAR groups/ }))
+      await userEvent.click(await screen.findByRole('option', { name: 'Flood Response' }))
+      await userEvent.keyboard('{Escape}')
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cstarGroupIdsTo: ['group-1', 'group-2'],
+            cstarGroupIdsCc: [],
+            cstarGroupIdsBcc: [],
+          }),
+        ),
+      )
+    })
+
+    it('counts a To group as a recipient, with no address needed', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, to: [], cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ to: [], cstarGroupIdsTo: ['group-1'] }),
+        ),
+      )
+      expect(screen.queryByText('Please select at least one recipient.')).not.toBeInTheDocument()
+    })
+
+    it('treats CSTAR groups with no To group as no recipient at all', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, to: [], cstarGroupIdsCc: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      expect(await screen.findByText('Please select at least one recipient.')).toBeInTheDocument()
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('does not save the groups of a source that has been unchosen', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroups: groups,
+      })
+
+      await userEvent.click(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' }))
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ to: ['alice@gov.bc.ca'], cstarGroupIdsTo: [] }),
+        ),
+      )
     })
   })
 
@@ -462,7 +597,7 @@ describe('EventsEmailTab', () => {
       )
     })
 
-    it('saves "No logo" as no logo rather than falling back to the tenant one', async () => {
+    it('does not offer a no-logo option for custom headers', async () => {
       const { onSave } = renderTab({
         values: savedAndActive,
         isConfigured: true,
@@ -473,12 +608,14 @@ describe('EventsEmailTab', () => {
 
       await userEvent.click(screen.getByRole('radio', { name: 'Custom' }))
       await userEvent.click(screen.getByRole('button', { name: /BC Gov Email logo\/brand/ }))
-      await userEvent.click(await screen.findByRole('option', { name: 'No logo' }))
+      expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
       await userEvent.click(saveButton())
 
       await waitFor(() =>
         expect(onSave).toHaveBeenCalledWith(
-          expect.objectContaining({ useCustomHeader: true, headerLogoId: null }),
+          expect.objectContaining({ useCustomHeader: true, headerLogoId: 'logo-1' }),
         ),
       )
     })
@@ -546,6 +683,9 @@ describe('EventsEmailTab', () => {
           to: ['alice@gov.bc.ca'],
           cc: [],
           bcc: [],
+          cstarGroupIdsTo: [],
+          cstarGroupIdsCc: [],
+          cstarGroupIdsBcc: [],
           useCustomHeader: false,
           headerLogoId: null,
           headerTitle: '',
@@ -578,6 +718,21 @@ describe('EventsEmailTab', () => {
           }),
         ),
       )
+    })
+
+    it('reports an incomplete form instead of saving it', async () => {
+      const { onSave } = renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.clear(senderField())
+      await userEvent.click(saveButton())
+
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith(
+          'Required fields missing',
+          'Settings not saved. Complete all required fields before saving.',
+        ),
+      )
+      expect(onSave).not.toHaveBeenCalled()
     })
 
     it('reports a failed save without clearing the form', async () => {
@@ -616,6 +771,86 @@ describe('EventsEmailTab', () => {
 
       resolveSave()
       await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
+    })
+  })
+
+  describe('leaving with unsaved changes', () => {
+    it('lets a navigation through while nothing has been edited', () => {
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(false)
+      expect(blockerOptions?.enableBeforeUnload()).toBe(false)
+    })
+
+    it('blocks a navigation once a setting has been changed', async () => {
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.type(senderField(), 'x')
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(true)
+      expect(blockerOptions?.enableBeforeUnload()).toBe(true)
+    })
+
+    it('blocks a navigation once the channel has been switched on', async () => {
+      renderTab({ values: { ...savedAndActive, active: false }, isConfigured: true })
+
+      await userEvent.click(activateSwitch())
+
+      expect(blockerOptions?.shouldBlockFn()).toBe(true)
+    })
+
+    it("does not block the save's own navigation", async () => {
+      let resolveSave: () => void = () => {}
+      const onSave = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve
+          }),
+      )
+      renderTab({ values: savedAndActive, isConfigured: true, onSave })
+
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'renewals@gov.bc.ca')
+      await userEvent.click(saveButton())
+
+      await screen.findByRole('button', { name: 'Saving…' })
+      expect(blockerOptions?.shouldBlockFn()).toBe(false)
+
+      resolveSave()
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
+    })
+
+    it('warns before a blocked navigation', () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'You have unsaved changes to your email notification settings. If you leave this page, your changes will be lost.',
+        ),
+      ).toBeInTheDocument()
+    })
+
+    it('abandons the changes when the user leaves', async () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Leave without saving' }))
+
+      expect(proceedMock).toHaveBeenCalled()
+      expect(resetMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps the user on the page when they stay, and when they close the dialog', async () => {
+      blockerStatus = 'blocked'
+      renderTab({ values: savedAndActive, isConfigured: true })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Stay on page' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+      expect(resetMock).toHaveBeenCalledTimes(2)
+      expect(proceedMock).not.toHaveBeenCalled()
     })
   })
 

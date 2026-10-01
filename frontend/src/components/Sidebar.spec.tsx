@@ -142,7 +142,7 @@ describe('Sidebar', () => {
   it('shows the batch send link when the bulk notifications flag is on', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'], { bulk_notifications: true })
 
-    expect(screen.getByRole('link', { name: /batch send/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /send batch notification/i })).toHaveAttribute(
       'href',
       '/bulk-notifications',
     )

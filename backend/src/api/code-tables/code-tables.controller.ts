@@ -5,11 +5,16 @@ import {
   ApiOkResponse,
   ApiBearerAuth,
   ApiExcludeEndpoint,
+  ApiExcludeController,
 } from '@nestjs/swagger'
 import { CodeTablesService } from './code-tables.service'
 import { CodeTableDto, CodeTablesResponseDto } from './schemas/code-table.dto'
 import { JwtGuard } from '../../common/guards/auth.jwt-guard'
 
+// Guarded by JwtGuard, so a service holding an API key cannot call it. The published spec is
+// the API-key surface, and documenting an endpoint the reader cannot reach is worse than
+// omitting it.
+@ApiExcludeController()
 @ApiTags('Reference data')
 @Controller('code-tables')
 @UseGuards(JwtGuard)

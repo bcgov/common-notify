@@ -1,0 +1,3 @@
+# BC Notify is an authenticated internal service; nothing here is meant to be indexed.
+User-agent: *
+Disallow: /

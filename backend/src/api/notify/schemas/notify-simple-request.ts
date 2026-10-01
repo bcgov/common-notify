@@ -21,8 +21,8 @@ export class NotifySimpleRequest {
   params?: Record<string, unknown>
 
   @ApiPropertyOptional({
-    type: NotifyEmailChannel,
     description: 'Send by email. At least one channel must be present.',
+    type: NotifyEmailChannel,
   })
   @IsOptional()
   @ValidateNested()
@@ -30,18 +30,15 @@ export class NotifySimpleRequest {
   email?: NotifyEmailChannel
 
   @ApiPropertyOptional({
+    description: 'Send by SMS. SMS must be enabled for the tenant.',
     type: NotifySmsChannel,
-    description: 'Send by SMS. Requires the sms_notifications feature flag.',
   })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifySmsChannel)
   sms?: NotifySmsChannel
 
-  @ApiPropertyOptional({
-    type: NotifyMsgAppChannel,
-    description: 'Send by messaging app.',
-  })
+  @ApiPropertyOptional({ description: 'Send by messaging app.', type: NotifyMsgAppChannel })
   @IsOptional()
   @ValidateNested()
   @Type(() => NotifyMsgAppChannel)

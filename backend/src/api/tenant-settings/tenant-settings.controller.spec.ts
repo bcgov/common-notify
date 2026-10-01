@@ -91,7 +91,12 @@ describe('TenantSettingsController', () => {
 
   it('returns approved logos with service-built public image URLs', async () => {
     mockEmailLogoService.findApproved.mockResolvedValue([
-      { id: 'logo-1', name: 'Primary', fileKey: 'logos/primary.png' },
+      {
+        id: 'logo-1',
+        name: 'Attorney General (AG)',
+        isDefault: false,
+        fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      },
     ])
     mockEmailLogoService.buildPublicImageUrl.mockReturnValue(
       'https://gateway.example.test/logos/logo-1/image',
@@ -100,7 +105,8 @@ describe('TenantSettingsController', () => {
     await expect(controller.getApprovedEmailLogos()).resolves.toEqual([
       {
         id: 'logo-1',
-        name: 'Primary',
+        name: 'Attorney General (AG)',
+        isDefault: false,
         imageUrl: 'https://gateway.example.test/logos/logo-1/image',
       },
     ])
