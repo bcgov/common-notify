@@ -37,6 +37,7 @@ describe('TenantSettingsService', () => {
     save: vi.fn(),
   }
   const mockEmailLogoService = {
+    getDefault: vi.fn().mockResolvedValue({ id: 'default-logo' }),
     findByIdIfApproved: vi.fn().mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
     }),
@@ -282,7 +283,7 @@ describe('TenantSettingsService', () => {
       expect(result).toEqual(savedSettings)
     })
 
-    it('should clear emailLogoId without an approval lookup', async () => {
+    it('should use the default logo when a legacy client sends null', async () => {
       const existingSettings = { ...mockTenantSettings, emailLogoId: emailDto.emailLogoId }
       const dto = { ...emailDto, emailLogoId: null }
       mockRepository.findOne.mockResolvedValue(existingSettings)
@@ -290,7 +291,7 @@ describe('TenantSettingsService', () => {
 
       await service.upsertEmailSettings('tenant-uuid-1', dto, 'updater-guid')
 
-      expect(existingSettings.emailLogoId).toBeNull()
+      expect(existingSettings.emailLogoId).toBe('default-logo')
       expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
     })
 

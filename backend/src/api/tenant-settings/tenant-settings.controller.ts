@@ -56,9 +56,10 @@ export class TenantSettingsController {
   async getApprovedEmailLogos(): Promise<ApprovedEmailLogoDto[]> {
     const logos = await this.emailLogoService.findApproved()
 
-    return logos.map(({ id, name }) => ({
+    return logos.map(({ id, name, isDefault }) => ({
       id,
       name,
+      isDefault,
       imageUrl: this.emailLogoService.buildPublicImageUrl(id),
     }))
   }

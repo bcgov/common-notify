@@ -19,9 +19,6 @@ interface EmailLogoMenuProps {
   isLoading?: boolean
 }
 
-const NO_LOGO_OPTION: EmailLogoMenuOption = { id: null, name: 'No logo' }
-const RECOMMENDED_LOGO_NAME = 'Main BC Mark (horizontal)'
-
 const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   logos,
   value,
@@ -43,27 +40,27 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
 
   const logoOptions: EmailLogoMenuOption[] = logos.map((logo) => ({
     id: logo.id,
-    name: logo.name ?? 'Unnamed logo',
+    name: logo.isDefault ? 'Main BC Mark (Default)' : (logo.name ?? 'Unnamed logo'),
     imageUrl: logo.imageUrl,
-    isRecommended: logo.name === RECOMMENDED_LOGO_NAME,
+    isRecommended: logo.isDefault,
   }))
   const options: EmailLogoMenuOption[] = [
     ...logoOptions.filter((option) => option.isRecommended),
     ...logoOptions.filter((option) => !option.isRecommended),
-    NO_LOGO_OPTION,
   ]
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredOptions = options.filter((option) =>
     option.name.toLocaleLowerCase().includes(normalizedQuery),
   )
-  const selectedOption =
-    options.find((option) => option.id === value) ??
-    (value ? { id: value, name: isLoading ? 'Loading logo…' : 'Unavailable logo' } : NO_LOGO_OPTION)
+  const effectiveValue = value ?? logos.find((logo) => logo.isDefault)?.id
+  const selectedOption = options.find((option) => option.id === effectiveValue) ?? {
+    id: null,
+    name: isLoading ? 'Loading logo...' : 'Unavailable logo',
+  }
   const activeOptionId =
     activeIndex >= 0 && activeIndex < filteredOptions.length
       ? `${id}-option-${activeIndex}`
       : undefined
-  const showsNoLogo = filteredOptions.some((option) => option.id === null)
   const filteredRecommended = filteredOptions.filter(
     (option) => option.id !== null && option.isRecommended,
   )
@@ -88,7 +85,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
   function openMenu() {
     if (isDisabled) return
     setSearchQuery('')
-    const selectedIndex = options.findIndex((option) => option.id === value)
+    const selectedIndex = options.findIndex((option) => option.id === effectiveValue)
     setActiveIndex(Math.max(0, selectedIndex))
     setIsOpen(true)
   }
@@ -132,7 +129,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
         option={option}
         optionId={`${id}-option-${optionIndex}`}
         isActive={optionIndex === activeIndex}
-        isSelected={option.id === value}
+        isSelected={option.id === effectiveValue}
         onActivate={() => setActiveIndex(optionIndex)}
         onSelect={() => selectOption(option)}
       />
@@ -232,25 +229,6 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
                   </div>
                   {filteredMinistries.map(renderLogoOption)}
                 </div>
-              </>
-            )}
-            {showsNoLogo && (
-              <>
-                {(filteredRecommended.length > 0 || filteredMinistries.length > 0) && (
-                  <div className="email-logo-menu__divider" role="separator" />
-                )}
-                <EmailLogoMenuItem
-                  option={NO_LOGO_OPTION}
-                  optionId={`${id}-option-${filteredOptions.findIndex((option) => option.id === null)}`}
-                  isActive={
-                    filteredOptions.findIndex((option) => option.id === null) === activeIndex
-                  }
-                  isSelected={value === null}
-                  onActivate={() =>
-                    setActiveIndex(filteredOptions.findIndex((option) => option.id === null))
-                  }
-                  onSelect={() => selectOption(NO_LOGO_OPTION)}
-                />
               </>
             )}
           </div>

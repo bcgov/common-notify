@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EmailSettings from './EmailSettings'
+import EmailLogoMenu from '@/components/EmailLogoMenu'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
 import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
 import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -31,6 +32,13 @@ vi.mock('@/redux/utils/toastUtils', () => ({
 }))
 
 vi.mock('@bcgov/design-system-react-components', () => ({
+  InlineAlert: ({ children }: any) => <div>{children}</div>,
+  Link: ({ children, iconRight, ...props }: any) => (
+    <a {...props}>
+      {children}
+      {iconRight}
+    </a>
+  ),
   Button: ({ children, isDisabled, isIconButton: _isIconButton, ...props }: any) => (
     <button disabled={isDisabled} {...props}>
       {children}
@@ -94,6 +102,7 @@ const APPROVED_LOGOS = [
   {
     id: 'logo-3',
     name: 'Main BC Mark (horizontal)',
+    isDefault: true,
     imageUrl: 'https://gateway.example.test/logos/logo-3/image',
   },
 ]
@@ -148,6 +157,24 @@ describe('EmailSettings section', () => {
     expect(screen.getByText('1,000,500 emails/year')).toBeInTheDocument()
   })
 
+  it('shows the flagged default when no tenant logo has been selected', async () => {
+    render(
+      <EmailLogoMenu
+        logos={APPROVED_LOGOS.map((logo) => ({ isDefault: false, ...logo }))}
+        value={null}
+        onChange={vi.fn()}
+      />,
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Email logo/brand Main BC Mark (Default)' }),
+    )
+    expect(screen.getByRole('option', { name: 'Main BC Mark (Default)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
+  })
+
   it('renders the selected logo and API-provided thumbnails in the dropdown', async () => {
     renderWithRoles()
 
@@ -159,7 +186,7 @@ describe('EmailSettings section', () => {
     const primaryOption = screen.getByRole('option', { name: 'Primary logo' })
     expect(primaryOption.querySelector('img')).toHaveAttribute('src', APPROVED_LOGOS[0].imageUrl)
     expect(screen.getByRole('option', { name: 'Alternate logo' })).toBeInTheDocument()
-    const recommendedOption = screen.getByRole('option', { name: 'Main BC Mark (horizontal)' })
+    const recommendedOption = screen.getByRole('option', { name: 'Main BC Mark (Default)' })
     expect(screen.getByRole('group', { name: 'Recommended' })).toContainElement(recommendedOption)
     expect(screen.getByRole('group', { name: 'Provincial Ministry Marks' })).toContainElement(
       primaryOption,
@@ -167,7 +194,7 @@ describe('EmailSettings section', () => {
     expect(screen.getByRole('group', { name: 'Provincial Ministry Marks' })).toContainElement(
       screen.getByRole('option', { name: 'Alternate logo' }),
     )
-    expect(screen.getByRole('option', { name: 'No logo' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
   })
 
   it('saves a newly selected logo with the existing email settings payload', async () => {
@@ -187,16 +214,16 @@ describe('EmailSettings section', () => {
     })
   })
 
-  it('allows clearing the selected logo', async () => {
+  it('allows selecting the system default logo', async () => {
     renderWithRoles()
 
     await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
-    await userEvent.click(screen.getByRole('option', { name: 'No logo' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Main BC Mark (Default)' }))
     fireEvent.click(saveButton())
 
     await waitFor(() => {
       expect(updateEmailSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ emailLogoId: null }),
+        expect.objectContaining({ emailLogoId: APPROVED_LOGOS[2].id }),
       )
     })
   })

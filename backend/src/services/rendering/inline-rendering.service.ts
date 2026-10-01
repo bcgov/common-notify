@@ -55,8 +55,7 @@ export class InlineRenderingService {
     // than the values substituted into it: Handlebars and Mustache escape `{{value}}` but not
     // `{{{value}}}`, and the legacy engine escapes nothing. Sanitising the finished body closes
     // that. The pass is idempotent, so markup the boundary already accepted survives unchanged,
-    // and inline content never gets the email layout wrapper - what comes back from the renderer
-    // is the caller's own markup and nothing of ours.
+    // and the delivery worker adds the configured email logo after rendering.
     //
     // The subject is not HTML: it reaches the recipient as a header, where markup is literal text.
     return content.bodyType === 'html'

@@ -7,6 +7,9 @@ export class ApprovedEmailLogoDto {
   @ApiProperty({ nullable: true })
   name: string | null
 
+  @ApiProperty({ description: 'Whether this is the default logo for emails' })
+  isDefault: boolean
+
   @ApiProperty({ format: 'uri' })
   imageUrl: string
 }

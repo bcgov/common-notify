@@ -94,6 +94,7 @@ describe('TenantSettingsController', () => {
       {
         id: 'logo-1',
         name: 'Attorney General (AG)',
+        isDefault: false,
         fileKey: 'logos/BC_AG_H_RGB_pos.svg',
       },
     ])
@@ -105,6 +106,7 @@ describe('TenantSettingsController', () => {
       {
         id: 'logo-1',
         name: 'Attorney General (AG)',
+        isDefault: false,
         imageUrl: 'https://gateway.example.test/logos/logo-1/image',
       },
     ])

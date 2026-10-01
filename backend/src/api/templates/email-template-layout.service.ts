@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { TemplateEngine } from '../../enum/template-engine.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
@@ -11,12 +10,6 @@ export interface RenderedEmailContent {
   body: string
   bodyType: 'text' | 'markdown' | 'html'
 }
-
-const LAYOUT_SUPPORTED_ENGINES = new Set<TemplateEngine>([
-  TemplateEngine.HANDLEBARS,
-  TemplateEngine.MUSTACHE,
-  TemplateEngine.LEGACY_GC_NOTIFY,
-])
 
 @Injectable()
 export class EmailTemplateLayoutService {
@@ -31,32 +24,27 @@ export class EmailTemplateLayoutService {
     private readonly emailLogoService: EmailLogoService,
   ) {}
 
-  async apply(template: Template, rendered: RenderedEmailContent): Promise<RenderedEmailContent> {
+  async apply(
+    template: Pick<Template, 'tenantId' | 'channelCode'>,
+    rendered: RenderedEmailContent,
+  ): Promise<RenderedEmailContent> {
     if (template.channelCode !== NotificationChannel.EMAIL) {
       return rendered
     }
 
-    if (template.engineCode === TemplateEngine.MJML) {
-      // Deliberately do not wrap MJML output: it is a complete, self-contained HTML document,
-      // and prepending layout markup could invalidate or break that document.
-      return rendered
-    }
-
-    if (!LAYOUT_SUPPORTED_ENGINES.has(template.engineCode as TemplateEngine)) {
-      return rendered
-    }
-
     const tenantSettings = await this.tenantSettingsService.findByTenantId(template.tenantId)
-    if (!tenantSettings?.emailLogoId) {
-      return rendered
-    }
-
-    const imageUrl = this.emailLogoService.buildPublicImageUrl(tenantSettings.emailLogoId)
+    const logoId = tenantSettings?.emailLogoId ?? (await this.emailLogoService.getDefault()).id
+    const imageUrl = this.emailLogoService.buildPublicImageUrl(logoId)
     const htmlBody = this.toHtml(rendered.body, rendered.bodyType)
 
+    const logo = `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="">`
+    // Complete HTML documents (including MJML) keep their document structure.
+    const body = /<body\b[^>]*>/i.test(htmlBody)
+      ? htmlBody.replace(/<body\b[^>]*>/i, (openingTag) => `${openingTag}\n${logo}`)
+      : `${logo}\n${htmlBody}`
     return {
       ...rendered,
-      body: `<img src="${this.escapeHtmlAttribute(imageUrl)}" alt="">\n${htmlBody}`,
+      body,
       bodyType: 'html',
     }
   }
@@ -68,7 +56,6 @@ export class EmailTemplateLayoutService {
 
     if (bodyType === 'markdown') {
       // This pre-conversion is reached only when a logo is actually being injected.
-      // Logo-free messages retain their original body/bodyType and CHES converts them as before.
       return this.markdown.render(body)
     }
 

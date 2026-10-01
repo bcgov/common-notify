@@ -32,6 +32,9 @@ export class EmailLogo {
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date
 
+  @Column({ type: 'boolean', default: false, name: 'is_default' })
+  isDefault: boolean
+
   @Column({ type: 'boolean', default: false, name: 'is_deleted' })
   isDeleted: boolean
 }

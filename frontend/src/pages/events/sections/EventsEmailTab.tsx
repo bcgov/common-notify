@@ -43,8 +43,6 @@ const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
 const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
 const HEADER_CUSTOM_ID = 'custom'
-// Sentinel for the "No logo" entry in the logo select; saved as a null headerLogoId.
-const NO_LOGO_ID = 'no-logo'
 
 // Subscription service recipients are not implemented yet.
 const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
@@ -178,8 +176,9 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const [headerMode, setHeaderMode] = useState(
     values.useCustomHeader ? HEADER_CUSTOM_ID : HEADER_TENANT_DEFAULT_ID,
   )
+  const defaultLogoId = tenantEmailLogoId ?? approvedLogos.find((logo) => logo.isDefault)?.id
   const [headerLogoId, setHeaderLogoId] = useState<string | undefined>(
-    values.useCustomHeader ? (values.headerLogoId ?? NO_LOGO_ID) : (tenantEmailLogoId ?? undefined),
+    values.useCustomHeader ? (values.headerLogoId ?? defaultLogoId) : defaultLogoId,
   )
   const [headerTitle, setHeaderTitle] = useState(
     values.useCustomHeader ? values.headerTitle : (tenantName ?? ''),
@@ -211,10 +210,10 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   // Tenant settings can also land after mount; seed the header defaults from them the same way,
   // while both fields are still untouched and no custom header has been saved.
   useEffect(() => {
-    if (!values.useCustomHeader && !headerLogoId && tenantEmailLogoId) {
-      setHeaderLogoId(tenantEmailLogoId)
+    if (!headerLogoId && defaultLogoId) {
+      setHeaderLogoId(defaultLogoId)
     }
-  }, [headerLogoId, tenantEmailLogoId, values.useCustomHeader])
+  }, [headerLogoId, defaultLogoId])
 
   useEffect(() => {
     if (!headerTitleTouched.current && !values.useCustomHeader && !headerTitle && tenantName) {
@@ -226,15 +225,15 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const logoItems = [
-    { id: NO_LOGO_ID, label: 'No logo' },
     ...approvedLogos.map((logo) => ({
       id: logo.id,
-      label: logo.name ?? 'Unnamed logo',
+      label: logo.isDefault ? 'Main BC Mark (Default)' : (logo.name ?? 'Unnamed logo'),
     })),
   ]
   // A custom header previews its own logo and title; the tenant default previews the tenant's
   // configured logo on its own.
-  const previewLogoId = headerMode === HEADER_CUSTOM_ID ? headerLogoId : tenantEmailLogoId
+  const previewLogoId =
+    headerMode === HEADER_CUSTOM_ID ? (headerLogoId ?? defaultLogoId) : defaultLogoId
   const previewLogo = approvedLogos.find((logo) => logo.id === previewLogoId)
   const previewTitle = headerMode === HEADER_CUSTOM_ID ? headerTitle : ''
 
@@ -339,9 +338,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
         cstarGroupIdsCc: submittedGroups.cc,
         cstarGroupIdsBcc: submittedGroups.bcc,
         useCustomHeader,
-        // "No logo" is a real choice, so it saves as no logo rather than as the tenant default.
-        headerLogoId:
-          useCustomHeader && headerLogoId && headerLogoId !== NO_LOGO_ID ? headerLogoId : null,
+        // Custom headers always start with the tenant or system default logo.
+        headerLogoId: useCustomHeader ? (headerLogoId ?? defaultLogoId ?? null) : null,
         headerTitle: useCustomHeader ? headerTitle.trim() : '',
       })
       setValidationAttempted(false)

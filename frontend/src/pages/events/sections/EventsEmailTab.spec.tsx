@@ -59,8 +59,13 @@ const template = {
 }
 
 const logos: ApprovedEmailLogo[] = [
-  { id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
-  { id: 'logo-2', name: 'Ministry', imageUrl: 'https://example.test/ministry.png' },
+  { isDefault: false, id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
+  {
+    isDefault: false,
+    id: 'logo-2',
+    name: 'Ministry',
+    imageUrl: 'https://example.test/ministry.png',
+  },
 ]
 
 const groups: CstarGroup[] = [
@@ -591,7 +596,7 @@ describe('EventsEmailTab', () => {
       )
     })
 
-    it('saves "No logo" as no logo rather than falling back to the tenant one', async () => {
+    it('does not offer a no-logo option for custom headers', async () => {
       const { onSave } = renderTab({
         values: savedAndActive,
         isConfigured: true,
@@ -602,12 +607,12 @@ describe('EventsEmailTab', () => {
 
       await userEvent.click(screen.getByRole('radio', { name: 'Custom' }))
       await userEvent.click(screen.getByRole('button', { name: /BC Gov Email logo\/brand/ }))
-      await userEvent.click(await screen.findByRole('option', { name: 'No logo' }))
+      expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
       await userEvent.click(saveButton())
 
       await waitFor(() =>
         expect(onSave).toHaveBeenCalledWith(
-          expect.objectContaining({ useCustomHeader: true, headerLogoId: null }),
+          expect.objectContaining({ useCustomHeader: true, headerLogoId: 'logo-1' }),
         ),
       )
     })

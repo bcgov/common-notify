@@ -20,6 +20,7 @@ export interface EmailSettingsValues {
 }
 
 export interface ApprovedEmailLogo {
+  isDefault: boolean
   id: string
   name: string | null
   imageUrl: string

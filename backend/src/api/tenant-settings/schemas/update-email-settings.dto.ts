@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger'
 
 export class UpdateEmailSettingsDto {
   @ApiProperty({
-    description: 'Approved email logo to use, or null to clear the selection',
+    description: 'Approved email logo to use, or null to use the system default logo',
     format: 'uuid',
     nullable: true,
   })

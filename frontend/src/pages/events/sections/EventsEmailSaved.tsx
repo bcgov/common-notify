@@ -93,7 +93,9 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   // configured logo on its own.
   const useCustomHeader = emailSettings?.useCustomHeader ?? false
   const headerLogoId = useCustomHeader ? emailSettings?.headerLogoId : tenantEmailLogoId
-  const headerLogo = approvedLogos.find((logo) => logo.id === headerLogoId)
+  const headerLogo =
+    approvedLogos.find((logo) => logo.id === headerLogoId) ??
+    approvedLogos.find((logo) => logo.isDefault)
   const headerTitle = useCustomHeader ? (emailSettings?.headerTitle ?? '') : ''
 
   function openTab(tab: EventTab) {

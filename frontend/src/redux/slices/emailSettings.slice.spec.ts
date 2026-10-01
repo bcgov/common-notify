@@ -145,6 +145,7 @@ describe('emailSettingsSlice', () => {
       {
         id: 'logo-1',
         name: 'Primary',
+        isDefault: false,
         imageUrl: 'https://gateway.example.test/logos/logo-1/image',
       },
     ]
