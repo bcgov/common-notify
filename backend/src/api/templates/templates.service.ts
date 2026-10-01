@@ -50,7 +50,7 @@ export class TemplatesService {
   ) {}
 
   public applyEmailLayout(
-    template: Template,
+    template: Pick<Template, 'tenantId' | 'channelCode'>,
     rendered: RenderedEmailContent,
   ): Promise<RenderedEmailContent> {
     return this.emailTemplateLayoutService.apply(template, rendered)

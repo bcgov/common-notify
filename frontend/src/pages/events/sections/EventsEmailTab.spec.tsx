@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventsEmailTab from './EventsEmailTab'
@@ -59,8 +60,13 @@ const template = {
 }
 
 const logos: ApprovedEmailLogo[] = [
-  { id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
-  { id: 'logo-2', name: 'Ministry', imageUrl: 'https://example.test/ministry.png' },
+  { isDefault: false, id: 'logo-1', name: 'BC Gov', imageUrl: 'https://example.test/bcgov.png' },
+  {
+    isDefault: false,
+    id: 'logo-2',
+    name: 'Ministry',
+    imageUrl: 'https://example.test/ministry.png',
+  },
 ]
 
 const groups: CstarGroup[] = [
@@ -100,16 +106,16 @@ type RenderOptions = {
   tenantEmailLogoId?: string | null
   tenantName?: string | null
   cstarGroups?: CstarGroup[]
-  onSave?: ReturnType<typeof vi.fn>
-  onDeactivate?: ReturnType<typeof vi.fn>
+  onSave?: Mock<(values: EmailSettingsValues) => Promise<void>>
+  onDeactivate?: Mock<() => Promise<void>>
 }
 
 function renderTab({
   values = unconfigured,
   isConfigured = false,
   isDisabled = false,
-  onSave = vi.fn().mockResolvedValue(undefined),
-  onDeactivate = vi.fn().mockResolvedValue(undefined),
+  onSave = vi.fn<(values: EmailSettingsValues) => Promise<void>>().mockResolvedValue(undefined),
+  onDeactivate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   ...rest
 }: RenderOptions = {}) {
   const view = render(
@@ -591,7 +597,7 @@ describe('EventsEmailTab', () => {
       )
     })
 
-    it('saves "No logo" as no logo rather than falling back to the tenant one', async () => {
+    it('does not offer a no-logo option for custom headers', async () => {
       const { onSave } = renderTab({
         values: savedAndActive,
         isConfigured: true,
@@ -602,12 +608,14 @@ describe('EventsEmailTab', () => {
 
       await userEvent.click(screen.getByRole('radio', { name: 'Custom' }))
       await userEvent.click(screen.getByRole('button', { name: /BC Gov Email logo\/brand/ }))
-      await userEvent.click(await screen.findByRole('option', { name: 'No logo' }))
+      expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
       await userEvent.click(saveButton())
 
       await waitFor(() =>
         expect(onSave).toHaveBeenCalledWith(
-          expect.objectContaining({ useCustomHeader: true, headerLogoId: null }),
+          expect.objectContaining({ useCustomHeader: true, headerLogoId: 'logo-1' }),
         ),
       )
     })

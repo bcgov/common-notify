@@ -255,6 +255,19 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
+        // Template sends are branded above; inline and pre-rendered sends need the same layout.
+        if (!emailTemplateId) {
+          const branded = await templatesService.applyEmailLayout(
+            { tenantId, channelCode: 'EMAIL' },
+            {
+              subject: emailPayload.content?.subject,
+              body: emailPayload.content?.body,
+              bodyType: emailPayload.content?.bodyType ?? 'text',
+            },
+          )
+          emailPayload = { ...emailPayload, content: { ...emailPayload.content, ...branded } }
+        }
+
         if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
           throw new Error('Invalid email payload: subject is missing or invalid')
         }
@@ -519,9 +532,13 @@ export class EmailDeliveryWorker {
           bodyType = rendered.bodyType
         } else {
           const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
-          subject = rendered.subject
-          body = rendered.body
-          bodyType = inlineContent!.bodyType
+          const branded = await templatesService.applyEmailLayout(
+            { tenantId, channelCode: 'EMAIL' },
+            { ...rendered, bodyType: inlineContent!.bodyType ?? 'text' },
+          )
+          subject = branded.subject
+          body = branded.body
+          bodyType = branded.bodyType
         }
 
         const emailPayload = {
