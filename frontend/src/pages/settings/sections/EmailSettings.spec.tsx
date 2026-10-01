@@ -344,6 +344,7 @@ describe('EmailSettings section', () => {
         emailNotificationsEnabled: false,
         emailAttachmentsEnabled: true,
         replyToEmail: 'support',
+        useCustomEmailHeader: false,
       })
       expect(showSuccessToast).toHaveBeenCalledWith('Email settings updated successfully')
     })
