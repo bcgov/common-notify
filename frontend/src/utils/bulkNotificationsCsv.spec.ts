@@ -177,7 +177,7 @@ describe('validateCsv row-level problems', () => {
   })
 
   it('explains an invalid phone number in the terms the SMS channel accepts', () => {
-    const parsed = { headers: ['phone', 'firstName'], rows: [['not-a-number', 'Alice']] }
+    const parsed = { headers: ['phone', 'firstName'], rows: [['778-111-223', 'Alice']] }
 
     const [issue] = validateCsv(parsed, placeholders, 'sms').rowIssues
 
@@ -205,14 +205,27 @@ describe('validateCsv row-level problems', () => {
     },
   )
 
-  it.each(['778-111-223', 'garbage2505551234', '+12505551234 ext. 9'])(
-    'rejects invalid SMS recipient %s',
-    (phone) => {
-      expect(
-        validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues[0].title,
-      ).toBe('Invalid phone number')
-    },
-  )
+  it.each(['778-111-223', '12345'])('rejects invalid SMS recipient %s', (phone) => {
+    expect(validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues[0].title).toBe(
+      'Invalid phone number',
+    )
+  })
+
+  it.each([
+    'garbage2505551234',
+    '+12505551234 ext. 9',
+    '++12505551234',
+    '(250 555-1234',
+    '250+5551234',
+  ])('distinguishes invalid formatting for %s', (phone) => {
+    expect(
+      validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues[0],
+    ).toMatchObject({
+      title: 'Invalid phone number format',
+      detail:
+        'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
+    })
+  })
 
   it('caps how many row problems it reports', () => {
     const rows = Array.from({ length: 500 }, () => ['not-an-email', 'Name'])

@@ -88,6 +88,10 @@ function isValidPhone(value: string): boolean {
   return !!phone && !phone.ext && phone.isValid()
 }
 
+function isPhoneFormat(value: string): boolean {
+  return /^\+?(?:\d+|\(\d+\))(?:[\s.-]*(?:\d+|\(\d+\)))*$/.test(value.trim())
+}
+
 /** Is this cell a usable recipient for the channel? */
 function isValidRecipient(value: string, channel: BulkChannel): boolean {
   return channel === 'sms' ? isValidPhone(value) : isValidEmail(value)
@@ -260,6 +264,19 @@ export function validateCsv(
       }
 
       if (column === recipientIndex) {
+        // Syntax and number validity are separate: readable separators are allowed,
+        // but letters, extensions, misplaced plus signs and unbalanced parentheses are not.
+        if (channel === 'sms' && !isPhoneFormat(value)) {
+          rowIssues.push({
+            row: rowNumber,
+            column: name,
+            value,
+            title: 'Invalid phone number format',
+            detail:
+              'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
+          })
+          continue
+        }
         if (!isValidRecipient(value, channel)) {
           rowIssues.push({
             row: rowNumber,
@@ -284,7 +301,7 @@ export function validateCsv(
               value,
               title: 'Unsupported destination',
               detail:
-                'SMS is only supported for numbers with the +1 country calling code. Remove this recipient.',
+                'SMS is not supported in the country or region for this phone number. Remove this recipient.',
             })
             continue
           }

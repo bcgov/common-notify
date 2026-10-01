@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import { previewTemplate } from '@/api/templates.api'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
+import SmsPreview from '@/components/SmsPreview'
 import type { PreviewVariable } from '@/components/NotificationPreviewModal'
 import { rowParams, rowRecipient, RECIPIENT_COLUMN } from '@/utils/bulkNotificationsCsv'
 import type { BulkChannel, ParsedCsv } from '@/utils/bulkNotificationsCsv'
@@ -109,10 +110,11 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
       subject={subject}
       bodyHtml={bodyHtml}
       bodyText={bodyText}
+      smsPreview={channel === 'sms' ? <SmsPreview body={bodyText} showParts /> : undefined}
       isLoading={loading}
       error={error}
       footer={
-        <Button variant="primary" onPress={onSend} isDisabled={isSending}>
+        <Button variant="primary" onPress={onSend} isDisabled={isSending || loading || !!error}>
           {isSending ? 'Sending...' : `Send notification (${rowCount})`}
         </Button>
       }
