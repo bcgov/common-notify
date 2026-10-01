@@ -608,6 +608,8 @@ describe('EventsEmailTab', () => {
       await userEvent.click(screen.getByRole('radio', { name: 'Custom' }))
       await userEvent.click(screen.getByRole('button', { name: /BC Gov Email logo\/brand/ }))
       expect(screen.queryByRole('option', { name: 'No logo' })).not.toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
       await userEvent.click(saveButton())
 
       await waitFor(() =>
