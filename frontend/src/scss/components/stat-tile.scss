@@ -1,0 +1,39 @@
+@import '../variables';
+
+// Lay out on a <dl>; each StatTile is a <div> holding its <dt>/<dd> pair.
+.stat-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: $spacing-md;
+  width: 100%;
+  margin: 0;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background-color: $white;
+
+  .stat-tile__label {
+    font-size: $font-size-sm;
+    font-weight: 400;
+    color: $text-secondary;
+  }
+
+  .stat-tile__value {
+    margin: 0;
+    font-size: $font-size-xl;
+    font-weight: 700;
+    color: $dark-text;
+  }
+
+  .stat-tile__hint {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
+}

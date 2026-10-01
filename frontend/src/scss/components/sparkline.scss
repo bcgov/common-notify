@@ -1,0 +1,38 @@
+@import '../variables';
+
+.sparkline {
+  display: block;
+  overflow: visible;
+
+  .sparkline__line {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+
+    &--in {
+      stroke: $border-active;
+    }
+
+    &--out {
+      stroke: $success-color;
+    }
+  }
+}
+
+// Legend swatches for pages that explain the sparkline colours in text.
+.sparkline-key {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  margin-right: $spacing-xs;
+  vertical-align: middle;
+
+  &--in {
+    background-color: $border-active;
+  }
+
+  &--out {
+    background-color: $success-color;
+  }
+}

@@ -1,10 +1,20 @@
-import { Module, OnModuleInit, Inject, Logger, Optional, forwardRef } from '@nestjs/common'
+import {
+  Module,
+  OnModuleInit,
+  OnModuleDestroy,
+  Inject,
+  Logger,
+  Optional,
+  forwardRef,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type Bull from 'bull'
+import type Redis from 'ioredis'
 import { QueueName } from '../enum/queue-name.enum'
 import { createQueue, createRedisClient } from './redis-connection'
+import { WorkerHeartbeat } from './worker-heartbeat'
 import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
@@ -157,8 +167,9 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     QueueName.WEBHOOK_DELIVERY,
   ],
 })
-export class QueueModule implements OnModuleInit {
+export class QueueModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueModule.name)
+  private heartbeat?: WorkerHeartbeat
 
   constructor(
     @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
@@ -183,7 +194,14 @@ export class QueueModule implements OnModuleInit {
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
+    @Optional()
+    @Inject(ProviderToken.REDIS_CLIENT)
+    private readonly redisClient?: Redis | null,
   ) {}
+
+  onModuleDestroy(): void {
+    this.heartbeat?.stop()
+  }
 
   async onModuleInit() {
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
@@ -200,6 +218,9 @@ export class QueueModule implements OnModuleInit {
     // Read concurrency configuration
     const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
     this.logger.debug(`Ingestion worker concurrency: ${concurrency}`)
+
+    // Published per pod so the admin monitoring page can list every pod's workers.
+    this.heartbeat = this.redisClient ? new WorkerHeartbeat(this.redisClient) : undefined
 
     // Initialize workers in background - don't block app startup
     // Workers will be ready when first job is queued
@@ -218,6 +239,7 @@ export class QueueModule implements OnModuleInit {
         this.attachmentService,
         this.phoneNumberService,
       )
+      this.heartbeat?.track(this.ingestionQueue, concurrency)
       this.logger.debug('Ingestion worker initialization started')
 
       this.logger.debug('About to initialize email delivery worker...')
@@ -240,6 +262,7 @@ export class QueueModule implements OnModuleInit {
         this.structuredLogger,
         this.tenantSettingsService,
       )
+      this.heartbeat?.track(this.emailQueue, emailConcurrency)
       this.logger.log('Email delivery worker initialization started')
 
       this.logger.log('About to initialize SMS delivery worker...')
@@ -260,6 +283,7 @@ export class QueueModule implements OnModuleInit {
         smsConcurrency,
         this.structuredLogger,
       )
+      this.heartbeat?.track(this.smsQueue, smsConcurrency)
       this.logger.log('SMS delivery worker initialization started')
 
       // Initialize webhook delivery worker — handles HTTP POST callbacks
@@ -272,8 +296,11 @@ export class QueueModule implements OnModuleInit {
           this.webhookDeliveryLogRepository,
           webhookConcurrency,
         )
+        this.heartbeat?.track(this.webhookQueue, webhookConcurrency)
         this.logger.log('Webhook delivery worker initialization started')
       }
+
+      this.heartbeat?.start()
 
       this.logger.log('Queue workers initialized successfully')
     } catch (error) {

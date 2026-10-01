@@ -629,6 +629,24 @@ routes:
     response_buffering: true
 
   # ============================================================================
+  # MONITORING ADMIN ROUTES (admin only)
+  # ============================================================================
+  # /api/v1/frontend/admin/monitoring/queues (queue, worker and Redis health)
+  - name: ${ROUTE_PREFIX}admin-monitoring-queues-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/monitoring/queues
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # ============================================================================
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
@@ -1677,6 +1695,16 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-list-frontend
+    config: *jwtConfig
+
+  # ============================================================================
+  # MONITORING ADMIN ROUTES PLUGINS
+  # ============================================================================
+  # Admin Monitoring Queues - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-monitoring-queues-frontend
     config: *jwtConfig
 
   # ============================================================================
