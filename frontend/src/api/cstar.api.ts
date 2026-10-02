@@ -2,6 +2,13 @@ import { generateApiParameters, get } from '@/common/api'
 import type { CstarTenantsResponse } from '@/interfaces/CstarTenant'
 import type { BackendRolesResponse } from '@/interfaces/CstarRoles'
 
+/** A CSTAR group a notification event can be addressed to. */
+export interface CstarGroup {
+  id: string
+  name: string
+  description: string
+}
+
 /**
  * CSTAR API Client (Frontend Proxy)
  *
@@ -11,6 +18,7 @@ import type { BackendRolesResponse } from '@/interfaces/CstarRoles'
  * API Routes:
  * - GET /api/v1/frontend/auth/tenants - Get user's CSTAR tenants
  * - GET /api/v1/frontend/auth/tenants/:tenantId/roles - Get user's roles in tenant
+ * - GET /api/v1/frontend/events/cstar-groups - Get the selected tenant's CSTAR groups
  */
 export const cstarApi = {
   /**
@@ -56,6 +64,27 @@ export const cstarApi = {
         roles: response.roles || [],
       },
     }
+  },
+
+  /**
+   * Fetch the selected tenant's CSTAR groups through the backend proxy.
+   * Calls: GET /api/v1/frontend/events/cstar-groups
+   *
+   * Backs the group picker on an event's Email Notification tab. The tenant is taken from the
+   * request's tenant header, so no ID is passed here.
+   *
+   * @returns Promise with the tenant's groups
+   */
+  async fetchTenantGroups(): Promise<CstarGroup[]> {
+    const parameters = generateApiParameters<never>(
+      '/api/v1/frontend/events/cstar-groups',
+      undefined,
+      false,
+      true, // Requires JWT auth
+    )
+
+    const response = (await get(parameters)) as { groups?: CstarGroup[] }
+    return response.groups || []
   },
 }
 

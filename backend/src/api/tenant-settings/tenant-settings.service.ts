@@ -95,6 +95,7 @@ export class TenantSettingsService {
     updatedBy?: string,
   ): Promise<TenantSettings> {
     try {
+      const emailLogoId = dto.emailLogoId ?? (await this.emailLogoService.getDefault()).id
       if (dto.emailLogoId !== null) {
         const approvedLogo = await this.emailLogoService.findByIdIfApproved(dto.emailLogoId)
         if (!approvedLogo) {
@@ -107,7 +108,9 @@ export class TenantSettingsService {
       const existing = await this.findByTenantId(tenantId)
 
       if (existing) {
-        existing.emailLogoId = dto.emailLogoId
+        existing.useCustomEmailHeader =
+          dto.useCustomEmailHeader ?? existing.useCustomEmailHeader ?? false
+        existing.emailLogoId = emailLogoId
         existing.emailNotificationsEnabled = dto.emailNotificationsEnabled
         existing.replyToEmail = dto.replyToEmail
         existing.emailAttachmentsEnabled = dto.emailAttachmentsEnabled
@@ -120,7 +123,8 @@ export class TenantSettingsService {
 
       const settings = this.tenantSettingsRepository.create({
         tenantId,
-        emailLogoId: dto.emailLogoId,
+        emailLogoId,
+        useCustomEmailHeader: dto.useCustomEmailHeader ?? false,
         emailNotificationsEnabled: dto.emailNotificationsEnabled,
         replyToEmail: dto.replyToEmail,
         emailAttachmentsEnabled: dto.emailAttachmentsEnabled,

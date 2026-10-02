@@ -11,6 +11,7 @@ describe('emailSettingsSlice', () => {
   // Mirrors the tenant_settings column defaults.
   const initialState = {
     emailLogoId: null,
+    useCustomEmailHeader: false,
     emailNotificationsEnabled: true,
     replyToEmail: null,
     emailAttachmentsEnabled: true,
@@ -21,6 +22,7 @@ describe('emailSettingsSlice', () => {
 
   const loadedState = {
     emailLogoId: 'logo-1',
+    useCustomEmailHeader: true,
     emailNotificationsEnabled: false,
     replyToEmail: 'noreply',
     emailAttachmentsEnabled: false,
@@ -30,6 +32,7 @@ describe('emailSettingsSlice', () => {
   }
 
   const tenantSettings: TenantSettings = {
+    useCustomEmailHeader: true,
     id: 'settings-1',
     tenantId: 'tenant-1',
     alertEmail: 'alerts@example.com',
@@ -63,6 +66,7 @@ describe('emailSettingsSlice', () => {
 
       expect(state.emailNotificationsEnabled).toBe(true)
       expect(state.emailLogoId).toBeNull()
+      expect(state.useCustomEmailHeader).toBe(false)
       expect(state.replyToEmail).toBeNull()
       expect(state.emailAttachmentsEnabled).toBe(true)
       expect(state.error).toBeUndefined()
@@ -76,6 +80,7 @@ describe('emailSettingsSlice', () => {
 
       expect(state.emailNotificationsEnabled).toBe(false)
       expect(state.emailLogoId).toBe('logo-1')
+      expect(state.useCustomEmailHeader).toBe(true)
       expect(state.replyToEmail).toBe('noreply')
       expect(state.emailAttachmentsEnabled).toBe(false)
     })
@@ -145,6 +150,7 @@ describe('emailSettingsSlice', () => {
       {
         id: 'logo-1',
         name: 'Primary',
+        isDefault: false,
         imageUrl: 'https://gateway.example.test/logos/logo-1/image',
       },
     ]

@@ -18,6 +18,14 @@ export class EmailLogoService {
     return this.emailLogoRepository.findByIdIfApproved(id)
   }
 
+  async getDefault(): Promise<EmailLogo> {
+    const logo = (await this.findApproved()).find((item) => item.isDefault)
+    if (!logo) {
+      throw new InternalServerErrorException('Default email logo is not configured')
+    }
+    return logo
+  }
+
   buildPublicImageUrl(id: string): string {
     const baseUrl = this.configService.get<string>('emailLogo.publicBaseUrl')?.replace(/\/+$/, '')
     if (!baseUrl) {
