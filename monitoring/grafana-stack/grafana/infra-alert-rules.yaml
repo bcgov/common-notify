@@ -172,6 +172,47 @@ groups:
           summary: "Pod not ready: {{ $labels.namespace }}/{{ $labels.pod }}"
           description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has been not Ready (failing its readiness probe, or stuck starting) for over 10 minutes."
 
+      # Job pods are excluded from PodNotReady, so a failed Crunchy backup is
+      # reported here instead. Keeps firing until the failed pod is cleaned up.
+      - uid: cn-backup-job-failed
+        title: BackupJobFailed
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod) (
+                  kube_pod_status_phase{
+                    namespace=~"f6bc3f-(test|prod)",
+                    phase="Failed"
+                  }
+                ) > 0
+                and on (namespace, pod) kube_pod_owner{owner_kind="Job"}
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: backup
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} backup job failed"
+          summary: "Backup job failed: {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "Job pod {{ $labels.pod }} in {{ $labels.namespace }} ended in Failed. Check the pod logs; for a Crunchy pgBackRest job, confirm the next scheduled backup succeeds."
+
       - uid: cn-deployment-replicas
         title: DeploymentReplicasMismatch
         condition: C
