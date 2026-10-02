@@ -34,7 +34,8 @@ jobs:
         with:
           package: ${{ matrix.package }}
           tags: ${{ github.event.number }}
-          tag_fallback: latest
+          # :latest is whichever image was tagged most recently by any build.
+          tag_fallback: dev
           triggers: ('${{ matrix.package }}/')
 
   import:
