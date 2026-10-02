@@ -41,6 +41,47 @@ datasources:
               matcherRegex: '"notificationId":"([^"]+)"'
               name: NotificationID
               url: ''
+      # ---------------------------------------------------------------------
+      # PLATFORM METRICS (OpenShift cluster monitoring, via Thanos)
+      #
+      # Container memory usage and PVC usage come from the kubelet/cAdvisor,
+      # which our namespace-scoped Prometheus cannot scrape: that needs
+      # cluster-level `nodes/metrics`, which product teams are not granted.
+      # The metrics DO exist in the platform's own monitoring stack, so the
+      # usage rules read them from there instead.
+      #
+      # Port 9092 is the TENANCY port: it serves only the namespace named in
+      # the request and requires a token with `view` in that namespace. The
+      # namespace cannot be expressed per-query by Grafana, so it is pinned
+      # per datasource via customQueryParameters — which is why there is one
+      # datasource per environment rather than one for both.
+      # ---------------------------------------------------------------------
+      - name: Platform Metrics (test)
+        type: prometheus
+        uid: platform-test
+        access: proxy
+        url: https://thanos-querier.openshift-monitoring.svc:9092
+        jsonData:
+          httpMethod: GET
+          tlsSkipVerify: true
+          customQueryParameters: namespace=f6bc3f-test
+          httpHeaderName1: Authorization
+          manageAlerts: false
+        secureJsonData:
+          httpHeaderValue1: Bearer $PLATFORM_METRICS_TOKEN
+      - name: Platform Metrics (prod)
+        type: prometheus
+        uid: platform-prod
+        access: proxy
+        url: https://thanos-querier.openshift-monitoring.svc:9092
+        jsonData:
+          httpMethod: GET
+          tlsSkipVerify: true
+          customQueryParameters: namespace=f6bc3f-prod
+          httpHeaderName1: Authorization
+          manageAlerts: false
+        secureJsonData:
+          httpHeaderValue1: Bearer $PLATFORM_METRICS_TOKEN
       # Prometheus (in-namespace, deployed via monitoring/grafana-stack/prometheus).
       # Source for the metric-based pod-state / OOM alerts (infra-alert-rules.yaml).
       # UID "prometheus" is referenced by those rules' datasourceUid.
@@ -264,6 +305,16 @@ securityContext:
 # Environment variables
 env:
   TZ: America/Vancouver
+
+# Bearer token for the platform Thanos datasources below. Sourced from the
+# grafana-platform-metrics ServiceAccount, which holds the `view` role in
+# f6bc3f-test and f6bc3f-prod — that is what the tenancy port authorises
+# against. Kept out of git by reading it from the Secret at runtime.
+envValueFrom:
+  PLATFORM_METRICS_TOKEN:
+    secretKeyRef:
+      name: grafana-platform-metrics-token
+      key: token
 
 # RBAC - Use OpenShift defaults
 rbac:

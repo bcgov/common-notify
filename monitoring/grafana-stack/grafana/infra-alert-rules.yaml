@@ -212,88 +212,6 @@ groups:
     folder: Common Notify Infra
     interval: 1m
     rules:
-      - uid: cn-mem-high
-        title: ContainerMemoryHigh
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 10m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: |
-                max by (namespace, pod, container) (
-                  container_memory_working_set_bytes{
-                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
-                  }
-                  /
-                  kube_pod_container_resource_limits{
-                    namespace=~"f6bc3f-(test|prod)", resource="memory"
-                  }
-                ) * 100
-              instant: true
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [85] }
-              refId: C
-        labels:
-          severity: warning
-          service: common-notify
-          component: memory
-        annotations:
-          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 85%"
-          summary: "High memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
-          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is using {{ printf \"%.0f\" $values.A.Value }}% of its memory limit (threshold 85%). Risk of OOMKill."
-
-      - uid: cn-mem-critical
-        title: ContainerMemoryCritical
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 5m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: |
-                max by (namespace, pod, container) (
-                  container_memory_working_set_bytes{
-                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
-                  }
-                  /
-                  kube_pod_container_resource_limits{
-                    namespace=~"f6bc3f-(test|prod)", resource="memory"
-                  }
-                ) * 100
-              instant: true
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [95] }
-              refId: C
-        labels:
-          severity: critical
-          service: common-notify
-          component: memory
-        annotations:
-          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 95%"
-          summary: "CRITICAL memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
-          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is above 95% of its memory limit and likely to be OOMKilled imminently."
-
       - uid: cn-oomkilled
         title: ContainerOOMKilled
         condition: C
@@ -478,111 +396,6 @@ groups:
           summary: "Elevated response times: {{ $labels.namespace }}"
           description: "p95 request latency in {{ $labels.namespace }} has been above 2s for 10+ minutes."
 
-  # =========================================================================
-  # STORAGE — PVC utilisation. Uses kubelet volume metrics.
-  # ⚠️ CAVEAT: kubelet_volume_stats_* come from the kubelet, NOT
-  # kube-state-metrics. A namespace-scoped Prometheus may not scrape the
-  # kubelet (needs node-level RBAC). If these metrics are absent, these two
-  # rules simply never fire (no error) — same caveat as the memory-% rules.
-  # Validate `kubelet_volume_stats_available_bytes` exists in Prometheus; if
-  # not, PVC alerting must move to a cluster-level monitoring stack.
-  # =========================================================================
-  - orgId: 1
-    name: storage
-    folder: Common Notify Infra
-    interval: 1m
-    rules:
-      - uid: cn-pvc-high
-        title: PVCUsageHigh
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 5m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: |
-                (
-                  1 - (
-                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(test|prod)"}
-                    /
-                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(test|prod)"}
-                  )
-                ) * 100
-              instant: true
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [85] }
-              refId: C
-        labels:
-          severity: warning
-          service: common-notify
-          component: storage
-        annotations:
-          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 85%"
-          summary: "PVC usage high: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
-          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 85% full."
-
-      - uid: cn-pvc-critical
-        title: PVCUsageCritical
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 5m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: |
-                (
-                  1 - (
-                    kubelet_volume_stats_available_bytes{namespace=~"f6bc3f-(test|prod)"}
-                    /
-                    kubelet_volume_stats_capacity_bytes{namespace=~"f6bc3f-(test|prod)"}
-                  )
-                ) * 100
-              instant: true
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [95] }
-              refId: C
-        labels:
-          severity: critical
-          service: common-notify
-          component: storage
-        annotations:
-          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 95%"
-          summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
-          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
-
-  # =========================================================================
-  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
-  # readiness. We can't scrape the DB/Redis exporters directly from this
-  # namespace-scoped Prometheus, so availability is inferred from pod Ready
-  # state of the primary DB / Redis master pods (kube_pod_status_ready).
-  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
-  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
-  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
-  # Completed/Error and would otherwise register as "not ready" and fire a
-  # permanent false-positive:
-  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
-  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
-  # =========================================================================
   - orgId: 1
     name: dependencies
     folder: Common Notify Infra
@@ -665,3 +478,374 @@ groups:
           short: "{{ $labels.namespace }} Redis has no ready pod"
           summary: "Redis unavailable: {{ $labels.namespace }}"
           description: "No ready Redis pod in {{ $labels.namespace }} for 3+ minutes — the queue/cache backend is unavailable."
+
+  # =========================================================================
+  # RESOURCE USAGE — reads the PLATFORM monitoring stack, not our Prometheus
+  #
+  # container_memory_working_set_bytes and kubelet_volume_stats_* come from the
+  # kubelet/cAdvisor. A namespace-scoped Prometheus cannot scrape those (it needs
+  # cluster-level nodes/metrics, which product teams are not granted), so these
+  # four rules previously queried metrics that were simply ABSENT and could never
+  # fire under any circumstances.
+  #
+  # They now read the platform's Thanos tenancy endpoint, where the metrics do
+  # exist. That endpoint serves exactly one namespace per request, so the rules
+  # are split per environment against the matching datasource.
+  # =========================================================================
+  - orgId: 1
+    name: resource-usage-test
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-mem-high-test
+        title: ContainerMemoryHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace="f6bc3f-test", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace="f6bc3f-test", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: memory
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 85%"
+          summary: "High memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is using {{ printf \"%.0f\" $values.A.Value }}% of its memory limit (threshold 85%). Risk of OOMKill."
+
+      - uid: cn-mem-critical-test
+        title: ContainerMemoryCritical
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace="f6bc3f-test", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace="f6bc3f-test", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: memory
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 95%"
+          summary: "CRITICAL memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is above 95% of its memory limit and likely to be OOMKilled imminently."
+
+      - uid: cn-pvc-high-test
+        title: PVCUsageHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace="f6bc3f-test"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-test"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 85%"
+          summary: "PVC usage high: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 85% full."
+
+      - uid: cn-pvc-critical-test
+        title: PVCUsageCritical
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace="f6bc3f-test"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-test"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 95%"
+          summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
+
+  # =========================================================================
+  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
+  # readiness. We can't scrape the DB/Redis exporters directly from this
+  # namespace-scoped Prometheus, so availability is inferred from pod Ready
+  # state of the primary DB / Redis master pods (kube_pod_status_ready).
+  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
+  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
+  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
+  # Completed/Error and would otherwise register as "not ready" and fire a
+  # permanent false-positive:
+  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
+  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
+  # =========================================================================
+
+  - orgId: 1
+    name: resource-usage-prod
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-mem-high-prod
+        title: ContainerMemoryHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace="f6bc3f-prod", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace="f6bc3f-prod", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: memory
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 85%"
+          summary: "High memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is using {{ printf \"%.0f\" $values.A.Value }}% of its memory limit (threshold 85%). Risk of OOMKill."
+
+      - uid: cn-mem-critical-prod
+        title: ContainerMemoryCritical
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                max by (namespace, pod, container) (
+                  container_memory_working_set_bytes{
+                    namespace="f6bc3f-prod", container!="", container!="POD"
+                  }
+                  /
+                  kube_pod_container_resource_limits{
+                    namespace="f6bc3f-prod", resource="memory"
+                  }
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: memory
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} memory above 95%"
+          summary: "CRITICAL memory: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is above 95% of its memory limit and likely to be OOMKilled imminently."
+
+      - uid: cn-pvc-high-prod
+        title: PVCUsageHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace="f6bc3f-prod"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-prod"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 85%"
+          summary: "PVC usage high: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 85% full."
+
+      - uid: cn-pvc-critical-prod
+        title: PVCUsageCritical
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                (
+                  1 - (
+                    kubelet_volume_stats_available_bytes{namespace="f6bc3f-prod"}
+                    /
+                    kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-prod"}
+                  )
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: storage
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} PVC above 95%"
+          summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
+          description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
+
+  # =========================================================================
+  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
+  # readiness. We can't scrape the DB/Redis exporters directly from this
+  # namespace-scoped Prometheus, so availability is inferred from pod Ready
+  # state of the primary DB / Redis master pods (kube_pod_status_ready).
+  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
+  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
+  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
+  # Completed/Error and would otherwise register as "not ready" and fire a
+  # permanent false-positive:
+  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
+  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
+  # =========================================================================
