@@ -252,6 +252,48 @@ describe('LokiTransport', () => {
     await loki.close()
   })
 
+  it('keeps identical lines in the same millisecond distinct so Loki cannot dedupe them', async () => {
+    const loki = await startLoki((_req, res) => res.writeHead(204).end())
+    const { transport } = makeTransport(loki.url)
+
+    // Nest logs the same line repeatedly inside one millisecond at boot; in an
+    // incident it is the same error repeated. Loki drops exact repeats.
+    const repeated = '{"level":"error","message":"CHES delivery failed"}'
+    for (let i = 0; i < 5; i++) transport.log(entry(repeated, 'error'), () => {})
+    await transport.flush()
+
+    const payload = JSON.parse(loki.received[0].body)
+    const values: [string, string][] = payload.streams[0].values
+    expect(values).toHaveLength(5)
+    expect(new Set(values.map((v) => v[0])).size).toBe(5)
+    expect(values.every((v) => v[1] === repeated)).toBe(true)
+    // All five stay inside the original millisecond.
+    expect(
+      values.every((v) =>
+        v[0].startsWith(String(new Date(entry('x').timestamp as string).valueOf())),
+      ),
+    ).toBe(true)
+
+    transport.close()
+    await loki.close()
+  })
+
+  it('emits nanosecond timestamps derived from the winston timestamp', async () => {
+    const loki = await startLoki((_req, res) => res.writeHead(204).end())
+    const { transport } = makeTransport(loki.url)
+
+    transport.log(entry('{"msg":"a"}'), () => {})
+    await transport.flush()
+
+    const [ts] = JSON.parse(loki.received[0].body).streams[0].values[0]
+    const expectedMs = new Date('2026-10-02T12:00:00.000Z').valueOf()
+    expect(ts).toBe(`${expectedMs}000000`)
+    expect(ts).toHaveLength(String(expectedMs).length + 6)
+
+    transport.close()
+    await loki.close()
+  })
+
   it('does not post anything when there is nothing queued', async () => {
     const loki = await startLoki((_req, res) => res.writeHead(204).end())
     const { transport } = makeTransport(loki.url)

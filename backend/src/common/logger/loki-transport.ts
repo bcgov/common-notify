@@ -36,7 +36,7 @@ export interface LokiTransportOptions extends TransportStream.TransportStreamOpt
 
 interface QueuedEntry {
   level: string
-  ts: number
+  ts: string
   line: string
 }
 
@@ -54,6 +54,8 @@ export class LokiTransport extends TransportStream {
   private inFlight = false
   private droppedEntries = 0
   private consecutiveFailures = 0
+  private lastMs = 0
+  private subMs = 0
 
   constructor(options: LokiTransportOptions) {
     super(options)
@@ -86,7 +88,11 @@ export class LokiTransport extends TransportStream {
     const level = String(info[Symbol.for('level') as unknown as string] ?? info.level ?? 'info')
     const parsed = info.timestamp ? new Date(info.timestamp as string).valueOf() : Date.now()
 
-    this.queue.push({ level, line, ts: Number.isNaN(parsed) ? Date.now() : parsed })
+    this.queue.push({
+      level,
+      line,
+      ts: this.nanoTimestamp(Number.isNaN(parsed) ? Date.now() : parsed),
+    })
 
     if (this.queue.length > this.maxQueueEntries) {
       const overflow = this.queue.length - this.maxQueueEntries
@@ -95,6 +101,24 @@ export class LokiTransport extends TransportStream {
     }
 
     callback()
+  }
+
+  /**
+   * Loki silently discards an entry that repeats an existing (stream, timestamp,
+   * line) exactly. Winston only gives millisecond precision, so N identical
+   * lines logged in the same millisecond — N copies of one error, say — would
+   * collapse to a single line and undercount every count_over_time threshold
+   * built on top of them. Spend the nanosecond field on a per-millisecond
+   * sequence so each entry stays distinct.
+   */
+  private nanoTimestamp(ms: number): string {
+    if (ms === this.lastMs) {
+      this.subMs = Math.min(this.subMs + 1, 999_999)
+    } else {
+      this.lastMs = ms
+      this.subMs = 0
+    }
+    return `${ms}${String(this.subMs).padStart(6, '0')}`
   }
 
   async flush(): Promise<void> {
@@ -130,7 +154,7 @@ export class LokiTransport extends TransportStream {
     const byLevel = new Map<string, Array<[string, string]>>()
     for (const entry of batch) {
       const values = byLevel.get(entry.level) ?? []
-      values.push([`${entry.ts}000000`, entry.line])
+      values.push([entry.ts, entry.line])
       byLevel.set(entry.level, values)
     }
     return JSON.stringify({
