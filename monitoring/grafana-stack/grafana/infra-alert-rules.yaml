@@ -514,7 +514,7 @@ groups:
                   container_memory_working_set_bytes{
                     namespace="f6bc3f-test", container!="", container!="POD"
                   }
-                  /
+                  / on(namespace, pod, container)
                   kube_pod_container_resource_limits{
                     namespace="f6bc3f-test", resource="memory"
                   }
@@ -555,7 +555,7 @@ groups:
                   container_memory_working_set_bytes{
                     namespace="f6bc3f-test", container!="", container!="POD"
                   }
-                  /
+                  / on(namespace, pod, container)
                   kube_pod_container_resource_limits{
                     namespace="f6bc3f-test", resource="memory"
                   }
@@ -671,6 +671,41 @@ groups:
   #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
   # =========================================================================
 
+      - uid: cn-metrics-absent-test
+        title: ResourceMetricsMissing
+        condition: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                absent(container_memory_working_set_bytes{namespace="f6bc3f-test"})
+                or
+                absent(kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-test"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: monitoring
+        annotations:
+          short: "f6bc3f-test resource metrics missing — usage alerts are blind"
+          summary: "Resource metrics missing for f6bc3f-test"
+          description: "container_memory_working_set_bytes or kubelet_volume_stats_* stopped arriving from the platform Thanos for f6bc3f-test. The ContainerMemory and PVCUsage rules use noDataState=OK, so they will read Normal while measuring nothing. Check the platform-test datasource and its ServiceAccount token."
+
   - orgId: 1
     name: resource-usage-prod
     folder: Common Notify Infra
@@ -693,7 +728,7 @@ groups:
                   container_memory_working_set_bytes{
                     namespace="f6bc3f-prod", container!="", container!="POD"
                   }
-                  /
+                  / on(namespace, pod, container)
                   kube_pod_container_resource_limits{
                     namespace="f6bc3f-prod", resource="memory"
                   }
@@ -734,7 +769,7 @@ groups:
                   container_memory_working_set_bytes{
                     namespace="f6bc3f-prod", container!="", container!="POD"
                   }
-                  /
+                  / on(namespace, pod, container)
                   kube_pod_container_resource_limits{
                     namespace="f6bc3f-prod", resource="memory"
                   }
@@ -849,6 +884,41 @@ groups:
   #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
   #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
   # =========================================================================
+      - uid: cn-metrics-absent-prod
+        title: ResourceMetricsMissing
+        condition: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                absent(container_memory_working_set_bytes{namespace="f6bc3f-prod"})
+                or
+                absent(kubelet_volume_stats_capacity_bytes{namespace="f6bc3f-prod"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: monitoring
+        annotations:
+          short: "f6bc3f-prod resource metrics missing — usage alerts are blind"
+          summary: "Resource metrics missing for f6bc3f-prod"
+          description: "container_memory_working_set_bytes or kubelet_volume_stats_* stopped arriving from the platform Thanos for f6bc3f-prod. The ContainerMemory and PVCUsage rules use noDataState=OK, so they will read Normal while measuring nothing. Check the platform-prod datasource and its ServiceAccount token."
+
 
 # ---------------------------------------------------------------------------
 # Remove the superseded single-datasource usage rules.
