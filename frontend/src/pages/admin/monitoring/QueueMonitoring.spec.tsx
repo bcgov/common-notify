@@ -310,6 +310,31 @@ describe('QueueMonitoring', () => {
     expect(screen.getByText('4 idle workers listening')).toBeInTheDocument()
   })
 
+  it('hides fragmentation at low memory use and flags it when high on a busy instance', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    const { unmount } = renderPage('system')
+    // 300 MB used in the default snapshot: meaningful, and 1.12 is normal.
+    expect(await screen.findByText('1.12')).toBeInTheDocument()
+    unmount()
+
+    const small = snapshot()
+    small.redis = { ...small.redis, usedMemoryBytes: 45 * MB, fragmentationRatio: 2.76 }
+    mockedGet.mockResolvedValue(small)
+    const second = renderPage('system')
+    expect(await screen.findByText('Not meaningful at low memory use')).toBeInTheDocument()
+    expect(screen.queryByText('2.76')).not.toBeInTheDocument()
+    second.unmount()
+
+    const fragmented = snapshot()
+    fragmented.redis = { ...fragmented.redis, fragmentationRatio: 2.4 }
+    mockedGet.mockResolvedValue(fragmented)
+    renderPage('system')
+    expect(await screen.findByText('2.40')).toBeInTheDocument()
+    expect(
+      screen.getByText('High: Redis holds more memory than its data needs'),
+    ).toBeInTheDocument()
+  })
+
   it('lists recent failures on the Failures tab, reached from the tab bar', async () => {
     mockedGet.mockResolvedValue(snapshot())
     renderPage()
