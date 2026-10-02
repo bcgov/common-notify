@@ -179,11 +179,13 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
+              # Deficit, not the available count: `available < spec` returns AVAILABLE, so a
+              # total outage evaluates to 0 and silently passes the `gt 0` threshold.
               expr: |
                 (
-                  kube_deployment_status_replicas_available{namespace=~"f6bc3f-(test|prod)"}
-                  <
                   kube_deployment_spec_replicas{namespace=~"f6bc3f-(test|prod)"}
+                  - on(namespace, deployment)
+                  kube_deployment_status_replicas_available{namespace=~"f6bc3f-(test|prod)"}
                 )
               instant: true
               refId: A
@@ -202,7 +204,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }}/{{ $labels.deployment }} under desired replicas"
           summary: "Deployment under-replicated: {{ $labels.namespace }}/{{ $labels.deployment }}"
-          description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has fewer available replicas than desired for 10+ minutes."
+          description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} is short {{ printf \"%.0f\" $values.A.Value }} replica(s) of its desired count, for 10+ minutes."
 
   # =========================================================================
   # MEMORY / OOM — the memory check you asked for. Limits are 8Gi per container.
@@ -248,57 +250,6 @@ groups:
           short: "{{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled"
           summary: "OOMKilled: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
           description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) was OOMKilled in the last 10 minutes. Increase memory limits or investigate a leak."
-
-  # =========================================================================
-  # CPU — throttling (limits are 4 CPU per container)
-  # =========================================================================
-  - orgId: 1
-    name: cpu
-    folder: Common Notify Infra
-    interval: 1m
-    rules:
-      - uid: cn-cpu-throttling
-        title: ContainerCPUThrottlingHigh
-        condition: C
-        noDataState: OK
-        execErrState: OK
-        for: 15m
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: |
-                sum by (namespace, pod, container) (
-                  rate(container_cpu_cfs_throttled_periods_total{
-                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
-                  }[5m])
-                )
-                /
-                sum by (namespace, pod, container) (
-                  rate(container_cpu_cfs_periods_total{
-                    namespace=~"f6bc3f-(test|prod)", container!="", container!="POD"
-                  }[5m])
-                ) * 100 > 25
-              instant: true
-              refId: A
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator: { type: gt, params: [25] }
-              refId: C
-        labels:
-          severity: warning
-          service: common-notify
-          component: cpu
-        annotations:
-          short: "{{ $labels.namespace }}/{{ $labels.pod }} CPU throttled >25%"
-          summary: "CPU throttling: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
-          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is being CPU-throttled >25% of the time for 15+ minutes."
 
   # =========================================================================
   # NOTIFY API — 5xx rate & latency, from the app /api/metrics scrape
@@ -396,6 +347,20 @@ groups:
           summary: "Elevated response times: {{ $labels.namespace }}"
           description: "p95 request latency in {{ $labels.namespace }} has been above 2s for 10+ minutes."
 
+  # =========================================================================
+  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
+  # readiness. We can't scrape the DB/Redis exporters directly from this
+  # namespace-scoped Prometheus, so availability is inferred from pod Ready
+  # state of the primary DB / Redis master pods (kube_pod_status_ready).
+  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
+  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
+  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
+  # Completed/Error and would otherwise register as "not ready" and fire a
+  # permanent false-positive:
+  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
+  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
+  # =========================================================================
+
   - orgId: 1
     name: dependencies
     folder: Common Notify Infra
@@ -482,11 +447,12 @@ groups:
   # =========================================================================
   # RESOURCE USAGE — reads the PLATFORM monitoring stack, not our Prometheus
   #
-  # container_memory_working_set_bytes and kubelet_volume_stats_* come from the
-  # kubelet/cAdvisor. A namespace-scoped Prometheus cannot scrape those (it needs
-  # cluster-level nodes/metrics, which product teams are not granted), so these
-  # four rules previously queried metrics that were simply ABSENT and could never
-  # fire under any circumstances.
+  # container_memory_working_set_bytes, kubelet_volume_stats_* and
+  # container_cpu_cfs_*_periods_total come from the kubelet/cAdvisor. A
+  # namespace-scoped Prometheus cannot scrape those (it needs cluster-level
+  # nodes/metrics, which product teams are not granted), so these rules
+  # previously queried metrics that were simply ABSENT and could never fire
+  # under any circumstances.
   #
   # They now read the platform's Thanos tenancy endpoint, where the metrics do
   # exist. That endpoint serves exactly one namespace per request, so the rules
@@ -657,19 +623,48 @@ groups:
           summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
           description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
 
-  # =========================================================================
-  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
-  # readiness. We can't scrape the DB/Redis exporters directly from this
-  # namespace-scoped Prometheus, so availability is inferred from pod Ready
-  # state of the primary DB / Redis master pods (kube_pod_status_ready).
-  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
-  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
-  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
-  # Completed/Error and would otherwise register as "not ready" and fire a
-  # permanent false-positive:
-  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
-  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
-  # =========================================================================
+      - uid: cn-cpu-throttling-test
+        title: ContainerCPUThrottlingHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: platform-test
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_throttled_periods_total{
+                    namespace="f6bc3f-test", container!="", container!="POD"
+                  }[5m])
+                )
+                / on(namespace, pod, container)
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_periods_total{
+                    namespace="f6bc3f-test", container!="", container!="POD"
+                  }[5m])
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [25] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: cpu
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} CPU throttled above 25%"
+          summary: "CPU throttling: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is being CPU-throttled {{ printf \"%.0f\" $values.A.Value }}% of the time (threshold 25%) for 15+ minutes."
 
       - uid: cn-metrics-absent-test
         title: ResourceMetricsMissing
@@ -871,19 +866,49 @@ groups:
           summary: "PVC usage critical: {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }}"
           description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is above 95% full — writes may fail imminently."
 
-  # =========================================================================
-  # DEPENDENCIES — Postgres / Redis availability, via kube-state-metrics pod
-  # readiness. We can't scrape the DB/Redis exporters directly from this
-  # namespace-scoped Prometheus, so availability is inferred from pod Ready
-  # state of the primary DB / Redis master pods (kube_pod_status_ready).
-  # Pod-name regexes VERIFIED against the live cluster (dev/test/prod) — they
-  # match EXACTLY the primary pod and deliberately EXCLUDE the crunchy backup
-  # jobs (repo1-full / repo1-incr / repo-host) and pgbouncer, which run to
-  # Completed/Error and would otherwise register as "not ready" and fire a
-  # permanent false-positive:
-  #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
-  #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
-  # =========================================================================
+      - uid: cn-cpu-throttling-prod
+        title: ContainerCPUThrottlingHigh
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: platform-prod
+            model:
+              editorMode: code
+              expr: |
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_throttled_periods_total{
+                    namespace="f6bc3f-prod", container!="", container!="POD"
+                  }[5m])
+                )
+                / on(namespace, pod, container)
+                sum by (namespace, pod, container) (
+                  rate(container_cpu_cfs_periods_total{
+                    namespace="f6bc3f-prod", container!="", container!="POD"
+                  }[5m])
+                ) * 100
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [25] }
+              refId: C
+        labels:
+          severity: warning
+          service: common-notify
+          component: cpu
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.pod }} CPU throttled above 25%"
+          summary: "CPU throttling: {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }})"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} ({{ $labels.namespace }}) is being CPU-throttled {{ printf \"%.0f\" $values.A.Value }}% of the time (threshold 25%) for 15+ minutes."
+
       - uid: cn-metrics-absent-prod
         title: ResourceMetricsMissing
         condition: C
@@ -923,8 +948,8 @@ groups:
 # ---------------------------------------------------------------------------
 # Remove the superseded single-datasource usage rules.
 #
-# These four queried our in-namespace Prometheus for kubelet metrics it does
-# not have, so they could never fire. They are replaced by the per-namespace
+# These five queried our in-namespace Prometheus for kubelet/cAdvisor metrics it
+# does not have, so they could never fire. They are replaced by the per-namespace
 # resource-usage-* groups above, which read the platform Thanos instead.
 #
 # This block is required, not tidiness: Grafana keeps a file-provisioned rule
@@ -940,3 +965,5 @@ deleteRules:
     uid: cn-pvc-high
   - orgId: 1
     uid: cn-pvc-critical
+  - orgId: 1
+    uid: cn-cpu-throttling
