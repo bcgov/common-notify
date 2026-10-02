@@ -131,9 +131,12 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
           <Switch isSelected={liveUpdates} onChange={setLiveUpdates}>
             Live updates
           </Switch>
-          <Button variant="secondary" size="small" onPress={refresh} isDisabled={isRefreshing}>
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </Button>
+          {/* A live stream already refetches on every change; manual refresh is for when it isn't. */}
+          {liveStatus !== 'live' && (
+            <Button variant="secondary" size="small" onPress={refresh} isDisabled={isRefreshing}>
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          )}
         </div>
       </div>
 

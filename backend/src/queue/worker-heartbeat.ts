@@ -65,19 +65,22 @@ export class WorkerHeartbeat {
     }
     this.states.set(queue.name, state)
 
-    queue.on('active', () => {
-      state.active++
-    })
-    queue.on('completed', () => {
-      state.active = Math.max(0, state.active - 1)
-      state.completed++
+    // Keyed by job id, not counted: Bull's stalled-job check emits a local `failed` for jobs
+    // another pod abandoned, which a plain counter would take as one of this pod's jobs ending.
+    const running = new Set<Bull.JobId>()
+    const finish = (job: Bull.Job | undefined, outcome: 'completed' | 'failed') => {
+      if (!job || !running.delete(job.id)) return
+      state.active = running.size
+      state[outcome]++
       state.lastFinishedAt = Date.now()
+    }
+
+    queue.on('active', (job: Bull.Job) => {
+      running.add(job.id)
+      state.active = running.size
     })
-    queue.on('failed', () => {
-      state.active = Math.max(0, state.active - 1)
-      state.failed++
-      state.lastFinishedAt = Date.now()
-    })
+    queue.on('completed', (job: Bull.Job) => finish(job, 'completed'))
+    queue.on('failed', (job: Bull.Job) => finish(job, 'failed'))
   }
 
   start(): void {

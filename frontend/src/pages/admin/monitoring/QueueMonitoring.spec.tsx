@@ -393,6 +393,18 @@ describe('QueueMonitoring', () => {
     expect(mockedGet).toHaveBeenCalledTimes(2)
   })
 
+  it('hides Refresh while the stream is live and brings it back when it drops', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
+
+    act(() => stream.onOpen())
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
+
+    act(() => stream.onError(false))
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+  })
+
   it('polls slowly while live and falls back to faster polling when the stream drops', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mockedGet.mockResolvedValue(snapshot())
