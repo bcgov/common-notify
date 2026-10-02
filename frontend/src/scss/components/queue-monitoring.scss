@@ -94,3 +94,15 @@
     background-color: $warning-color;
   }
 }
+
+.queue-monitoring__warnings {
+  margin: 0 0 $spacing-xs;
+  padding-left: $spacing-lg;
+}
+
+// A text-styled button: it switches tabs rather than navigating, so it is not a link.
+.queue-monitoring__link {
+  @include button-reset;
+  color: $border-active;
+  text-decoration: underline;
+}

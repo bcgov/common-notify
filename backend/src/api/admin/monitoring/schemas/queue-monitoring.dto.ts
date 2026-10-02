@@ -119,9 +119,23 @@ export interface ActiveBatchDto {
   startedAt: string | null
 }
 
+/** Totals over the last hour, for the summary cards. */
+export interface MonitoringOverviewDto {
+  windowMinutes: number
+  /** From the request being accepted (or a scheduled send falling due) to the provider accepting the message. */
+  deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
+  messagesSent: number
+  messagesFailed: number
+  sentPerMinute: number
+  failurePercent: number
+  /** Notification requests accepted: one ingestion job each. */
+  requestsReceived: number
+}
+
 export interface QueueMonitoringResponseDto {
   generatedAt: string
   status: HealthStatus
+  overview: MonitoringOverviewDto
   redis: RedisStatsDto
   messages: MessageChannelStatsDto[]
   queues: QueueStatsDto[]

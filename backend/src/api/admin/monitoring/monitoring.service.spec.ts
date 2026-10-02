@@ -6,6 +6,7 @@ import type { Repository } from 'typeorm'
 import {
   MonitoringService,
   averageOfWholeMinutes,
+  buildOverview,
   buildRedisStats,
   countUnheldActiveJobs,
   evaluateQueue,
@@ -198,6 +199,45 @@ describe('countUnheldActiveJobs', () => {
   })
 })
 
+describe('buildOverview', () => {
+  const channel = (sent: number, failed: number) => ({
+    channel: 'EMAIL',
+    pending: 0,
+    oldestPendingAgeMs: null,
+    sent: [...Array<number>(59).fill(0), sent],
+    failed: [...Array<number>(59).fill(0), failed],
+    sentPerMinute: 0,
+    failedPerMinute: 0,
+    estimatedClearMinutes: 0,
+  })
+
+  it('totals the hour across channels and counts requests from ingestion adds', () => {
+    const ingestion = {
+      ...baseQueue,
+      name: 'notification-ingestion',
+      throughput: { ...baseQueue.throughput, added: [...Array<number>(59).fill(0), 38] },
+    }
+    const overview = buildOverview(
+      [channel(1200, 6), { ...channel(40, 2), channel: 'SMS' }],
+      [evaluateQueue(ingestion)],
+      null,
+    )
+
+    expect(overview).toMatchObject({
+      windowMinutes: 60,
+      messagesSent: 1240,
+      messagesFailed: 8,
+      sentPerMinute: 20.7,
+      failurePercent: 0.6,
+      requestsReceived: 38,
+    })
+  })
+
+  it('reports a zero failure rate when nothing finished', () => {
+    expect(buildOverview([channel(0, 0)], [], null).failurePercent).toBe(0)
+  })
+})
+
 describe('helpers', () => {
   it('averages whole minutes and leaves out the current partial minute', () => {
     expect(averageOfWholeMinutes([1, 2, 4, 6, 8, 10, 999], 5)).toBe(6)
@@ -259,9 +299,13 @@ describe('MonitoringService', () => {
     } as unknown as Redis
   }
 
-  /** Query builders resolve in creation order: the pending query, then the finished query. */
-  function fakeDetailRepository(pendingRows: object[] = [], finishedRows: object[] = []) {
-    const results = [pendingRows, finishedRows]
+  /** Query builders resolve in creation order: pending, finished, then delivery time. */
+  function fakeDetailRepository(
+    pendingRows: object[] = [],
+    finishedRows: object[] = [],
+    deliveryRow: object = { median: null, p95: null, messages: '0' },
+  ) {
+    const results: unknown[] = [pendingRows, finishedRows, deliveryRow]
     return {
       createQueryBuilder: vi.fn(() => {
         const rows = results.shift() ?? []
@@ -278,6 +322,7 @@ describe('MonitoringService', () => {
           builder[method] = vi.fn(() => builder)
         }
         builder.getRawMany = vi.fn().mockResolvedValue(rows)
+        builder.getRawOne = vi.fn().mockResolvedValue(rows)
         return builder
       }),
     } as unknown as Repository<NotificationRequestDetail>
@@ -453,6 +498,36 @@ describe('MonitoringService', () => {
         startedAt: new Date(now - 20_000).toISOString(),
       },
     ])
+  })
+
+  it('reports delivery time percentiles for the last hour', async () => {
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository([], [], { median: '42000.4', p95: '130000', messages: '1240' }),
+    )
+
+    const { overview } = await service.getQueueMonitoring()
+
+    expect(overview.deliveryTime).toEqual({ medianMs: 42000, p95Ms: 130000, messages: 1240 })
+  })
+
+  it('reports no delivery time when nothing was sent in the last hour', async () => {
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+    )
+
+    expect((await service.getQueueMonitoring()).overview.deliveryTime).toBeNull()
   })
 
   it('is unavailable when Redis is not configured', async () => {

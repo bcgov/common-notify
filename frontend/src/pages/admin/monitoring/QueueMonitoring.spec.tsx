@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { useState } from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import QueueMonitoring, { BACKSTOP_INTERVAL_MS, FALLBACK_INTERVAL_MS } from './QueueMonitoring'
+import type { MonitoringTab } from './QueueMonitoring'
 import { connectQueueMonitoringStream, getQueueMonitoring } from '@/api/monitoring.api'
 import type { QueueMonitoringStreamHandlers } from '@/api/monitoring.api'
 import UserService from '@/service/user-service'
@@ -23,6 +25,15 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
   return {
     generatedAt,
     status: 'healthy',
+    overview: {
+      windowMinutes: 60,
+      deliveryTime: { medianMs: 42_000, p95Ms: 130_000, messages: 1240 },
+      messagesSent: 1240,
+      messagesFailed: 8,
+      sentPerMinute: 20.7,
+      failurePercent: 0.6,
+      requestsReceived: 38,
+    },
     redis: {
       status: 'healthy',
       reasons: [],
@@ -130,6 +141,15 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
 }
 
 const mockedGet = vi.mocked(getQueueMonitoring)
+
+/** The route owns the tab (it lives in the URL); this stands in for it. */
+function renderPage(initialTab: MonitoringTab = 'overview') {
+  function Harness() {
+    const [tab, setTab] = useState<MonitoringTab>(initialTab)
+    return <QueueMonitoring tab={tab} onTabChange={setTab} />
+  }
+  return render(<Harness />)
+}
 const mockedConnect = vi.mocked(connectQueueMonitoringStream)
 
 /** The handlers the page passed to the most recently opened stream. */
@@ -153,27 +173,55 @@ describe('QueueMonitoring', () => {
 
   it('shows Redis memory against its cap', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
+    renderPage()
 
     const meter = await screen.findByRole('meter', { name: 'Redis memory used' })
     expect(meter).toHaveAttribute('aria-valuenow', '39.1')
     expect(meter).toHaveAttribute('aria-valuetext', '300 MB of 768 MB (39.1%)')
-    expect(screen.getByText('noeviction')).toBeInTheDocument()
+    // Redis internals belong on the System tab, not the overview.
+    expect(screen.queryByText('noeviction')).not.toBeInTheDocument()
+  })
+
+  it('summarises delivery time, the last hour and the backlog in cards', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    renderPage()
+
+    const delivery = await screen.findByRole('region', { name: 'Delivery time' })
+    expect(within(delivery).getByText('42s median')).toBeInTheDocument()
+    expect(within(delivery).getByText('95% within 2m 10s')).toBeInTheDocument()
+
+    const hour = screen.getByRole('region', { name: 'Last hour' })
+    expect(within(hour).getByText('1,240 sent')).toBeInTheDocument()
+    expect(within(hour).getByText('38 requests received')).toBeInTheDocument()
+    expect(within(hour).getByText('8 failed (0.6%)')).toBeInTheDocument()
+
+    const backlog = screen.getByRole('region', { name: 'Backlog' })
+    expect(within(backlog).getByText('63 pending')).toBeInTheDocument()
+    expect(within(backlog).getByText('Clears in ~3 min')).toBeInTheDocument()
+  })
+
+  it('says when nothing was sent in the last hour', async () => {
+    const data = snapshot()
+    data.overview = { ...data.overview, deliveryTime: null }
+    mockedGet.mockResolvedValue(data)
+    renderPage()
+
+    const delivery = await screen.findByRole('region', { name: 'Delivery time' })
+    expect(within(delivery).getByText('Nothing sent in the last hour')).toBeInTheDocument()
   })
 
   it('counts individual messages, not just jobs', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
+    renderPage()
 
     expect(await screen.findByText('63 messages pending')).toBeInTheDocument()
-    expect(screen.getByText('120 jobs waiting')).toBeInTheDocument()
-    expect(screen.getByText('Clears in ~3 min')).toBeInTheDocument()
+    expect(screen.getAllByText('Clears in ~3 min').length).toBeGreaterThan(0)
 
-    const table = screen.getByRole('table', { name: 'Messages' })
+    const table = screen.getByRole('table', { name: 'Right now' })
     const email = within(table).getByRole('row', { name: /Email/ })
     expect(within(email).getByText('63')).toBeInTheDocument()
     expect(within(email).getByText('50s')).toBeInTheDocument()
-    expect(within(email).getByText('Sent 21/min')).toBeInTheDocument()
+    expect(within(email).getByText('21/min')).toBeInTheDocument()
     expect(within(email).getByText('~3 min')).toBeInTheDocument()
     const sms = within(table).getByRole('row', { name: /SMS/ })
     expect(within(sms).getByText('Nothing pending')).toBeInTheDocument()
@@ -181,7 +229,7 @@ describe('QueueMonitoring', () => {
 
   it('shows per-recipient progress for a batch that is one job', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
+    renderPage()
 
     const table = await screen.findByRole('table', { name: 'Batches in progress' })
     const meter = within(table).getByRole('meter', { name: 'Batch req-1-EMAIL-0 progress' })
@@ -192,16 +240,16 @@ describe('QueueMonitoring', () => {
 
   it('says so when no batch is sending', async () => {
     mockedGet.mockResolvedValue(snapshot({ activeBatches: [] }))
-    render(<QueueMonitoring />)
+    renderPage()
 
     expect(
       (await screen.findAllByText('No batches are sending right now.')).length,
     ).toBeGreaterThan(0)
   })
 
-  it('shows each queue with its backlog, rates and drain estimate', async () => {
+  it('shows each queue with its backlog, rates and drain estimate on the System tab', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
+    renderPage('system')
 
     const table = await screen.findByRole('table', { name: 'Queues' })
     const row = within(table).getByRole('row', { name: /Email delivery/ })
@@ -225,39 +273,67 @@ describe('QueueMonitoring', () => {
       liveWorkerPods: 0,
     }
     mockedGet.mockResolvedValue(data)
-    render(<QueueMonitoring />)
+    renderPage()
 
+    // Surfaced above the tabs, so a problem is never hidden on a tab you are not looking at.
     expect(
-      await screen.findByText('Jobs are waiting but no pod is processing this queue'),
+      await screen.findByText(
+        'Email delivery: Jobs are waiting but no pod is processing this queue',
+      ),
     ).toBeInTheDocument()
     expect(screen.getAllByText('Critical').length).toBeGreaterThan(0)
-    expect(screen.getByText('Not draining: Email delivery')).toBeInTheDocument()
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'View details on the System tab' }))
+
+    const table = await screen.findByRole('table', { name: 'Queues' })
+    expect(
+      within(table).getByText('Jobs are waiting but no pod is processing this queue'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'View details on the System tab' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('lists worker pods and recent failures', async () => {
+  it('lists worker pods and Redis details on the System tab', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
+    renderPage('system')
 
     const workers = await screen.findByRole('table', { name: 'Workers' })
     expect(within(workers).getByText('notify-backend-abc12')).toBeInTheDocument()
     expect(within(workers).getByText('2 of 2')).toBeInTheDocument()
+    expect(screen.getByText('noeviction')).toBeInTheDocument()
+    expect(screen.getByText('4 idle workers listening')).toBeInTheDocument()
+  })
 
-    const failures = screen.getByRole('table', { name: 'Recent failed jobs' })
+  it('lists recent failures on the Failures tab, reached from the tab bar', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
+    expect(screen.queryByRole('table', { name: 'Recent failed jobs' })).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByText('Failures (1)'))
+
+    const failures = await screen.findByRole('table', { name: 'Recent failed jobs' })
     expect(within(failures).getByText('Health Ministry')).toBeInTheDocument()
     expect(within(failures).getByText('CHES rejected [email]')).toBeInTheDocument()
   })
 
   it('shows empty states when there are no workers or failures', async () => {
     mockedGet.mockResolvedValue(snapshot({ workers: [], recentFailures: [] }))
-    render(<QueueMonitoring />)
-
+    const { unmount } = renderPage('system')
     expect(await screen.findAllByText(/No worker heartbeats received/)).not.toHaveLength(0)
-    expect(screen.getAllByText('No failed jobs.')).not.toHaveLength(0)
+    unmount()
+
+    renderPage('failures')
+    expect(await screen.findAllByText('No failed jobs.')).not.toHaveLength(0)
+    expect(screen.getByText('Failures (0)')).toBeInTheDocument()
   })
 
   it('shows a loading message until the first snapshot arrives', () => {
     mockedGet.mockReturnValue(new Promise(() => {}))
-    render(<QueueMonitoring />)
+    renderPage()
 
     expect(screen.getByText('Loading queue health…')).toBeInTheDocument()
   })
@@ -266,7 +342,7 @@ describe('QueueMonitoring', () => {
     mockedGet.mockRejectedValue(
       new Error('Failed to load queue monitoring: Redis is not configured'),
     )
-    render(<QueueMonitoring />)
+    renderPage()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Redis is not configured')
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
@@ -275,15 +351,15 @@ describe('QueueMonitoring', () => {
   it('keeps the last snapshot on screen when a refresh fails', async () => {
     const user = userEvent.setup()
     mockedGet.mockResolvedValueOnce(snapshot()).mockRejectedValueOnce(new Error('Network Error'))
-    render(<QueueMonitoring />)
+    renderPage()
 
-    await screen.findByRole('table', { name: 'Queues' })
+    await screen.findByRole('table', { name: 'Right now' })
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Network Error Showing the last successful snapshot.',
     )
-    expect(screen.getByRole('table', { name: 'Queues' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Right now' })).toBeInTheDocument()
   })
 
   it('announces a change in overall health but not an unchanged refresh', async () => {
@@ -292,8 +368,8 @@ describe('QueueMonitoring', () => {
       .mockResolvedValueOnce(snapshot())
       .mockResolvedValueOnce(snapshot())
       .mockResolvedValueOnce(snapshot({ status: 'warning' }))
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(screen.queryByText(/Queue health changed/)).not.toBeInTheDocument()
@@ -304,8 +380,8 @@ describe('QueueMonitoring', () => {
 
   it('refetches when the stream signals a change', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
     act(() => stream.onOpen())
     expect(screen.getByText('Live')).toBeInTheDocument()
     expect(mockedGet).toHaveBeenCalledTimes(1)
@@ -320,8 +396,8 @@ describe('QueueMonitoring', () => {
   it('polls slowly while live and falls back to faster polling when the stream drops', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
     act(() => stream.onOpen())
 
     await act(() => vi.advanceTimersByTimeAsync(FALLBACK_INTERVAL_MS))
@@ -337,8 +413,8 @@ describe('QueueMonitoring', () => {
 
   it('catches up once when the stream reconnects', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
     act(() => stream.onOpen())
     act(() => stream.onError(false))
 
@@ -349,8 +425,8 @@ describe('QueueMonitoring', () => {
 
   it('says when live updates are refused, and keeps polling', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
 
     act(() => stream.onError(true))
 
@@ -361,8 +437,8 @@ describe('QueueMonitoring', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueueMonitoring />)
-    await screen.findByRole('table', { name: 'Queues' })
+    renderPage()
+    await screen.findByRole('table', { name: 'Right now' })
     const opened = streamController
 
     await user.click(screen.getByRole('switch', { name: 'Live updates' }))
@@ -378,7 +454,7 @@ describe('QueueMonitoring', () => {
 
   it('is not available to users without the NOTIFY_ADMIN role, and never calls the API', () => {
     vi.mocked(UserService.hasRole).mockReturnValue(false)
-    render(<QueueMonitoring />)
+    renderPage()
 
     expect(screen.queryByRole('heading', { name: 'Monitoring' })).not.toBeInTheDocument()
     expect(mockedGet).not.toHaveBeenCalled()

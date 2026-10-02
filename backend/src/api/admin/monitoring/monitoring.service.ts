@@ -30,6 +30,7 @@ import { MONITORING_THRESHOLDS } from './monitoring-thresholds'
 import type {
   HealthStatus,
   MessageChannelStatsDto,
+  MonitoringOverviewDto,
   QueueMonitoringResponseDto,
   QueueStatsDto,
   RedisStatsDto,
@@ -254,6 +255,29 @@ export function countUnheldActiveJobs(
   return Math.max(0, settled - held)
 }
 
+export function buildOverview(
+  messages: MessageChannelStatsDto[],
+  queues: QueueStatsDto[],
+  deliveryTime: MonitoringOverviewDto['deliveryTime'],
+): MonitoringOverviewDto {
+  const sumSeries = (pick: (m: MessageChannelStatsDto) => number[]) =>
+    messages.reduce((total, m) => total + pick(m).reduce((a, b) => a + b, 0), 0)
+  const messagesSent = sumSeries((m) => m.sent)
+  const messagesFailed = sumSeries((m) => m.failed)
+  const finished = messagesSent + messagesFailed
+  const ingestion = queues.find((queue) => queue.name === QueueName.INGESTION)
+
+  return {
+    windowMinutes: MONITORING_WINDOW_MINUTES,
+    deliveryTime,
+    messagesSent,
+    messagesFailed,
+    sentPerMinute: Math.round((messagesSent / MONITORING_WINDOW_MINUTES) * 10) / 10,
+    failurePercent: finished > 0 ? Math.round((messagesFailed / finished) * 1000) / 10 : 0,
+    requestsReceived: ingestion ? ingestion.throughput.added.reduce((a, b) => a + b, 0) : 0,
+  }
+}
+
 /**
  * Read-only view of the Bull queues, their workers and the Redis instance behind them, for the
  * admin monitoring page. Everything is read from Redis on each request, so the answer is the
@@ -286,12 +310,13 @@ export class MonitoringService {
     }
 
     const now = Date.now()
-    const [info, workers, messages, failedJobs, activeByQueue] = await Promise.all([
+    const [info, workers, messages, failedJobs, activeByQueue, deliveryTime] = await Promise.all([
       this.redis.info(),
       this.getWorkers(now),
       this.getMessageStats(now),
       this.getRecentFailedJobs(),
       this.getActiveJobs(),
+      this.getDeliveryTime(now),
     ])
     const redis = buildRedisStats(parseRedisInfo(info))
     const queues = await Promise.all(
@@ -309,6 +334,7 @@ export class MonitoringService {
     return {
       generatedAt: new Date(now).toISOString(),
       status: worstStatus([redis.status, ...queues.map((queue) => queue.status)]),
+      overview: buildOverview(messages, queues, deliveryTime),
       redis,
       messages,
       queues,
@@ -453,6 +479,37 @@ export class MonitoringService {
       ),
     )
     return new Map(perQueue)
+  }
+
+  /**
+   * Median and 95th percentile time to send, over recipients sent in the last hour. Timed from
+   * the parent request's acceptance rather than the detail row's creation, which for a merge
+   * send only happens once ingestion runs; a scheduled send is timed from when it fell due.
+   */
+  private async getDeliveryTime(now: number): Promise<MonitoringOverviewDto['deliveryTime']> {
+    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
+    const elapsedMs =
+      'EXTRACT(EPOCH FROM (detail.last_attempt_at - GREATEST(request.created_at, ' +
+      'COALESCE(request.delayed_send_time, request.created_at)))) * 1000'
+    const row = await this.detailRepository
+      .createQueryBuilder('detail')
+      .innerJoin('detail.notificationRequest', 'request')
+      .select(`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'median')
+      .addSelect(`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'p95')
+      .addSelect('COUNT(*)', 'messages')
+      // Repeats the partial index predicate (V72) so the planner uses it, then narrows to sent.
+      .where("detail.status IN ('sent', 'failed')")
+      .andWhere("detail.status = 'sent'")
+      .andWhere('detail.last_attempt_at >= :since', { since })
+      .getRawOne<{ median: string | null; p95: string | null; messages: string }>()
+
+    const messages = Number(row?.messages ?? 0)
+    if (!row || messages === 0 || row.median === null || row.p95 === null) return null
+    return {
+      medianMs: Math.max(0, Math.round(Number(row.median))),
+      p95Ms: Math.max(0, Math.round(Number(row.p95))),
+      messages,
+    }
   }
 
   private async getTenantNames(ids: Array<string | null>): Promise<Map<string, string>> {

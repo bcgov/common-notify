@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
 import { Button, Switch } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
+import TabBar from '@/components/TabBar'
+import type { TabBarItem } from '@/components/TabBar'
 import { StatusBadge } from '@/components/StatusBadge'
 import Alert from '@/components/Alert'
 import NotAuthorized from '@/components/NotAuthorized'
@@ -13,6 +15,7 @@ import type { LiveStatus } from '@/hooks/useLiveUpdates'
 import { connectQueueMonitoringStream, getQueueMonitoring } from '@/api/monitoring.api'
 import type { HealthStatus } from '@/interfaces/queueMonitoring.interface'
 import { HEALTH_LABELS, formatQueueName } from '@/utils/monitoring'
+import OverviewCards from './sections/OverviewCards'
 import MessagesSection from './sections/MessagesSection'
 import ActiveBatchesSection from './sections/ActiveBatchesSection'
 import RedisSection from './sections/RedisSection'
@@ -38,7 +41,15 @@ const LIVE_STATUS_TEXT: Record<LiveStatus, string> = {
  * Admin view of the Bull queues, the pods working them and the Redis instance they live in.
  * Read-only: it shows whether notifications are flowing; acting on failures is out of scope.
  */
-const QueueMonitoring: FC = () => {
+export type MonitoringTab = 'overview' | 'failures' | 'system'
+export const MONITORING_TABS: MonitoringTab[] = ['overview', 'failures', 'system']
+
+interface QueueMonitoringProps {
+  tab: MonitoringTab
+  onTabChange: (tab: MonitoringTab) => void
+}
+
+const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   const [liveUpdates, setLiveUpdates] = useState(true)
 
@@ -58,7 +69,7 @@ const QueueMonitoring: FC = () => {
     refreshRef.current = refresh
   }, [refresh])
 
-  // Announce only changes in overall health, not every 15-second refresh.
+  // Announce only changes in overall health, not every refresh.
   const [announcement, setAnnouncement] = useState('')
   const [announcedStatus, setAnnouncedStatus] = useState<HealthStatus | null>(null)
   if (data && data.status !== announcedStatus) {
@@ -74,22 +85,29 @@ const QueueMonitoring: FC = () => {
 
   const now = data ? new Date(data.generatedAt).getTime() : 0
   const pendingMessages = data?.messages.reduce((sum, m) => sum + m.pending, 0) ?? 0
-  const jobsWaiting =
-    data?.queues.reduce((sum, q) => sum + q.counts.waiting + q.counts.paused, 0) ?? 0
   const slowest = data?.messages.reduce<number | null>((longest, m) => {
     if (m.estimatedClearMinutes === null || m.estimatedClearMinutes === 0) return longest
     return Math.max(longest ?? 0, m.estimatedClearMinutes)
   }, null)
-  const notDraining = data?.queues.filter(
-    (q) => q.estimatedDrainMinutes === null && q.counts.waiting + q.counts.paused > 0,
-  )
+  // Warnings live on the System tab but surface here, so none is hidden behind a tab.
+  const warnings = data
+    ? [
+        ...data.redis.reasons.map((reason) => `Redis: ${reason}`),
+        ...data.queues.flatMap((queue) =>
+          queue.reasons.map((reason) => `${formatQueueName(queue.name)}: ${reason}`),
+        ),
+      ]
+    : []
+
+  const tabs: TabBarItem<MonitoringTab>[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'failures', label: `Failures (${data?.recentFailures.length ?? 0})` },
+    { id: 'system', label: 'System' },
+  ]
 
   return (
     <div className="page queue-monitoring">
-      <PageHeading
-        title="Monitoring"
-        meta="Messages, queues, workers and Redis across every pod. Read-only."
-      />
+      <PageHeading title="Monitoring" meta="Notification delivery across every pod. Read-only." />
 
       <div aria-live="polite" aria-atomic="true" className="visually-hidden">
         {announcement}
@@ -101,14 +119,7 @@ const QueueMonitoring: FC = () => {
             <>
               <StatusBadge status={data.status} statusLabel={HEALTH_LABELS[data.status]} />
               <span>{pendingMessages.toLocaleString()} messages pending</span>
-              <span>{jobsWaiting.toLocaleString()} jobs waiting</span>
-              {notDraining && notDraining.length > 0 ? (
-                <span>
-                  Not draining: {notDraining.map((q) => formatQueueName(q.name)).join(', ')}
-                </span>
-              ) : (
-                slowest != null && <span>Clears in ~{slowest.toLocaleString()} min</span>
-              )}
+              {slowest != null && <span>Clears in ~{slowest.toLocaleString()} min</span>}
             </>
           )}
         </div>
@@ -126,6 +137,25 @@ const QueueMonitoring: FC = () => {
         </div>
       </div>
 
+      {warnings.length > 0 && (
+        <Alert variant="warning" role="status">
+          <ul className="queue-monitoring__warnings">
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+          {tab !== 'system' && (
+            <button
+              type="button"
+              className="queue-monitoring__link"
+              onClick={() => onTabChange('system')}
+            >
+              View details on the System tab
+            </button>
+          )}
+        </Alert>
+      )}
+
       {error && (
         <Alert variant="danger">
           {error}
@@ -141,12 +171,25 @@ const QueueMonitoring: FC = () => {
 
       {data && (
         <>
-          <MessagesSection messages={data.messages} />
-          <ActiveBatchesSection batches={data.activeBatches} now={now} />
-          <QueuesSection queues={data.queues} />
-          <RedisSection redis={data.redis} />
-          <WorkersSection workers={data.workers} now={now} />
-          <RecentFailuresSection failures={data.recentFailures} now={now} />
+          <TabBar items={tabs} selected={tab} onSelect={onTabChange} label="Monitoring views" />
+
+          {tab === 'overview' && (
+            <>
+              <OverviewCards overview={data.overview} messages={data.messages} redis={data.redis} />
+              <MessagesSection messages={data.messages} />
+              <ActiveBatchesSection batches={data.activeBatches} now={now} />
+            </>
+          )}
+
+          {tab === 'failures' && <RecentFailuresSection failures={data.recentFailures} now={now} />}
+
+          {tab === 'system' && (
+            <>
+              <QueuesSection queues={data.queues} />
+              <WorkersSection workers={data.workers} now={now} />
+              <RedisSection redis={data.redis} />
+            </>
+          )}
         </>
       )}
     </div>

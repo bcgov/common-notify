@@ -96,9 +96,22 @@ export interface ActiveBatch {
   startedAt: string | null
 }
 
+/** Totals over the last hour, for the summary cards. */
+export interface MonitoringOverview {
+  windowMinutes: number
+  /** From the request being accepted (or a scheduled send falling due) to the provider accepting it. */
+  deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
+  messagesSent: number
+  messagesFailed: number
+  sentPerMinute: number
+  failurePercent: number
+  requestsReceived: number
+}
+
 export interface QueueMonitoring {
   generatedAt: string
   status: HealthStatus
+  overview: MonitoringOverview
   redis: RedisStats
   messages: MessageChannelStats[]
   queues: QueueStats[]

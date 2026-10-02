@@ -27,21 +27,19 @@ const columns: TableColumn<MessageChannelStats>[] = [
     render: (_, row) =>
       row.oldestPendingAgeMs === null ? '—' : formatDuration(row.oldestPendingAgeMs),
   },
+  { key: 'sentPerMinute', label: 'Sending', render: (_, row) => formatRate(row.sentPerMinute) },
+  { key: 'failedPerMinute', label: 'Failing', render: (_, row) => formatRate(row.failedPerMinute) },
   {
-    key: 'sentPerMinute',
-    label: 'Sent / failed',
+    key: 'sent',
+    label: 'Last 60 min',
     render: (_, row) => (
-      <div className="queue-monitoring__rates">
-        <span>Sent {formatRate(row.sentPerMinute)}</span>
-        <span>Failed {formatRate(row.failedPerMinute)}</span>
-        <Sparkline
-          label={`${formatMessageChannel(row.channel)}, last 60 minutes: ${sum(row.sent).toLocaleString()} sent, ${sum(row.failed).toLocaleString()} failed`}
-          series={[
-            { variant: 'out', values: row.sent },
-            { variant: 'failed', values: row.failed },
-          ]}
-        />
-      </div>
+      <Sparkline
+        label={`${formatMessageChannel(row.channel)}, last 60 minutes: ${sum(row.sent).toLocaleString()} sent, ${sum(row.failed).toLocaleString()} failed`}
+        series={[
+          { variant: 'out', values: row.sent },
+          { variant: 'failed', values: row.failed },
+        ]}
+      />
     ),
   },
   { key: 'estimatedClearMinutes', label: 'Time to clear', render: (_, row) => clearText(row) },
@@ -54,22 +52,21 @@ interface MessagesSectionProps {
 /** Individual emails and texts, as opposed to the jobs that carry them. */
 const MessagesSection: FC<MessagesSectionProps> = ({ messages }) => (
   <section className="page__section">
-    <PageSubHeading title="Messages" />
+    <PageSubHeading title="Right now" />
     <DataTable
       columns={columns}
       data={messages}
       keyExtractor={(row) => row.channel}
-      label="Messages"
+      label="Right now"
       emptyMessage="No messages in the last 24 hours."
       multiline
     />
     <p className="queue-monitoring__legend">
-      One row per recipient. Pending counts messages accepted in the last 24 hours that have not
-      been sent or failed yet; scheduled sends are not counted until they are due.
+      Rates average the last 5 minutes.
       <span className="sparkline-key sparkline-key--out ms-2" aria-hidden="true" />
       Sent
       <span className="sparkline-key sparkline-key--failed ms-3" aria-hidden="true" />
-      Failed, over the last 60 minutes.
+      Failed
     </p>
   </section>
 )
