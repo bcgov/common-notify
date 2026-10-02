@@ -849,3 +849,24 @@ groups:
   #   Postgres primary : pg-<id>-crunchy-db-<hash>-0   (regex: pg-.*-crunchy-db-.*)
   #   Redis master     : common-notify-redis-master-0  (regex: common-notify-redis-master-.*)
   # =========================================================================
+
+# ---------------------------------------------------------------------------
+# Remove the superseded single-datasource usage rules.
+#
+# These four queried our in-namespace Prometheus for kubelet metrics it does
+# not have, so they could never fire. They are replaced by the per-namespace
+# resource-usage-* groups above, which read the platform Thanos instead.
+#
+# This block is required, not tidiness: Grafana keeps a file-provisioned rule
+# after it is removed from the file, so without an explicit delete the dead
+# rules linger in every environment and look like working coverage.
+# ---------------------------------------------------------------------------
+deleteRules:
+  - orgId: 1
+    uid: cn-mem-high
+  - orgId: 1
+    uid: cn-mem-critical
+  - orgId: 1
+    uid: cn-pvc-high
+  - orgId: 1
+    uid: cn-pvc-critical
