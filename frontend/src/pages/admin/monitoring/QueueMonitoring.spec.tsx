@@ -30,7 +30,7 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
       deliveryTime: { medianMs: 42_000, p95Ms: 130_000, messages: 1240 },
       messagesSent: 1240,
       messagesFailed: 8,
-      sentPerMinute: 20.7,
+      sendingRate: { perMinute: 36.1, messages: 1180, busySeconds: 1962 },
       failurePercent: 0.6,
       requestsReceived: 38,
     },
@@ -192,6 +192,9 @@ describe('QueueMonitoring', () => {
 
     const hour = screen.getByRole('region', { name: 'Last hour' })
     expect(within(hour).getByText('1,240 sent')).toBeInTheDocument()
+    expect(
+      within(hour).getByText('Sends ~36.1/min (measured over 32m 42s of sending)'),
+    ).toBeInTheDocument()
     expect(within(hour).getByText('38 requests received')).toBeInTheDocument()
     expect(within(hour).getByText('8 failed (0.6%)')).toBeInTheDocument()
 

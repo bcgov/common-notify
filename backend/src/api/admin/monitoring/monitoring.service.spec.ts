@@ -8,6 +8,7 @@ import {
   averageOfWholeMinutes,
   buildOverview,
   buildRedisStats,
+  sendingRateFrom,
   countUnheldActiveJobs,
   evaluateQueue,
   maskPersonalData,
@@ -199,6 +200,19 @@ describe('countUnheldActiveJobs', () => {
   })
 })
 
+describe('sendingRateFrom', () => {
+  it('scales busy sending up to a per-minute rate', () => {
+    // 20 messages over 30 seconds of sending is a 40/min pace.
+    expect(sendingRateFrom(20, 30)).toEqual({ perMinute: 40, messages: 20, busySeconds: 30 })
+  })
+
+  it('is null when there is too little sending to extrapolate from', () => {
+    expect(sendingRateFrom(9, 60)).toBeNull()
+    expect(sendingRateFrom(50, 4)).toBeNull()
+    expect(sendingRateFrom(0, 0)).toBeNull()
+  })
+})
+
 describe('buildOverview', () => {
   const channel = (sent: number, failed: number) => ({
     channel: 'EMAIL',
@@ -221,20 +235,21 @@ describe('buildOverview', () => {
       [channel(1200, 6), { ...channel(40, 2), channel: 'SMS' }],
       [evaluateQueue(ingestion)],
       null,
+      null,
     )
 
     expect(overview).toMatchObject({
       windowMinutes: 60,
       messagesSent: 1240,
       messagesFailed: 8,
-      sentPerMinute: 20.7,
+      sendingRate: null,
       failurePercent: 0.6,
       requestsReceived: 38,
     })
   })
 
   it('reports a zero failure rate when nothing finished', () => {
-    expect(buildOverview([channel(0, 0)], [], null).failurePercent).toBe(0)
+    expect(buildOverview([channel(0, 0)], [], null, null).failurePercent).toBe(0)
   })
 })
 
@@ -304,9 +319,12 @@ describe('MonitoringService', () => {
     pendingRows: object[] = [],
     finishedRows: object[] = [],
     deliveryRow: object = { median: null, p95: null, messages: '0' },
+    rateRow: object = { busy_messages: '0', busy_seconds: '0' },
   ) {
     const results: unknown[] = [pendingRows, finishedRows, deliveryRow]
     return {
+      metadata: { tablePath: 'notify.notification_request_detail' },
+      query: vi.fn().mockResolvedValue([rateRow]),
       createQueryBuilder: vi.fn(() => {
         const rows = results.shift() ?? []
         const builder: Record<string, unknown> = {}
@@ -514,6 +532,22 @@ describe('MonitoringService', () => {
     const { overview } = await service.getQueueMonitoring()
 
     expect(overview.deliveryTime).toEqual({ medianMs: 42000, p95Ms: 130000, messages: 1240 })
+  })
+
+  it('reports the sustained sending speed from busy time', async () => {
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository([], [], undefined, { busy_messages: '28', busy_seconds: '46.5' }),
+    )
+
+    const { overview } = await service.getQueueMonitoring()
+
+    expect(overview.sendingRate).toEqual({ perMinute: 36.1, messages: 28, busySeconds: 47 })
   })
 
   it('reports no delivery time when nothing was sent in the last hour', async () => {

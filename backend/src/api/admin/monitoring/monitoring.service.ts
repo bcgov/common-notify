@@ -48,6 +48,10 @@ const UNHELD_GRACE_MS = HEARTBEAT_INTERVAL_MS * 2
 const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
 /** Older in-flight rows are abandoned, not backlog, and would pin "oldest pending" forever. */
 const PENDING_LOOKBACK_MS = 24 * 60 * 60 * 1000
+/** A longer pause between consecutive sends is idle time, not part of how fast sending runs. */
+const IDLE_GAP_SECONDS = 30
+const MIN_RATE_MESSAGES = 10
+const MIN_RATE_BUSY_SECONDS = 5
 const DEFAULT_MESSAGE_CHANNELS = [NotificationChannel.EMAIL, NotificationChannel.SMS]
 const RECENT_FAILURES_LIMIT = 20
 /** A failure rate over a handful of jobs is noise; below this many finished jobs it is ignored. */
@@ -255,10 +259,27 @@ export function countUnheldActiveJobs(
   return Math.max(0, settled - held)
 }
 
+/**
+ * Turn busy sending time into a per-minute rate, or null when there is too little to go on: a
+ * handful of messages, or a few seconds, extrapolate to a minute badly.
+ */
+export function sendingRateFrom(
+  busyMessages: number,
+  busySeconds: number,
+): MonitoringOverviewDto['sendingRate'] {
+  if (busyMessages < MIN_RATE_MESSAGES || busySeconds < MIN_RATE_BUSY_SECONDS) return null
+  return {
+    perMinute: Math.round((busyMessages / busySeconds) * 60 * 10) / 10,
+    messages: busyMessages,
+    busySeconds: Math.round(busySeconds),
+  }
+}
+
 export function buildOverview(
   messages: MessageChannelStatsDto[],
   queues: QueueStatsDto[],
   deliveryTime: MonitoringOverviewDto['deliveryTime'],
+  sendingRate: MonitoringOverviewDto['sendingRate'],
 ): MonitoringOverviewDto {
   const sumSeries = (pick: (m: MessageChannelStatsDto) => number[]) =>
     messages.reduce((total, m) => total + pick(m).reduce((a, b) => a + b, 0), 0)
@@ -272,7 +293,7 @@ export function buildOverview(
     deliveryTime,
     messagesSent,
     messagesFailed,
-    sentPerMinute: Math.round((messagesSent / MONITORING_WINDOW_MINUTES) * 10) / 10,
+    sendingRate,
     failurePercent: finished > 0 ? Math.round((messagesFailed / finished) * 1000) / 10 : 0,
     requestsReceived: ingestion ? ingestion.throughput.added.reduce((a, b) => a + b, 0) : 0,
   }
@@ -310,14 +331,16 @@ export class MonitoringService {
     }
 
     const now = Date.now()
-    const [info, workers, messages, failedJobs, activeByQueue, deliveryTime] = await Promise.all([
-      this.redis.info(),
-      this.getWorkers(now),
-      this.getMessageStats(now),
-      this.getRecentFailedJobs(),
-      this.getActiveJobs(),
-      this.getDeliveryTime(now),
-    ])
+    const [info, workers, messages, failedJobs, activeByQueue, deliveryTime, sendingRate] =
+      await Promise.all([
+        this.redis.info(),
+        this.getWorkers(now),
+        this.getMessageStats(now),
+        this.getRecentFailedJobs(),
+        this.getActiveJobs(),
+        this.getDeliveryTime(now),
+        this.getSendingRate(now),
+      ])
     const redis = buildRedisStats(parseRedisInfo(info))
     const queues = await Promise.all(
       this.queues.map((queue) =>
@@ -334,7 +357,7 @@ export class MonitoringService {
     return {
       generatedAt: new Date(now).toISOString(),
       status: worstStatus([redis.status, ...queues.map((queue) => queue.status)]),
-      overview: buildOverview(messages, queues, deliveryTime),
+      overview: buildOverview(messages, queues, deliveryTime, sendingRate),
       redis,
       messages,
       queues,
@@ -510,6 +533,31 @@ export class MonitoringService {
       p95Ms: Math.max(0, Math.round(Number(row.p95))),
       messages,
     }
+  }
+
+  /**
+   * Sustained sending speed over the last hour, measured from the gaps between consecutive sends
+   * rather than per-minute buckets, so a 30-second burst reads as its own pace instead of being
+   * split across, or diluted by, the minutes around it. Concurrent workers shrink the gaps, so
+   * this is the whole system's throughput, not one worker's.
+   */
+  private async getSendingRate(now: number): Promise<MonitoringOverviewDto['sendingRate']> {
+    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
+    const table = this.detailRepository.metadata.tablePath
+    // The status filter repeats the partial index predicate (V72) so the planner uses it.
+    const [row] = (await this.detailRepository.query(
+      `SELECT COUNT(*) FILTER (WHERE gap <= $2) AS busy_messages,
+              COALESCE(SUM(gap) FILTER (WHERE gap <= $2), 0) AS busy_seconds
+         FROM (
+           SELECT EXTRACT(EPOCH FROM last_attempt_at - lag(last_attempt_at)
+                    OVER (ORDER BY last_attempt_at)) AS gap
+             FROM ${table}
+            WHERE status IN ('sent', 'failed') AND status = 'sent' AND last_attempt_at >= $1
+         ) gaps`,
+      [since, IDLE_GAP_SECONDS],
+    )) as Array<{ busy_messages: string; busy_seconds: string }>
+
+    return sendingRateFrom(Number(row?.busy_messages ?? 0), Number(row?.busy_seconds ?? 0))
   }
 
   private async getTenantNames(ids: Array<string | null>): Promise<Map<string, string>> {

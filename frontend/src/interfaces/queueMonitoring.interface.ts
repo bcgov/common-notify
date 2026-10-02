@@ -103,7 +103,12 @@ export interface MonitoringOverview {
   deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
   messagesSent: number
   messagesFailed: number
-  sentPerMinute: number
+  /**
+   * Sustained sending speed: messages sent while busy, divided by time spent busy, as a
+   * per-minute rate. Gaps between sends longer than an idle threshold are not counted as busy.
+   * Null when there was too little sending to estimate from.
+   */
+  sendingRate: { perMinute: number; messages: number; busySeconds: number } | null
   failurePercent: number
   requestsReceived: number
 }

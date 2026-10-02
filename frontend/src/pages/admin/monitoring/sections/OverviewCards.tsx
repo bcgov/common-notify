@@ -54,7 +54,11 @@ const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) =>
       </SummaryCard>
 
       <SummaryCard title="Last hour" value={`${overview.messagesSent.toLocaleString()} sent`}>
-        <p>{overview.sentPerMinute.toLocaleString()}/min on average</p>
+        <p>
+          {overview.sendingRate
+            ? `Sends ~${overview.sendingRate.perMinute.toLocaleString()}/min (measured over ${formatDuration(overview.sendingRate.busySeconds * 1000)} of sending)`
+            : 'Not enough sending to estimate a rate'}
+        </p>
         <p>{overview.requestsReceived.toLocaleString()} requests received</p>
         <p>
           {overview.messagesFailed.toLocaleString()} failed ({overview.failurePercent}%)
