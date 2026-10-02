@@ -2,6 +2,7 @@ import { BadRequestException, HttpException, Logger, NotFoundException } from '@
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
+import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -97,6 +98,7 @@ export class SmsDeliveryWorker {
             smsAdapter,
             requestDetailService,
             notificationService,
+            batchProgressReporter(job),
           )
         }
 
@@ -405,6 +407,7 @@ export class SmsDeliveryWorker {
     smsAdapter: ISmsTransport,
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
+    reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params, recipients } = mailMergeData
     const templateId = content?.templateId
@@ -452,6 +455,9 @@ export class SmsDeliveryWorker {
 
     let sent = 0
     let failed = 0
+    // Recipients delivered by an earlier attempt count as sent, so a retried batch resumes its bar.
+    const progress = () => ({ sent: alreadySent.size + sent, failed, total: recipients.length })
+    reportProgress?.(progress())
 
     for (const recipient of pending) {
       try {
@@ -490,6 +496,7 @@ export class SmsDeliveryWorker {
         )
         failed++
       }
+      reportProgress?.(progress())
     }
 
     logger.log(`[${notifyId}] SMS merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)

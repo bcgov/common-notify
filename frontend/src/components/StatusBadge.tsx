@@ -27,7 +27,11 @@ export function StatusBadge({
       case 'completed':
       case 'sent':
       case 'delivered':
+      case 'healthy':
         dotClassName = 'status-badge__dot--success'
+        break
+      case 'critical':
+        dotClassName = 'status-badge__dot--failed'
         break
       case 'partially_completed':
         dotClassName = 'status-badge__dot--partial'

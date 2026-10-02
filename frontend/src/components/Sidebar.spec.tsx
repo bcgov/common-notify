@@ -184,6 +184,29 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
+  it('shows the Monitoring link to NOTIFY_ADMIN users', async () => {
+    const user = userEvent.setup()
+    const UserService = (await import('@/service/user-service')).default
+    vi.mocked(UserService.hasRole).mockReturnValue(true)
+
+    renderSidebar()
+    await user.click(screen.getByRole('button', { name: /admin/i }))
+
+    expect(screen.getByRole('link', { name: 'Monitoring' })).toHaveAttribute(
+      'href',
+      '/admin/monitoring',
+    )
+  })
+
+  it('does not show the Monitoring link without the NOTIFY_ADMIN role', async () => {
+    const UserService = (await import('@/service/user-service')).default
+    vi.mocked(UserService.hasRole).mockReturnValue(false)
+
+    renderSidebar()
+
+    expect(screen.queryByRole('link', { name: 'Monitoring' })).not.toBeInTheDocument()
+  })
+
   it('renders the logged-in user display name', () => {
     renderSidebar(mockUser)
 

@@ -3,6 +3,7 @@ import Redis from 'ioredis'
 import { attachRedisErrorLogging } from '../common/redis/redis-error.util'
 import { REDIS_KEY_PREFIX } from '../common/redis/redis-namespace'
 import { QueueName } from '../enum/queue-name.enum'
+import { countAddedJobs } from './queue-metrics'
 
 /** Shape of the `redis` block in configuration.ts. */
 export interface RedisConfig {
@@ -33,6 +34,15 @@ export function buildRedisOptions(
 }
 
 /**
+ * Minutes of completed/failed counts Bull keeps per queue, read back with `queue.getMetrics()`.
+ * Each point is one integer in a capped Redis list, so a day of history is a few KB per queue.
+ */
+export const QUEUE_METRICS_MAX_DATA_POINTS = parseInt(
+  process.env.QUEUE_METRICS_MAX_DATA_POINTS || '1440',
+  10,
+)
+
+/**
  * Create a Bull queue with an error listener attached.
  *
  * The listener is not optional: without one, a Redis failure prints the raw ioredis error -
@@ -48,8 +58,10 @@ export function createQueue(name: QueueName, redisConfig: RedisConfig): Bull.Que
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
     }),
+    metrics: { maxDataPoints: QUEUE_METRICS_MAX_DATA_POINTS },
   })
   attachRedisErrorLogging(queue, `Queue[${name}]`)
+  countAddedJobs(queue)
   return queue
 }
 

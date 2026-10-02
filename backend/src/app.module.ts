@@ -12,6 +12,10 @@ import { MetricsController } from './metrics.controller'
 import { HealthController } from './health.controller'
 import { AuthModule } from './auth/auth.module'
 import { QueueModule } from './queue/queue.module'
+// Imported after QueueModule, never from AdminModule: monitoring.module imports queue.module,
+// and loading that file first from the admin chain leaves TemplatesModule undefined inside
+// NotificationModule. test/app.e2e-spec.ts fails if the order breaks.
+import { MonitoringModule } from './api/admin/monitoring/monitoring.module'
 import { NotificationModule } from './api/notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
@@ -32,6 +36,7 @@ import { LoggerModule } from './common/logger'
     DatabaseModule,
     QueueModule,
     AdminModule,
+    MonitoringModule,
     ApiModule,
     AuthModule,
     NotificationModule,

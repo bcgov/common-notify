@@ -1,0 +1,108 @@
+@import '../variables';
+
+.queue-monitoring__toolbar {
+  @include flex-between;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+}
+
+.queue-monitoring__overall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-sm $spacing-md;
+  font-weight: 700;
+}
+
+.queue-monitoring__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-md;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.queue-monitoring__memory {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  width: 100%;
+  max-width: 640px;
+}
+
+.queue-monitoring__memory-caption {
+  @include flex-between;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.queue-monitoring__reasons {
+  margin: 0;
+  padding-left: $spacing-lg;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.queue-monitoring__rates {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  font-size: $font-size-sm;
+  white-space: nowrap;
+}
+
+.queue-monitoring__legend {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.queue-monitoring__reason-text {
+  max-width: 420px;
+  word-break: break-word;
+}
+
+.queue-monitoring__progress {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-width: 200px;
+  font-size: $font-size-sm;
+}
+
+// Text carries the state; the dot only reinforces it.
+.queue-monitoring__live {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: $text-disabled;
+  }
+
+  &[data-status='live']::before {
+    background-color: $success-color;
+  }
+
+  &[data-status='reconnecting']::before,
+  &[data-status='unavailable']::before {
+    background-color: $warning-color;
+  }
+}
+
+.queue-monitoring__warnings {
+  margin: 0 0 $spacing-xs;
+  padding-left: $spacing-lg;
+}
+
+// A text-styled button: it switches tabs rather than navigating, so it is not a link.
+.queue-monitoring__link {
+  @include button-reset;
+  color: $border-active;
+  text-decoration: underline;
+}

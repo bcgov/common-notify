@@ -2,6 +2,7 @@ import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
+import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -134,6 +135,7 @@ export class EmailDeliveryWorker {
             requestDetailService,
             notificationService,
             fromAddress,
+            batchProgressReporter(job),
           )
         }
 
@@ -477,6 +479,7 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
     fromAddress: string | null,
+    reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params, recipients } = mailMergeData
     const templateId = content?.templateId
@@ -512,6 +515,7 @@ export class EmailDeliveryWorker {
 
     let sent = 0
     let failed = 0
+    reportProgress?.({ sent, failed, total: recipients.length })
 
     for (const recipient of recipients) {
       try {
@@ -575,6 +579,7 @@ export class EmailDeliveryWorker {
         )
         failed++
       }
+      reportProgress?.({ sent, failed, total: recipients.length })
     }
 
     logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)

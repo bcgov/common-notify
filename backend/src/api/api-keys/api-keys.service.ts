@@ -1,4 +1,4 @@
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common'
+import { Injectable, Logger, ForbiddenException, ConflictException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
@@ -158,10 +158,16 @@ export class ApiKeysService {
       where: { credentialIdentifier },
     })
     if (existing) {
+      // Never move a key off a real tenant: that would let anyone holding a tenant's DEV key
+      // re-point it at the load-test tenant while auto-bind is on. Only a new key, or the
+      // load-test key on a later run, gets through.
       if (existing.tenantId !== tenant.id) {
-        existing.tenantId = tenant.id
-        existing.updatedAt = now
-        await this.apiKeyConsumerRepository.save(existing)
+        this.logger.error(
+          `[LOADTEST] Refusing to re-bind credential ${credentialIdentifier}: bound to tenant ${existing.tenantId}`,
+        )
+        throw new ConflictException(
+          'This API key belongs to another tenant and cannot be used for load testing. Use a dedicated load-test key.',
+        )
       }
       return existing
     }
