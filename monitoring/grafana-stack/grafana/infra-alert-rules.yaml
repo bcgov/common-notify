@@ -990,6 +990,108 @@ groups:
           summary: "Resource metrics missing for f6bc3f-prod"
           description: "container_memory_working_set_bytes or kubelet_volume_stats_* stopped arriving from the platform Thanos for f6bc3f-prod. The ContainerMemory and PVCUsage rules use noDataState=OK, so they will read Normal while measuring nothing. Check the platform-prod datasource and its ServiceAccount token."
 
+  # =========================================================================
+  # SCRAPE HEALTH — the canary for the in-namespace Prometheus
+  #
+  # Every rule above that reads datasourceUid: prometheus uses noDataState=OK,
+  # because for most of them "no series" IS the healthy state (no pod is
+  # crashlooping, no container was OOMKilled). The cost is that a scrape outage
+  # looks exactly like good health: the rules go quiet and read Normal while
+  # measuring nothing. That has already happened once — the app /api/metrics
+  # scrape was down in all three namespaces until fallback_scrape_protocol was
+  # set — and nothing alerted.
+  #
+  # These two rules are the fallback. `up` is the scrape's own verdict, so
+  # MetricsScrapeDown covers a target that is registered and failing, and
+  # MetricsScrapeMissing covers a target that disappeared from the config
+  # entirely (which leaves MetricsScrapeDown with no series to evaluate).
+  # Between them, the in-namespace rules can no longer fail silently.
+  # =========================================================================
+  - orgId: 1
+    name: scrape-health
+    folder: Common Notify Infra
+    interval: 1m
+    rules:
+      - uid: cn-scrape-down
+        title: MetricsScrapeDown
+        condition: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # kube-state-metrics labels its namespace `cluster_namespace`, so it is
+              # copied onto `namespace` — that is the label the Teams message reads.
+              expr: |
+                label_replace(
+                  up{job="kube-state-metrics", cluster_namespace=~"f6bc3f-(test|prod)"},
+                  "namespace", "$1", "cluster_namespace", "(.+)"
+                )
+                or
+                up{job="common-notify-app", namespace=~"f6bc3f-(test|prod)"}
+                or
+                up{job="prometheus"}
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: monitoring
+        annotations:
+          short: "{{ $labels.job }} scrape failing — alerts on it are blind"
+          summary: "Metrics scrape down: {{ $labels.job }} ({{ $labels.instance }})"
+          description: "Prometheus cannot scrape {{ $labels.instance }} (job {{ $labels.job }}). Rules built on it use noDataState=OK, so they will read Normal while measuring nothing."
+
+      - uid: cn-scrape-missing
+        title: MetricsScrapeMissing
+        condition: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # A target that vanished from the scrape config has no `up` series at
+              # all, so MetricsScrapeDown cannot see it. absent() can.
+              expr: |
+                absent(up{job="kube-state-metrics", cluster_namespace="f6bc3f-test"})
+                or absent(up{job="kube-state-metrics", cluster_namespace="f6bc3f-prod"})
+                or absent(up{job="common-notify-app", namespace="f6bc3f-test"})
+                or absent(up{job="common-notify-app", namespace="f6bc3f-prod"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: critical
+          service: common-notify
+          component: monitoring
+        annotations:
+          short: "a metrics scrape target has disappeared — alerts on it are blind"
+          summary: "Metrics scrape target missing"
+          description: "An expected scrape target (kube-state-metrics or common-notify-app, test or prod) has no `up` series, so it is gone from the Prometheus config rather than merely failing. Every rule reading that target is now blind."
+
 
 # ---------------------------------------------------------------------------
 # Remove the superseded single-datasource usage rules.
