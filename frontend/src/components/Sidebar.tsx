@@ -44,14 +44,14 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
+    label: 'Bulk Notifications',
+    to: '/bulk-notifications',
+    icon: <SendOutlinedIcon />,
+  },
+  {
     label: 'Templates',
     to: '/templates',
     icon: <FolderOutlinedIcon />,
-  },
-  {
-    label: 'Send Batch Notification',
-    to: '/bulk-notifications',
-    icon: <SendOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
