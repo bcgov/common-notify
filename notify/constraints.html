@@ -1161,6 +1161,11 @@
                                         <td>(((address)::text &#61; btrim((address)::text)) AND (length((address)::text) &gt; 0))</td>
                                     </tr>
                                     <tr>
+                                        <td><a href='tables/email_logo.html'>email_logo</a></td>
+                                        <td>chk_email_logo_default_approved</td>
+                                        <td>((NOT is_default) OR (((status_code)::text &#61; &#39;APPROVED&#39;::text) AND (NOT is_deleted) AND ((source_code)::text &#61; &#39;SYSTEM&#39;::text)))</td>
+                                    </tr>
+                                    <tr>
                                         <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a></td>
                                         <td>chk_provisioned_phone_number_allocation</td>
                                         <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
@@ -1214,11 +1219,6 @@
                                         <td><a href='tables/api_key_limit_alert.html'>api_key_limit_alert</a></td>
                                         <td>chk_api_key_limit_alert_threshold</td>
                                         <td>((warn_threshold_percent &gt;&#61; 1) AND (warn_threshold_percent &lt;&#61; 100))</td>
-                                    </tr>
-                                    <tr>
-                                        <td><a href='tables/tenant_settings.html'>tenant_settings</a></td>
-                                        <td>chk_tenant_settings_custom_header</td>
-                                        <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/tenant_settings.html'>tenant_settings</a></td>

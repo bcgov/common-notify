@@ -328,7 +328,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>When true, custom_email_header_title is used instead of the tenant default header title.</p></td>
+                                    <td><p>When true, show the selected logo display title beside the logo. False uses the logo only.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="custom_email_header_title">custom_email_header_title</span></td>
@@ -345,7 +345,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Custom email header title (max 60 chars). Used only when use_custom_email_header is true.</p></td>
+                                    <td><p>Legacy tenant-entered header title. Retained for compatibility; current email headers use email_logo.display_title.</p></td>
                                 </tr>
                                 <tr>
                                     <td><span id="email_attachments_enabled">email_attachments_enabled</span></td>
@@ -531,10 +531,6 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_tenant_settings_safelist_max</td>
-                                    <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_tenant_settings_reply_to_email</td>
                                     <td>((reply_to_email IS NULL) OR ((reply_to_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
                                 </tr>
@@ -543,8 +539,8 @@
                                     <td>((default_sender_email IS NULL) OR ((default_sender_email)::text ~ &#39;^[A-Za-z0-9._-]{1,64}$&#39;::text))</td>
                                 </tr>
                                 <tr>
-                                    <td>chk_tenant_settings_custom_header</td>
-                                    <td>((use_custom_email_header &#61; false) OR (custom_email_header_title IS NOT NULL))</td>
+                                    <td>chk_tenant_settings_safelist_max</td>
+                                    <td>((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -570,30 +566,30 @@
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
 <area shape="rect" id="node1" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="213,5,632,632">
-<area shape="rect" id="node2" href="email_logo.html" target="_top" title="email_logo" alt="" coords="5,536,169,712">
+<area shape="rect" id="node2" href="email_logo.html" target="_top" title="email_logo" alt="" coords="5,536,169,741">
 <area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="17,37,158,213">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant_settings.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="634,900,859,988">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="347,1108,489,1284">
-<area shape="rect" id="node14" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1169,240,1257">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="660,1005,833,1093">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="616,1111,877,1199">
-<area shape="rect" id="node5" href="email_logo.html" target="_top" title="email_logo" alt="" coords="665,496,829,672">
-<area shape="rect" id="node6" href="email_logo_source_code.html" target="_top" title="email_logo_source_code" alt="" coords="284,491,552,579">
-<area shape="rect" id="node7" href="email_logo_status_code.html" target="_top" title="email_logo_status_code" alt="" coords="285,596,551,684">
-<area shape="rect" id="node8" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1022,689,1279,777">
-<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="634,689,859,777">
-<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="596,795,897,883">
-<area shape="rect" id="node11" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="659,1321,834,1409">
-<area shape="rect" id="node12" href="notification_request.html" target="_top" title="notification_request" alt="" coords="626,1568,867,1656">
-<area shape="rect" id="node13" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="639,1463,855,1551">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="634,915,859,1003">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="347,1123,489,1299">
+<area shape="rect" id="node14" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1184,240,1272">
+<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="660,1020,833,1108">
+<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="616,1125,877,1213">
+<area shape="rect" id="node5" href="email_logo.html" target="_top" title="email_logo" alt="" coords="665,481,829,687">
+<area shape="rect" id="node6" href="email_logo_source_code.html" target="_top" title="email_logo_source_code" alt="" coords="284,476,552,564">
+<area shape="rect" id="node7" href="email_logo_status_code.html" target="_top" title="email_logo_status_code" alt="" coords="285,581,551,669">
+<area shape="rect" id="node8" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1022,704,1279,792">
+<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="634,704,859,792">
+<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="596,809,897,897">
+<area shape="rect" id="node11" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="659,1336,834,1424">
+<area shape="rect" id="node12" href="notification_request.html" target="_top" title="notification_request" alt="" coords="626,1583,867,1671">
+<area shape="rect" id="node13" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="639,1477,855,1565">
 <area shape="rect" id="node15" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="941,5,1360,632">
-<area shape="rect" id="node16" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="643,1216,851,1304">
-<area shape="rect" id="node17" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1023,1389,1278,1477">
+<area shape="rect" id="node16" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="643,1231,851,1319">
+<area shape="rect" id="node17" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1023,1404,1278,1492">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant_settings.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
