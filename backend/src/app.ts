@@ -11,6 +11,7 @@ import bodyParser from 'body-parser'
 import { Router } from 'express'
 import { ValidationExceptionFilter } from './common/filters/validation.filter'
 import { JwtGuard } from './common/guards/auth.jwt-guard'
+import { installShutdownDiagnostics } from './common/shutdown-diagnostics'
 import { applyNotifySchemaConstraints } from './api/notify/schemas/schema-constraints'
 
 /**
@@ -53,6 +54,7 @@ export async function bootstrap() {
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
+  installShutdownDiagnostics()
 
   // Health check at root level (before global prefix) for Kong's health probe
   const rootRouter = Router()
