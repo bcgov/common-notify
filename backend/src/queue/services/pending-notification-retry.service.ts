@@ -4,6 +4,8 @@ import { Repository } from 'typeorm'
 import { InjectRepository } from '@nestjs/typeorm'
 import Bull from 'bull'
 import { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
+import { mergeContentFromRequest, mergeRequestChannel } from '../merge-batch-builder'
+import type { IngestionJobPayload } from '../queue.types'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { QueueName } from '../../enum/queue-name.enum'
@@ -116,26 +118,18 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
             queueName: this.ingestionQueue?.name,
           })
 
-          // Try to add to queue with stored payload
-          await this.ingestionQueue.add(
-            'process',
-            {
-              notifyId: notification.id,
-              tenantId: notification.tenantId,
-              request: notification.payload || {}, // Use stored payload
-              requestedAt: notification.createdAt.toISOString(),
+          // Unnamed, like every other add: the ingestion worker registers Bull's default
+          // handler, and a named job finds no handler and fails as soon as it is picked up.
+          await this.ingestionQueue.add(this.ingestionPayloadFor(notification), {
+            jobId: notification.id,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
             },
-            {
-              jobId: notification.id,
-              attempts: 3,
-              backoff: {
-                type: 'exponential',
-                delay: 2000,
-              },
-              removeOnComplete: COMPLETED_JOB_RETENTION,
-              removeOnFail: FAILED_JOB_RETENTION,
-            },
-          )
+            removeOnComplete: COMPLETED_JOB_RETENTION,
+            removeOnFail: FAILED_JOB_RETENTION,
+          })
 
           // Update status to QUEUED
           await this.notificationService.update(notification.id, notification.tenantId, {
@@ -164,6 +158,31 @@ export class PendingNotificationRetryService implements OnApplicationBootstrap, 
         (error as Error).stack,
       )
       // Don't throw - scheduler should continue running
+    }
+  }
+
+  /**
+   * The ingestion job the request would have been queued with when it was accepted. A merge
+   * needs its fan-out fields, or ingestion treats it as a plain send; its recipients are read
+   * by ingestion from the stored request, as for any merge.
+   */
+  private ingestionPayloadFor(notification: NotificationRequest): IngestionJobPayload {
+    const base = {
+      notifyId: notification.id,
+      tenantId: notification.tenantId,
+      request: (notification.payload || {}) as IngestionJobPayload['request'],
+      requestedAt: notification.createdAt.toISOString(),
+    }
+    const channel = mergeRequestChannel(notification.payload)
+    if (!channel) return base
+
+    const mailMergeData = mergeContentFromRequest(notification.payload, channel)
+    return {
+      ...base,
+      request: { templateId: mailMergeData.content?.templateId } as IngestionJobPayload['request'],
+      mailMerge: true,
+      mailMergeChannel: channel,
+      mailMergeData,
     }
   }
 

@@ -93,24 +93,26 @@ export class NotificationRequestDetailService {
   }
 
   /**
-   * Create pending request detail records for one batch of a mail merge email send.
-   * Each record is tagged with the shared batchId so a delivery worker can scope updates to its batch.
+   * Create pending request detail records for one batch of a mail merge send.
+   * Each record is tagged with the shared batchId so a delivery worker can scope updates to its
+   * batch, and keeps the recipient's personalisation, which the worker renders from.
    */
   async createMergePending(
     notificationRequestId: string,
     batchId: string,
-    addresses: string[],
+    recipients: Array<{ address: string; params?: Record<string, unknown> }>,
     channel: NotificationChannel = NotificationChannel.EMAIL,
     createdBy?: string,
   ): Promise<void> {
-    if (addresses.length === 0) return
+    if (recipients.length === 0) return
     const now = new Date()
     const isEmail = channel === NotificationChannel.EMAIL
-    const entities = addresses.map((address) =>
+    const entities = recipients.map(({ address, params }) =>
       this.detailRepository.create({
         notificationRequestId,
         batchId,
         recipientAddress: address,
+        params: params ?? null,
         channel,
         // Only meaningful for email, where a recipient can be a to/cc/bcc.
         ...(isEmail && { emailAddressType: 'primary' }),
@@ -122,6 +124,40 @@ export class NotificationRequestDetailService {
       }),
     )
     await this.detailRepository.save(entities)
+  }
+
+  /**
+   * A merge batch's recipients as stored at ingestion, in insertion order, with their status so
+   * a retried batch can skip those already sent.
+   */
+  async findBatchRecipients(
+    notificationRequestId: string,
+    batchId: string,
+  ): Promise<Array<{ address: string; params: Record<string, unknown>; status: string }>> {
+    const rows = await this.detailRepository.find({
+      where: { notificationRequestId, batchId },
+      select: { id: true, recipientAddress: true, params: true, status: true },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    })
+    return rows.map((row) => ({
+      address: row.recipientAddress,
+      params: row.params ?? {},
+      status: row.status,
+    }))
+  }
+
+  /** Rows already written for a merge batch; non-zero means ingestion created it on an earlier run. */
+  async countBatch(notificationRequestId: string, batchId: string): Promise<number> {
+    return this.detailRepository.count({ where: { notificationRequestId, batchId } })
+  }
+
+  /** Addresses of a request's recipients in one status, e.g. those the safelist blocked. */
+  async findAddressesByStatus(notificationRequestId: string, status: string): Promise<Set<string>> {
+    const rows = await this.detailRepository.find({
+      where: { notificationRequestId, status },
+      select: { recipientAddress: true },
+    })
+    return new Set(rows.map((row) => row.recipientAddress))
   }
 
   /**

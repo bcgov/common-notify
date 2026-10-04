@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common'
 import Bull from 'bull'
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { IngestionWorker } from './ingestion.worker'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -29,6 +29,8 @@ describe('IngestionWorker', () => {
       createPending: vi.fn().mockResolvedValue(undefined),
       createMergePending: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
+      countBatch: vi.fn().mockResolvedValue(0),
+      findAddressesByStatus: vi.fn().mockResolvedValue(new Set()),
     }
 
     mockConfigService = {
@@ -828,10 +830,11 @@ describe('IngestionWorker', () => {
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
+        // Each recipient's params go on its row; the worker renders from there.
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
           'notify-bulk',
           'notify-bulk-EMAIL-0',
-          ['alice@example.com', 'bob@example.com'],
+          recipients,
           'EMAIL',
           'tenant-bulk',
         )
@@ -843,7 +846,7 @@ describe('IngestionWorker', () => {
             channel: NotificationChannel.EMAIL,
             mailMerge: true,
             batchId: 'notify-bulk-EMAIL-0',
-            mailMergeData: expect.objectContaining({ recipients }),
+            mailMergeData: { params: { key: 'val' } },
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
@@ -903,35 +906,31 @@ describe('IngestionWorker', () => {
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(2)
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
-        expect(mockEmailQueue.add).toHaveBeenCalledWith(
-          expect.objectContaining({
-            channel: NotificationChannel.EMAIL,
-            mailMerge: true,
-            batchId: 'notify-bulk-multi-EMAIL-0',
-            mailMergeData: expect.objectContaining({
-              recipients: [
-                { address: 'a@example.com', params: {} },
-                { address: 'b@example.com', params: {} },
-              ],
-            }),
-          }),
-          expect.anything(),
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
+          'notify-bulk-multi',
+          'notify-bulk-multi-EMAIL-0',
+          [
+            { address: 'a@example.com', params: {} },
+            { address: 'b@example.com', params: {} },
+          ],
+          'EMAIL',
+          'tenant-bulk',
         )
-        expect(mockEmailQueue.add).toHaveBeenCalledWith(
-          expect.objectContaining({
-            channel: NotificationChannel.EMAIL,
-            mailMerge: true,
-            batchId: 'notify-bulk-multi-EMAIL-1',
-            mailMergeData: expect.objectContaining({
-              recipients: [{ address: 'c@example.com', params: {} }],
-            }),
-          }),
-          expect.anything(),
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
+          'notify-bulk-multi',
+          'notify-bulk-multi-EMAIL-1',
+          [{ address: 'c@example.com', params: {} }],
+          'EMAIL',
+          'tenant-bulk',
         )
+        // Jobs carry the batch id, not its recipients.
+        for (const [payload] of mockEmailQueue.add.mock.calls) {
+          expect(payload.mailMergeData).not.toHaveProperty('recipients')
+        }
       })
 
-      it('should default to batchSize 100 when not configured', async () => {
-        // mockConfigService.get returns undefined for queue.batchSize → defaults to 100
+      it('should default to batchSize 25 when not configured', async () => {
+        // mockConfigService.get returns undefined for queue.batchSize → defaults to 25
         const recipients = Array.from({ length: 150 }, (_, i) => ({
           address: `user${i}@example.com`,
           params: {},
@@ -964,8 +963,114 @@ describe('IngestionWorker', () => {
 
         const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
 
-        // 150 addresses with default batchSize=100 → 2 batches
-        expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
+        // 150 addresses with default batchSize=25 → 6 batches
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 6 })
+        expect(mockEmailQueue.add).toHaveBeenCalledTimes(6)
+      })
+
+      it('reads recipients from the stored request when the job carries none, less blocked ones', async () => {
+        mockNotificationService.findOne = vi.fn().mockResolvedValue({
+          payload: {
+            email: {
+              content: { templateId: 'template-uuid' },
+              recipients: {
+                mergeArray: [
+                  ['email', 'name'],
+                  ['a@example.com', 'Ann'],
+                  ['blocked@example.com', 'Bo'],
+                ],
+              },
+            },
+          },
+        })
+        mockNotificationService.parseMailMergeRecipients = vi.fn((rows: string[][]) =>
+          rows.slice(1).map(([address, name]) => ({ address, params: { name } })),
+        )
+        mockRequestDetailService.findAddressesByStatus.mockResolvedValue(
+          new Set(['blocked@example.com']),
+        )
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        const result = await processHandler({
+          data: {
+            notifyId: 'notify-db',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            mailMerge: true,
+            mailMergeData: { content: { templateId: 'template-uuid' }, params: {} },
+          },
+        } as Bull.Job<IngestionJobPayload>)
+
+        expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
+        expect(mockNotificationService.findOne).toHaveBeenCalledWith('notify-db', 'tenant-bulk')
+        expect(mockRequestDetailService.findAddressesByStatus).toHaveBeenCalledWith(
+          'notify-db',
+          'blocked',
+        )
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
+          'notify-db',
+          'notify-db-EMAIL-0',
+          [{ address: 'a@example.com', params: { name: 'Ann' } }],
+          'EMAIL',
+          'tenant-bulk',
+        )
+      })
+
+      it('does not write rows again for a batch an earlier run of the job created', async () => {
+        // An ingestion retry re-runs the fan-out; duplicate rows would send twice.
+        mockRequestDetailService.countBatch.mockResolvedValueOnce(2).mockResolvedValue(0)
+        mockConfigService.get.mockImplementation((key: string) =>
+          key === 'queue.batchSize' ? 2 : undefined,
+        )
+
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        await processHandler({
+          data: {
+            notifyId: 'notify-retry',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            mailMerge: true,
+            mailMergeData: {
+              params: {},
+              recipients: [
+                { address: 'a@example.com', params: {} },
+                { address: 'b@example.com', params: {} },
+                { address: 'c@example.com', params: {} },
+              ],
+            },
+          },
+        } as Bull.Job<IngestionJobPayload>)
+
+        // Batch 0 already had rows; only batch 1 is written. Both are (re)queued - Bull ignores a
+        // jobId it already holds.
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(
+          'notify-retry',
+          'notify-retry-EMAIL-1',
+          [{ address: 'c@example.com', params: {} }],
+          'EMAIL',
+          'tenant-bulk',
+        )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(2)
       })
     })

@@ -18,7 +18,12 @@ describe('PendingNotificationRetryService', () => {
 
   beforeEach(async () => {
     mockRepository = { find: vi.fn() }
-    mockNotificationService = { update: vi.fn() }
+    mockNotificationService = {
+      update: vi.fn(),
+      parseMailMergeRecipients: vi.fn((rows: string[][]) =>
+        rows.slice(1).map(([address, firstName]) => ({ address, params: { firstName } })),
+      ),
+    }
     // The sweep takes a lock through the queue's own Redis connection; 'OK' means acquired.
     mockRedisClient = {
       set: vi.fn().mockResolvedValue('OK'),
@@ -153,10 +158,58 @@ describe('PendingNotificationRetryService', () => {
       mockNotificationService.update.mockResolvedValue({})
       await service.retryPendingNotifications()
       expect(mockQueue.add).toHaveBeenCalledWith(
-        'process',
         expect.objectContaining({ request: {} }),
         expect.any(Object),
       )
+    })
+
+    it('queues the job unnamed, so the ingestion worker has a handler for it', async () => {
+      // A named job ('process') matches no handler - the worker registers Bull's default one -
+      // and fails the moment it is picked up.
+      mockRepository.find.mockResolvedValue([
+        { id: 'notify-1', tenantId: 'tenant-1', payload: {}, createdAt: new Date() },
+      ])
+
+      await service.retryPendingNotifications()
+
+      expect(typeof mockQueue.add.mock.calls[0][0]).toBe('object')
+    })
+
+    const storedMerge = {
+      id: 'notify-merge',
+      tenantId: 'tenant-1',
+      createdAt: new Date('2026-10-04T12:00:00Z'),
+      payload: {
+        params: { org: 'BC' },
+        email: {
+          content: { subject: 'Hi {{firstName}}', body: 'Body', bodyType: 'text' },
+          params: { team: 'Notify' },
+          recipients: {
+            mergeArray: [
+              ['email', 'firstName'],
+              ['a@example.com', 'Ann'],
+              ['blocked@example.com', 'Bo'],
+            ],
+          },
+        },
+      },
+    }
+
+    it('re-queues a merge as a merge, leaving its recipients for ingestion to read', async () => {
+      mockRepository.find.mockResolvedValue([storedMerge])
+
+      await service.retryPendingNotifications()
+
+      const [payload] = mockQueue.add.mock.calls[0]
+      expect(payload.mailMergeData).toEqual({
+        content: { subject: 'Hi {{firstName}}', body: 'Body', bodyType: 'text' },
+        params: { org: 'BC', team: 'Notify' },
+      })
+      expect(payload).toMatchObject({
+        notifyId: 'notify-merge',
+        mailMerge: true,
+        mailMergeChannel: 'EMAIL',
+      })
     })
 
     it('should log stats', async () => {
@@ -296,7 +349,7 @@ describe('PendingNotificationRetryService', () => {
       mockQueue.add.mockResolvedValue({ id: 'job-123' })
       mockNotificationService.update.mockResolvedValue({})
       await service.retryPendingNotifications()
-      const jobConfig = mockQueue.add.mock.calls[0][2]
+      const jobConfig = mockQueue.add.mock.calls[0][1]
       expect(jobConfig.attempts).toBe(3)
       expect(jobConfig.backoff).toEqual({ type: 'exponential', delay: 2000 })
       // Bounded by age and count: an unbounded completed set eventually fills a Redis that
@@ -319,7 +372,7 @@ describe('PendingNotificationRetryService', () => {
       mockQueue.add.mockResolvedValue({ id: 'job-123' })
       mockNotificationService.update.mockResolvedValue({})
       await service.retryPendingNotifications()
-      const jobConfig = mockQueue.add.mock.calls[0][2]
+      const jobConfig = mockQueue.add.mock.calls[0][1]
       expect(jobConfig.jobId).toBe('my-unique-id')
     })
 
@@ -337,7 +390,7 @@ describe('PendingNotificationRetryService', () => {
       mockQueue.add.mockResolvedValue({ id: 'job-123' })
       mockNotificationService.update.mockResolvedValue({})
       await service.retryPendingNotifications()
-      const jobData = mockQueue.add.mock.calls[0][1]
+      const jobData = mockQueue.add.mock.calls[0][0]
       expect(jobData).toHaveProperty('notifyId', 'notify-1')
       expect(jobData).toHaveProperty('tenantId', 'tenant-1')
       expect(jobData).toHaveProperty('request')

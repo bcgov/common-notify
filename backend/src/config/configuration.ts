@@ -180,8 +180,9 @@ export default () => {
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
-      // Number of recipients per mail merge delivery batch
-      batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
+      // Recipients per merge delivery job. Small enough that a job finishes in seconds, so a
+      // pod stopping mid-send replays little and its drain fits the termination grace period.
+      batchSize: parseInt(process.env.BATCH_SIZE || '25', 10),
       emailDeliveryWorkerConcurrency: parseInt(
         process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',
         10,

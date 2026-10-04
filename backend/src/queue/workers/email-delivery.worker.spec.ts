@@ -41,6 +41,7 @@ describe('EmailDeliveryWorker', () => {
       markRecipientFailed: vi.fn().mockResolvedValue(undefined),
       countByStatus: vi.fn().mockResolvedValue(0),
       findSentAddresses: vi.fn().mockResolvedValue(new Set()),
+      findBatchRecipients: vi.fn().mockResolvedValue([]),
     }
 
     // Mock the notification service
@@ -1557,6 +1558,29 @@ describe('EmailDeliveryWorker', () => {
           { sent: 1, failed: 0, total: 2 },
           { sent: 2, failed: 0, total: 2 },
         ])
+      })
+
+      it("reads a batch's recipients and their params from its rows when the job carries none", async () => {
+        mockRequestDetailService.findBatchRecipients.mockResolvedValue([
+          { address: 'alice@example.com', params: { name: 'Alice' }, status: 'sent' },
+          { address: 'bob@example.com', params: { name: 'Bob' }, status: 'pending' },
+        ])
+        const job = makeBulkJob([])
+        delete (job.data!.mailMergeData as { recipients?: unknown }).recipients
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockRequestDetailService.findBatchRecipients).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+        )
+        // Alice was sent by an earlier attempt; only Bob goes out, rendered with his own params.
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ name: 'Bob' }),
+        )
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
       })
 
       it('should render inline content per recipient when no templateId is given', async () => {

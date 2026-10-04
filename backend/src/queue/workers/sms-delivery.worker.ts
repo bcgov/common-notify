@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
+import { loadBatchRecipients } from './merge-batch-recipients'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -409,7 +410,13 @@ export class SmsDeliveryWorker {
     notificationService: NotificationService,
     reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { content, params, recipients } = mailMergeData
+    const { content, params } = mailMergeData
+    const { recipients, alreadySent } = await loadBatchRecipients(
+      requestDetailService,
+      notifyId,
+      batchId,
+      mailMergeData.recipients,
+    )
     const templateId = content?.templateId
     const hasInlineContent = !!content?.body
 
@@ -442,7 +449,6 @@ export class SmsDeliveryWorker {
 
     // The merge branch returns before the retry handling above, so a redelivered batch filters
     // here instead. Addresses delivered by an earlier attempt keep their rows and are skipped.
-    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
     const pending = alreadySent.size
       ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
       : recipients

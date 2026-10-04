@@ -3,6 +3,7 @@ import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
+import { loadBatchRecipients } from './merge-batch-recipients'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -481,7 +482,13 @@ export class EmailDeliveryWorker {
     fromAddress: string | null,
     reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { content, params, recipients } = mailMergeData
+    const { content, params } = mailMergeData
+    const { recipients, alreadySent } = await loadBatchRecipients(
+      requestDetailService,
+      notifyId,
+      batchId,
+      mailMergeData.recipients,
+    )
     const templateId = content?.templateId
     const hasInlineContent = !!(content && (content.subject || content.body))
 
@@ -516,7 +523,6 @@ export class EmailDeliveryWorker {
     // A retried batch (a pod replaced mid-send, a crash, a provider error) starts again from
     // the top. Addresses an earlier attempt delivered keep their rows and are skipped, or they
     // would get the email twice. Mirrors SmsDeliveryWorker.processMergeBatch.
-    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
     const pending = alreadySent.size
       ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
       : recipients

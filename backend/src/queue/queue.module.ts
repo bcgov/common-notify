@@ -22,6 +22,7 @@ import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { WebhookDeliveryWorker } from './workers/webhook-delivery.worker'
 import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
+import { BatchReconcilerService } from './services/batch-reconciler.service'
 import { WebhookTriggerService } from './services/webhook-trigger.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
 import { NotificationRequestDetail } from '../api/notification/entities/notification-request-detail.entity'
@@ -75,6 +76,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
   ],
   providers: [
     PendingNotificationRetryService,
+    BatchReconcilerService,
     NotificationService,
     NotificationRequestDetailService,
     NotificationPubSubService,
