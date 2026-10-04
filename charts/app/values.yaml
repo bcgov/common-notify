@@ -30,6 +30,12 @@ backend:
   enabled: true
   #-- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
+  #-- V8 heap limit in MB, passed as NODE_OPTIONS. Only used memory counts against the pod, so
+  #-- raising it costs no quota; it must stay well under the container's memory limit.
+  heapMb: 512
+  #-- memory the scheduler reserves for each backend pod. Kept low by default because DEV
+  #-- hosts every PR environment under one quota; TEST and PROD raise it in merge.yml.
+  memoryRequest: 200Mi
   #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
   #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
   terminationGracePeriodSeconds: 120
