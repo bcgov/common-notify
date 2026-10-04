@@ -49,6 +49,8 @@ export interface WorkerPod {
   podId: string
   startedAt: string
   lastHeartbeatAt: string
+  /** Shutting down: finishing the jobs it holds, taking no new ones. */
+  draining: boolean
   queues: Array<{
     queue: string
     concurrency: number

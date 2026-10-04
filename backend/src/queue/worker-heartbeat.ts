@@ -30,6 +30,8 @@ export interface WorkerHeartbeatPayload {
   podId: string
   startedAt: number
   heartbeatAt: number
+  /** The pod is shutting down: it takes no new jobs and is finishing the ones it holds. */
+  draining: boolean
   queues: WorkerQueueState[]
 }
 
@@ -49,6 +51,7 @@ export class WorkerHeartbeat {
   private readonly podId = process.env.HOSTNAME || hostname()
   private readonly startedAt = Date.now()
   private readonly states = new Map<string, WorkerQueueState>()
+  private draining = false
   private timer?: NodeJS.Timeout
 
   constructor(private readonly redis: Redis) {}
@@ -96,12 +99,36 @@ export class WorkerHeartbeat {
     this.timer = undefined
   }
 
+  /**
+   * Keep reporting while the pod shuts down, flagged as draining, so the jobs it is still
+   * finishing show as held rather than as stalled.
+   */
+  markDraining(): void {
+    this.draining = true
+    void this.beat()
+  }
+
+  /** Drop off the live list straight away instead of waiting for the key to expire. */
+  async remove(): Promise<void> {
+    this.stop()
+    try {
+      await this.redis
+        .multi()
+        .del(workerHeartbeatKey(this.podId))
+        .zrem(WORKER_INDEX_KEY, this.podId)
+        .exec()
+    } catch (error) {
+      logger.warn(`Failed to remove worker heartbeat: ${(error as Error).message}`)
+    }
+  }
+
   async beat(): Promise<void> {
     const now = Date.now()
     const payload: WorkerHeartbeatPayload = {
       podId: this.podId,
       startedAt: this.startedAt,
       heartbeatAt: now,
+      draining: this.draining,
       queues: [...this.states.values()],
     }
     try {

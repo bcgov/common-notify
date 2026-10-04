@@ -112,6 +112,7 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
         podId: 'notify-backend-abc12',
         startedAt: new Date(now - 3_600_000).toISOString(),
         lastHeartbeatAt: new Date(now - 4_000).toISOString(),
+        draining: false,
         queues: [
           {
             queue: 'email-delivery',
@@ -333,6 +334,16 @@ describe('QueueMonitoring', () => {
     expect(
       screen.getByText('High: Redis holds more memory than its data needs'),
     ).toBeInTheDocument()
+  })
+
+  it('labels a pod that is shutting down', async () => {
+    const data = snapshot()
+    data.workers = [{ ...data.workers[0], draining: true }]
+    mockedGet.mockResolvedValue(data)
+    renderPage('system')
+
+    const workers = await screen.findByRole('table', { name: 'Workers' })
+    expect(within(workers).getByText('Shutting down')).toBeInTheDocument()
   })
 
   it('lists recent failures on the Failures tab, reached from the tab bar', async () => {

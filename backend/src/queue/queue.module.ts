@@ -1,4 +1,5 @@
 import {
+  BeforeApplicationShutdown,
   Module,
   OnModuleInit,
   OnModuleDestroy,
@@ -167,7 +168,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     QueueName.WEBHOOK_DELIVERY,
   ],
 })
-export class QueueModule implements OnModuleInit, OnModuleDestroy {
+export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplicationShutdown {
   private readonly logger = new Logger(QueueModule.name)
   private heartbeat?: WorkerHeartbeat
 
@@ -200,7 +201,47 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleDestroy(): void {
-    this.heartbeat?.stop()
+    // Not stopped yet: the workers keep running until beforeApplicationShutdown drains them,
+    // and the page should show their jobs as held by a pod shutting down, not as stalled.
+    this.heartbeat?.markDraining()
+  }
+
+  /**
+   * Let in-flight jobs finish before the pod exits. Without this a deploy kills a merge batch
+   * part-way through and Bull retries it on another pod about a minute later.
+   *
+   * Runs before onApplicationShutdown, where TypeORM closes its connection, so a finishing job
+   * can still record what it sent. Bull's close() stops taking new jobs and resolves once the
+   * active ones end. The wait is capped below the pod's termination grace period; a batch still
+   * running then is left for Bull to retry, and the merge workers skip recipients already sent.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
+    const queues = [this.ingestionQueue, this.emailQueue, this.smsQueue, this.webhookQueue].filter(
+      (queue): queue is Bull.Queue => !!queue,
+    )
+    if (queues.length === 0) return
+
+    const drainMs = parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
+    this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
+    let timer: NodeJS.Timeout | undefined
+    const drained = await Promise.race([
+      Promise.all(queues.map((queue) => queue.close())).then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), drainMs)
+      }),
+    ]).catch((error: Error) => {
+      this.logger.error(`Queue drain failed: ${error.message}`)
+      return false
+    })
+    if (timer) clearTimeout(timer)
+
+    if (drained) {
+      this.logger.log('Queue workers drained')
+      await this.heartbeat?.remove()
+    } else {
+      // Still holding jobs: keep the heartbeat until the pod is killed so they read as held.
+      this.logger.warn('Queue drain timed out; unfinished jobs will be retried on another pod')
+    }
   }
 
   async onModuleInit() {

@@ -1,5 +1,6 @@
 import type { FC } from 'react'
 import PageSubHeading from '@/components/PageSubHeading'
+import { StatusBadge } from '@/components/StatusBadge'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import type { WorkerPod } from '@/interfaces/queueMonitoring.interface'
@@ -8,6 +9,7 @@ import { formatAgo, formatQueueName } from '@/utils/monitoring'
 interface WorkerRow {
   key: string
   podId: string
+  draining: boolean
   queue: string
   concurrency: number
   active: number
@@ -28,13 +30,27 @@ const WorkersSection: FC<WorkersSectionProps> = ({ workers, now }) => {
     pod.queues.map((queue) => ({
       key: `${pod.podId}-${queue.queue}`,
       podId: pod.podId,
+      draining: pod.draining,
       lastHeartbeatAt: pod.lastHeartbeatAt,
       ...queue,
     })),
   )
 
   const columns: TableColumn<WorkerRow>[] = [
-    { key: 'podId', label: 'Pod' },
+    {
+      key: 'podId',
+      label: 'Pod',
+      render: (_, row) => (
+        <>
+          {row.podId}
+          {row.draining && (
+            <div>
+              <StatusBadge status="warning" statusLabel="Shutting down" />
+            </div>
+          )}
+        </>
+      ),
+    },
     { key: 'queue', label: 'Queue', render: (_, row) => formatQueueName(row.queue) },
     {
       key: 'active',
@@ -70,8 +86,8 @@ const WorkersSection: FC<WorkersSectionProps> = ({ workers, now }) => {
         emptyMessage="No worker heartbeats received. Either no pod is processing jobs, or the running pods predate worker heartbeats."
       />
       <p className="queue-monitoring__legend">
-        Completed and failed counts are since each pod started. A pod drops off this list 30 seconds
-        after its last heartbeat.
+        Completed and failed counts are since each pod started. A pod shutting down finishes the
+        jobs it holds before it exits, and drops off this list once it has.
       </p>
     </section>
   )

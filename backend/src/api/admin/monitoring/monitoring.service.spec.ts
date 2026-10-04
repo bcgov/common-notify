@@ -384,6 +384,8 @@ describe('MonitoringService', () => {
     expect(result.queues[0].liveWorkerPods).toBe(1)
     expect(result.queues[0].oldestWaitingAgeMs).toBeGreaterThanOrEqual(30_000)
     expect(result.workers[0].podId).toBe('pod-0')
+    // Heartbeats from a build that predates draining carry no flag.
+    expect(result.workers[0].draining).toBe(false)
     expect(result.status).toBe('healthy')
   })
 

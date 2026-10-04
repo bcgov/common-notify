@@ -513,11 +513,26 @@ export class EmailDeliveryWorker {
       `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
     )
 
+    // A retried batch (a pod replaced mid-send, a crash, a provider error) starts again from
+    // the top. Addresses an earlier attempt delivered keep their rows and are skipped, or they
+    // would get the email twice. Mirrors SmsDeliveryWorker.processMergeBatch.
+    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
+    const pending = alreadySent.size
+      ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
+      : recipients
+
+    if (alreadySent.size > 0) {
+      logger.log(
+        `[${notifyId}] Batch ${batchId}: skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+      )
+    }
+
     let sent = 0
     let failed = 0
-    reportProgress?.({ sent, failed, total: recipients.length })
+    const progress = () => ({ sent: alreadySent.size + sent, failed, total: recipients.length })
+    reportProgress?.(progress())
 
-    for (const recipient of recipients) {
+    for (const recipient of pending) {
       try {
         // Merge global params with per-recipient params; per-recipient takes precedence
         const mergedParams = { ...(params || {}), ...recipient.params }
@@ -579,7 +594,7 @@ export class EmailDeliveryWorker {
         )
         failed++
       }
-      reportProgress?.({ sent, failed, total: recipients.length })
+      reportProgress?.(progress())
     }
 
     logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)

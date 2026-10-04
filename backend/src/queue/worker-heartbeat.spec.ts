@@ -11,9 +11,17 @@ import {
 import type { WorkerHeartbeatPayload } from './worker-heartbeat'
 
 function fakeRedis() {
-  const multi = { set: vi.fn(), zadd: vi.fn(), exec: vi.fn().mockResolvedValue([]) }
+  const multi = {
+    set: vi.fn(),
+    zadd: vi.fn(),
+    del: vi.fn(),
+    zrem: vi.fn(),
+    exec: vi.fn().mockResolvedValue([]),
+  }
   multi.set.mockReturnValue(multi)
   multi.zadd.mockReturnValue(multi)
+  multi.del.mockReturnValue(multi)
+  multi.zrem.mockReturnValue(multi)
   return { redis: { multi: vi.fn(() => multi) } as unknown as Redis, multi }
 }
 
@@ -88,5 +96,23 @@ describe('WorkerHeartbeat', () => {
     const { redis, multi } = fakeRedis()
     multi.exec.mockRejectedValue(new Error('connection lost'))
     await expect(new WorkerHeartbeat(redis).beat()).resolves.toBeUndefined()
+  })
+
+  it('reports draining while the pod shuts down, then removes itself', async () => {
+    const { redis, multi } = fakeRedis()
+    const heartbeat = new WorkerHeartbeat(redis)
+    heartbeat.track(fakeQueue('email-delivery'), 2)
+
+    await heartbeat.beat()
+    expect(JSON.parse(multi.set.mock.calls[0][1]).draining).toBe(false)
+
+    heartbeat.markDraining()
+    await vi.waitFor(() => expect(multi.set).toHaveBeenCalledTimes(2))
+    const payload = JSON.parse(multi.set.mock.calls[1][1]) as WorkerHeartbeatPayload
+    expect(payload.draining).toBe(true)
+
+    await heartbeat.remove()
+    expect(multi.del).toHaveBeenCalledWith(workerHeartbeatKey(payload.podId))
+    expect(multi.zrem).toHaveBeenCalledWith(WORKER_INDEX_KEY, payload.podId)
   })
 })

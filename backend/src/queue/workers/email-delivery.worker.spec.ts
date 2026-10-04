@@ -40,6 +40,7 @@ describe('EmailDeliveryWorker', () => {
       markRecipientSent: vi.fn().mockResolvedValue(undefined),
       markRecipientFailed: vi.fn().mockResolvedValue(undefined),
       countByStatus: vi.fn().mockResolvedValue(0),
+      findSentAddresses: vi.fn().mockResolvedValue(new Set()),
     }
 
     // Mock the notification service
@@ -1527,6 +1528,34 @@ describe('EmailDeliveryWorker', () => {
           { sent: 0, failed: 0, total: 2 },
           { sent: 1, failed: 0, total: 2 },
           { sent: 1, failed: 1, total: 2 },
+        ])
+      })
+
+      it('should not re-send to recipients an earlier attempt of the batch delivered', async () => {
+        // A pod replaced mid-batch leaves the job to be retried from the top.
+        mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['alice@example.com']))
+        const progress = vi.fn().mockResolvedValue(undefined)
+        const job = { ...makeBulkJob(['alice@example.com', 'bob@example.com']), progress }
+
+        const result = await processHandler(job as unknown as Bull.Job<DeliveryJobPayload>)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(mockRequestDetailService.findSentAddresses).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+        )
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'ext-123',
+        )
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
+        // The bar resumes where the earlier attempt left off.
+        expect(progress.mock.calls.map(([value]) => value)).toEqual([
+          { sent: 1, failed: 0, total: 2 },
+          { sent: 2, failed: 0, total: 2 },
         ])
       })
 

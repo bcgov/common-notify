@@ -30,6 +30,9 @@ backend:
   enabled: true
   #-- the deployment strategy, can be "Recreate" or "RollingUpdate"
   deploymentStrategy: Recreate
+  #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
+  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
+  terminationGracePeriodSeconds: 120
   #-- the number of replicas when autoscaling is disabled
   replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.

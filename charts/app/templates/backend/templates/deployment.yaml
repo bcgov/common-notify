@@ -25,6 +25,9 @@ spec:
       labels:
         {{- include "backend.labels" . | nindent 8 }}
     spec:
+      # Time for queue workers to finish in-flight jobs on shutdown (QueueModule
+      # beforeApplicationShutdown). QUEUE_SHUTDOWN_DRAIN_MS below stops waiting 15s short of it.
+      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds | default 120 }}
       securityContext:
         runAsNonRoot: true
       initContainers:
@@ -119,6 +122,8 @@ spec:
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            - name: QUEUE_SHUTDOWN_DRAIN_MS
+              value: {{ mul (sub (.Values.backend.terminationGracePeriodSeconds | default 120) 15) 1000 | quote }}
             - name: NOTIFICATION_DEDUP_WINDOW_SECONDS
               value: {{ .Values.backend.dedupWindowSeconds | quote }}
             - name: CLAMAV_HOST

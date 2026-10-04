@@ -74,6 +74,8 @@ export interface WorkerPodDto {
   podId: string
   startedAt: string
   lastHeartbeatAt: string
+  /** Shutting down: finishing the jobs it holds, taking no new ones. */
+  draining: boolean
   queues: WorkerQueueDto[]
 }
 

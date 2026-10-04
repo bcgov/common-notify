@@ -470,6 +470,8 @@ export class MonitoringService {
         podId: pod.podId,
         startedAt: new Date(pod.startedAt).toISOString(),
         lastHeartbeatAt: new Date(pod.heartbeatAt).toISOString(),
+        // Absent from pods running a build from before draining was reported.
+        draining: pod.draining ?? false,
         queues: pod.queues.map((q) => ({
           ...q,
           lastFinishedAt: q.lastFinishedAt ? new Date(q.lastFinishedAt).toISOString() : null,
