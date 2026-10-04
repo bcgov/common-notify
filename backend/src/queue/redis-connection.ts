@@ -43,6 +43,13 @@ export const QUEUE_METRICS_MAX_DATA_POINTS = parseInt(
 )
 
 /**
+ * Times a job may stall (its pod dies or loses its lock mid-job) before Bull fails it instead
+ * of retrying. Bull's default of 1 fails a batch interrupted twice, e.g. a pod deleted and then
+ * restarted during the same send. A retry is safe: merge batches skip recipients already sent.
+ */
+export const QUEUE_MAX_STALLED_COUNT = parseInt(process.env.QUEUE_MAX_STALLED_COUNT || '3', 10)
+
+/**
  * Create a Bull queue with an error listener attached.
  *
  * The listener is not optional: without one, a Redis failure prints the raw ioredis error -
@@ -59,6 +66,7 @@ export function createQueue(name: QueueName, redisConfig: RedisConfig): Bull.Que
       maxRetriesPerRequest: null,
     }),
     metrics: { maxDataPoints: QUEUE_METRICS_MAX_DATA_POINTS },
+    settings: { maxStalledCount: QUEUE_MAX_STALLED_COUNT },
   })
   attachRedisErrorLogging(queue, `Queue[${name}]`)
   countAddedJobs(queue)
