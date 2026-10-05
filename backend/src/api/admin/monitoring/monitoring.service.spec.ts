@@ -8,6 +8,7 @@ import {
   averageOfWholeMinutes,
   buildOverview,
   buildRedisStats,
+  buildReconcilerStats,
   sendingRateFrom,
   countUnheldActiveJobs,
   evaluateQueue,
@@ -301,8 +302,32 @@ describe('MonitoringService', () => {
     } as unknown as Bull.Queue
   }
 
-  function fakeRedis(workers: object[] = []) {
+  /** Reconcile activity as the pipeline returns it: last pass, recent actions, then minute counts. */
+  function fakeReconcilePipeline(
+    lastPass: object | null = null,
+    recent: object[] = [],
+    lastMinuteCounts: Record<string, string> = {},
+  ) {
+    const minutes = Array.from({ length: MONITORING_WINDOW_MINUTES }, (_, i) =>
+      i === MONITORING_WINDOW_MINUTES - 1 ? lastMinuteCounts : {},
+    )
+    const pipeline: Record<string, unknown> = {}
+    for (const method of ['get', 'lrange', 'hgetall']) pipeline[method] = vi.fn(() => pipeline)
+    pipeline.exec = vi
+      .fn()
+      .mockResolvedValue(
+        [
+          lastPass && JSON.stringify(lastPass),
+          recent.map((action) => JSON.stringify(action)),
+          ...minutes,
+        ].map((value) => [null, value]),
+      )
+    return pipeline
+  }
+
+  function fakeRedis(workers: object[] = [], pipeline = fakeReconcilePipeline()) {
     return {
+      pipeline: vi.fn(() => pipeline),
       info: vi
         .fn()
         .mockResolvedValue(
@@ -387,6 +412,48 @@ describe('MonitoringService', () => {
     // Heartbeats from a build that predates draining carry no flag.
     expect(result.workers[0].draining).toBe(false)
     expect(result.status).toBe('healthy')
+  })
+
+  it('reports what the delivery reconciler recovered, with tenant names', async () => {
+    const pipeline = fakeReconcilePipeline(
+      { at: now - 20_000, durationMs: 40, intervalMs: 60_000, found: 3, outcomes: { requeued: 1 } },
+      [
+        {
+          at: now - 20_000,
+          kind: 'batch',
+          action: 'gave-up',
+          jobId: 'n-1-EMAIL-0',
+          notifyId: 'n-1',
+          tenantId: 't-1',
+        },
+      ],
+      { requeued: '2', 'gave-up': '1' },
+    )
+    const service = new MonitoringService(
+      fakeRedis([livePod], pipeline),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+    )
+
+    const result = await service.getQueueMonitoring()
+
+    expect(result.reconciler).toMatchObject({
+      lastPassFound: 3,
+      requeued: 2,
+      gaveUp: 1,
+      retried: 0,
+      status: 'warning',
+    })
+    expect(result.reconciler.recentActions[0]).toMatchObject({
+      notificationId: 'n-1',
+      tenantName: 'Health Ministry',
+    })
+    // A give-up is surfaced in the page's overall status, not only on its own panel.
+    expect(result.status).toBe('warning')
   })
 
   it('returns recent failures newest first with tenant names and masked reasons', async () => {
@@ -577,5 +644,55 @@ describe('MonitoringService', () => {
       fakeDetailRepository(),
     )
     await expect(service.getQueueMonitoring()).rejects.toBeInstanceOf(ServiceUnavailableException)
+  })
+})
+
+describe('buildReconcilerStats', () => {
+  const now = Date.parse('2026-10-05T12:00:00Z')
+  const counts = { retried: 0, requeued: 0, 'gave-up': 0 }
+  const pass = (ageMs: number) => ({
+    at: now - ageMs,
+    durationMs: 12,
+    intervalMs: 60_000,
+    found: 0,
+    outcomes: {},
+  })
+
+  it('is healthy when passes are running and nothing was given up', () => {
+    const stats = buildReconcilerStats(
+      { lastPass: pass(30_000), counts, recent: [] },
+      now,
+      new Map(),
+    )
+    expect(stats.status).toBe('healthy')
+    expect(stats.reasons).toEqual([])
+    expect(stats.lastPassAt).toBe('2026-10-05T11:59:30.000Z')
+  })
+
+  it('warns when the reconciler has missed several passes', () => {
+    const stats = buildReconcilerStats(
+      { lastPass: pass(5 * 60_000), counts, recent: [] },
+      now,
+      new Map(),
+    )
+    expect(stats.status).toBe('warning')
+    expect(stats.reasons[0]).toMatch(/Has not run for 5 min/)
+  })
+
+  it('treats no recorded pass as not yet run rather than a fault', () => {
+    const stats = buildReconcilerStats({ lastPass: null, counts, recent: [] }, now, new Map())
+    expect(stats.status).toBe('healthy')
+    expect(stats.lastPassAt).toBeNull()
+    expect(stats.intervalMs).toBeNull()
+  })
+
+  it('warns when work was given up on', () => {
+    const stats = buildReconcilerStats(
+      { lastPass: pass(1_000), counts: { ...counts, 'gave-up': 2 }, recent: [] },
+      now,
+      new Map(),
+    )
+    expect(stats.status).toBe('warning')
+    expect(stats.reasons[0]).toMatch(/Gave up on 2 stuck send/)
   })
 })

@@ -139,6 +139,33 @@ export interface MonitoringOverviewDto {
   requestsReceived: number
 }
 
+export interface ReconcilerActionDto {
+  at: string
+  /** What was owed: pending, ingestion, scheduled, batch or delivery. */
+  kind: string
+  action: 'retried' | 'requeued' | 'gave-up'
+  jobId: string
+  notificationId: string
+  tenantId: string
+  tenantName: string | null
+}
+
+/** The delivery reconciler: when it last ran and what it recovered. */
+export interface ReconcilerStatsDto {
+  status: HealthStatus
+  reasons: string[]
+  lastPassAt: string | null
+  intervalMs: number | null
+  lastPassDurationMs: number | null
+  /** Work items the last pass checked, including those whose job was still running. */
+  lastPassFound: number | null
+  windowMinutes: number
+  retried: number
+  requeued: number
+  gaveUp: number
+  recentActions: ReconcilerActionDto[]
+}
+
 export interface QueueMonitoringResponseDto {
   generatedAt: string
   status: HealthStatus
@@ -148,5 +175,6 @@ export interface QueueMonitoringResponseDto {
   queues: QueueStatsDto[]
   activeBatches: ActiveBatchDto[]
   workers: WorkerPodDto[]
+  reconciler: ReconcilerStatsDto
   recentFailures: RecentFailureDto[]
 }

@@ -26,6 +26,8 @@ import {
   workerHeartbeatKey,
 } from '../../../queue/worker-heartbeat'
 import type { WorkerHeartbeatPayload } from '../../../queue/worker-heartbeat'
+import { readReconcileActivity } from '../../../queue/reconcile-activity'
+import type { ReconcileActivity } from '../../../queue/reconcile-activity'
 import { MONITORING_THRESHOLDS } from './monitoring-thresholds'
 import type {
   HealthStatus,
@@ -33,6 +35,7 @@ import type {
   MonitoringOverviewDto,
   QueueMonitoringResponseDto,
   QueueStatsDto,
+  ReconcilerStatsDto,
   RedisStatsDto,
   WorkerPodDto,
 } from './schemas/queue-monitoring.dto'
@@ -56,6 +59,9 @@ const DEFAULT_MESSAGE_CHANNELS = [NotificationChannel.EMAIL, NotificationChannel
 const RECENT_FAILURES_LIMIT = 20
 /** A failure rate over a handful of jobs is noise; below this many finished jobs it is ignored. */
 const MIN_JOBS_FOR_FAILURE_RATE = 10
+
+/** Passes missed before the reconciler is reported as not running. */
+const RECONCILER_MISSED_PASSES = 3
 
 const SEVERITY: Record<HealthStatus, number> = { healthy: 0, warning: 1, critical: 2 }
 
@@ -299,6 +305,47 @@ export function buildOverview(
   }
 }
 
+export function buildReconcilerStats(
+  activity: ReconcileActivity,
+  now: number,
+  tenantNames: Map<string, string>,
+): ReconcilerStatsDto {
+  const { lastPass, counts, recent } = activity
+  const reasons: string[] = []
+  // No pass recorded yet is a fresh Redis or a first deploy, not a fault; one follows within a minute.
+  if (lastPass && now - lastPass.at > lastPass.intervalMs * RECONCILER_MISSED_PASSES) {
+    reasons.push(
+      `Has not run for ${Math.round((now - lastPass.at) / 60_000)} min; stuck sends are not being recovered`,
+    )
+  }
+  if (counts['gave-up'] > 0) {
+    reasons.push(
+      `Gave up on ${counts['gave-up'].toLocaleString()} stuck send(s) in the last ${MONITORING_WINDOW_MINUTES} min; what they owed is marked failed`,
+    )
+  }
+  return {
+    status: reasons.length > 0 ? 'warning' : 'healthy',
+    reasons,
+    lastPassAt: lastPass ? new Date(lastPass.at).toISOString() : null,
+    intervalMs: lastPass?.intervalMs ?? null,
+    lastPassDurationMs: lastPass?.durationMs ?? null,
+    lastPassFound: lastPass?.found ?? null,
+    windowMinutes: MONITORING_WINDOW_MINUTES,
+    retried: counts.retried,
+    requeued: counts.requeued,
+    gaveUp: counts['gave-up'],
+    recentActions: recent.map((action) => ({
+      at: new Date(action.at).toISOString(),
+      kind: action.kind,
+      action: action.action,
+      jobId: action.jobId,
+      notificationId: action.notifyId,
+      tenantId: action.tenantId,
+      tenantName: tenantNames.get(action.tenantId) ?? null,
+    })),
+  }
+}
+
 /**
  * Read-only view of the Bull queues, their workers and the Redis instance behind them, for the
  * admin monitoring page. Everything is read from Redis on each request, so the answer is the
@@ -331,16 +378,25 @@ export class MonitoringService {
     }
 
     const now = Date.now()
-    const [info, workers, messages, failedJobs, activeByQueue, deliveryTime, sendingRate] =
-      await Promise.all([
-        this.redis.info(),
-        this.getWorkers(now),
-        this.getMessageStats(now),
-        this.getRecentFailedJobs(),
-        this.getActiveJobs(),
-        this.getDeliveryTime(now),
-        this.getSendingRate(now),
-      ])
+    const [
+      info,
+      workers,
+      messages,
+      failedJobs,
+      activeByQueue,
+      deliveryTime,
+      sendingRate,
+      reconcileActivity,
+    ] = await Promise.all([
+      this.redis.info(),
+      this.getWorkers(now),
+      this.getMessageStats(now),
+      this.getRecentFailedJobs(),
+      this.getActiveJobs(),
+      this.getDeliveryTime(now),
+      this.getSendingRate(now),
+      readReconcileActivity(this.redis, now, MONITORING_WINDOW_MINUTES),
+    ])
     const redis = buildRedisStats(parseRedisInfo(info))
     const queues = await Promise.all(
       this.queues.map((queue) =>
@@ -348,15 +404,21 @@ export class MonitoringService {
       ),
     )
     const activeJobs = activeBatches(activeByQueue)
-    const tenantNames = await this.getTenantNames(
-      [...failedJobs, ...activeJobs].map(({ job }) =>
+    const tenantNames = await this.getTenantNames([
+      ...[...failedJobs, ...activeJobs].map(({ job }) =>
         asString((job.data as JobIdentifiers)?.tenantId),
       ),
-    )
+      ...reconcileActivity.recent.map((action) => action.tenantId),
+    ])
+    const reconciler = buildReconcilerStats(reconcileActivity, now, tenantNames)
 
     return {
       generatedAt: new Date(now).toISOString(),
-      status: worstStatus([redis.status, ...queues.map((queue) => queue.status)]),
+      status: worstStatus([
+        redis.status,
+        reconciler.status,
+        ...queues.map((queue) => queue.status),
+      ]),
       overview: buildOverview(messages, queues, deliveryTime, sendingRate),
       redis,
       messages,
@@ -369,6 +431,7 @@ export class MonitoringService {
         startedAt: job.processedOn ? new Date(job.processedOn).toISOString() : null,
       })),
       workers,
+      reconciler,
       recentFailures: failedJobs.map(({ queue, job }) => ({
         queue,
         jobId: String(job.id),

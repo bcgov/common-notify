@@ -115,6 +115,34 @@ export interface MonitoringOverview {
   requestsReceived: number
 }
 
+export type ReconcilerActionType = 'retried' | 'requeued' | 'gave-up'
+
+export interface ReconcilerAction {
+  at: string
+  /** What was owed: pending, ingestion, scheduled, batch or delivery. */
+  kind: string
+  action: ReconcilerActionType
+  jobId: string
+  notificationId: string
+  tenantId: string
+  tenantName: string | null
+}
+
+/** The delivery reconciler: when it last ran and what it recovered. */
+export interface ReconcilerStats {
+  status: HealthStatus
+  reasons: string[]
+  lastPassAt: string | null
+  intervalMs: number | null
+  lastPassDurationMs: number | null
+  lastPassFound: number | null
+  windowMinutes: number
+  retried: number
+  requeued: number
+  gaveUp: number
+  recentActions: ReconcilerAction[]
+}
+
 export interface QueueMonitoring {
   generatedAt: string
   status: HealthStatus
@@ -124,5 +152,6 @@ export interface QueueMonitoring {
   queues: QueueStats[]
   activeBatches: ActiveBatch[]
   workers: WorkerPod[]
+  reconciler: ReconcilerStats
   recentFailures: RecentFailure[]
 }

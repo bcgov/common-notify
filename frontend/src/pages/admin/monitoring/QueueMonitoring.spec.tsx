@@ -125,6 +125,29 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
         ],
       },
     ],
+    reconciler: {
+      status: 'healthy',
+      reasons: [],
+      lastPassAt: new Date(now - 20_000).toISOString(),
+      intervalMs: 60_000,
+      lastPassDurationMs: 35,
+      lastPassFound: 4,
+      windowMinutes: 60,
+      retried: 1,
+      requeued: 3,
+      gaveUp: 0,
+      recentActions: [
+        {
+          at: new Date(now - 120_000).toISOString(),
+          kind: 'scheduled',
+          action: 'requeued',
+          jobId: 'notif-90',
+          notificationId: 'notif-90',
+          tenantId: 't-1',
+          tenantName: 'Health Ministry',
+        },
+      ],
+    },
     recentFailures: [
       {
         queue: 'email-delivery',
@@ -334,6 +357,41 @@ describe('QueueMonitoring', () => {
     expect(
       screen.getByText('High: Redis holds more memory than its data needs'),
     ).toBeInTheDocument()
+  })
+
+  it('shows what the delivery reconciler recovered on the System tab', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    renderPage('system')
+
+    const recoveries = await screen.findByRole('table', { name: 'Recent recoveries' })
+    expect(within(recoveries).getByText('Re-queued')).toBeInTheDocument()
+    expect(within(recoveries).getByText('Scheduled send')).toBeInTheDocument()
+    expect(within(recoveries).getByText('notif-90')).toBeInTheDocument()
+    expect(screen.getByText('Every 1m 0s; checked 4')).toBeInTheDocument()
+  })
+
+  it('raises reconciler warnings in the banner and says when it has not run yet', async () => {
+    const data = snapshot()
+    data.reconciler = {
+      ...data.reconciler,
+      status: 'warning',
+      reasons: ['Gave up on 2 stuck send(s) in the last 60 min; what they owed is marked failed'],
+      lastPassAt: null,
+      intervalMs: null,
+      lastPassFound: null,
+      recentActions: [],
+    }
+    mockedGet.mockResolvedValue(data)
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        'Delivery recovery: Gave up on 2 stuck send(s) in the last 60 min; what they owed is marked failed',
+      ),
+    ).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByText('View details on the System tab'))
+    expect(await screen.findByText('Not run yet')).toBeInTheDocument()
+    expect(screen.getAllByText('Nothing has needed recovering.')).not.toHaveLength(0)
   })
 
   it('labels a pod that is shutting down', async () => {

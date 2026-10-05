@@ -21,6 +21,7 @@ import ActiveBatchesSection from './sections/ActiveBatchesSection'
 import RedisSection from './sections/RedisSection'
 import QueuesSection from './sections/QueuesSection'
 import WorkersSection from './sections/WorkersSection'
+import ReconcilerSection from './sections/ReconcilerSection'
 import RecentFailuresSection from './sections/RecentFailuresSection'
 import '@/scss/components/queue-monitoring.scss'
 
@@ -93,6 +94,7 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
   const warnings = data
     ? [
         ...data.redis.reasons.map((reason) => `Redis: ${reason}`),
+        ...data.reconciler.reasons.map((reason) => `Delivery recovery: ${reason}`),
         ...data.queues.flatMap((queue) =>
           queue.reasons.map((reason) => `${formatQueueName(queue.name)}: ${reason}`),
         ),
@@ -190,6 +192,7 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
             <>
               <QueuesSection queues={data.queues} />
               <WorkersSection workers={data.workers} now={now} />
+              <ReconcilerSection reconciler={data.reconciler} now={now} />
               <RedisSection redis={data.redis} />
             </>
           )}

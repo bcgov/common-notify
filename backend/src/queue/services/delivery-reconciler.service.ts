@@ -27,6 +27,8 @@ import {
   mergeContentFromRequest,
 } from '../merge-batch-builder'
 import type { DeliveryJobPayload } from '../queue.types'
+import { recordReconcilePass } from '../reconcile-activity'
+import type { ReconcileActionRecord, ReconcileKind } from '../reconcile-activity'
 
 const intFromEnv = (name: string, fallback: number) => {
   const value = parseInt(process.env[name] || '', 10)
@@ -78,11 +80,13 @@ export type ReconcileOutcome = 'in-progress' | 'retried' | 'requeued' | 'gave-up
  *   - `pending`: a request stored but never queued (Redis unreachable at acceptance), job
  *     `<notifyId>` on ingestion;
  *   - `ingestion`: a request queued but never fanned out, job `<notifyId>` on ingestion;
+ *   - `scheduled`: a scheduled send past its send time but never fanned out, job `<notifyId>` on
+ *     ingestion (its delayed job was lost or failed);
  *   - `batch`: a merge batch's recipients, job `<batchId>` on the channel's delivery queue;
  *   - `delivery`: a plain send's recipients on one channel, job `<notifyId>_<channel>`.
  */
 interface StuckWork {
-  kind: 'pending' | 'ingestion' | 'batch' | 'delivery'
+  kind: ReconcileKind
   jobId: string
   notifyId: string
   tenantId: string
@@ -156,18 +160,25 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       return outcomes
     }
 
+    const startedAt = Date.now()
     try {
       const staleBefore = new Date(now - STALE_AFTER_MS)
       const items = [
         ...(await this.findPendingRequests(new Date(now - PENDING_STALE_MS))),
         ...(await this.findStuckIngestions(staleBefore)),
+        ...(await this.findOverdueScheduled(staleBefore)),
         ...(await this.findStaleBatches(staleBefore)),
         ...(await this.findStaleDeliveries(staleBefore)),
       ]
+      const actions: ReconcileActionRecord[] = []
       for (const item of items) {
         try {
           const outcome = await this.reconcileItem(item)
           outcomes[outcome] = (outcomes[outcome] ?? 0) + 1
+          if (outcome !== 'in-progress') {
+            const { kind, jobId, notifyId, tenantId } = item
+            actions.push({ at: Date.now(), kind, action: outcome, jobId, notifyId, tenantId })
+          }
         } catch (error) {
           this.logger.error(
             `[${item.notifyId}] Could not reconcile ${item.kind} ${item.jobId}: ${(error as Error).message}`,
@@ -176,6 +187,16 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       }
       const acted = (outcomes.retried ?? 0) + (outcomes.requeued ?? 0) + (outcomes['gave-up'] ?? 0)
       if (acted > 0) this.logger.warn(`Delivery reconcile: ${JSON.stringify(outcomes)}`)
+      const pass = {
+        at: now,
+        durationMs: Date.now() - startedAt,
+        intervalMs: RECONCILE_INTERVAL_MS,
+        found: items.length,
+        outcomes,
+      }
+      await recordReconcilePass(this.redis, pass, actions).catch((error: Error) =>
+        this.logger.warn(`Could not record the reconcile pass: ${error.message}`),
+      )
     } catch (error) {
       this.logger.error(`Delivery reconcile pass failed: ${(error as Error).message}`)
     } finally {
@@ -251,6 +272,26 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     return rows.map((row) => ({ kind: 'ingestion', jobId: row.notifyId, ...row }))
   }
 
+  /**
+   * Scheduled sends still SCHEDULED a stale window after their send time. Ingestion moves a
+   * scheduled send to PROCESSING when its delayed job runs, so one still waiting this long has a
+   * job that was lost or failed. Before its send time a scheduled send is never checked: its job
+   * is meant to be sitting delayed, and checking every future send each pass would not scale.
+   */
+  private async findOverdueScheduled(staleBefore: Date): Promise<StuckWork[]> {
+    if (!this.ingestionQueue) return []
+    const rows = await this.requestRepository
+      .createQueryBuilder('request')
+      .select('request.id', 'notifyId')
+      .addSelect('request.tenant_id', 'tenantId')
+      .where('request.status = :scheduled', { scheduled: NotificationStatus.SCHEDULED })
+      .andWhere('request.delayed_send_time < :staleBefore', { staleBefore })
+      .orderBy('request.delayed_send_time', 'ASC')
+      .limit(ITEMS_PER_KIND_PER_PASS)
+      .getRawMany<{ notifyId: string; tenantId: string }>()
+    return rows.map((row) => ({ kind: 'scheduled', jobId: row.notifyId, ...row }))
+  }
+
   /** Requests still PENDING: stored at acceptance, but their ingestion job never queued. Oldest first. */
   private async findPendingRequests(pendingBefore: Date): Promise<StuckWork[]> {
     if (!this.ingestionQueue) return []
@@ -276,7 +317,8 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
   }
 
   private queueFor(item: StuckWork): Bull.Queue | null | undefined {
-    if (item.kind === 'ingestion' || item.kind === 'pending') return this.ingestionQueue
+    if (item.kind === 'ingestion' || item.kind === 'pending' || item.kind === 'scheduled')
+      return this.ingestionQueue
     return item.channel === NotificationChannel.SMS ? this.smsQueue : this.emailQueue
   }
 

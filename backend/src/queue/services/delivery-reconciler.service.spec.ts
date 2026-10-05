@@ -42,6 +42,7 @@ function setup({
   deliveries = [],
   ingestions = [],
   pending = [],
+  scheduled = [],
   ingestionJob = null,
 }: {
   job?: Partial<Bull.Job> | null
@@ -54,6 +55,8 @@ function setup({
   ingestions?: object[]
   /** Requests still PENDING; queried before the QUEUED ones. */
   pending?: object[]
+  /** Scheduled sends past their send time; queried after the QUEUED ones. */
+  scheduled?: object[]
   ingestionJob?: Partial<Bull.Job> | null
 }) {
   const results = [stale, deliveries]
@@ -88,7 +91,7 @@ function setup({
   for (const m of ['select', 'addSelect', 'where', 'andWhere', 'orderBy', 'limit']) {
     requestBuilder[m] = vi.fn(() => requestBuilder)
   }
-  const requestResults = [pending, ingestions]
+  const requestResults = [pending, ingestions, scheduled]
   requestBuilder.getRawMany = vi.fn(() => Promise.resolve(requestResults.shift() ?? []))
   const requestRepository = {
     findOne: vi.fn().mockResolvedValue(storedRequest),
@@ -103,7 +106,13 @@ function setup({
       rows.slice(1).map(([address, name]) => ({ address, params: { name } })),
     update: vi.fn().mockResolvedValue(undefined),
   }
+  const multi: Record<string, ReturnType<typeof vi.fn>> = {}
+  for (const m of ['set', 'hincrby', 'expire', 'lpush', 'ltrim']) {
+    multi[m] = vi.fn(() => multi)
+  }
+  multi.exec = vi.fn().mockResolvedValue([])
   const redis = {
+    multi: vi.fn(() => multi),
     set: vi.fn().mockResolvedValue(locked),
     eval: vi.fn().mockResolvedValue(1),
     incr: vi.fn().mockResolvedValue(attempt),
@@ -128,6 +137,7 @@ function setup({
     requestRepository,
     notificationService,
     redis,
+    multi,
     queue,
     ingestionQueue,
   }
@@ -214,6 +224,37 @@ describe('DeliveryReconcilerService', () => {
       updatedBy: 'delivery-reconciler',
     })
     expect(queue.add).not.toHaveBeenCalled()
+  })
+
+  it('records the pass and what it acted on for the monitoring page', async () => {
+    const { service, multi } = setup({ job: jobIn('failed') })
+
+    await service.reconcile()
+
+    const [, pass] = multi.set.mock.calls[0]
+    expect(JSON.parse(pass)).toMatchObject({ found: 1, outcomes: { retried: 1 } })
+    expect(multi.hincrby).toHaveBeenCalledWith(expect.any(String), 'retried', 1)
+    expect(JSON.parse(multi.lpush.mock.calls[0][1])).toMatchObject({
+      kind: 'batch',
+      action: 'retried',
+      jobId: 'req-1-EMAIL-0',
+      notifyId: 'req-1',
+    })
+  })
+
+  it('records a pass that found only live work without logging any action', async () => {
+    const { service, multi } = setup({ job: jobIn('active') })
+
+    expect(await service.reconcile()).toEqual({ 'in-progress': 1 })
+    expect(multi.set).toHaveBeenCalled()
+    expect(multi.lpush).not.toHaveBeenCalled()
+  })
+
+  it('still reconciles when the pass cannot be recorded', async () => {
+    const { service, multi } = setup({ job: jobIn('failed') })
+    multi.exec.mockRejectedValue(new Error('READONLY'))
+
+    expect(await service.reconcile()).toEqual({ retried: 1 })
   })
 
   it('does nothing when another pod holds the lock', async () => {
@@ -387,6 +428,69 @@ describe('DeliveryReconcilerService', () => {
 
       expect(await service.reconcile()).toEqual({ 'in-progress': 1 })
       expect(ingestionQueue.add).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('scheduled sends past their send time', () => {
+    const SCHEDULED = [{ notifyId: 'req-1', tenantId: 'tenant-1' }]
+    const overdueRequest = {
+      ...storedRequest,
+      payload: {
+        email: {
+          recipients: { to: ['a@example.com'] },
+          content: { subject: 'S', body: 'B' },
+          delayedSend: '2026-10-04T13:00:00Z',
+        },
+      },
+    }
+
+    it('runs ingestion now when the delayed job was lost, leaving the status to ingestion', async () => {
+      const { service, ingestionQueue, notificationService, requestRepository } = setup({
+        stale: [],
+        scheduled: SCHEDULED,
+      })
+      requestRepository.findOne.mockResolvedValue(overdueRequest)
+
+      expect(await service.reconcile()).toEqual({ requeued: 1 })
+      const [payload, options] = ingestionQueue.add.mock.calls[0]
+      expect(payload).toMatchObject({ notifyId: 'req-1', scheduledFor: '2026-10-04T13:00:00Z' })
+      expect(options).toMatchObject({ jobId: 'req-1' })
+      expect(options).not.toHaveProperty('delay')
+      expect(notificationService.update).not.toHaveBeenCalled()
+    })
+
+    it('leaves a send whose job is still delayed alone', async () => {
+      const { service, ingestionQueue } = setup({
+        stale: [],
+        scheduled: SCHEDULED,
+        ingestionJob: jobIn('delayed'),
+      })
+
+      expect(await service.reconcile()).toEqual({ 'in-progress': 1 })
+      expect(ingestionQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('retries a delayed job that failed', async () => {
+      const ingestionJob = jobIn('failed')
+      const { service } = setup({ stale: [], scheduled: SCHEDULED, ingestionJob })
+
+      expect(await service.reconcile()).toEqual({ retried: 1 })
+      expect(ingestionJob.retry).toHaveBeenCalled()
+    })
+
+    it('settles the request as failed after the recovery limit', async () => {
+      const { service, ingestionQueue, notificationService } = setup({
+        stale: [],
+        scheduled: SCHEDULED,
+        attempt: 6,
+      })
+
+      expect(await service.reconcile()).toEqual({ 'gave-up': 1 })
+      expect(ingestionQueue.add).not.toHaveBeenCalled()
+      expect(notificationService.update).toHaveBeenCalledWith('req-1', 'tenant-1', {
+        status: NotificationStatus.FAILED,
+        updatedBy: 'delivery-reconciler',
+      })
     })
   })
 })
