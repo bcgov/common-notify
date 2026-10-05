@@ -61,7 +61,10 @@ export default () => {
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
       // Per request. Without one a CHES that accepts the connection but never answers holds a
       // worker until Node's own ~5-minute timeout, per message.
-      timeoutMs: parseInt(process.env.CHES_TIMEOUT_MS || '30000', 10),
+      timeoutMs: parseInt(process.env.CHES_TIMEOUT_MS || '120000', 10),
+      // Across every pod. CHES accepts messages at a fixed rate, so more callers only make each
+      // call wait longer, until they pass timeoutMs. 0 turns the limit off.
+      maxConcurrentRequests: parseInt(process.env.CHES_MAX_CONCURRENT_REQUESTS || '5', 10),
     },
 
     // Notification events

@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config'
 import { BadGatewayException, GatewayTimeoutException } from '@nestjs/common'
 import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
 import type { SendEmailOptions, SendEmailResult } from '../../../../../../src/adapters/interfaces'
+import { RedisConcurrencyLimiter } from '../../../../../../src/common/redis/concurrency-limiter'
+
+vi.mock('../../../../../../src/queue/redis-connection', () => ({
+  createRedisClient: vi.fn(() => ({ quit: vi.fn().mockResolvedValue('OK') })),
+}))
 
 const fetchMock = vi.fn()
 global.fetch = fetchMock
@@ -860,6 +865,58 @@ describe('ChesEmailTransport', () => {
       await expect(
         transport.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
       ).rejects.toThrow('fetch failed')
+    })
+  })
+
+  describe('concurrency limit', () => {
+    const config = (overrides: Record<string, unknown>) =>
+      ({
+        get: (key: string) =>
+          ({
+            'ches.baseUrl': 'https://ches.example.com/api/v1',
+            'ches.clientId': 'client-id',
+            'ches.clientSecret': 'client-secret',
+            'ches.tokenUrl': 'https://auth.example.com/token',
+            'ches.from': 'noreply@gov.bc.ca',
+            redis: { host: 'localhost', port: 6379 },
+            ...overrides,
+          })[key],
+      }) as unknown as ConfigService
+    const respond = () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'tok', expires_in: 300 }),
+      })
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ messages: [{ msgId: 'm1' }], txId: 't1' }),
+      })
+    }
+
+    it('sends each email through the shared limit', async () => {
+      const run = vi
+        .spyOn(RedisConcurrencyLimiter.prototype, 'run')
+        .mockImplementation((fn) => fn())
+      respond()
+      const limited = new ChesEmailTransport(config({ 'ches.maxConcurrentRequests': 5 }))
+
+      await expect(
+        limited.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
+      ).resolves.toMatchObject({ messageId: 'm1' })
+      // The email POST only: the token request is cached and rare.
+      expect(run).toHaveBeenCalledTimes(1)
+      run.mockRestore()
+    })
+
+    it('sends unlimited when the limit is 0', async () => {
+      const run = vi.spyOn(RedisConcurrencyLimiter.prototype, 'run')
+      respond()
+      const unlimited = new ChesEmailTransport(config({ 'ches.maxConcurrentRequests': 0 }))
+
+      await unlimited.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' })
+
+      expect(run).not.toHaveBeenCalled()
+      run.mockRestore()
     })
   })
 })

@@ -5,9 +5,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import type Redis from 'ioredis'
+import { RedisConcurrencyLimiter } from '../../../../../common/redis/concurrency-limiter'
+import { redisKey } from '../../../../../common/redis/redis-namespace'
+import { createRedisClient, type RedisConfig } from '../../../../../queue/redis-connection'
 import { toEmailHtml } from '../../../../../services/rendering/email-body-html'
 import { IEmailTransport, SendEmailOptions, SendEmailResult } from '../../../../interfaces'
 
@@ -45,13 +50,42 @@ interface ChesErrorResponse {
 }
 
 @Injectable()
-export class ChesEmailTransport implements IEmailTransport {
+export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
   readonly name = 'ches'
   private readonly logger = new Logger(ChesEmailTransport.name)
 
   private tokenCache: { token: string; expiresAt: number } | null = null
+  private readonly redis: Redis | null = null
+  /**
+   * Caps how many emails this service is sending to CHES at once, counted across every pod
+   * (CHES_MAX_CONCURRENT_REQUESTS). Each send waits here for a free slot before it calls CHES.
+   * Null - no cap - when Redis is not configured (tests) or the limit is 0.
+   */
+  private readonly limiter: RedisConcurrencyLimiter | null = null
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    const redisConfig = this.configService.get<RedisConfig>('redis')
+    const limit = this.configService.get<number>('ches.maxConcurrentRequests') ?? 0
+    if (!redisConfig || !(limit > 0)) return
+
+    this.redis = createRedisClient(redisConfig, ChesEmailTransport.name, {
+      // On the send path: a Redis outage has to fall back to unlimited sending in milliseconds.
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+      commandTimeout: 250,
+    })
+    const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 120_000
+    this.limiter = new RedisConcurrencyLimiter(this.redis, redisKey('ches:in-flight'), {
+      limit,
+      // Outlasts the request's own timeout, so a slot is only reclaimed from a pod that died.
+      leaseMs: timeoutMs + 15_000,
+    })
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.redis?.quit().catch(() => this.redis?.disconnect())
+  }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
     // Handle both flat (SendEmailOptions) and nested (NotifyEmailChannel) structures
@@ -171,14 +205,17 @@ export class ChesEmailTransport implements IEmailTransport {
       })}`,
     )
 
-    const response = await this.fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/email`, 'email', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
+    const post = () =>
+      this.fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/email`, 'email', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+    // The wait for a slot sits outside the timeout: it measures CHES, not our own queue.
+    const response = this.limiter ? await this.limiter.run(post) : await post()
 
     if (!response.ok) {
       const errText = await response.text()
@@ -218,7 +255,7 @@ export class ChesEmailTransport implements IEmailTransport {
     operation: 'email' | 'token',
     init: RequestInit,
   ): Promise<Response> {
-    const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 30_000
+    const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 120_000
     try {
       return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
     } catch (caught: unknown) {
