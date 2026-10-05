@@ -122,6 +122,8 @@ export class IngestionWorker {
 
       logger.debug(`[${notifyId}] Processing ingestion job for tenant=${tenantId}`)
 
+      // Set once ingestion finds rows an earlier run wrote; read by both the success and error paths.
+      let resumed = false
       try {
         logger.log(`[${notifyId}] [IngestionWorker] Starting to process job ${job.id}`)
 
@@ -221,8 +223,12 @@ export class IngestionWorker {
         } else {
           processedRequest = IngestionWorker.normalizeSmsRecipients(request, phoneNumberService)
 
-          // Create notification request detail entries for regular notification request
-          await requestDetailService.createPending(notifyId, processedRequest, tenantId)
+          // A re-run (Bull retry, or recovery by the delivery reconciler) finds its rows already
+          // written; writing them again would double every recipient.
+          resumed = (await requestDetailService.countUnbatched(notifyId)) > 0
+          if (!resumed) {
+            await requestDetailService.createPending(notifyId, processedRequest, tenantId)
+          }
         }
 
         const channelAttachments = [
@@ -358,6 +364,13 @@ export class IngestionWorker {
 
         // Queue delivery jobs with idempotency and tracing
         for (const { queue, channel, payload } of deliveryJobs) {
+          // On a re-run, a channel whose recipients are all sent or failed is done; queueing it
+          // again would re-send it while recovering the other channel.
+          if (resumed && (await requestDetailService.countInFlight(notifyId, channel)) === 0) {
+            logger.log(`[${notifyId}] Skipping ${channel}: delivered on an earlier run`)
+            continue
+          }
+
           const deliveryPayload: DeliveryJobPayload = {
             notifyId,
             tenantId,
@@ -406,7 +419,11 @@ export class IngestionWorker {
           updatedBy: 'ingestion-worker',
         })
 
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+        // Not on a re-run: some rows are already sent or failed, and a blanket update would mark
+        // them in flight again - and the reconciler would then send them twice.
+        if (!resumed) {
+          await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+        }
 
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
@@ -421,7 +438,9 @@ export class IngestionWorker {
           status: NotificationStatus.FAILED,
           updatedBy: 'ingestion-worker',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED, {
+          preserveCompleted: resumed,
+        })
 
         // Re-throw to trigger BullMQ retry logic
         throw error

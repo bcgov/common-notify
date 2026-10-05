@@ -1,6 +1,6 @@
 import { NotificationChannel } from '../enum/notification-channel.enum'
 import type { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
-import type { MailMergeJobData } from './queue.types'
+import type { IngestionJobPayload, MailMergeJobData } from './queue.types'
 
 /** NotificationService.parseMailMergeRecipients, passed in so this stays a plain function. */
 export type ParseMergeRecipients = (
@@ -66,4 +66,48 @@ export function mergeJobDataFromRequest(
     params: { ...request.params, ...channelPayload.params },
     recipients: keep ? recipients.filter(({ address }) => keep(address)) : recipients,
   }
+}
+
+/**
+ * The ingestion job a request would have been queued with when it was accepted, rebuilt from
+ * notification_request. A merge gets its fan-out fields - without them ingestion treats it as a
+ * plain send - and leaves its recipients for ingestion to read from the stored request. A
+ * scheduled send keeps its send time in `scheduledFor`; queue it with that delay (see
+ * delayUntilScheduled), or it goes out immediately.
+ */
+export function ingestionJobFromRequest(request: {
+  id: string
+  tenantId: string
+  payload?: unknown
+  createdAt: Date
+}): IngestionJobPayload {
+  const stored = request.payload as NotifySimpleRequest | undefined
+  const scheduledFor =
+    stored?.email?.delayedSend || stored?.sms?.delayedSend || stored?.msgApp?.delayedSend
+  const base = {
+    notifyId: request.id,
+    tenantId: request.tenantId,
+    request: (request.payload || {}) as IngestionJobPayload['request'],
+    requestedAt: request.createdAt.toISOString(),
+    ...(scheduledFor && { scheduledFor }),
+  }
+  const channel = mergeRequestChannel(request.payload)
+  if (!channel) return base
+
+  const mailMergeData = mergeContentFromRequest(request.payload, channel)
+  return {
+    ...base,
+    request: { templateId: mailMergeData.content?.templateId } as IngestionJobPayload['request'],
+    mailMerge: true,
+    mailMergeChannel: channel,
+    mailMergeData,
+  }
+}
+
+/** Milliseconds until a job's scheduled send time; 0 when it is unscheduled or already due. */
+export function delayUntilScheduled(
+  job: Pick<IngestionJobPayload, 'scheduledFor'>,
+  now = Date.now(),
+) {
+  return job.scheduledFor ? Math.max(0, new Date(job.scheduledFor).getTime() - now) : 0
 }

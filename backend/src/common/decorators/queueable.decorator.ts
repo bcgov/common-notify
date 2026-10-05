@@ -876,7 +876,7 @@ export function Queueable(
 
         // Fire off queueing asynchronously - don't block the response
         // If queuing succeeds, status updates to QUEUED
-        // If queuing fails, PendingNotificationRetryService will pick it up and retry
+        // If queuing fails, the record stays PENDING and DeliveryReconcilerService queues it
         setImmediate(async () => {
           try {
             const jobPayload = {
@@ -933,7 +933,7 @@ export function Queueable(
             }
           } catch (queueError) {
             // Redis unavailable... that's OK, status stays PENDING
-            // PendingNotificationRetryService will pick it up once Redis is back
+            // DeliveryReconcilerService queues it once Redis is back
             logger.warn(`Failed to enqueue job (will be retried): ${notificationRecord.id}`, {
               tenantId,
               error: (queueError as Error).message,

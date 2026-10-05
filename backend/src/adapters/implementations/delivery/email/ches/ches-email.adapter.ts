@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  GatewayTimeoutException,
   Injectable,
   Logger,
   NotFoundException,
@@ -170,7 +171,7 @@ export class ChesEmailTransport implements IEmailTransport {
       })}`,
     )
 
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/email`, {
+    const response = await this.fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/email`, 'email', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -207,6 +208,33 @@ export class ChesEmailTransport implements IEmailTransport {
     }
   }
 
+  /**
+   * fetch with a deadline. A timeout becomes a 504 naming CHES, so it reads as the provider being
+   * slow - a retryable failure for the job, or one failed recipient in a merge batch - rather than
+   * a bare AbortError.
+   */
+  private async fetchWithTimeout(
+    url: string,
+    operation: 'email' | 'token',
+    init: RequestInit,
+  ): Promise<Response> {
+    const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 30_000
+    try {
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+    } catch (caught: unknown) {
+      if (
+        caught instanceof Error &&
+        (caught.name === 'TimeoutError' || caught.name === 'AbortError')
+      ) {
+        this.logger.error(`[CHES] ${operation} request timed out after ${timeoutMs}ms`)
+        throw new GatewayTimeoutException(
+          `CHES ${operation} request timed out after ${timeoutMs / 1000}s`,
+        )
+      }
+      throw caught
+    }
+  }
+
   private async getAccessToken(
     tokenUrl: string,
     clientId: string,
@@ -223,7 +251,7 @@ export class ChesEmailTransport implements IEmailTransport {
       client_secret: clientSecret,
     })
 
-    const response = await fetch(tokenUrl, {
+    const response = await this.fetchWithTimeout(tokenUrl, 'token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
-import { BadGatewayException } from '@nestjs/common'
+import { BadGatewayException, GatewayTimeoutException } from '@nestjs/common'
 import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
 import type { SendEmailOptions, SendEmailResult } from '../../../../../../src/adapters/interfaces'
 
@@ -793,6 +793,73 @@ describe('ChesEmailTransport', () => {
       }
 
       await expect(transport.send(options)).rejects.toThrow(BadGatewayException)
+    })
+  })
+
+  describe('request timeout', () => {
+    const configured = (timeoutMs?: number) =>
+      configGetMock.mockImplementation((key: string) => {
+        const map: Record<string, unknown> = {
+          'ches.baseUrl': 'https://ches.example.com/api/v1',
+          'ches.clientId': 'client-id',
+          'ches.clientSecret': 'client-secret',
+          'ches.tokenUrl': 'https://auth.example.com/token',
+          'ches.from': 'noreply@gov.bc.ca',
+          'ches.timeoutMs': timeoutMs,
+        }
+        return map[key]
+      })
+    const tokenOk = () =>
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'tok', expires_in: 300 }),
+      })
+    const timedOut = () =>
+      Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+
+    it('gives every CHES request a deadline', async () => {
+      configured(15_000)
+      tokenOk()
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ messages: [{ msgId: 'm1' }], txId: 't1' }),
+      })
+
+      await transport.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' })
+
+      for (const [, init] of fetchMock.mock.calls) {
+        expect(init.signal).toBeInstanceOf(AbortSignal)
+      }
+    })
+
+    it('reports a CHES that never answers as a 504 naming CHES', async () => {
+      configured(15_000)
+      tokenOk()
+      fetchMock.mockRejectedValueOnce(timedOut())
+
+      const sending = transport.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' })
+
+      await expect(sending).rejects.toBeInstanceOf(GatewayTimeoutException)
+      await expect(sending).rejects.toThrow('CHES email request timed out after 15s')
+    })
+
+    it('times out the token request too', async () => {
+      configured(15_000)
+      fetchMock.mockRejectedValueOnce(timedOut())
+
+      await expect(
+        transport.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
+      ).rejects.toThrow('CHES token request timed out after 15s')
+    })
+
+    it('leaves other network errors as they are', async () => {
+      configured(15_000)
+      tokenOk()
+      fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'))
+
+      await expect(
+        transport.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
+      ).rejects.toThrow('fetch failed')
     })
   })
 })

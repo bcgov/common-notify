@@ -59,6 +59,9 @@ export default () => {
       clientSecret: process.env.CHES_CLIENT_SECRET,
       tokenUrl: process.env.CHES_TOKEN_URL,
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
+      // Per request. Without one a CHES that accepts the connection but never answers holds a
+      // worker until Node's own ~5-minute timeout, per message.
+      timeoutMs: parseInt(process.env.CHES_TIMEOUT_MS || '30000', 10),
     },
 
     // Notification events
@@ -193,7 +196,6 @@ export default () => {
       ),
       jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
-      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
     },
 
     // Identical sends (same tenant, recipients and content) within this window are answered with

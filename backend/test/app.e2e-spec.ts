@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AppModule } from '../src/app.module'
-import { PendingNotificationRetryService } from '../src/queue/services/pending-notification-retry.service'
 import { NotificationPubSubService } from '../src/api/notification/notification-pubsub.service'
 import { ModulesContainer } from '@nestjs/core'
 import { TypeOrmModule } from '@nestjs/typeorm'
@@ -50,10 +49,6 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue(configMock)
-      .overrideProvider(PendingNotificationRetryService)
-      .useValue({
-        onModuleInit: () => Promise.resolve(),
-      })
       .overrideProvider(NotificationPubSubService)
       .useValue({
         publish: () => Promise.resolve(),

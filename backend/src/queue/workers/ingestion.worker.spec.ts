@@ -31,6 +31,9 @@ describe('IngestionWorker', () => {
       updateStatus: vi.fn().mockResolvedValue(undefined),
       countBatch: vi.fn().mockResolvedValue(0),
       findAddressesByStatus: vi.fn().mockResolvedValue(new Set()),
+      // A first run: no rows yet, so every channel is queued.
+      countUnbatched: vi.fn().mockResolvedValue(0),
+      countInFlight: vi.fn().mockResolvedValue(1),
     }
 
     mockConfigService = {
@@ -793,6 +796,46 @@ describe('IngestionWorker', () => {
 
       expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).not.toHaveBeenCalled()
       expect(mockEmailQueue.add).not.toHaveBeenCalled()
+    })
+
+    describe('re-run of a plain send', () => {
+      it('writes no rows twice, skips a finished channel and leaves row statuses alone', async () => {
+        // An earlier run wrote the rows and email finished; only SMS is still owed.
+        mockRequestDetailService.countUnbatched.mockResolvedValue(3)
+        mockRequestDetailService.countInFlight.mockImplementation((_id: string, channel: string) =>
+          Promise.resolve(channel === NotificationChannel.EMAIL ? 0 : 1),
+        )
+        await IngestionWorker.initialize(
+          mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockRequestDetailService,
+          mockConfigService,
+          mockClamavService,
+        )
+
+        await processHandler({
+          data: {
+            notifyId: 'notify-rerun',
+            tenantId: 'tenant-1',
+            requestedAt: new Date().toISOString(),
+            request: {
+              email: {
+                recipients: { to: ['a@example.com'] },
+                content: { subject: 'S', body: 'B' },
+              },
+              sms: { recipients: { to: ['+12505550123'] }, content: { body: 'B' } },
+            } as any,
+          },
+        } as Bull.Job<IngestionJobPayload>)
+
+        expect(mockRequestDetailService.createPending).not.toHaveBeenCalled()
+        expect(mockEmailQueue.add).not.toHaveBeenCalled()
+        expect(mockSmsQueue.add).toHaveBeenCalledTimes(1)
+        // A blanket PROCESSING would put the sent email rows back in flight.
+        expect(mockRequestDetailService.updateStatus).not.toHaveBeenCalled()
+      })
     })
 
     describe('bulk email fan-out', () => {

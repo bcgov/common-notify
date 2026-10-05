@@ -1,7 +1,7 @@
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindOptionsWhere, In, Not, Repository } from 'typeorm'
+import { FindOptionsWhere, In, IsNull, Not, Repository } from 'typeorm'
 import { NotificationRequestDetail } from './entities/notification-request-detail.entity'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -41,6 +41,9 @@ export const notificationRequestDetailListQueryConfig: QueryableFieldsConfig = {
  * refused deliberately. Resetting either back to pending re-sends to that address.
  */
 const RETRY_PRESERVED_STATUSES = ['sent', 'blocked']
+
+/** Detail statuses between acceptance and a final sent/failed. */
+export const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
 
 @Injectable()
 export class NotificationRequestDetailService {
@@ -149,6 +152,23 @@ export class NotificationRequestDetailService {
   /** Rows already written for a merge batch; non-zero means ingestion created it on an earlier run. */
   async countBatch(notificationRequestId: string, batchId: string): Promise<number> {
     return this.detailRepository.count({ where: { notificationRequestId, batchId } })
+  }
+
+  /**
+   * Rows for a request outside any merge batch, ignoring safelist-blocked ones. Non-zero means an
+   * earlier run of ingestion already wrote them.
+   */
+  async countUnbatched(notificationRequestId: string): Promise<number> {
+    return this.detailRepository.count({
+      where: { notificationRequestId, batchId: IsNull(), status: Not('blocked') },
+    })
+  }
+
+  /** A request's recipients on one channel that are not yet sent or failed. */
+  async countInFlight(notificationRequestId: string, channel: string): Promise<number> {
+    return this.detailRepository.count({
+      where: { notificationRequestId, channel, status: In(IN_FLIGHT_DETAIL_STATUSES) },
+    })
   }
 
   /** Addresses of a request's recipients in one status, e.g. those the safelist blocked. */

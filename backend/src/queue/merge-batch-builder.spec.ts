@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { NotificationChannel } from '../enum/notification-channel.enum'
-import { mergeJobDataFromRequest, mergeRequestChannel } from './merge-batch-builder'
+import {
+  delayUntilScheduled,
+  ingestionJobFromRequest,
+  mergeJobDataFromRequest,
+  mergeRequestChannel,
+} from './merge-batch-builder'
 
 const parse = (rows: string[][]) =>
   rows.slice(1).map(([address, name]) => ({ address, params: { name } }))
@@ -58,5 +63,57 @@ describe('mergeJobDataFromRequest', () => {
     expect(() => mergeJobDataFromRequest(emailMerge, NotificationChannel.SMS, parse)).toThrow(
       /not a SMS merge/,
     )
+  })
+})
+
+describe('ingestionJobFromRequest', () => {
+  const createdAt = new Date('2026-10-05T12:00:00Z')
+
+  it('rebuilds a plain send with its stored request', () => {
+    const payload = {
+      email: { recipients: { to: ['a@example.com'] }, content: { subject: 'S', body: 'B' } },
+    }
+    expect(ingestionJobFromRequest({ id: 'r1', tenantId: 't1', payload, createdAt })).toEqual({
+      notifyId: 'r1',
+      tenantId: 't1',
+      request: payload,
+      requestedAt: createdAt.toISOString(),
+    })
+  })
+
+  it('rebuilds a merge with its fan-out fields and no recipients', () => {
+    const job = ingestionJobFromRequest({
+      id: 'r1',
+      tenantId: 't1',
+      payload: emailMerge,
+      createdAt,
+    })
+    expect(job).toMatchObject({ mailMerge: true, mailMergeChannel: NotificationChannel.EMAIL })
+    expect(job.mailMergeData).not.toHaveProperty('recipients')
+  })
+
+  it('keeps a scheduled send time', () => {
+    const payload = {
+      sms: {
+        recipients: { to: ['+12505550123'] },
+        content: { body: 'B' },
+        delayedSend: '2026-10-06T09:00:00Z',
+      },
+    }
+    const job = ingestionJobFromRequest({ id: 'r1', tenantId: 't1', payload, createdAt })
+    expect(job.scheduledFor).toBe('2026-10-06T09:00:00Z')
+  })
+})
+
+describe('delayUntilScheduled', () => {
+  const now = Date.parse('2026-10-05T12:00:00Z')
+
+  it('is the time left until the send', () => {
+    expect(delayUntilScheduled({ scheduledFor: '2026-10-05T12:10:00Z' }, now)).toBe(10 * 60_000)
+  })
+
+  it('is zero when unscheduled or already due', () => {
+    expect(delayUntilScheduled({}, now)).toBe(0)
+    expect(delayUntilScheduled({ scheduledFor: '2026-10-05T11:00:00Z' }, now)).toBe(0)
   })
 })
