@@ -27,8 +27,10 @@ datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
+      # UID "loki" is referenced by log-alert-rules.yaml's datasourceUid.
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
         url: http://loki.f6bc3f-tools.svc.cluster.local:3100
         isDefault: true
@@ -39,13 +41,47 @@ datasources:
               matcherRegex: '"notificationId":"([^"]+)"'
               name: NotificationID
               url: ''
-      - name: Loki Alerting
-        type: loki
+      # ---------------------------------------------------------------------
+      # PLATFORM METRICS (OpenShift cluster monitoring, via Thanos)
+      #
+      # Container memory usage and PVC usage come from the kubelet/cAdvisor,
+      # which our namespace-scoped Prometheus cannot scrape: that needs
+      # cluster-level `nodes/metrics`, which product teams are not granted.
+      # The metrics DO exist in the platform's own monitoring stack, so the
+      # usage rules read them from there instead.
+      #
+      # Port 9092 is the TENANCY port: it serves only the namespace named in
+      # the request and requires a token with `view` in that namespace. The
+      # namespace cannot be expressed per-query by Grafana, so it is pinned
+      # per datasource via customQueryParameters — which is why there is one
+      # datasource per environment rather than one for both.
+      # ---------------------------------------------------------------------
+      - name: Platform Metrics (test)
+        type: prometheus
+        uid: platform-test
         access: proxy
-        url: http://loki.f6bc3f-tools.svc.cluster.local:3100
+        url: https://thanos-querier.openshift-monitoring.svc:9092
         jsonData:
-          manageAlerts: true
-          alertmanagerUid: alertmanager
+          httpMethod: GET
+          tlsSkipVerify: true
+          customQueryParameters: namespace=f6bc3f-test
+          httpHeaderName1: Authorization
+          manageAlerts: false
+        secureJsonData:
+          httpHeaderValue1: Bearer $PLATFORM_METRICS_TOKEN
+      - name: Platform Metrics (prod)
+        type: prometheus
+        uid: platform-prod
+        access: proxy
+        url: https://thanos-querier.openshift-monitoring.svc:9092
+        jsonData:
+          httpMethod: GET
+          tlsSkipVerify: true
+          customQueryParameters: namespace=f6bc3f-prod
+          httpHeaderName1: Authorization
+          manageAlerts: false
+        secureJsonData:
+          httpHeaderValue1: Bearer $PLATFORM_METRICS_TOKEN
       # Prometheus (in-namespace, deployed via monitoring/grafana-stack/prometheus).
       # Source for the metric-based pod-state / OOM alerts (infra-alert-rules.yaml).
       # UID "prometheus" is referenced by those rules' datasourceUid.
@@ -72,34 +108,26 @@ alerting:
             settings:
               url: https://n8n.developer.gov.bc.ca/webhook/3b412e93-0003-4414-b9f3-bcaf18d9bc64
               httpMethod: POST
-              title: 'Grafana Alert Notification'
+              title: 'Notify Alert'
+              # Message format (per the alerting ticket). One line per alert:
+              #   🔴 FIRING | CRITICAL | <env> | <Alert name> — <detail>
+              #   🟠 FIRING | WARNING  | <env> | <Alert name> — <detail>
+              #   🟢 RESOLVED | <env> | <Alert name> — <detail>
+              # - Icon derived from severity (🔴 critical / 🟠 warning; 🟢 resolved).
+              # - <env> derived from .Labels.namespace (f6bc3f-dev→dev, etc.). PR
+              #   apps deploy into f6bc3f-dev; the PR number is not a label, but the
+              #   pod name (e.g. common-notify-211-backend) appears in <detail>.
+              # - <detail> = the `short` annotation when present, else `summary`.
+              # IMPORTANT: this is the COMPLETE, final message. The downstream n8n
+              # webhook must forward `message` VERBATIM (title/body), not rebuild
+              # its own envelope — otherwise the 🚨/State/Severity wrapper returns.
+              # That node lives in n8n, not this repo, and must be changed there.
               message: |
-                {{ `{{ if gt (len .Alerts.Firing) 0 }}` }}
-                **🔴 FIRING ALERTS ({{ `{{ len .Alerts.Firing }}` }})**
                 {{ `{{ range .Alerts.Firing }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Severity:** {{ `{{ .Labels.severity }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Service:** {{ `{{ .Labels.service }}` }}
-                {{ `{{ if .Labels.app }}` }}**App:** {{ `{{ .Labels.app }}{{ end }}` }}
-
-                **Summary:** {{ `{{ .Annotations.summary }}` }}
-                {{ `{{ if .Annotations.description }}` }}**Description:** {{ `{{ .Annotations.description }}{{ end }}` }}
-
-                **Status:** Firing since {{ `{{ .StartsAt }}` }}
-                [View in Grafana]({{ `{{ .GeneratorURL }}` }})
+                {{ `{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }}` }} FIRING | {{ `{{ .Labels.severity | toUpper }}` }} | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
-                {{ `{{ end }}` }}
-
-                {{ `{{ if gt (len .Alerts.Resolved) 0 }}` }}
-                **✅ RESOLVED ALERTS ({{ `{{ len .Alerts.Resolved }}` }})**
                 {{ `{{ range .Alerts.Resolved }}` }}
-                ---
-                **Alert:** {{ `{{ .Labels.alertname }}` }}
-                **Namespace:** {{ `{{ .Labels.namespace }}` }}
-                **Resolved at:** {{ `{{ .EndsAt }}` }}
-                {{ `{{ end }}` }}
+                🟢 RESOLVED | {{ `{{ .Labels.namespace | reReplaceAll "^f6bc3f-" "" }}` }} | {{ `{{ .Labels.alertname }}` }} — {{ `{{ if .Annotations.short }}{{ .Annotations.short }}{{ else }}{{ .Annotations.summary }}{{ end }}` }}
                 {{ `{{ end }}` }}
             disableResolveMessage: false
 
@@ -277,6 +305,16 @@ securityContext:
 # Environment variables
 env:
   TZ: America/Vancouver
+
+# Bearer token for the platform Thanos datasources below. Sourced from the
+# grafana-platform-metrics ServiceAccount, which holds the `view` role in
+# f6bc3f-test and f6bc3f-prod — that is what the tenancy port authorises
+# against. Kept out of git by reading it from the Secret at runtime.
+envValueFrom:
+  PLATFORM_METRICS_TOKEN:
+    secretKeyRef:
+      name: grafana-platform-metrics-token
+      key: token
 
 # RBAC - Use OpenShift defaults
 rbac:
