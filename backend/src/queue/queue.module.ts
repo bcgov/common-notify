@@ -207,25 +207,39 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
   }
 
   /**
-   * Let in-flight jobs finish before the pod exits. Without this a deploy kills a merge batch
-   * part-way through and Bull retries it on another pod about a minute later.
+   * Let in-flight jobs finish before the pod exits. Without this a deploy or an HPA scale-down
+   * kills a merge batch part-way through and Bull re-runs it on another pod once its lock lapses.
    *
-   * Runs before onApplicationShutdown, where TypeORM closes its connection, so a finishing job
-   * can still record what it sent. Bull's close() stops taking new jobs and resolves once the
-   * active ones end. The wait is capped below the pod's termination grace period; a batch still
-   * running then is left for Bull to retry, and the merge workers skip recipients already sent.
+   * Every queue stops taking new work on this pod first; then ingestion drains ahead of the
+   * delivery queues it feeds, and delivery ahead of the webhooks it triggers. Runs before
+   * onApplicationShutdown, where TypeORM closes its connection, so a finishing job can still
+   * record what it sent. The wait is capped below the pod's termination grace period
+   * (QUEUE_SHUTDOWN_DRAIN_MS, set by the chart); a batch still running then is re-run elsewhere,
+   * and the delivery workers skip recipients already sent.
    */
   async beforeApplicationShutdown(): Promise<void> {
-    const queues = [this.ingestionQueue, this.emailQueue, this.smsQueue, this.webhookQueue].filter(
-      (queue): queue is Bull.Queue => !!queue,
-    )
+    const stages = [
+      [this.ingestionQueue],
+      [this.emailQueue, this.smsQueue],
+      [this.webhookQueue],
+    ].map((stage) => stage.filter((queue): queue is Bull.Queue => !!queue))
+    const queues = stages.flat()
     if (queues.length === 0) return
 
     const drainMs = parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
     this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
+
+    const drain = async (): Promise<void> => {
+      // Local pause without waiting: stops fetching new jobs on this pod only.
+      await Promise.all(queues.map((queue) => queue.pause(true, true)))
+      for (const stage of stages) {
+        await Promise.all(stage.map((queue) => queue.close()))
+      }
+    }
+
     let timer: NodeJS.Timeout | undefined
     const drained = await Promise.race([
-      Promise.all(queues.map((queue) => queue.close())).then(() => true),
+      drain().then(() => true),
       new Promise<false>((resolve) => {
         timer = setTimeout(() => resolve(false), drainMs)
       }),
@@ -240,7 +254,9 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       await this.heartbeat?.remove()
     } else {
       // Still holding jobs: keep the heartbeat until the pod is killed so they read as held.
-      this.logger.warn('Queue drain timed out; unfinished jobs will be retried on another pod')
+      this.logger.warn(
+        `Queue drain did not finish within ${drainMs}ms; unfinished jobs will be re-run by another pod`,
+      )
     }
   }
 
@@ -349,58 +365,6 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
         `Queue worker initialization failed: ${error instanceof Error ? error.message : String(error)}`,
       )
       this.logger.debug(error)
-    }
-  }
-
-  /**
-   * Let this pod's running jobs finish before it exits. Without this a stopping pod (a rolling
-   * deploy, an HPA scale-down) abandons its active jobs, and Bull re-runs them on another pod once
-   * their lock lapses. Every queue stops taking new work first; then ingestion drains ahead of the
-   * delivery queues it feeds, and delivery ahead of the webhooks it triggers.
-   *
-   * Bounded below Kubernetes' default 30s termination grace period. A job still running at the
-   * deadline is re-run elsewhere, which the delivery workers' already-sent checks make safe.
-   */
-  async beforeApplicationShutdown(): Promise<void> {
-    const stages = [
-      [this.ingestionQueue],
-      [this.emailQueue, this.smsQueue],
-      [this.webhookQueue],
-    ].map((stage) => stage.filter((queue): queue is Bull.Queue => !!queue))
-    const queues = stages.flat()
-    if (queues.length === 0) return
-
-    const timeoutMs = parseInt(process.env.QUEUE_SHUTDOWN_TIMEOUT_MS || '20000', 10)
-    this.logger.log(`Draining queue workers before shutdown (timeout ${timeoutMs}ms)`)
-
-    const drain = async (): Promise<void> => {
-      // Local pause without waiting: stops fetching new jobs on this pod only.
-      await Promise.all(queues.map((queue) => queue.pause(true, true)))
-      for (const stage of stages) {
-        await Promise.all(stage.map((queue) => queue.close()))
-      }
-    }
-
-    let timer: NodeJS.Timeout | undefined
-    const deadline = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), timeoutMs)
-    })
-
-    try {
-      const outcome = await Promise.race([drain().then(() => 'drained' as const), deadline])
-      if (outcome === 'timeout') {
-        this.logger.warn(
-          `Queue drain did not finish within ${timeoutMs}ms; remaining jobs will be re-run by another pod`,
-        )
-      } else {
-        this.logger.log('Queue workers drained')
-      }
-    } catch (error) {
-      this.logger.error(
-        `Queue drain failed: ${error instanceof Error ? error.message : String(error)}`,
-      )
-    } finally {
-      clearTimeout(timer)
     }
   }
 }
