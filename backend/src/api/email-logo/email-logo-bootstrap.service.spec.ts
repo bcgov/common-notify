@@ -33,7 +33,7 @@ describe('EmailLogoBootstrapService', () => {
     vi.clearAllMocks()
   })
 
-  it('uploads all 23 approved SVG assets under their configured storage keys', async () => {
+  it('uploads all 24 approved SVG assets under their configured storage keys', async () => {
     vi.mocked(storage.head).mockResolvedValue(null)
     vi.mocked(storage.upload).mockImplementation(async (input) => ({
       storageKey: input.storageKey,
@@ -48,11 +48,11 @@ describe('EmailLogoBootstrapService', () => {
       path.posix.basename(storageKey),
     ).sort()
 
-    expect(checkedInFilenames).toHaveLength(23)
-    expect(new Set(SYSTEM_EMAIL_LOGO_KEYS).size).toBe(23)
+    expect(checkedInFilenames).toHaveLength(24)
+    expect(new Set(SYSTEM_EMAIL_LOGO_KEYS).size).toBe(24)
     expect(configuredFilenames).toEqual(checkedInFilenames)
-    expect(clamavService.scanBuffer).toHaveBeenCalledTimes(23)
-    expect(storage.head).toHaveBeenCalledTimes(23)
+    expect(clamavService.scanBuffer).toHaveBeenCalledTimes(24)
+    expect(storage.head).toHaveBeenCalledTimes(24)
     expect(storage.upload).toHaveBeenCalledTimes(SYSTEM_EMAIL_LOGO_KEYS.length)
 
     const scanCalls = vi.mocked(clamavService.scanBuffer).mock.calls
@@ -62,7 +62,7 @@ describe('EmailLogoBootstrapService', () => {
       const [scannedContent, scannedFilename] = scanCalls[index]
       const [uploadInput] = uploadCalls[index]
 
-      expect(storageKey).toMatch(/^logos\/BC_[A-Z]+_H_RGB_pos\.svg$/)
+      expect(storageKey).toMatch(/^logos\/BC(?:ID|_[A-Z]+)_H_RGB_pos\.svg$/)
       expect(storage.head).toHaveBeenNthCalledWith(index + 1, storageKey)
       expect(scannedFilename).toBe(filename)
       expect(Buffer.isBuffer(scannedContent)).toBe(true)

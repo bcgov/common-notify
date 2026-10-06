@@ -14,6 +14,7 @@ import { SafelistService } from '../safelist/safelist.service'
 import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
 import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
+import { NotificationDedupService } from '../notify/services/notification-dedup.service'
 import {
   enforceLimits,
   handleMerge,
@@ -62,6 +63,13 @@ describe('GcNotifyInternalExecutionService', () => {
   const mockApiKeyUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
   const mockSmsSegmentService = { countSegments: vi.fn() }
   let mockTenantSettingsService: { resolveSenderAddress: ReturnType<typeof vi.fn> }
+  // Disabled unless a test opts in, so the rest of the suite runs the undeduplicated path.
+  let mockNotificationDedupService: {
+    enabled: boolean
+    fingerprint: ReturnType<typeof vi.fn>
+    findDuplicate: ReturnType<typeof vi.fn>
+    claim: ReturnType<typeof vi.fn>
+  }
 
   const TENANT_ID = 'tenant-1'
 
@@ -102,6 +110,12 @@ describe('GcNotifyInternalExecutionService', () => {
     mockTenantSettingsService = {
       resolveSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
     }
+    mockNotificationDedupService = {
+      enabled: false,
+      fingerprint: vi.fn().mockReturnValue('fingerprint-1'),
+      findDuplicate: vi.fn().mockResolvedValue(null),
+      claim: vi.fn(),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -122,6 +136,7 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
         { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
+        { provide: NotificationDedupService, useValue: mockNotificationDedupService },
       ],
     }).compile()
 
@@ -544,6 +559,168 @@ describe('GcNotifyInternalExecutionService', () => {
 
       expect(mockNotificationService.create).not.toHaveBeenCalled()
       expect(recordAcceptedUsage).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('deduplication', () => {
+    const CLAIMED_ID = '0b7c6f1e-2d4a-4c8e-9f10-3a5b7c9d1e2f'
+    const ORIGINAL_ID = '6f1e0b7c-4a2d-4e8c-8f10-9d1e2f3a5b7c'
+    const original = {
+      notifyId: ORIGINAL_ID,
+      status: 'completed',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    }
+    const release = vi.fn().mockResolvedValue(undefined)
+    const emailBody = {
+      email_address: 'user@example.com',
+      template_id: 'tpl-1',
+      personalisation: { name: 'Alice' },
+    }
+    const smsBody = { phone_number: '+15555550100', template_id: 'tpl-2' }
+
+    beforeEach(() => {
+      vi.mocked(enforceLimits).mockClear()
+      vi.mocked(recordAcceptedUsage).mockClear()
+      vi.mocked(resolveSmsSegments).mockClear()
+      vi.mocked(resolveSmsSegments).mockResolvedValue(1)
+      mockNotificationDedupService.enabled = true
+      mockNotificationDedupService.claim.mockResolvedValue({
+        kind: 'proceed',
+        notifyId: CLAIMED_ID,
+        release,
+      })
+      mockNotificationService.create.mockImplementation(async (dto: { id?: string }) => ({
+        id: dto.id ?? 'db-generated-id',
+        createdAt: new Date(),
+      }))
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 's',
+        body: 'b',
+        bodyType: 'markdown',
+      })
+    })
+
+    const emailTemplate = () =>
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 3,
+        channelCode: NotificationChannel.EMAIL,
+      })
+    const smsTemplate = () =>
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-2',
+        version: 1,
+        channelCode: NotificationChannel.SMS,
+      })
+
+    it('fingerprints the recipient where recipients are normalised, and the template version', async () => {
+      emailTemplate()
+
+      await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+
+      expect(mockNotificationDedupService.fingerprint).toHaveBeenCalledWith({
+        email: { recipients: { to: ['user@example.com'] } },
+        gcNotify: expect.objectContaining({
+          template_id: 'tpl-1',
+          personalisation: { name: 'Alice' },
+          email_address: undefined,
+          templateVersion: 3,
+        }),
+      })
+    })
+
+    it('creates the row with the claimed notifyId and returns it', async () => {
+      emailTemplate()
+
+      const result = await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+
+      expect(mockNotificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ id: CLAIMED_ID }),
+      )
+      expect(result.id).toBe(CLAIMED_ID)
+      expect(result.uri).toBe(`/gcnotify/v2/notifications/${CLAIMED_ID}`)
+    })
+
+    it('answers a known duplicate with the original id, storing and counting nothing', async () => {
+      emailTemplate()
+      mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+      const result = await service.sendEmail(
+        {
+          ...emailBody,
+          personalisation: { name: 'Alice', doc: { file: 'aGVsbG8=', filename: 'a.pdf' } },
+        },
+        TENANT_ID,
+        'consumer-7',
+      )
+
+      expect(result.id).toBe(ORIGINAL_ID)
+      expect(result.uri).toBe(`/gcnotify/v2/notifications/${ORIGINAL_ID}`)
+      expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+      expect(enforceLimits).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+      expect(recordAcceptedUsage).not.toHaveBeenCalled()
+    })
+
+    it('does not create or count a send that loses the claim race', async () => {
+      emailTemplate()
+      mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
+
+      const result = await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+
+      expect(result.id).toBe(ORIGINAL_ID)
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+      expect(recordAcceptedUsage).not.toHaveBeenCalled()
+      expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+    })
+
+    it('releases the claim when the row cannot be created', async () => {
+      emailTemplate()
+      mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
+
+      await expect(service.sendEmail(emailBody, TENANT_ID, 'consumer-7')).rejects.toThrow(
+        'database down',
+      )
+      expect(release).toHaveBeenCalledTimes(1)
+    })
+
+    it('answers a duplicate SMS without counting its segments', async () => {
+      smsTemplate()
+      mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+      const result = await service.sendSms(smsBody, TENANT_ID, 'consumer-7')
+
+      expect(result.id).toBe(ORIGINAL_ID)
+      expect(mockNotificationDedupService.fingerprint).toHaveBeenCalledWith({
+        sms: { recipients: { to: ['+15555550100'] } },
+        gcNotify: expect.objectContaining({ template_id: 'tpl-2', phone_number: undefined }),
+      })
+      expect(resolveSmsSegments).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+    })
+
+    it('reports the row count for a duplicate bulk send, which carries no count of its own', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-bulk',
+        version: 2,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      vi.mocked(handleMerge).mockResolvedValue({
+        notifyId: ORIGINAL_ID,
+        duplicate: true,
+        createdAt: original.createdAt,
+      } as never)
+
+      const result = await service.sendBulk(
+        {
+          template_id: 'tpl-bulk',
+          name: 'Reminders',
+          rows: [['email address'], ['alice@example.com'], ['bob@example.com']],
+        } as any,
+        TENANT_ID,
+      )
+
+      expect(result.data).toMatchObject({ id: ORIGINAL_ID, notification_count: 2 })
     })
   })
 

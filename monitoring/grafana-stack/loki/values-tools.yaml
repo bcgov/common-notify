@@ -32,19 +32,15 @@ loki:
       chunks_directory: /var/loki/chunks
       rules_directory: /var/loki/rules
 
-  # Enable ruler for alerting
-  rulerConfig:
-    enable_api: true
-    enable_alertmanager_v2: true
-    alertmanager_url: http://localhost:9093  # Update with actual Alertmanager URL when available
-    storage:
-      type: local
-      local:
-        directory: /var/loki/rules
-    rule_path: /tmp/loki/rules-temp
-    ring:
-      kvstore:
-        store: inmemory
+  # Ruler intentionally NOT configured for alerting.
+  #
+  # Log alert rules used to be evaluated here and forwarded to an Alertmanager
+  # at `alertmanager_url: http://localhost:9093`. No Alertmanager is deployed
+  # (the Prometheus chart sets `alertmanager: enabled: false` — "Grafana handles
+  # alerting -> n8n"), so every alert this ruler produced was posted into a void.
+  #
+  # The rules are now Grafana-managed against the Loki datasource; see
+  # monitoring/grafana-stack/grafana/log-alert-rules.yaml.
 
   # Retention: 5 days (limited by 5Gi storage quota in tools namespace)
   limits_config:
@@ -112,16 +108,6 @@ singleBinary:
       value: America/Vancouver
 
   # Mount alert rules from ConfigMap
-  extraVolumes:
-    - name: alert-rules
-      configMap:
-        name: loki-alert-rules
-
-  extraVolumeMounts:
-    - name: alert-rules
-      mountPath: /var/loki/rules/common-notify
-      readOnly: true
-
   # OpenShift-compatible security context (let OpenShift assign UIDs)
   podSecurityContext:
     fsGroup: null

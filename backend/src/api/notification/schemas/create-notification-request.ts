@@ -5,6 +5,14 @@ import { NotificationStatus } from '../../../enum/notification-status.enum'
 export { NotificationStatus }
 
 export class CreateNotificationRequestDto {
+  @ApiPropertyOptional({
+    description: 'Pre-assigned id. Set when the id is reserved before the row is written (dedup).',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  id?: string
+
   @ApiProperty({ description: 'Tenant UUID that submitted the request', format: 'uuid' })
   @IsUUID()
   tenantId: string
