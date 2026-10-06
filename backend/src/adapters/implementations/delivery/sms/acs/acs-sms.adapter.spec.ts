@@ -95,18 +95,43 @@ describe('AcsSmsTransport', () => {
       body: 'Hello',
     })
 
-    expect(mockSend).toHaveBeenCalledWith({
-      from: '+15551234567',
-      to: ['+15559876543'],
-      message: 'Hello',
-    })
+    expect(mockSend).toHaveBeenCalledWith(
+      {
+        from: '+15551234567',
+        to: ['+15559876543'],
+        message: 'Hello',
+      },
+      // Without enableDeliveryReport, ACS emits no delivery events at all - so it has to be set
+      // now for a future webhook to have anything to consume.
+      { enableDeliveryReport: true, tag: undefined },
+    )
     expect(result).toEqual({
       messageId: 'acs-message-123',
-      providerResponse: 'sent to 1 recipient(s)',
+      providerResponse: 'sent to 1 of 1 recipient(s)',
+      results: [
+        { to: '+15559876543', success: true, messageId: 'acs-message-123', error: undefined },
+      ],
     })
   })
 
-  it('throws and logs recipient details when ACS returns mixed success and failure', async () => {
+  it('tags the send so a delivery report can be matched back to the notification', async () => {
+    transport = await createModule({
+      connectionString: 'endpoint=https://example;accesskey=key',
+      fromNumber: '+15551234567',
+    })
+    mockSend.mockResolvedValue([
+      { to: '+15559876543', messageId: 'acs-message-123', successful: true, httpStatusCode: 202 },
+    ])
+
+    await transport.send({ to: '+15559876543', body: 'Hello', tag: 'notify-abc' })
+
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ enableDeliveryReport: true, tag: 'notify-abc' }),
+    )
+  })
+
+  it('reports a partial failure per recipient instead of throwing', async () => {
     transport = await createModule({
       connectionString: 'endpoint=https://example;accesskey=key',
       fromNumber: '+15551234567',
@@ -127,17 +152,47 @@ describe('AcsSmsTransport', () => {
       },
     ])
 
-    await expect(
-      transport.send({
-        to: ['+15559876543', '+15550000001'],
-        body: 'Hello',
-      }),
-    ).rejects.toThrow('ACS send failed for 1 of 2 recipients')
+    // Throwing here used to fail the whole job, and the queue's retry then re-sent to the
+    // recipient who had already received the message.
+    const result = await transport.send({
+      to: ['+15559876543', '+15550000001'],
+      body: 'Hello',
+    })
 
+    expect(result.results).toEqual([
+      { to: '+15559876543', success: true, messageId: 'acs-message-123', error: undefined },
+      { to: '+15550000001', success: false, messageId: undefined, error: 'Invalid recipient' },
+    ])
+    expect(result.providerResponse).toBe('sent to 1 of 2 recipient(s)')
     expect(errorSpy).toHaveBeenCalledWith(
-      'ACS send failures: [{"to":"+15550000001","errorMessage":"Invalid recipient","httpStatusCode":400}]',
+      'ACS send failures: [{"to":"+15550000001","error":"Invalid recipient"}]',
     )
+  })
 
-    errorSpy.mockRestore()
+  it('still throws when every recipient fails, so the job is retried', async () => {
+    transport = await createModule({
+      connectionString: 'endpoint=https://example;accesskey=key',
+      fromNumber: '+15551234567',
+    })
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined)
+    mockSend.mockResolvedValue([
+      {
+        to: '+15559876543',
+        successful: false,
+        errorMessage: 'Bad credential',
+        httpStatusCode: 401,
+      },
+      {
+        to: '+15550000001',
+        successful: false,
+        errorMessage: 'Bad credential',
+        httpStatusCode: 401,
+      },
+    ])
+
+    // Nothing was delivered, so retrying cannot duplicate anything - and the cause is systemic.
+    await expect(
+      transport.send({ to: ['+15559876543', '+15550000001'], body: 'Hello' }),
+    ).rejects.toThrow('ACS send failed for all 2 recipient(s)')
   })
 })

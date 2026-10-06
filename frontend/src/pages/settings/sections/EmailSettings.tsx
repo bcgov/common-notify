@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
+  InlineAlert,
   Radio,
   RadioGroup,
+  Link,
   SvgInfoIcon,
   Switch,
   TextField,
   Tooltip,
 } from '@bcgov/design-system-react-components'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import EmailLogoMenu from '@/components/EmailLogoMenu'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -29,8 +33,6 @@ const normalizeReplyTo = (value: string): string | null => value.trim() || null
 
 const isValidReplyTo = (value: string): boolean => REPLY_TO_PATTERN.test(value)
 
-const NO_LOGO_VALUE = 'none'
-
 interface EmailSwitches {
   emailNotificationsEnabled: boolean
   emailAttachmentsEnabled: boolean
@@ -41,6 +43,7 @@ const EmailSettings: FC = () => {
   const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
   const {
     emailLogoId,
+    useCustomEmailHeader = false,
     emailNotificationsEnabled,
     replyToEmail,
     emailAttachmentsEnabled,
@@ -63,6 +66,7 @@ const EmailSettings: FC = () => {
   })
   const [replyToInput, setReplyToInput] = useState(replyToEmail ?? '')
   const [selectedEmailLogoId, setSelectedEmailLogoId] = useState<string | null>(emailLogoId)
+  const [showHeaderTitle, setShowHeaderTitle] = useState(useCustomEmailHeader)
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
 
   // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
@@ -70,6 +74,11 @@ const EmailSettings: FC = () => {
     dispatch(fetchApiKeyUsage())
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
+
+  const selectedLogo =
+    approvedLogos.find((logo) => logo.id === selectedEmailLogoId) ??
+    approvedLogos.find((logo) => logo.isDefault)
+  const headerDisplayTitle = selectedLogo?.displayTitle || 'Government of British Columbia'
 
   const normalizedReplyTo = normalizeReplyTo(replyToInput)
   const validationError =
@@ -83,6 +92,7 @@ const EmailSettings: FC = () => {
     switches.emailNotificationsEnabled !== emailNotificationsEnabled ||
     switches.emailAttachmentsEnabled !== emailAttachmentsEnabled ||
     selectedEmailLogoId !== emailLogoId ||
+    showHeaderTitle !== useCustomEmailHeader ||
     normalizedReplyTo !== replyToEmail
   const isSaveDisabled = !canEdit || !settingsChanged || saving || Boolean(validationError)
   const isFieldDisabled = saving || !canEdit
@@ -112,6 +122,7 @@ const EmailSettings: FC = () => {
         updateEmailSettings({
           ...switches,
           emailLogoId: selectedEmailLogoId,
+          useCustomEmailHeader: showHeaderTitle,
           replyToEmail: normalizedReplyTo,
         }),
       ).unwrap()
@@ -122,6 +133,7 @@ const EmailSettings: FC = () => {
       })
       setReplyToInput(updatedSettings.replyToEmail ?? '')
       setSelectedEmailLogoId(updatedSettings.emailLogoId)
+      setShowHeaderTitle(updatedSettings.useCustomEmailHeader ?? false)
       setShouldShowValidation(false)
       showSuccessToast('Email settings updated successfully')
     } catch (updateError) {
@@ -132,50 +144,10 @@ const EmailSettings: FC = () => {
   }
 
   return (
-    <form className="settings__form" onSubmit={handleSubmit}>
+    <form className="settings__form settings__form--email" onSubmit={handleSubmit}>
       <h2 className="settings__section-heading">Email Settings</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
-
-      <div className="settings__field">
-        <RadioGroup
-          className="settings__logo-picker"
-          label="Email logo"
-          description="Choose a logo for outgoing emails, or select no logo."
-          value={selectedEmailLogoId ?? NO_LOGO_VALUE}
-          onChange={(value) => setSelectedEmailLogoId(value === NO_LOGO_VALUE ? null : value)}
-          isDisabled={isFieldDisabled || approvedLogosLoading}
-        >
-          <div className="settings__logo-grid">
-            <div className="settings__logo-option">
-              <Radio value={NO_LOGO_VALUE}>
-                <span className="settings__logo-none">No logo</span>
-              </Radio>
-            </div>
-            {approvedLogos.map((logo) => (
-              <div className="settings__logo-option" key={logo.id}>
-                <Radio value={logo.id}>
-                  <span className="settings__logo-content">
-                    <img
-                      alt=""
-                      className="settings__logo-thumbnail"
-                      loading="lazy"
-                      src={logo.imageUrl}
-                    />
-                    <span>{logo.name ?? 'Unnamed logo'}</span>
-                  </span>
-                </Radio>
-              </div>
-            ))}
-          </div>
-        </RadioGroup>
-        {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
-        {approvedLogosError && (
-          <p className="settings__field-error" role="alert">
-            {approvedLogosError}
-          </p>
-        )}
-      </div>
 
       <div className="settings__field">
         <div className="settings__switch-row">
@@ -184,7 +156,6 @@ const EmailSettings: FC = () => {
             <TooltipTrigger>
               <Button
                 aria-label="About email notifications"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -235,13 +206,67 @@ const EmailSettings: FC = () => {
       </div>
 
       <div className="settings__field">
+        <RadioGroup
+          label="Email notification header"
+          orientation="vertical"
+          value={showHeaderTitle ? 'logo-and-title' : 'logo-only'}
+          onChange={(value) => setShowHeaderTitle(value === 'logo-and-title')}
+          isDisabled={isFieldDisabled}
+        >
+          <Radio value="logo-only">Use logo only (default)</Radio>
+          <Radio value="logo-and-title">Use logo and title</Radio>
+        </RadioGroup>
+      </div>
+
+      <div className="settings__field">
+        <EmailLogoMenu
+          logos={approvedLogos}
+          value={selectedEmailLogoId}
+          onChange={setSelectedEmailLogoId}
+          isDisabled={isFieldDisabled || approvedLogosLoading}
+          isLoading={approvedLogosLoading}
+        />
+        <p className="settings__help">
+          Select the authoring logo displayed on notifications sent from this tenant. Can be
+          overridden at the event level.
+        </p>
+        {approvedLogosLoading && <p className="settings__help">Loading logos…</p>}
+        {approvedLogosError && (
+          <p className="settings__field-error" role="alert">
+            {approvedLogosError}
+          </p>
+        )}
+      </div>
+
+      {showHeaderTitle && selectedLogo && (
+        <div className="settings__header-preview" role="group" aria-label="Email header preview">
+          <img src={selectedLogo.imageUrl} alt="Government of British Columbia" />
+          <span>{headerDisplayTitle}</span>
+        </div>
+      )}
+
+      <InlineAlert variant="info">
+        <span className="description" id="alert-title">
+          Only approved authoring logos may be used. Contact your{' '}
+          <Link
+            href="https://www2.gov.bc.ca/gov/content/governments/services-for-government/policies-procedures/bc-visual-identity"
+            target="_blank"
+            rel="noopener noreferrer"
+            iconRight={<OpenInNewIcon fontSize="inherit" />}
+          >
+            ministry GCPE communications office
+          </Link>{' '}
+          if you’re unsure.
+        </span>
+      </InlineAlert>
+
+      <div className="settings__field">
         <div className="settings__switch-row">
           <span className="settings__label">
             Allow email attachments
             <TooltipTrigger>
               <Button
                 aria-label="About allowing email attachments"
-                className="settings__info-icon"
                 isIconButton
                 size="xsmall"
                 type="button"
@@ -269,7 +294,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the daily limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"
@@ -293,7 +317,6 @@ const EmailSettings: FC = () => {
           <TooltipTrigger>
             <Button
               aria-label="About the annual limit"
-              className="settings__info-icon"
               isIconButton
               size="xsmall"
               type="button"

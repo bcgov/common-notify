@@ -39,10 +39,13 @@ export function ColumnHeaderDropdown({
   }
   const [ascLabel, descLabel] = SORT_LABELS[sortType ?? 'date'] ?? SORT_LABELS.date
 
-  // Sync pending values when active filters change externally
+  // Sync pending values when active filters change externally. Keyed on the joined string, not the
+  // array: the table rebuilds that array every render, which would clear ticked checkboxes.
+  const activeFilterKey = activeFilterValues.join(',')
   useEffect(() => {
     setPendingValues(activeFilterValues)
-  }, [activeFilterValues])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilterKey])
 
   // Close on outside click
   useEffect(() => {

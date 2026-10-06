@@ -8,7 +8,13 @@ import Papa from 'papaparse'
  * the way out. Keeping the translation here means the published API contract does not have to
  * change to match a UI label.
  */
-export const RECIPIENT_COLUMN = 'email'
+export type BulkChannel = 'email' | 'sms'
+
+/** The column a channel's recipients go under, as the downloaded sample CSV labels it. */
+export const RECIPIENT_COLUMN: Record<BulkChannel, string> = {
+  email: 'email',
+  sms: 'phone',
+}
 
 /** What the API calls the recipient column. */
 const API_RECIPIENT_COLUMN = 'to'
@@ -29,6 +35,9 @@ export const MAX_REPORTED_ISSUES = 100
 
 /**
  * A problem with one cell, shown in the results table as Row / Column / Value found / Issue.
+ *
+ * The issue is split in two: `title` names the problem, `detail` says how to fix it. Both are
+ * shown, the title above the detail, so keep the detail to a sentence - it sits in a table cell.
  */
 export interface RowIssue {
   /** Row number as the spreadsheet shows it: the header is row 1, so the first recipient is row 2. */
@@ -36,7 +45,10 @@ export interface RowIssue {
   column: string
   /** The offending cell, or undefined when it was empty. */
   value?: string
-  issue: string
+  /** Short label naming the problem. */
+  title: string
+  /** One sentence on how to fix it, shown under the title. */
+  detail: string
 }
 
 /**
@@ -67,12 +79,39 @@ function isValidEmail(value: string): boolean {
 }
 
 /**
+ * Loosely check a phone number, mirroring the server's normalisation rather than reimplementing it.
+ *
+ * The API normalises to E.164 and assumes Canada when no country code is given, so anything with
+ * 10 digits (or 11 starting with 1) is plausible. The authoritative check is server-side; this only
+ * needs to catch the typos worth showing someone a row number for.
+ */
+function isValidPhone(value: string): boolean {
+  const digits = value.replace(/[^\d]/g, '')
+  if (digits.length === 10) return true
+  if (digits.length === 11 && digits.startsWith('1')) return true
+  // Any other country code, given explicitly.
+  return value.trim().startsWith('+') && digits.length >= 8 && digits.length <= 15
+}
+
+/** Is this cell a usable recipient for the channel? */
+function isValidRecipient(value: string, channel: BulkChannel): boolean {
+  return channel === 'sms' ? isValidPhone(value) : isValidEmail(value)
+}
+
+/** Key a recipient for duplicate detection, matching how the server compares them. */
+function recipientKey(value: string, channel: BulkChannel): string {
+  return channel === 'sms'
+    ? value.replace(/[^\d]/g, '').replace(/^1(?=\d{10}$)/, '')
+    : value.toLowerCase()
+}
+
+/**
  * Build the sample spreadsheet for a template: the recipient column followed by one column per
  * placeholder. Headers only - a pre-filled example row is one careless upload away from being
  * mailed to whoever it names.
  */
-export function buildSampleCsv(placeholders: string[]): string {
-  return Papa.unparse([[RECIPIENT_COLUMN, ...placeholders]])
+export function buildSampleCsv(placeholders: string[], channel: BulkChannel): string {
+  return Papa.unparse([[RECIPIENT_COLUMN[channel], ...placeholders]])
 }
 
 /** Hand the sample spreadsheet to the browser as a download. */
@@ -151,9 +190,14 @@ export function parseCsv(text: string): ParsedCsv {
  * A file-level problem short-circuits: if the columns are wrong there is no point reporting the
  * same mistake once per row.
  */
-export function validateCsv(parsed: ParsedCsv, placeholders: string[]): ValidationResult {
+export function validateCsv(
+  parsed: ParsedCsv,
+  placeholders: string[],
+  channel: BulkChannel,
+): ValidationResult {
   const { headers, rows } = parsed
-  const expected = [RECIPIENT_COLUMN, ...placeholders]
+  const recipientColumn = RECIPIENT_COLUMN[channel]
+  const expected = [recipientColumn, ...placeholders]
 
   if (headers.length === 0) {
     return {
@@ -198,7 +242,7 @@ export function validateCsv(parsed: ParsedCsv, placeholders: string[]): Validati
     }
   }
 
-  const recipientIndex = headers.indexOf(RECIPIENT_COLUMN)
+  const recipientIndex = headers.indexOf(recipientColumn)
   const rowIssues: RowIssue[] = []
   const firstSeenAt = new Map<string, number>()
 
@@ -211,24 +255,40 @@ export function validateCsv(parsed: ParsedCsv, placeholders: string[]): Validati
       const name = headers[column]
 
       if (!value) {
-        rowIssues.push({ row: rowNumber, column: name, issue: 'Missing or invalid value' })
+        rowIssues.push({
+          row: rowNumber,
+          column: name,
+          title: 'Missing or invalid value',
+          detail: `The '${name}' column is empty. Fill it in, or delete the row.`,
+        })
         continue
       }
 
       if (column === recipientIndex) {
-        if (!isValidEmail(value)) {
-          rowIssues.push({ row: rowNumber, column: name, value, issue: 'Invalid format' })
+        if (!isValidRecipient(value, channel)) {
+          rowIssues.push({
+            row: rowNumber,
+            column: name,
+            value,
+            title: 'Invalid format',
+            // The offending value is already in its own column, so the detail is the fix alone.
+            detail:
+              channel === 'sms'
+                ? 'Use a 10-digit number, or a country code after a plus sign, like +12505550199.'
+                : 'Use a single @ with a domain after it, like name@example.com.',
+          })
           continue
         }
 
-        const normalised = value.toLowerCase()
+        const normalised = recipientKey(value, channel)
         const firstSeen = firstSeenAt.get(normalised)
         if (firstSeen !== undefined) {
           rowIssues.push({
             row: rowNumber,
             column: name,
             value,
-            issue: `Duplicate of row ${firstSeen}`,
+            title: `Duplicate of row ${firstSeen}`,
+            detail: `This recipient was already listed on row ${firstSeen}. Remove one of the rows.`,
           })
         } else {
           firstSeenAt.set(normalised, rowNumber)
@@ -244,8 +304,8 @@ export function validateCsv(parsed: ParsedCsv, placeholders: string[]): Validati
  * The `mergeArray` the API expects: header row first, then one row per recipient, with the
  * recipient column renamed to `to` and moved to the front.
  */
-export function toMergeArray(parsed: ParsedCsv): string[][] {
-  const recipientIndex = parsed.headers.indexOf(RECIPIENT_COLUMN)
+export function toMergeArray(parsed: ParsedCsv, channel: BulkChannel): string[][] {
+  const recipientIndex = parsed.headers.indexOf(RECIPIENT_COLUMN[channel])
   const otherIndexes = parsed.headers.map((_, i) => i).filter((i) => i !== recipientIndex)
   const order = [recipientIndex, ...otherIndexes]
 
@@ -265,12 +325,16 @@ const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
  * `mergeArray`: the renderer reads `{{alert.id}}` as a path, so a literal `"alert.id"` key would
  * never bind, and the personalisation check looks for the root key `alert`.
  */
-export function rowParams(parsed: ParsedCsv, rowIndex: number): Record<string, unknown> {
+export function rowParams(
+  parsed: ParsedCsv,
+  rowIndex: number,
+  channel: BulkChannel,
+): Record<string, unknown> {
   const params: Record<string, unknown> = {}
   const row = parsed.rows[rowIndex] ?? []
 
   parsed.headers.forEach((header, index) => {
-    if (header !== RECIPIENT_COLUMN) {
+    if (header !== RECIPIENT_COLUMN[channel]) {
       setParam(params, header, row[index] ?? '')
     }
   })
@@ -307,7 +371,7 @@ function setParam(params: Record<string, unknown>, key: string, value: string): 
 }
 
 /** The recipient address on one row, whichever column it sits in. */
-export function rowRecipient(parsed: ParsedCsv, rowIndex: number): string {
-  const recipientIndex = parsed.headers.indexOf(RECIPIENT_COLUMN)
+export function rowRecipient(parsed: ParsedCsv, rowIndex: number, channel: BulkChannel): string {
+  const recipientIndex = parsed.headers.indexOf(RECIPIENT_COLUMN[channel])
   return parsed.rows[rowIndex]?.[recipientIndex] ?? ''
 }

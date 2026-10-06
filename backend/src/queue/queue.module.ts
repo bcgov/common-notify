@@ -18,11 +18,13 @@ import { NotificationService } from '../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
 import { TemplatesRepository } from '../api/templates/templates.repository'
+import { TenantSettingsService } from '../api/tenant-settings/tenant-settings.service'
 import { TemplatesService } from '../api/templates/templates.service'
 import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
 import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
+import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
@@ -54,6 +56,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     TypeOrmModule.forFeature([NotificationRequest, NotificationRequestDetail]),
     TenantsModule,
     TemplatesModule,
+    TenantSettingsModule,
     WebhookModule,
     AttachmentModule,
     ClamavModule,
@@ -174,6 +177,7 @@ export class QueueModule implements OnModuleInit {
     @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
     @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     private readonly notificationRequestDetailService?: NotificationRequestDetailService,
+    private readonly tenantSettingsService?: TenantSettingsService,
     private readonly clamavService?: ClamavService,
     private readonly phoneNumberService?: PhoneNumberService,
     private readonly webhookService?: WebhookService,
@@ -234,6 +238,7 @@ export class QueueModule implements OnModuleInit {
         this.notificationRequestDetailService,
         emailConcurrency,
         this.structuredLogger,
+        this.tenantSettingsService,
       )
       this.logger.log('Email delivery worker initialization started')
 

@@ -10,13 +10,21 @@ import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import type * as BulkNotificationsApi from '@/api/bulkNotifications.api'
 import BulkNotifications from './BulkNotifications'
+import { showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
+// SMS availability is a feature flag; default it on and let one test turn it off.
+const featureFlagMock = vi.fn(() => true)
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
+  useFeatureFlag: (code: string) => featureFlagMock(code),
+}))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
+  showInfoToast: vi.fn(),
   showSuccessToast: vi.fn(),
 }))
 
@@ -110,18 +118,21 @@ vi.mock('@bcgov/design-system-react-components', () => {
   const RadioGroup = ({
     label,
     isRequired,
+    description,
     value,
     onChange,
     children,
   }: {
     label: string
     isRequired?: boolean
+    description?: string
     value?: string
     onChange?: (value: string) => void
     children: ReactNode
   }) => (
     <fieldset>
       <legend>{isRequired ? `${label} (required)` : label}</legend>
+      {description ? <p>{description}</p> : null}
       <div
         onChange={(event) => onChange?.((event.target as HTMLInputElement).value)}
         data-value={value}
@@ -253,6 +264,7 @@ function csv(contents: string) {
 describe('BulkNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    featureFlagMock.mockReturnValue(true)
     getTemplatesMock.mockResolvedValue({
       data: [emailTemplate],
       count: 1,
@@ -283,8 +295,14 @@ describe('BulkNotifications', () => {
     })
   })
 
-  it('requests only email templates for the selected tenant', async () => {
+  it('requests templates for the chosen channel, not before one is chosen', async () => {
     renderPage()
+
+    await screen.findByRole('radio', { name: 'Email notification' })
+    // Fetching on mount would show email templates to someone about to pick SMS.
+    expect(getTemplatesMock).not.toHaveBeenCalled()
+
+    await chooseEmailChannel()
 
     await waitFor(() =>
       expect(getTemplatesMock).toHaveBeenCalledWith(1, 100, undefined, 'name', [
@@ -293,11 +311,31 @@ describe('BulkNotifications', () => {
     )
   })
 
-  it('offers email and shows SMS as unavailable, since the send pipeline is email-only', async () => {
+  it('requests SMS templates when the SMS channel is chosen', async () => {
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'SMS notification' }))
+
+    await waitFor(() =>
+      expect(getTemplatesMock).toHaveBeenCalledWith(1, 100, undefined, 'name', [
+        'channelCode:eq:SMS',
+      ]),
+    )
+  })
+
+  it('offers SMS when the tenant has the SMS channel', async () => {
     renderPage()
 
     expect(await screen.findByRole('radio', { name: 'Email notification' })).toBeEnabled()
-    expect(screen.getByRole('radio', { name: 'SMS notification' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'SMS notification' })).toBeEnabled()
+  })
+
+  it('disables SMS when the tenant does not have the channel, and says why', async () => {
+    featureFlagMock.mockImplementation((code: string) => code !== 'sms_notifications')
+    renderPage()
+
+    expect(await screen.findByRole('radio', { name: 'SMS notification' })).toBeDisabled()
+    expect(screen.getByText('SMS is not enabled for this tenant.')).toBeInTheDocument()
   })
 
   it('asks for a channel before it offers a template', async () => {
@@ -348,7 +386,7 @@ describe('BulkNotifications', () => {
     await chooseTemplate()
 
     expect(
-      await screen.findByText("This template can't be used for a bulk send."),
+      await screen.findByText("This template can't be used for a batch send."),
     ).toBeInTheDocument()
     expect(screen.getByText(/recommendations, moose/)).toBeInTheDocument()
     // No upload control is offered, and nothing can be sent.
@@ -445,6 +483,23 @@ describe('BulkNotifications', () => {
     expect(rowNumbers()).toEqual(['4', '3', '2'])
   })
 
+  it('states each issue as a title with the fix beneath it', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nbad-one,parking,Alice'),
+    )
+
+    await screen.findByText('1 item requires attention.')
+
+    expect(screen.getByText('Invalid format')).toBeInTheDocument()
+    expect(
+      screen.getByText('Use a single @ with a domain after it, like name@example.com.'),
+    ).toBeInTheDocument()
+  })
+
   it('renames the recipient column to the one the API expects when sending', async () => {
     renderPage()
     await chooseTemplate()
@@ -457,11 +512,15 @@ describe('BulkNotifications', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
 
     await waitFor(() =>
-      expect(sendBulkMock).toHaveBeenCalledWith('template-1', [
-        ['to', 'permitType', 'firstName'],
-        ['alice@gov.bc.ca', 'parking', 'Alice'],
-        ['bob@gov.bc.ca', 'parking', 'Bob'],
-      ]),
+      expect(sendBulkMock).toHaveBeenCalledWith(
+        'template-1',
+        [
+          ['to', 'permitType', 'firstName'],
+          ['alice@gov.bc.ca', 'parking', 'Alice'],
+          ['bob@gov.bc.ca', 'parking', 'Bob'],
+        ],
+        'email',
+      ),
     )
     expect(await screen.findByText('2 notifications queued')).toBeInTheDocument()
   })
@@ -490,6 +549,32 @@ describe('BulkNotifications', () => {
 
     expect(await screen.findByText('1 notification queued')).toBeInTheDocument()
     expect(screen.getByText(/not on this tenant safelist/)).toBeInTheDocument()
+  })
+
+  it('says a repeat of a recent batch was already sent, rather than queued again', async () => {
+    sendBulkMock.mockResolvedValue({
+      notifyId: 'original-notify-id',
+      status: 'completed',
+      channels: ['email'],
+      createdAt: '2026-08-28T00:00:00.000Z',
+      message: 'An identical notification was already accepted',
+      duplicate: true,
+    })
+
+    renderPage()
+    await chooseTemplate()
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,parking,Alice\nbob@gov.bc.ca,parking,Bob'),
+    )
+    await screen.findByText('All required data passed validation.')
+    await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
+
+    expect(await screen.findByRole('heading', { name: 'Already sent' })).toBeInTheDocument()
+    expect(screen.getByText(/nothing new was sent/)).toBeInTheDocument()
+    expect(screen.queryByText(/queued/)).not.toBeInTheDocument()
+    expect(showInfoToast).toHaveBeenCalledWith('Already sent. Nothing new was sent.')
+    expect(showSuccessToast).not.toHaveBeenCalled()
   })
 
   it('previews a recipient with that row values substituted', async () => {

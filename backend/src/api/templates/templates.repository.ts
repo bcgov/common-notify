@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { EntityManager, Repository } from 'typeorm'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
+import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 
@@ -17,7 +18,55 @@ export class TemplatesRepository {
     private readonly templateRepository: Repository<Template>,
     @InjectRepository(TemplateVersion)
     private readonly templateVersionRepository: Repository<TemplateVersion>,
+    @InjectRepository(EventChannelSetting)
+    private readonly eventChannelSettingRepository: Repository<EventChannelSetting>,
   ) {}
+
+  /**
+   * The tenant's event channel settings associated with this template
+   */
+  private settingsUsingTemplate(
+    manager: EntityManager,
+    tenantId: string,
+    templateId: string,
+    active: boolean,
+  ) {
+    return manager
+      .createQueryBuilder(EventChannelSetting, 'setting')
+      .innerJoinAndSelect('setting.event', 'event')
+      .where('setting.templateId = :templateId', { templateId })
+      .andWhere('setting.active = :active', { active })
+      .andWhere('setting.isDeleted = false')
+      .andWhere('event.tenantId = :tenantId', { tenantId })
+      .andWhere('event.isDeleted = false')
+  }
+
+  /**
+   * Events whose live channel settings render with this template.
+   *
+   * Only switched-on settings count. A switched-off channel that has the template selected is
+   * not sending with it, so it does not block the delete - softDelete clears the template off
+   * those settings instead.
+   */
+  async findEventsUsingTemplate(
+    tenantId: string,
+    templateId: string,
+  ): Promise<{ id: string; name: string; channelCode: string }[]> {
+    const settings = await this.settingsUsingTemplate(
+      this.eventChannelSettingRepository.manager,
+      tenantId,
+      templateId,
+      true,
+    )
+      .orderBy('event.name', 'ASC')
+      .getMany()
+
+    return settings.map((setting) => ({
+      id: setting.event.id,
+      name: setting.event.name,
+      channelCode: setting.channelCode,
+    }))
+  }
 
   /**
    * Find an active template by ID and tenant ID
@@ -149,16 +198,63 @@ export class TemplatesRepository {
    * Update a template
    */
   async update(template: Template): Promise<Template> {
-    return this.templateRepository.save(template)
+    // Persist only scalar columns. Templates are loaded with eager channel/engine relations, and
+    // TypeORM gives a populated relation precedence over a scalar foreign-key property when both
+    // map to the same database column. Saving the whole entity would therefore let a stale
+    // `template.engine` overwrite a newly assigned `template.engineCode` (and likewise for the
+    // channel). A direct partial update keeps those relation objects out of the write payload.
+    const result = await this.templateRepository.update(
+      { id: template.id, tenantId: template.tenantId, active: true },
+      {
+        name: template.name,
+        description: template.description,
+        channelCode: template.channelCode,
+        subject: template.subject,
+        body: template.body,
+        engineCode: template.engineCode,
+        bodyType: template.bodyType,
+        updatedBy: template.updatedBy,
+      },
+    )
+
+    if (result.affected !== 1) {
+      throw new Error(`Template ${template.id} could not be updated`)
+    }
+
+    // Reload so database-generated values, including the version set by the update trigger and
+    // the updated timestamp, are reflected in the API response.
+    const updated = await this.findById(template.tenantId, template.id)
+    if (!updated) {
+      throw new Error(`Template ${template.id} was not found after update`)
+    }
+
+    return updated
   }
 
   /**
-   * Soft delete a template (mark as inactive)
+   * Soft delete a template, clearing it off any switched-off channel settings that still point
+   * at it. Both happen in one transaction: clearing those references without deleting the
+   * template would unhook the channels for nothing.
    */
-  async softDelete(templateId: string): Promise<void> {
-    await this.templateRepository.update(templateId, {
-      active: false,
-      deletedAt: new Date(),
+  async softDelete(tenantId: string, templateId: string, userId: string): Promise<void> {
+    await this.templateRepository.manager.transaction(async (manager) => {
+      // Switched-off channels that still have the deleted template id have that id removed
+      const staleSettings = await this.settingsUsingTemplate(
+        manager,
+        tenantId,
+        templateId,
+        false,
+      ).getMany()
+
+      if (staleSettings.length > 0) {
+        await manager.update(
+          EventChannelSetting,
+          staleSettings.map((setting) => setting.id),
+          { templateId: null, updatedBy: userId },
+        )
+      }
+
+      await manager.update(Template, templateId, { active: false, deletedAt: new Date() })
     })
   }
 

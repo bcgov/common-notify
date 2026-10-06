@@ -11,6 +11,8 @@ interface SafelistState {
   maxEntries: number
   loading: boolean
   saving: boolean
+  /** True once a list response has been applied. Distinguishes "unknown" from "not enforced". */
+  hasLoaded: boolean
   error?: string
   /** Request id of the fetch currently being awaited; see utils/latestRequest. */
   currentRequestId: string | null
@@ -22,6 +24,7 @@ const initialState: SafelistState = {
   maxEntries: 0,
   loading: false,
   saving: false,
+  hasLoaded: false,
   currentRequestId: null,
 }
 
@@ -55,6 +58,7 @@ export const safelistSlice = createSlice({
         state.enforced = action.payload?.enforced ?? false
         state.maxEntries = action.payload?.maxEntries ?? 0
         state.loading = false
+        state.hasLoaded = true
         state.currentRequestId = null
       })
       .addCase(fetchSafelist.rejected, (state, action) => {

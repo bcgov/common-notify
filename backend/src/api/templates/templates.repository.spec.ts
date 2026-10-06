@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
+import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
@@ -47,6 +48,7 @@ describe('TemplatesRepository', () => {
     save: vi.fn(),
     update: vi.fn(),
     createQueryBuilder: vi.fn(),
+    manager: { transaction: vi.fn((run: (manager: unknown) => unknown) => run(mockManager)) },
   }
 
   const mockVersionRepository = {
@@ -54,6 +56,29 @@ describe('TemplatesRepository', () => {
     findAndCount: vi.fn(),
     create: vi.fn(),
     save: vi.fn(),
+  }
+
+  // softDelete runs in a transaction, and the channel-setting queries are built from a manager.
+  const mockManager = {
+    createQueryBuilder: vi.fn(),
+    update: vi.fn(),
+  }
+
+  const mockEventChannelSettingRepository = {
+    manager: mockManager,
+  }
+
+  /** A chainable query-builder stub resolving getMany() to the given rows. */
+  function mockSettingsQuery(settings: unknown[]) {
+    const builder = {
+      innerJoinAndSelect: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      andWhere: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      getMany: vi.fn().mockResolvedValue(settings),
+    }
+    mockManager.createQueryBuilder.mockReturnValue(builder)
+    return builder
   }
 
   beforeEach(async () => {
@@ -67,6 +92,10 @@ describe('TemplatesRepository', () => {
         {
           provide: getRepositoryToken(TemplateVersion),
           useValue: mockVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(EventChannelSetting),
+          useValue: mockEventChannelSettingRepository,
         },
       ],
     }).compile()
@@ -347,46 +376,119 @@ describe('TemplatesRepository', () => {
   describe('update', () => {
     it('should update an existing template', async () => {
       const updatedTemplate = { ...mockTemplate, name: 'Updated Name' }
-      mockTemplateRepository.save.mockResolvedValue(updatedTemplate)
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(updatedTemplate)
 
       const result = await repository.update(updatedTemplate)
 
       expect(result).toEqual(updatedTemplate)
-      expect(mockTemplateRepository.save).toHaveBeenCalledWith(updatedTemplate)
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        expect.objectContaining({ name: 'Updated Name' }),
+      )
     })
 
-    it('should handle partial updates', async () => {
-      const partialUpdate = { ...mockTemplate, description: 'Updated description' }
-      mockTemplateRepository.save.mockResolvedValue(partialUpdate)
+    it('should persist scalar foreign keys without stale eager relations', async () => {
+      const updatedTemplate = {
+        ...mockTemplate,
+        engineCode: TemplateEngine.MUSTACHE,
+        engine: { engineCode: TemplateEngine.HANDLEBARS },
+      } as Template
+      const reloadedTemplate = {
+        ...updatedTemplate,
+        engine: { engineCode: TemplateEngine.MUSTACHE },
+      } as Template
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(reloadedTemplate)
 
-      const result = await repository.update(partialUpdate)
+      const result = await repository.update(updatedTemplate)
 
-      expect(mockTemplateRepository.save).toHaveBeenCalledWith(partialUpdate)
-      expect(result.description).toBe('Updated description')
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        {
+          name: updatedTemplate.name,
+          description: updatedTemplate.description,
+          channelCode: updatedTemplate.channelCode,
+          subject: updatedTemplate.subject,
+          body: updatedTemplate.body,
+          engineCode: TemplateEngine.MUSTACHE,
+          bodyType: updatedTemplate.bodyType,
+          updatedBy: updatedTemplate.updatedBy,
+        },
+      )
+      expect(result.engineCode).toBe(TemplateEngine.MUSTACHE)
+      expect(result.engine.engineCode).toBe(TemplateEngine.MUSTACHE)
+    })
+
+    it('should fail when the tenant-owned active template was not updated', async () => {
+      mockTemplateRepository.update.mockResolvedValue({ affected: 0 })
+
+      await expect(repository.update(mockTemplate)).rejects.toThrow(
+        'Template template-123 could not be updated',
+      )
+      expect(mockTemplateRepository.findOne).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('findEventsUsingTemplate', () => {
+    it('should return the events whose switched-on channels use the template', async () => {
+      mockSettingsQuery([
+        {
+          channelCode: 'EMAIL',
+          event: { id: 'event-1', name: 'Air Quality 2026' },
+        },
+      ])
+
+      await expect(
+        repository.findEventsUsingTemplate('tenant-123', 'template-123'),
+      ).resolves.toEqual([{ id: 'event-1', name: 'Air Quality 2026', channelCode: 'EMAIL' }])
+    })
+
+    it('should only look at switched-on settings', async () => {
+      const builder = mockSettingsQuery([])
+
+      await repository.findEventsUsingTemplate('tenant-123', 'template-123')
+
+      expect(builder.andWhere).toHaveBeenCalledWith('setting.active = :active', { active: true })
     })
   })
 
   describe('softDelete', () => {
     it('should mark a template as inactive and record the deletion time', async () => {
-      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockSettingsQuery([])
 
-      await repository.softDelete('template-123')
+      await repository.softDelete('tenant-123', 'template-123', 'user-123')
 
-      expect(mockTemplateRepository.update).toHaveBeenCalledWith('template-123', {
+      expect(mockManager.update).toHaveBeenCalledWith(Template, 'template-123', {
         active: false,
         deletedAt: expect.any(Date),
       })
     })
 
-    it('should handle delete of non-existent template', async () => {
-      mockTemplateRepository.update.mockResolvedValue({ affected: 0 })
+    it('should clear the template off switched-off channel settings that still point at it', async () => {
+      const builder = mockSettingsQuery([{ id: 'setting-1' }, { id: 'setting-2' }])
 
-      await repository.softDelete('non-existent')
+      await repository.softDelete('tenant-123', 'template-123', 'user-123')
 
-      expect(mockTemplateRepository.update).toHaveBeenCalledWith('non-existent', {
-        active: false,
-        deletedAt: expect.any(Date),
-      })
+      expect(builder.andWhere).toHaveBeenCalledWith('setting.active = :active', { active: false })
+      expect(mockManager.update).toHaveBeenCalledWith(
+        EventChannelSetting,
+        ['setting-1', 'setting-2'],
+        { templateId: null, updatedBy: 'user-123' },
+      )
+    })
+
+    it('should not touch channel settings when none point at the template', async () => {
+      mockSettingsQuery([])
+
+      await repository.softDelete('tenant-123', 'template-123', 'user-123')
+
+      expect(mockManager.update).toHaveBeenCalledTimes(1)
+      expect(mockManager.update).not.toHaveBeenCalledWith(
+        EventChannelSetting,
+        expect.anything(),
+        expect.anything(),
+      )
     })
   })
 

@@ -14,6 +14,7 @@ import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ChannelBadge } from '@/components/ChannelBadge'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 import { RecipientsCell } from './RecipientsCell'
 
 /**
@@ -24,9 +25,8 @@ import { RecipientsCell } from './RecipientsCell'
 const NotificationStatusTable: FC = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const { sortBy, sortOrder, filters, page, limit, count, isLoading, hasLoaded } = useAppSelector(
-    (state) => state.notification,
-  )
+  const { sortBy, sortOrder, filters, page, limit, count, isLoading, hasLoaded, error } =
+    useAppSelector((state) => state.notification)
   const notifications = useAppSelector(selectNotifications)
   const statuses = useAppSelector(selectStatuses)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
@@ -49,6 +49,14 @@ const NotificationStatusTable: FC = () => {
       dispatch(fetchFeatureFlags(selectedTenant.id) as any)
     }
   }, [dispatch, selectedTenant?.id])
+
+  // Report a failed load, so a rejected sort/filter request doesn't just leave the previous rows
+  // on screen. The fixed toastId keeps repeat failures (an SSE-driven refetch) from stacking.
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error, undefined, { toastId: 'notification-list-error' })
+    }
+  }, [error])
 
   // Connect to SSE stream when tenant is selected and feature is enabled
   useEffect(() => {

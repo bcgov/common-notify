@@ -32,6 +32,11 @@ export default defineConfig({
         target: process.env.VITE_API_GATEWAY_NOTIFY_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
+      // GC Notify-compatible API, which has no /api prefix (see backend/src/app.ts)
+      '/gcnotify/': {
+        target: process.env.VITE_API_GATEWAY_NOTIFY_URL || 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

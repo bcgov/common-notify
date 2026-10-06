@@ -18,12 +18,14 @@ import { InlineRenderingService } from '../../services/rendering/inline-renderin
 import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
+import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
   extractTemplatePersonalisationKeys,
   describeTemplatePlaceholders,
@@ -44,10 +46,11 @@ export class TemplatesService {
     private readonly inlineRenderingService: InlineRenderingService,
     private readonly emailTemplateLayoutService: EmailTemplateLayoutService,
     private readonly configService: ConfigService,
+    private readonly tenantSettingsService: TenantSettingsService,
   ) {}
 
   public applyEmailLayout(
-    template: Template,
+    template: Pick<Template, 'tenantId' | 'channelCode'>,
     rendered: RenderedEmailContent,
   ): Promise<RenderedEmailContent> {
     return this.emailTemplateLayoutService.apply(template, rendered)
@@ -215,15 +218,44 @@ export class TemplatesService {
   }
 
   /**
-   * Delete a template (soft delete)
+   * Events that still render with this template, which the frontend shows instead of the
+   * delete confirmation when the list is not empty.
    */
-  async deleteTemplate(tenantId: string, templateId: string): Promise<void> {
+  async getTemplateUsage(tenantId: string, templateId: string): Promise<TemplateUsageResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
 
-    await this.templatesRepository.softDelete(templateId)
+    return { events: await this.templatesRepository.findEventsUsingTemplate(tenantId, templateId) }
+  }
+
+  /**
+   * Delete a template (soft delete)
+   * @param userId User deleting the template, stamped on any channel settings it is cleared from
+   */
+  async deleteTemplate(
+    tenantId: string,
+    templateId: string,
+    userId: string = 'system',
+  ): Promise<void> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    // A switched-on event pointing at a deleted template would fail at send time, so the
+    // template has to be taken off those events first. The frontend checks before asking for
+    // confirmation; this is what makes the rule hold for every caller. Switched-off channels
+    // are not sending, so softDelete just clears the template off them.
+    const events = await this.templatesRepository.findEventsUsingTemplate(tenantId, templateId)
+    if (events.length > 0) {
+      throw new ConflictException(
+        `Template ${templateId} is in use by event(s): ${events.map((e) => e.name).join(', ')}`,
+      )
+    }
+
+    await this.templatesRepository.softDelete(tenantId, templateId, userId)
   }
 
   /**
@@ -254,12 +286,8 @@ export class TemplatesService {
       // plain-text bodies carry no markup and are left for the caller to render as text.
       html:
         rendered.bodyType === 'text' ? undefined : toEmailHtml(rendered.body, rendered.bodyType),
-      // The address the send would actually use. Resolved the same way the transport resolves it,
-      // rather than from the tenant's default_sender_email - that setting is stored and displayed
-      // but is not consulted at send time, so showing it here would preview a lie.
-      from:
-        this.configService.get<string>('ches.from') ??
-        this.configService.get<string>('defaults.email.from'),
+      // The address the send would actually use, resolved exactly as delivery resolves it.
+      from: await this.tenantSettingsService.resolveSenderAddress(tenantId),
     }
   }
 
@@ -354,7 +382,13 @@ export class TemplatesService {
         ? Object.fromEntries(
             Object.entries(normalizedPersonalisation).map(([key, value]) => [
               key,
-              value !== null && value !== undefined ? String(value) : '',
+              // An array is a list value the legacy renderer formats itself, so it is passed
+              // through; String(["a","b"]) would flatten it to "a,b".
+              Array.isArray(value)
+                ? value
+                : value !== null && value !== undefined
+                  ? String(value)
+                  : '',
             ]),
           )
         : normalizedPersonalisation
@@ -407,6 +441,8 @@ export class TemplatesService {
     switch (engine) {
       case TemplateEngine.LEGACY_GC_NOTIFY:
         return 'legacy_gc_notify'
+      case TemplateEngine.GC_NOTIFY_NATIVE:
+        return 'gc_notify_native'
       case TemplateEngine.HANDLEBARS:
         return 'handlebars'
       case TemplateEngine.MUSTACHE:

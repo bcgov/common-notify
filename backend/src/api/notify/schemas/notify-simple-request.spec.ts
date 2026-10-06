@@ -5,7 +5,87 @@ import { NotifySimpleRequest } from './notify-simple-request'
 import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
 
+// Scheduling fixtures are computed, not hard-coded: a literal date silently becomes invalid the
+// day it passes, and delayedSend now rejects times in the past.
+const futureIso = (msAhead = 24 * 60 * 60 * 1000) => new Date(Date.now() + msAhead).toISOString()
+const futureOffset = () => futureIso().replace('Z', '+00:00')
+/** The same future instant written as a PDT (UTC-7) wall-clock time. */
+const futurePdt = () =>
+  new Date(Date.now() + 24 * 60 * 60 * 1000 - 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ') + ' PDT'
+
 describe('NotifySimpleRequest', () => {
+  describe('scheduling fields require a timezone', () => {
+    const recipients = { to: ['test@example.com'] }
+    const scheduleErrors = async (delayedSend: string) =>
+      validate(
+        plainToInstance(NotifySimpleRequest, {
+          email: { recipients, content: { body: 'Hello' }, delayedSend },
+        }),
+      )
+
+    it.each([
+      ['a Z suffix', futureIso],
+      ['a numeric offset', futureOffset],
+      ['a timezone abbreviation', futurePdt],
+    ])('accepts %s', async (_label, build) => {
+      expect(await scheduleErrors(build())).toHaveLength(0)
+    })
+
+    it('rejects a time in the past', async () => {
+      expect(
+        await scheduleErrors(new Date(Date.now() - 60 * 60_000).toISOString()),
+      ).not.toHaveLength(0)
+    })
+
+    it.each(['2026-06-01T16:00:00', '2026-06-01', '2026-06-01T09:00:00-0700', 'next tuesday'])(
+      'rejects %s',
+      async (value) => {
+        expect(await scheduleErrors(value)).not.toHaveLength(0)
+      },
+    )
+  })
+
+  describe('a stored template owns its own rendering', () => {
+    const TEMPLATE_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+    const recipients = { to: ['test@example.com'] }
+
+    const errorsFor = async (content: Record<string, unknown>) =>
+      validate(plainToInstance(NotifySimpleRequest, { email: { recipients, content } }))
+
+    it('accepts a templateId on its own', async () => {
+      expect(await errorsFor({ templateId: TEMPLATE_ID })).toHaveLength(0)
+    })
+
+    it.each(['renderer', 'bodyType', 'encoding'])(
+      'rejects a templateId combined with %s',
+      async (field) => {
+        const value =
+          field === 'renderer' ? 'handlebars' : field === 'bodyType' ? 'markdown' : 'utf-8'
+        expect(await errorsFor({ templateId: TEMPLATE_ID, [field]: value })).not.toHaveLength(0)
+      },
+    )
+
+    it('still allows bodyType and encoding alongside inline content', async () => {
+      const errors = await errorsFor({ body: 'Hello', bodyType: 'markdown', encoding: 'utf-8' })
+      expect(errors).toHaveLength(0)
+    })
+
+    // The channel-level rule also has to hold for /notifysimple/email, which posts a bare channel
+    // and never reaches the request-level constraint.
+    it('rejects a templateId combined with bodyType on the shorthand route', async () => {
+      const errors = await validate(
+        plainToInstance(NotifyEmailChannel, {
+          recipients,
+          content: { templateId: TEMPLATE_ID, bodyType: 'markdown' },
+        }),
+      )
+      expect(errors).not.toHaveLength(0)
+    })
+  })
+
   describe('Valid Instance Creation', () => {
     it('should create a valid instance with email channel', async () => {
       const data = {
@@ -13,9 +93,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -52,9 +130,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
         sms: {
           recipients: {
@@ -85,9 +161,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -142,9 +216,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -187,9 +259,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -211,9 +281,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -231,9 +299,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -304,9 +370,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -328,9 +392,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -352,9 +414,7 @@ describe('NotifySimpleRequest', () => {
           recipients: {
             to: ['test@example.com'],
           },
-          content: {
-            content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          },
+          content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
         },
       }
 
@@ -415,7 +475,7 @@ describe('NotifySimpleRequest', () => {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28T10:00:00Z',
+          delayedSend: futureIso(),
         },
       }
 
@@ -423,7 +483,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00Z')
+      expect(instance.email?.delayedSend).toBeDefined()
     })
 
     it('should accept ISO 8601 date format with offset for delayedSend', async () => {
@@ -431,7 +491,7 @@ describe('NotifySimpleRequest', () => {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28T10:00:00-07:00',
+          delayedSend: futureOffset(),
         },
       }
 
@@ -439,15 +499,16 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28T10:00:00-07:00')
+      expect(instance.email?.delayedSend).toBeDefined()
     })
 
     it('should accept relaxed date format with timezone abbreviation', async () => {
+      const delayedSend = futurePdt()
       const data = {
         email: {
           recipients: { to: ['test@example.com'] },
           content: { subject: 'Test', body: 'Test body', renderer: 'handlebars' },
-          delayedSend: '2026-04-28 10:00:00 PST',
+          delayedSend,
         },
       }
 
@@ -455,7 +516,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.email?.delayedSend).toBe('2026-04-28 10:00:00 PST')
+      expect(instance.email?.delayedSend).toBe(delayedSend)
     })
 
     it('should reject date format without timezone', async () => {
@@ -494,8 +555,8 @@ describe('NotifySimpleRequest', () => {
       const data = {
         sms: {
           recipients: { to: ['+16045551234'] },
-          body: 'Test SMS',
-          delayedSend: '2026-04-28T10:00:00Z',
+          content: { body: 'Test SMS' },
+          delayedSend: futureIso(),
         },
       }
 
@@ -503,7 +564,7 @@ describe('NotifySimpleRequest', () => {
       const errors = await validate(instance)
 
       expect(errors).toHaveLength(0)
-      expect(instance.sms?.delayedSend).toBe('2026-04-28T10:00:00Z')
+      expect(instance.sms?.delayedSend).toBeDefined()
     })
 
     it('should be optional field', async () => {

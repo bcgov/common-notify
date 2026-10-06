@@ -18,12 +18,12 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
-import { ChesApiClient } from '../../ches/ches-api.client'
 import { ConfigService } from '@nestjs/config'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -40,6 +40,7 @@ import { NotificationRequestDetailService } from '../../api/notification/notific
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { NotificationDedupService } from './services/notification-dedup.service'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -52,10 +53,6 @@ const mockAuthGuard: CanActivate = {
     request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
-}
-
-const mockChesApiClient = {
-  sendEmail: vi.fn(),
 }
 
 const mockConfigService = {
@@ -144,6 +141,14 @@ const mockSmsSegmentService = {
   countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
 }
 
+// Disabled unless a test opts in, so every other send test runs the undeduplicated path.
+const mockNotificationDedupService = {
+  enabled: false,
+  fingerprint: vi.fn().mockReturnValue('fingerprint-1'),
+  findDuplicate: vi.fn().mockResolvedValue(null),
+  claim: vi.fn(),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -163,6 +168,9 @@ describe('Notify Controllers', () => {
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
     mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
+    mockNotificationDedupService.enabled = false
+    mockNotificationDedupService.fingerprint.mockReturnValue('fingerprint-1')
+    mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [RenderingModule],
@@ -174,6 +182,7 @@ describe('Notify Controllers', () => {
         ChesEmailController,
       ],
       providers: [
+        { provide: NotifyPreviewService, useValue: {} },
         NotifyService,
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
@@ -182,7 +191,6 @@ describe('Notify Controllers', () => {
           provide: NotificationRequestDetailService,
           useValue: mockNotificationRequestDetailService,
         },
-        { provide: ChesApiClient, useValue: mockChesApiClient },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: QueueName.INGESTION, useValue: mockIngestionQueue },
         { provide: EMAIL_ADAPTER, useValue: mockEmailAdapter },
@@ -205,6 +213,7 @@ describe('Notify Controllers', () => {
           provide: SmsSegmentService,
           useValue: mockSmsSegmentService,
         },
+        { provide: NotificationDedupService, useValue: mockNotificationDedupService },
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -243,6 +252,28 @@ describe('Notify Controllers', () => {
   })
 
   describe('NotifySimpleController', () => {
+    it.each([
+      ['', ''],
+      ['', '?preview=false'],
+      ['', '?preview=TRUE'],
+      ['/email', ''],
+      ['/email', '?preview=false'],
+      ['/email', '?preview=1'],
+    ])('keeps real sends active on %s%s', async (path, query) => {
+      mockApiKeyConsumerId = 'consumer-standard'
+      const channel = {
+        recipients: { to: ['test@example.com'] },
+        content: { subject: 'Test', body: 'Hello' },
+      }
+      await request(app.getHttpServer())
+        .post(`/api/v1/notifysimple${path}${query}`)
+        .send(path ? channel : { email: channel })
+        .expect(202)
+      expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
+      expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
+      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+    })
+
     it('should be defined', () => {
       const controller = app.get(NotifySimpleController)
       expect(controller).toBeDefined()
@@ -523,6 +554,170 @@ describe('Notify Controllers', () => {
       })
     })
 
+    describe('deduplication', () => {
+      const CLAIMED_ID = '0b7c6f1e-2d4a-4c8e-9f10-3a5b7c9d1e2f'
+      const ORIGINAL_ID = '6f1e0b7c-4a2d-4e8c-8f10-9d1e2f3a5b7c'
+      const originalCreatedAt = '2026-09-25T10:00:00.000Z'
+      const body = {
+        email: {
+          recipients: { to: ['test@example.com'] },
+          content: { subject: 'Test', body: 'Hello' },
+        },
+      }
+      const mergeBody = {
+        content: { templateId: '12345678-1234-4234-8234-123456789012' },
+        recipients: { mergeArray: [['to'], ['alice@example.com'], ['bob@example.com']] },
+      }
+      const original = {
+        notifyId: ORIGINAL_ID,
+        status: 'completed',
+        channels: ['email'],
+        createdAt: new Date(originalCreatedAt),
+      }
+      const release = vi.fn().mockResolvedValue(undefined)
+
+      beforeEach(() => {
+        mockNotificationDedupService.enabled = true
+        mockNotificationDedupService.claim.mockResolvedValue({
+          kind: 'proceed',
+          notifyId: CLAIMED_ID,
+          release,
+        })
+        mockNotificationService.create.mockImplementation(async (dto: { id?: string }) => ({
+          id: dto.id ?? 'db-generated-id',
+        }))
+        mockApiKeyConsumerId = 'consumer-1'
+      })
+
+      const expectNothingAccepted = () => {
+        expect(mockNotificationService.create).not.toHaveBeenCalled()
+        expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      }
+
+      it('creates the row with the claimed notifyId', async () => {
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(mockNotificationDedupService.claim).toHaveBeenCalledWith(
+          'test-tenant-id',
+          'fingerprint-1',
+        )
+        expect(mockNotificationService.create).toHaveBeenCalledWith(
+          expect.objectContaining({ id: CLAIMED_ID }),
+        )
+        expect(response.body.notifyId).toBe(CLAIMED_ID)
+        expect(response.body.duplicate).toBeUndefined()
+      })
+
+      it('answers a known duplicate with the original before uploading or counting anything', async () => {
+        mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(response.body).toMatchObject({
+          notifyId: ORIGINAL_ID,
+          status: 'completed',
+          channels: ['email'],
+          createdAt: originalCreatedAt,
+          duplicate: true,
+        })
+        expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
+        expect(mockApiKeyUsageService.assertWithinLimits).not.toHaveBeenCalled()
+        expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+        expectNothingAccepted()
+      })
+
+      it('answers a duplicate that won the claim race with the original', async () => {
+        mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send(body)
+          .expect(202)
+
+        expect(response.body.notifyId).toBe(ORIGINAL_ID)
+        expect(response.body.duplicate).toBe(true)
+        expectNothingAccepted()
+      })
+
+      it('claims only after the limit check, so a rejected send holds no claim', async () => {
+        mockApiKeyUsageService.assertWithinLimits.mockRejectedValueOnce(
+          new BadRequestException('over limit'),
+        )
+
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(400)
+
+        expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+      })
+
+      it('releases the claim when the row cannot be created', async () => {
+        mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
+
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(500)
+
+        expect(release).toHaveBeenCalledTimes(1)
+      })
+
+      it('fingerprints the same shape whether the email is posted wrapped or bare', async () => {
+        await request(app.getHttpServer()).post('/api/v1/notifysimple').send(body).expect(202)
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(body.email)
+          .expect(202)
+
+        const [wrapped, bare] = mockNotificationDedupService.fingerprint.mock.calls.map(
+          ([payload]) => JSON.parse(JSON.stringify(payload)),
+        )
+        expect(bare).toEqual(wrapped)
+      })
+
+      it('answers a duplicate mail merge before validating or rendering its rows', async () => {
+        mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(202)
+
+        expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+        expect(mockNotificationService.validateMailMergeRules).not.toHaveBeenCalled()
+        expectNothingAccepted()
+      })
+
+      it('creates a mail merge with the claimed notifyId and releases it on failure', async () => {
+        const accepted = await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(202)
+        expect(accepted.body.notifyId).toBe(CLAIMED_ID)
+
+        mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send(mergeBody)
+          .expect(500)
+        expect(release).toHaveBeenCalledTimes(1)
+      })
+
+      it('deduplicates frontend sends through the same path', async () => {
+        mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
+
+        const response = await request(app.getHttpServer())
+          .post('/api/v1/frontend/notifysimple')
+          .send(mergeBody)
+          .expect(202)
+
+        expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+        expectNothingAccepted()
+      })
+    })
+
     describe('POST /api/v1/notifysimple', () => {
       it('returns a 400 identifying an unresolvable SMS recipient index and value', async () => {
         await request(app.getHttpServer())
@@ -595,11 +790,27 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 422 when no channel is provided', async () => {
+      // An empty body fails DTO validation now that ValidateTemplateOrContent actually runs, so it
+      // is rejected at the pipe with a 400 rather than reaching the business-rule check. 400 for a
+      // malformed request and 422 for a business-rule failure is the split ValidationExceptionFilter
+      // already assumes.
+      it('should return 400 when no channel is provided', async () => {
+        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(400)
+      })
+
+      it('should return 422 when a well-formed request fails a business rule', async () => {
         mockNotificationService.validateBusinessRules.mockResolvedValueOnce([
           'At least one recipient is required (email, SMS, or msgApp)',
         ])
-        return request(app.getHttpServer()).post('/api/v1/notifysimple').send({}).expect(422)
+        return request(app.getHttpServer())
+          .post('/api/v1/notifysimple')
+          .send({
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Hello' },
+            },
+          })
+          .expect(422)
       })
 
       it('should return 202 with status "accepted" for immediate send', async () => {
@@ -636,8 +847,11 @@ describe('Notify Controllers', () => {
           })
       })
 
-      it('should return 202 with status "scheduled" for past delayedSend date', async () => {
-        const pastDate = new Date(Date.now() - 3600000).toISOString() // 1 hour ago (ISO format with Z)
+      // A past delayedSend used to be accepted and sent immediately, because the delay is computed
+      // as Math.max(0, when - now). Scheduling into the past is never what a caller meant, so it is
+      // rejected now.
+      it('should return 400 for a delayedSend in the past', async () => {
+        const pastDate = new Date(Date.now() - 3600000).toISOString()
         return request(app.getHttpServer())
           .post('/api/v1/notifysimple')
           .send({
@@ -647,11 +861,7 @@ describe('Notify Controllers', () => {
               delayedSend: pastDate,
             },
           })
-          .expect(202)
-          .expect((res) => {
-            expect(res.body.status).toBe('scheduled')
-            expect(res.body.message).toContain('Notification scheduled for delivery')
-          })
+          .expect(400)
       })
 
       it('should return 400 and not persist when attachment validation fails', async () => {
@@ -708,6 +918,27 @@ describe('Notify Controllers', () => {
 
         expect(mockNotificationService.create).not.toHaveBeenCalled()
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('hands the email shorthand params to validation under the channel, not top level', async () => {
+        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // Everything the caller sent lands under email — so validateBusinessRules sees no
+        // top-level params and must read the channel's own params to resolve placeholders.
+        const templateId = '12345678-1234-4234-8234-123456789012'
+
+        await request(app.getHttpServer())
+          .post('/api/v1/notifysimple/email')
+          .send({
+            recipients: { to: ['test@example.com'] },
+            content: { templateId },
+            params: { firstName: 'Alice' },
+          })
+          .expect(202)
+
+        const [, validatedPayload] =
+          mockNotificationService.validateBusinessRules.mock.calls.at(-1)!
+        expect(validatedPayload.params).toBeUndefined()
+        expect(validatedPayload.email.params).toEqual({ firstName: 'Alice' })
       })
 
       it('should return a clear DTO error when attachment content is missing', async () => {
@@ -920,6 +1151,125 @@ describe('Notify Controllers', () => {
             .expect(400)
 
           expect(mockNotificationService.create).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('POST /api/v1/notifysimple/sms (mail-merge)', () => {
+        it.each(['', '?preview=false'])(
+          'keeps ordinary SMS sends unchanged with query %s',
+          async (query) => {
+            const body = {
+              sms: { recipients: { to: ['250 555 0123'] }, content: { body: 'Hello' } },
+            }
+            await request(app.getHttpServer())
+              .post(`/api/v1/notifysimple/sms${query}`)
+              .send(body)
+              .expect(202)
+              .expect((res) => {
+                expect(res.body.notifyId).toBeDefined()
+                expect(res.body.status).toBe('accepted')
+                expect(res.body.channels).toEqual(['sms'])
+                expect(res.body.sms).toBeUndefined()
+              })
+            expect(mockNotificationService.create).toHaveBeenCalled()
+            expect(mockIngestionQueue.add).toHaveBeenCalled()
+            expect(mockNotificationService.validateBusinessRules).toHaveBeenCalled()
+          },
+        )
+
+        // An SMS merge is a full NotifySimpleRequest whose sms.recipients use mergeArray.
+        const validSmsMerge = {
+          sms: {
+            content: { templateId: '12345678-1234-4234-8234-123456789012' },
+            recipients: {
+              mergeArray: [
+                ['to', 'firstName'],
+                ['+12505550123', 'Alice'],
+                ['+16045550147', 'Bob'],
+              ],
+            },
+          },
+        }
+
+        it('should accept an SMS merge and report the recipient count', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.notifyId).toBeDefined()
+              expect(res.body.status).toBe('accepted')
+              expect(res.body.channels).toEqual(['sms'])
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.message).toContain('SMS merge send accepted with 2 recipient(s)')
+            })
+        })
+
+        it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
+          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
+          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
+          mockSmsSegmentService.countSegmentsPerRecipient
+            .mockResolvedValueOnce(3)
+            .mockResolvedValueOnce(1)
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+            .expect((res) => {
+              expect(res.body.recipientCount).toBe(2)
+              expect(res.body.billableMessageCount).toBe(4)
+            })
+        })
+
+        it('should enforce limits on segments, not on recipients', async () => {
+          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockApiKeyConsumerId = 'consumer-1'
+
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(202)
+
+          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('consumer-1', [
+            { channel: 'SMS', count: 8 },
+          ])
+        })
+
+        it('should return 422 with the row that failed validation', async () => {
+          mockNotificationService.validateMailMergeRules.mockResolvedValueOnce([
+            'Row 2: "not-a-number" is not a valid phone number',
+          ])
+
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send(validSmsMerge)
+            .expect(422)
+            .expect((res) => {
+              expect(res.body.errors).toContain('Row 2: "not-a-number" is not a valid phone number')
+            })
+        })
+
+        it('should return 400 when both to and mergeArray are given', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({
+              sms: {
+                ...validSmsMerge.sms,
+                recipients: {
+                  to: ['+12505550123'],
+                  mergeArray: [['to'], ['+16045550147']],
+                },
+              },
+            })
+            .expect(400)
+        })
+
+        it('should still reject an empty to list', async () => {
+          return request(app.getHttpServer())
+            .post('/api/v1/notifysimple/sms')
+            .send({ sms: { ...validSmsMerge.sms, recipients: { to: [] } } })
+            .expect(400)
         })
       })
 

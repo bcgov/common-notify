@@ -16,6 +16,7 @@ import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 @Module({
   imports: [
@@ -31,6 +32,8 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
     TemplatesModule,
     FeatureFlagModule,
     CstarModule,
+    // ApiKeyConsumer repository for NotifyServiceGuard on NotificationController.
+    ApiKeysModule,
   ],
   controllers: [NotificationController, NotificationFrontendController],
   providers: [

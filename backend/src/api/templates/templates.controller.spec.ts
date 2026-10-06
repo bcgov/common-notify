@@ -446,7 +446,11 @@ describe('TemplatesController', () => {
       const result = await controller.deleteTemplate(createMockRequest(), 'template-123')
 
       expect(result).toBeUndefined()
-      expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-123')
+      expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith(
+        'tenant-123',
+        'template-123',
+        'system',
+      )
     })
 
     it('should call service with correct tenant and template IDs', async () => {
@@ -454,7 +458,11 @@ describe('TemplatesController', () => {
 
       await controller.deleteTemplate(createMockRequest(), 'template-456')
 
-      expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith('tenant-123', 'template-456')
+      expect(mockTemplatesService.deleteTemplate).toHaveBeenCalledWith(
+        'tenant-123',
+        'template-456',
+        'system',
+      )
     })
 
     it('should return 204 No Content status', async () => {
