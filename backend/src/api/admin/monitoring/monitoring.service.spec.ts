@@ -8,7 +8,9 @@ import {
   averageOfWholeMinutes,
   buildOverview,
   buildRedisStats,
+  buildProviderStats,
   buildReconcilerStats,
+  buildSendsInProgress,
   sendingRateFrom,
   countUnheldActiveJobs,
   evaluateQueue,
@@ -116,14 +118,71 @@ describe('evaluateQueue', () => {
     expect(queue.estimatedDrainMinutes).toBe(5)
   })
 
-  it('warns when jobs arrive faster than they finish', () => {
+  /** Per-minute series ending with the current, partial minute. */
+  const minutes = (...values: number[]) => [...Array(60 - values.length).fill(0), ...values]
+  /** Nothing added or finished in the last hour. */
+  const idle = {
+    ...baseQueue.throughput,
+    added: minutes(),
+    completed: minutes(),
+    failed: minutes(),
+    inPerMinute: 0,
+    outPerMinute: 0,
+  }
+
+  it('warns when jobs arrive faster than they finish minute after minute', () => {
     const queue = evaluateQueue({
       ...baseQueue,
       counts: { ...baseQueue.counts, waiting: 100 },
-      throughput: { ...baseQueue.throughput, inPerMinute: 30, outPerMinute: 10 },
+      throughput: {
+        ...baseQueue.throughput,
+        added: minutes(30, 30, 30, 0),
+        completed: minutes(10, 10, 10, 0),
+        inPerMinute: 30,
+        outPerMinute: 10,
+      },
     })
     expect(queue.status).toBe('warning')
+    expect(queue.reasons).toContain(
+      'Jobs have arrived faster than they finish for 3 minutes running',
+    )
     expect(queue.estimatedDrainMinutes).toBeNull()
+  })
+
+  it('does not warn about one burst of arrivals, such as a large send queueing its batches', () => {
+    const queue = evaluateQueue({
+      ...baseQueue,
+      counts: { ...baseQueue.counts, waiting: 60, active: 20 },
+      throughput: {
+        ...baseQueue.throughput,
+        added: minutes(80, 0, 0, 0),
+        completed: minutes(0, 2, 3, 1),
+        inPerMinute: 16,
+        outPerMinute: 1,
+      },
+    })
+    expect(queue.status).toBe('healthy')
+  })
+
+  it('does not flag long-waiting jobs while the queue is moving', () => {
+    const waiting = { ...baseQueue.counts, waiting: 60 }
+    const oldest = 15 * 60_000
+    // A batch finished in the last two minutes.
+    expect(
+      evaluateQueue({
+        ...baseQueue,
+        counts: waiting,
+        oldestWaitingAgeMs: oldest,
+        throughput: { ...idle, completed: minutes(1, 0) },
+      }).status,
+    ).toBe('healthy')
+    // No batch finished yet, but their recipients are being sent.
+    expect(
+      evaluateQueue(
+        { ...baseQueue, counts: waiting, oldestWaitingAgeMs: oldest, throughput: idle },
+        true,
+      ).status,
+    ).toBe('healthy')
   })
 
   it('is critical when jobs are waiting and no pod is processing the queue', () => {
@@ -135,14 +194,12 @@ describe('evaluateQueue', () => {
     expect(queue.status).toBe('critical')
   })
 
-  it('grades the oldest waiting job against both thresholds', () => {
-    const waiting = { ...baseQueue.counts, waiting: 1 }
-    expect(
-      evaluateQueue({ ...baseQueue, counts: waiting, oldestWaitingAgeMs: 3 * 60_000 }).status,
-    ).toBe('warning')
-    expect(
-      evaluateQueue({ ...baseQueue, counts: waiting, oldestWaitingAgeMs: 11 * 60_000 }).status,
-    ).toBe('critical')
+  it('grades the oldest waiting job against both thresholds when nothing is finishing', () => {
+    const stuck = { ...baseQueue, counts: { ...baseQueue.counts, waiting: 1 }, throughput: idle }
+    expect(evaluateQueue({ ...stuck, oldestWaitingAgeMs: 3 * 60_000 }).status).toBe('warning')
+    const critical = evaluateQueue({ ...stuck, oldestWaitingAgeMs: 11 * 60_000 })
+    expect(critical.status).toBe('critical')
+    expect(critical.reasons[0]).toMatch(/nothing has finished in the last 2 minutes/)
   })
 
   it('ignores the failure rate until enough jobs have finished', () => {
@@ -166,6 +223,7 @@ describe('countUnheldActiveJobs', () => {
     podId: 'pod',
     startedAt: '',
     lastHeartbeatAt: '',
+    draining: false,
     queues: [
       {
         queue: 'email-delivery',
@@ -328,6 +386,9 @@ describe('MonitoringService', () => {
   function fakeRedis(workers: object[] = [], pipeline = fakeReconcilePipeline()) {
     return {
       pipeline: vi.fn(() => pipeline),
+      get: vi.fn().mockResolvedValue(null),
+      exists: vi.fn().mockResolvedValue(0),
+      zcount: vi.fn().mockResolvedValue(3),
       info: vi
         .fn()
         .mockResolvedValue(
@@ -345,11 +406,19 @@ describe('MonitoringService', () => {
     finishedRows: object[] = [],
     deliveryRow: object = { median: null, p95: null, messages: '0' },
     rateRow: object = { busy_messages: '0', busy_seconds: '0' },
+    sendRows: object[] = [],
   ) {
     const results: unknown[] = [pendingRows, finishedRows, deliveryRow]
     return {
-      metadata: { tablePath: 'notify.notification_request_detail' },
-      query: vi.fn().mockResolvedValue([rateRow]),
+      metadata: {
+        tablePath: 'notify.notification_request_detail',
+        findRelationWithPropertyPath: () => ({
+          inverseEntityMetadata: { tablePath: 'notify.notification_request' },
+        }),
+      },
+      query: vi.fn((sql: string) =>
+        Promise.resolve(sql.includes('busy_messages') ? [rateRow] : sendRows),
+      ),
       createQueryBuilder: vi.fn(() => {
         const rows = results.shift() ?? []
         const builder: Record<string, unknown> = {}
@@ -456,6 +525,47 @@ describe('MonitoringService', () => {
     expect(result.status).toBe('warning')
   })
 
+  it('reports each provider, with CHES calls in flight, and closed circuits as healthy', async () => {
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+      {
+        get: (key: string) => ({ 'ches.maxConcurrentRequests': 5, 'delivery.sms': 'acs' })[key],
+      } as never,
+    )
+
+    const { providers, status } = await service.getQueueMonitoring()
+
+    expect(providers).toEqual([
+      {
+        name: 'CHES',
+        channel: 'EMAIL',
+        status: 'healthy',
+        reasons: [],
+        circuit: 'closed',
+        reopensAt: null,
+        inFlight: 3,
+        limit: 5,
+      },
+      {
+        name: 'ACS',
+        channel: 'SMS',
+        status: 'healthy',
+        reasons: [],
+        circuit: 'closed',
+        reopensAt: null,
+        inFlight: null,
+        limit: null,
+      },
+    ])
+    expect(status).toBe('healthy')
+  })
+
   it('returns recent failures newest first with tenant names and masked reasons', async () => {
     const failedJob = (id: string, finishedOn: number) => ({
       id,
@@ -549,7 +659,7 @@ describe('MonitoringService', () => {
     expect(sms).toMatchObject({ pending: 0, oldestPendingAgeMs: null, estimatedClearMinutes: 0 })
   })
 
-  it('reports progress for active merge batches and ignores other active jobs', async () => {
+  it('rolls sends up per request, counting the merge batches being worked now', async () => {
     const batch = {
       id: 'req-1-EMAIL-0',
       processedOn: now - 20_000,
@@ -567,23 +677,36 @@ describe('MonitoringService', () => {
       null,
       null,
       tenantRepository,
-      fakeDetailRepository(),
+      fakeDetailRepository([], [], undefined, undefined, [
+        {
+          id: 'req-1',
+          tenant_id: 't-1',
+          accepted_at: new Date(now - 60_000),
+          channels: 'EMAIL',
+          total: '100',
+          sent: '37',
+          failed: '2',
+          remaining: '61',
+          batches: '4',
+          batches_open: '3',
+          recent_finished: '39',
+        },
+      ]),
     )
 
-    const { activeBatches } = await service.getQueueMonitoring()
+    const { sendsInProgress } = await service.getQueueMonitoring()
 
-    expect(activeBatches).toEqual([
-      {
-        queue: 'email-delivery',
-        jobId: 'req-1-EMAIL-0',
+    expect(sendsInProgress).toEqual([
+      expect.objectContaining({
         notificationId: 'req-1',
-        tenantId: 't-1',
         tenantName: 'Health Ministry',
         sent: 37,
         failed: 2,
         total: 100,
-        startedAt: new Date(now - 20_000).toISOString(),
-      },
+        batchesDone: 1,
+        // The plain job on the same queue is not a batch.
+        batchesSending: 1,
+      }),
     ])
   })
 
@@ -694,5 +817,85 @@ describe('buildReconcilerStats', () => {
     )
     expect(stats.status).toBe('warning')
     expect(stats.reasons[0]).toMatch(/Gave up on 2 stuck send/)
+  })
+})
+
+describe('buildSendsInProgress', () => {
+  const row = {
+    id: 'n-1',
+    tenant_id: 't-1',
+    accepted_at: '2026-10-05T22:36:30.000Z',
+    channels: 'EMAIL',
+    total: '2000',
+    sent: '400',
+    failed: '2',
+    remaining: '1598',
+    batches: '80',
+    batches_open: '64',
+    recent_finished: '325',
+  }
+  const activeBatch = (notifyId: string) =>
+    ({
+      queue: 'email-delivery',
+      job: { data: { notifyId } },
+      progress: { sent: 3, failed: 0, total: 25 },
+    }) as unknown as Parameters<typeof buildSendsInProgress>[1][number]
+
+  it('rolls a merge up into one row with its batches and a time left', () => {
+    const [send] = buildSendsInProgress(
+      [row],
+      [activeBatch('n-1'), activeBatch('n-1'), activeBatch('other')],
+      new Map([['t-1', 'Health Ministry']]),
+    )
+    expect(send).toEqual({
+      notificationId: 'n-1',
+      tenantId: 't-1',
+      tenantName: 'Health Ministry',
+      channels: ['EMAIL'],
+      acceptedAt: '2026-10-05T22:36:30.000Z',
+      total: 2000,
+      sent: 400,
+      failed: 2,
+      remaining: 1598,
+      batches: 80,
+      batchesDone: 16,
+      batchesSending: 2,
+      perMinute: 65,
+      estimatedMinutesLeft: 25,
+    })
+  })
+
+  it('gives no time left when nothing has finished recently', () => {
+    const [send] = buildSendsInProgress(
+      [{ ...row, recent_finished: '0', batches: '0', batches_open: '0' }],
+      [],
+      new Map(),
+    )
+    expect(send).toMatchObject({ perMinute: 0, estimatedMinutesLeft: null, batches: 0 })
+  })
+})
+
+describe('buildProviderStats', () => {
+  const ches = { name: 'CHES', channel: 'EMAIL' as const, inFlight: 0, limit: 5 }
+
+  it('warns while the circuit is open, saying sends are waiting rather than failing', () => {
+    const stats = buildProviderStats(ches, {
+      state: 'open',
+      reopensAt: '2026-10-05T22:43:48.000Z',
+    })
+    expect(stats).toMatchObject({
+      status: 'warning',
+      circuit: 'open',
+      reopensAt: '2026-10-05T22:43:48.000Z',
+    })
+    expect(stats.reasons[0]).toMatch(/sends are waiting/)
+  })
+
+  it('warns while a probe is testing whether the provider has recovered', () => {
+    expect(buildProviderStats(ches, { state: 'half-open' }).reasons[0]).toMatch(/one test send/)
+  })
+
+  it('reports an unreadable circuit without raising an alarm', () => {
+    expect(buildProviderStats(ches, null)).toMatchObject({ status: 'healthy', circuit: null })
   })
 })

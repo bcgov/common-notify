@@ -11,6 +11,7 @@ import { NodemailerEmailTransport } from '../../src/adapters/implementations/del
 import { LogEmailTransport } from '../../src/adapters/implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from '../../src/adapters/implementations/delivery/sms/twilio/twilio-sms.adapter'
 import { AcsSmsTransport } from '../../src/adapters/implementations/delivery/sms/acs/acs-sms.adapter'
+import { SmsCircuitBreaker } from '../../src/adapters/implementations/delivery/sms/sms-circuit-breaker'
 
 describe('AdaptersModule', () => {
   it('forRoot returns dynamic module with all adapters and maps', () => {
@@ -18,7 +19,8 @@ describe('AdaptersModule', () => {
 
     expect(dynamic.module).toBe(AdaptersModule)
     expect(dynamic.global).toBe(true)
-    expect(dynamic.providers).toHaveLength(11)
+    expect(dynamic.providers).toHaveLength(12)
+    expect(dynamic.providers).toContain(SmsCircuitBreaker)
     expect(dynamic.exports).toContain(EMAIL_ADAPTER)
     expect(dynamic.exports).toContain(SMS_ADAPTER)
     expect(dynamic.exports).toContain(EMAIL_ADAPTER_MAP)
@@ -38,5 +40,19 @@ describe('AdaptersModule', () => {
     expect(adapterProviders).toContain(LogEmailTransport)
     expect(adapterProviders).toContain(TwilioSmsTransport)
     expect(adapterProviders).toContain(AcsSmsTransport)
+  })
+
+  it('sends SMS through the circuit breaker, whichever provider is configured', () => {
+    const provider = (AdaptersModule.forRoot().providers ?? []).find(
+      (p) => (p as { provide?: unknown }).provide === SMS_ADAPTER,
+    ) as { useFactory: (...args: unknown[]) => unknown }
+    const acs = { name: 'acs', send: vi.fn() }
+    const wrapped = { name: 'acs', send: vi.fn() }
+    const breaker = { wrap: vi.fn(() => wrapped) }
+
+    const adapter = provider.useFactory({ acs }, { get: () => 'acs' }, breaker)
+
+    expect(breaker.wrap).toHaveBeenCalledWith(acs)
+    expect(adapter).toBe(wrapped)
   })
 })

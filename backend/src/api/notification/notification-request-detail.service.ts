@@ -252,6 +252,21 @@ export class NotificationRequestDetailService {
   }
 
   /**
+   * Mark what one merge batch still owes failed, leaving its sent rows and every other batch
+   * alone. For a batch that can never succeed (its template deleted, say), once retries are spent.
+   */
+  async markBatchUnsentFailed(
+    notificationRequestId: string,
+    batchId: string,
+    errorMessage: string,
+  ): Promise<void> {
+    await this.detailRepository.update(
+      { notificationRequestId, batchId, status: In(IN_FLIGHT_DETAIL_STATUSES) },
+      { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
+    )
+  }
+
+  /**
    * Count detail records for a request in a given status (used to reconcile the parent request).
    */
   async countByStatus(notificationRequestId: string, status: string): Promise<number> {

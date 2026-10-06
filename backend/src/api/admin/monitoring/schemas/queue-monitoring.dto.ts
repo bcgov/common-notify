@@ -109,16 +109,32 @@ export interface MessageChannelStatsDto {
   estimatedClearMinutes: number | null
 }
 
-export interface ActiveBatchDto {
-  queue: string
-  jobId: string
-  notificationId: string | null
-  tenantId: string | null
+/**
+ * One notification request with recipients still to send: a whole mail merge, however many
+ * batches it was split into, or a plain send. Counted from its recipient rows.
+ */
+export interface SendInProgressDto {
+  notificationId: string
+  tenantId: string
   tenantName: string | null
+  /** Channels the request is sending on, e.g. ["EMAIL"]. */
+  channels: string[]
+  acceptedAt: string
+  /** Recipients to send to, blocked recipients excluded. */
+  total: number
   sent: number
   failed: number
-  total: number
-  startedAt: string | null
+  /** Accepted, queued or sending: not yet sent or failed. */
+  remaining: number
+  /** Merge batches; 0 for a plain send. */
+  batches: number
+  batchesDone: number
+  /** Batches a worker is on right now. */
+  batchesSending: number
+  /** Recipients sent or failed per minute over the last few minutes. */
+  perMinute: number
+  /** At perMinute; null when nothing finished recently. */
+  estimatedMinutesLeft: number | null
 }
 
 /** Totals over the last hour, for the summary cards. */
@@ -166,6 +182,22 @@ export interface ReconcilerStatsDto {
   recentActions: ReconcilerActionDto[]
 }
 
+/** A delivery provider as this service sees it: the shared circuit breaker in front of it. */
+export interface ProviderStatsDto {
+  /** e.g. "CHES", "ACS". */
+  name: string
+  channel: 'EMAIL' | 'SMS'
+  status: HealthStatus
+  reasons: string[]
+  /** closed: sending; open: provider failing, sends wait; half-open: one probe send in progress. Null when unreadable. */
+  circuit: 'closed' | 'open' | 'half-open' | null
+  /** When an open circuit lets its probe through. */
+  reopensAt: string | null
+  /** Requests in flight and the cap on them, where one is applied (CHES); null where not. */
+  inFlight: number | null
+  limit: number | null
+}
+
 export interface QueueMonitoringResponseDto {
   generatedAt: string
   status: HealthStatus
@@ -173,8 +205,9 @@ export interface QueueMonitoringResponseDto {
   redis: RedisStatsDto
   messages: MessageChannelStatsDto[]
   queues: QueueStatsDto[]
-  activeBatches: ActiveBatchDto[]
+  sendsInProgress: SendInProgressDto[]
   workers: WorkerPodDto[]
   reconciler: ReconcilerStatsDto
+  providers: ProviderStatsDto[]
   recentFailures: RecentFailureDto[]
 }

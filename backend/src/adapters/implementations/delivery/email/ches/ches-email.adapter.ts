@@ -6,12 +6,20 @@ import {
   Logger,
   NotFoundException,
   OnModuleDestroy,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type Redis from 'ioredis'
+import { RedisCircuitBreaker } from '../../../../../common/redis/circuit-breaker'
 import { RedisConcurrencyLimiter } from '../../../../../common/redis/concurrency-limiter'
-import { redisKey } from '../../../../../common/redis/redis-namespace'
+import {
+  TransientDeliveryError,
+  isNotSentNetworkError,
+  isTransientDeliveryError,
+  isTransientHttpStatus,
+} from '../../../../delivery-errors'
+import { CHES_CIRCUIT_KEY, CHES_IN_FLIGHT_KEY } from '../../../../delivery-keys'
 import { createRedisClient, type RedisConfig } from '../../../../../queue/redis-connection'
 import { toEmailHtml } from '../../../../../services/rendering/email-body-html'
 import { IEmailTransport, SendEmailOptions, SendEmailResult } from '../../../../interfaces'
@@ -49,8 +57,17 @@ interface ChesErrorResponse {
   errors?: Array<{ message: string }>
 }
 
+/**
+ * Five failures in ten seconds is CHES unwell rather than one bad message: at its usual pace
+ * that is most calls failing. Thirty seconds then covers a pod restart without probing it.
+ */
+const CHES_CIRCUIT = { failureThreshold: 5, windowMs: 10_000, cooldownMs: 30_000 }
+
+/** How long startup waits for the limiter's Redis connection before sending without it. */
+const LIMITER_CONNECT_WAIT_MS = 2000
+
 @Injectable()
-export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
+export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModuleDestroy {
   readonly name = 'ches'
   private readonly logger = new Logger(ChesEmailTransport.name)
 
@@ -62,6 +79,11 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
    * Null - no cap - when Redis is not configured (tests) or the limit is 0.
    */
   private readonly limiter: RedisConcurrencyLimiter | null = null
+  /**
+   * Stops every pod calling CHES while it is failing (TransientDeliveryError or a timeout):
+   * sends wait instead of failing, and resume once a probe send succeeds. Null with the limiter.
+   */
+  private readonly breaker: RedisCircuitBreaker | null = null
 
   constructor(private readonly configService: ConfigService) {
     const redisConfig = this.configService.get<RedisConfig>('redis')
@@ -70,16 +92,39 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
 
     this.redis = createRedisClient(redisConfig, ChesEmailTransport.name, {
       // On the send path: a Redis outage has to fall back to unlimited sending in milliseconds.
-      lazyConnect: true,
+      // Not lazy: see onModuleInit.
       enableOfflineQueue: false,
       maxRetriesPerRequest: 1,
       commandTimeout: 250,
     })
     const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 120_000
-    this.limiter = new RedisConcurrencyLimiter(this.redis, redisKey('ches:in-flight'), {
+    this.limiter = new RedisConcurrencyLimiter(this.redis, CHES_IN_FLIGHT_KEY, {
       limit,
       // Outlasts the request's own timeout, so a slot is only reclaimed from a pod that died.
       leaseMs: timeoutMs + 15_000,
+    })
+    this.breaker = new RedisCircuitBreaker(this.redis, CHES_CIRCUIT_KEY, {
+      ...CHES_CIRCUIT,
+      probeTimeoutMs: timeoutMs + 15_000,
+      isFailure: (error) =>
+        isTransientDeliveryError(error) || error instanceof GatewayTimeoutException,
+    })
+  }
+
+  /**
+   * Hold startup until the limiter's connection is up. With no offline queue a command sent
+   * mid-handshake is rejected, so without this a pod's first sends would skip the limit. Never
+   * fatal: after LIMITER_CONNECT_WAIT_MS the pod starts anyway and fails open until Redis is up.
+   */
+  async onModuleInit(): Promise<void> {
+    const redis = this.redis
+    if (!redis || redis.status === 'ready') return
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, LIMITER_CONNECT_WAIT_MS)
+      redis.once('ready', () => {
+        clearTimeout(timer)
+        resolve()
+      })
     })
   }
 
@@ -160,7 +205,6 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
       throw new Error('CHES adapter: "body" is required and must be a string')
     }
 
-    const token = await this.getAccessToken(tokenUrl, clientId, clientSecret)
     const from =
       opts.from ??
       this.configService.get<string>('ches.from') ??
@@ -205,23 +249,41 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
       })}`,
     )
 
-    const post = () =>
-      this.fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/email`, 'email', {
+    const url = `${baseUrl.replace(/\/$/, '')}/email`
+    const requestBody = JSON.stringify(payload)
+    const post = async () =>
+      this.fetchWithTimeout(url, 'email', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${await this.getAccessToken(tokenUrl, clientId, clientSecret)}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: requestBody,
       })
-    // The wait for a slot sits outside the timeout: it measures CHES, not our own queue.
-    const response = this.limiter ? await this.limiter.run(post) : await post()
-
-    if (!response.ok) {
-      const errText = await response.text()
-      this.logger.error(`[CHES] Response not OK: ${response.status} - ${errText}`)
-      this.throwForChesApiFailure(response.status, errText, 'email')
+    // The token is taken inside the slot: one taken before a long wait for a slot can expire
+    // before it is used. A 401 means CHES accepted nothing, so one retry with a fresh token
+    // cannot send twice; it covers a token that expired in flight or was revoked.
+    const send = async () => {
+      let response = await post()
+      if (response.status === 401) {
+        await response.text().catch(() => undefined)
+        this.logger.warn('[CHES] Token rejected; retrying once with a new token')
+        this.tokenCache = null
+        response = await post()
+      }
+      // Thrown here, inside the circuit breaker, so a 503 counts against CHES: fetch itself
+      // resolves for any status.
+      if (!response.ok) {
+        const errText = await response.text()
+        this.logger.error(`[CHES] Response not OK: ${response.status} - ${errText}`)
+        this.throwForChesApiFailure(response.status, errText, 'email')
+      }
+      return response
     }
+    // Waiting for a closed circuit and then a slot sits outside the timeout: that measures CHES,
+    // not our own queue. The circuit is checked first, so an open one holds no slots.
+    const limited = () => (this.limiter ? this.limiter.run(send) : send())
+    const response = this.breaker ? await this.breaker.run(limited) : await limited()
 
     let data: ChesEmailResponse
     try {
@@ -246,9 +308,9 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
   }
 
   /**
-   * fetch with a deadline. A timeout becomes a 504 naming CHES, so it reads as the provider being
-   * slow - a retryable failure for the job, or one failed recipient in a merge batch - rather than
-   * a bare AbortError.
+   * fetch with a deadline. An email timeout becomes a 504 naming CHES: the outcome is unknown -
+   * CHES may have queued it - so it is not retried as transient. A token timeout, or a network
+   * error before the request reached CHES, sent nothing, so it is transient.
    */
   private async fetchWithTimeout(
     url: string,
@@ -264,9 +326,13 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
         (caught.name === 'TimeoutError' || caught.name === 'AbortError')
       ) {
         this.logger.error(`[CHES] ${operation} request timed out after ${timeoutMs}ms`)
-        throw new GatewayTimeoutException(
-          `CHES ${operation} request timed out after ${timeoutMs / 1000}s`,
-        )
+        const message = `CHES ${operation} request timed out after ${timeoutMs / 1000}s`
+        if (operation === 'token') throw new TransientDeliveryError(message, 504)
+        throw new GatewayTimeoutException(message)
+      }
+      if (isNotSentNetworkError(caught)) {
+        const code = (caught as { cause: { code: string } }).cause.code
+        throw new TransientDeliveryError(`CHES ${operation} unreachable: ${code}`)
       }
       throw caught
     }
@@ -341,6 +407,13 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
       `${label} request failed`,
     )
 
+    // CHES down, restarting, overloaded or rate limiting: it accepted nothing, so send it later.
+    if (isTransientHttpStatus(status)) {
+      throw new TransientDeliveryError(
+        `${label}: upstream ${status} - ${message}`,
+        status >= 500 ? 502 : status,
+      )
+    }
     if (status === 400) {
       throw new BadRequestException(`${label}: ${message}`)
     }
@@ -352,12 +425,6 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleDestroy {
     }
     if (status === 422) {
       throw new BadRequestException(`${label} validation: ${message}`)
-    }
-    if (status === 429) {
-      throw new BadRequestException(`${label} rate limit: ${message}`)
-    }
-    if (status >= 500) {
-      throw new BadGatewayException(`${label}: upstream ${status} - ${message}`)
     }
 
     throw new BadGatewayException(`${label}: ${status} - ${message}`)

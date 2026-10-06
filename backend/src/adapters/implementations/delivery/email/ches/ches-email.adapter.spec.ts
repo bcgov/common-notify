@@ -1,9 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
-import { BadGatewayException, GatewayTimeoutException } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  GatewayTimeoutException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { ChesEmailTransport } from '../../../../../../src/adapters/implementations/delivery/email/ches/ches-email.adapter'
 import type { SendEmailOptions, SendEmailResult } from '../../../../../../src/adapters/interfaces'
 import { RedisConcurrencyLimiter } from '../../../../../../src/common/redis/concurrency-limiter'
+import { RedisCircuitBreaker } from '../../../../../../src/common/redis/circuit-breaker'
+import { TransientDeliveryError } from '../../../../../../src/adapters/delivery-errors'
+import { createRedisClient } from '../../../../../../src/queue/redis-connection'
 
 vi.mock('../../../../../../src/queue/redis-connection', () => ({
   createRedisClient: vi.fn(() => ({ quit: vi.fn().mockResolvedValue('OK') })),
@@ -908,6 +916,39 @@ describe('ChesEmailTransport', () => {
       run.mockRestore()
     })
 
+    it('holds startup until the limiter can reach Redis, so the first sends are limited', async () => {
+      const handlers: Record<string, () => void> = {}
+      vi.mocked(createRedisClient).mockReturnValueOnce({
+        status: 'connecting',
+        once: vi.fn((event: string, handler: () => void) => (handlers[event] = handler)),
+        quit: vi.fn().mockResolvedValue('OK'),
+      } as never)
+      const limited = new ChesEmailTransport(config({ 'ches.maxConcurrentRequests': 5 }))
+
+      let started = false
+      const init = limited.onModuleInit().then(() => (started = true))
+      await Promise.resolve()
+      expect(started).toBe(false)
+
+      handlers.ready()
+      await init
+      expect(started).toBe(true)
+    })
+
+    it('gets the token once it holds a slot, so a long wait cannot expire it', async () => {
+      const run = vi.spyOn(RedisConcurrencyLimiter.prototype, 'run').mockImplementation((fn) => {
+        expect(fetchMock).not.toHaveBeenCalled()
+        return fn()
+      })
+      respond()
+      const limited = new ChesEmailTransport(config({ 'ches.maxConcurrentRequests': 5 }))
+
+      await limited.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' })
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      run.mockRestore()
+    })
+
     it('sends unlimited when the limit is 0', async () => {
       const run = vi.spyOn(RedisConcurrencyLimiter.prototype, 'run')
       respond()
@@ -917,6 +958,199 @@ describe('ChesEmailTransport', () => {
 
       expect(run).not.toHaveBeenCalled()
       run.mockRestore()
+    })
+  })
+
+  describe('rejected token', () => {
+    const unlimited = () =>
+      new ChesEmailTransport({
+        get: (key: string) =>
+          ({
+            'ches.baseUrl': 'https://ches.example.com/api/v1',
+            'ches.clientId': 'client-id',
+            'ches.clientSecret': 'client-secret',
+            'ches.tokenUrl': 'https://auth.example.com/token',
+            'ches.from': 'noreply@gov.bc.ca',
+          })[key],
+      } as unknown as ConfigService)
+    const token = (value: string) =>
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: value, expires_in: 300 }),
+      })
+    const unauthorized = () =>
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => '{"detail":"Token claims invalid: [\\"exp\\"]=\\"token expired\\""}',
+      })
+    const authHeaders = () =>
+      fetchMock.mock.calls
+        .filter(([url]) => String(url).endsWith('/email'))
+        .map(([, init]) => (init.headers as Record<string, string>).Authorization)
+
+    it('retries once with a new token when CHES rejects the cached one', async () => {
+      token('stale')
+      unauthorized()
+      token('fresh')
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ messages: [{ msgId: 'm1' }], txId: 't1' }),
+      })
+
+      await expect(
+        unlimited().send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
+      ).resolves.toMatchObject({ messageId: 'm1' })
+      expect(authHeaders()).toEqual(['Bearer stale', 'Bearer fresh'])
+    })
+
+    it('reports a token CHES still rejects after the retry', async () => {
+      token('stale')
+      unauthorized()
+      token('fresh')
+      unauthorized()
+
+      await expect(
+        unlimited().send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(authHeaders()).toHaveLength(2)
+    })
+  })
+
+  describe('error classification', () => {
+    const transport = () =>
+      new ChesEmailTransport({
+        get: (key: string) =>
+          ({
+            'ches.baseUrl': 'https://ches.example.com/api/v1',
+            'ches.clientId': 'client-id',
+            'ches.clientSecret': 'client-secret',
+            'ches.tokenUrl': 'https://auth.example.com/token',
+            'ches.from': 'noreply@gov.bc.ca',
+            'ches.timeoutMs': 15_000,
+          })[key],
+      } as unknown as ConfigService)
+    const send = (t = transport()) =>
+      t.send({ to: 'user@example.com', subject: 'Hi', body: 'Hello' })
+    const tokenOk = () =>
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'tok', expires_in: 300 }),
+      })
+    const emailStatus = (status: number, body = '{"detail":"nope"}') =>
+      fetchMock.mockResolvedValueOnce({ ok: false, status, text: async () => body })
+
+    it.each([503, 502, 500, 429, 408])(
+      'treats a %i from CHES as transient: nothing was accepted',
+      async (status) => {
+        tokenOk()
+        emailStatus(status)
+        await expect(send()).rejects.toBeInstanceOf(TransientDeliveryError)
+      },
+    )
+
+    it.each([400, 404, 422])('treats a %i as a problem with this message', async (status) => {
+      tokenOk()
+      emailStatus(status)
+      const error = await send().catch((caught: unknown) => caught)
+      expect(error).not.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('treats CHES being unreachable as transient', async () => {
+      tokenOk()
+      fetchMock.mockRejectedValueOnce(
+        Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }),
+      )
+      await expect(send()).rejects.toThrow('CHES email unreachable: ECONNREFUSED')
+    })
+
+    it('does not retry a connection cut mid-request: CHES may have taken it', async () => {
+      tokenOk()
+      fetchMock.mockRejectedValueOnce(
+        Object.assign(new TypeError('terminated'), { cause: { code: 'ECONNRESET' } }),
+      )
+      const error = await send().catch((caught: unknown) => caught)
+      expect(error).not.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('keeps an email timeout as an unknown outcome, not transient', async () => {
+      tokenOk()
+      fetchMock.mockRejectedValueOnce(Object.assign(new Error('aborted'), { name: 'TimeoutError' }))
+      const error = await send().catch((caught: unknown) => caught)
+      expect(error).toBeInstanceOf(GatewayTimeoutException)
+      expect(error).not.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('treats a token timeout as transient: no email was sent', async () => {
+      fetchMock.mockRejectedValueOnce(Object.assign(new Error('aborted'), { name: 'TimeoutError' }))
+      await expect(send()).rejects.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('raises a 503 inside the circuit breaker, where it counts against CHES', async () => {
+      let seen: unknown
+      vi.spyOn(RedisCircuitBreaker.prototype, 'run').mockImplementation(async (fn) => {
+        try {
+          return await fn()
+        } catch (error) {
+          seen = error
+          throw error
+        }
+      })
+      vi.spyOn(RedisConcurrencyLimiter.prototype, 'run').mockImplementation((fn) => fn())
+      const limited = new ChesEmailTransport({
+        get: (key: string) =>
+          ({
+            'ches.baseUrl': 'https://ches.example.com/api/v1',
+            'ches.clientId': 'client-id',
+            'ches.clientSecret': 'client-secret',
+            'ches.tokenUrl': 'https://auth.example.com/token',
+            'ches.maxConcurrentRequests': 5,
+            redis: { host: 'localhost', port: 6379 },
+          })[key],
+      } as unknown as ConfigService)
+      tokenOk()
+      emailStatus(503, '{"detail":"Server is shutting down"}')
+
+      await expect(send(limited)).rejects.toBeInstanceOf(TransientDeliveryError)
+      expect(seen).toBeInstanceOf(TransientDeliveryError)
+      vi.restoreAllMocks()
+    })
+
+    it('sends through the circuit breaker, and counts timeouts as CHES being unwell', async () => {
+      let isFailure: ((error: unknown) => boolean) | undefined
+      const run = vi.spyOn(RedisCircuitBreaker.prototype, 'run').mockImplementation(function (
+        this: RedisCircuitBreaker,
+        fn,
+      ) {
+        isFailure = (this as unknown as { options: { isFailure: typeof isFailure } }).options
+          .isFailure
+        return fn()
+      })
+      const limited = new ChesEmailTransport({
+        get: (key: string) =>
+          ({
+            'ches.baseUrl': 'https://ches.example.com/api/v1',
+            'ches.clientId': 'client-id',
+            'ches.clientSecret': 'client-secret',
+            'ches.tokenUrl': 'https://auth.example.com/token',
+            'ches.maxConcurrentRequests': 5,
+            redis: { host: 'localhost', port: 6379 },
+          })[key],
+      } as unknown as ConfigService)
+      vi.spyOn(RedisConcurrencyLimiter.prototype, 'run').mockImplementation((fn) => fn())
+      tokenOk()
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ messages: [{ msgId: 'm1' }], txId: 't1' }),
+      })
+
+      await send(limited)
+
+      expect(run).toHaveBeenCalledTimes(1)
+      expect(isFailure?.(new TransientDeliveryError('503'))).toBe(true)
+      expect(isFailure?.(new GatewayTimeoutException('slow'))).toBe(true)
+      expect(isFailure?.(new BadRequestException('bad address'))).toBe(false)
+      vi.restoreAllMocks()
     })
   })
 })

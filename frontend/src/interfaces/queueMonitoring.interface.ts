@@ -86,16 +86,27 @@ export interface MessageChannelStats {
   estimatedClearMinutes: number | null
 }
 
-export interface ActiveBatch {
-  queue: string
-  jobId: string
-  notificationId: string | null
-  tenantId: string | null
+/**
+ * One notification request with recipients still to send: a whole mail merge, however many
+ * batches it was split into, or a plain send.
+ */
+export interface SendInProgress {
+  notificationId: string
+  tenantId: string
   tenantName: string | null
+  channels: string[]
+  acceptedAt: string
+  total: number
   sent: number
   failed: number
-  total: number
-  startedAt: string | null
+  remaining: number
+  /** Merge batches; 0 for a plain send. */
+  batches: number
+  batchesDone: number
+  batchesSending: number
+  /** Recipients sent or failed per minute over the last few minutes. */
+  perMinute: number
+  estimatedMinutesLeft: number | null
 }
 
 /** Totals over the last hour, for the summary cards. */
@@ -143,6 +154,21 @@ export interface ReconcilerStats {
   recentActions: ReconcilerAction[]
 }
 
+/** A delivery provider as the service sees it: the shared circuit breaker in front of it. */
+export interface ProviderStats {
+  /** e.g. "CHES", "ACS". */
+  name: string
+  channel: 'EMAIL' | 'SMS'
+  status: HealthStatus
+  reasons: string[]
+  /** closed: sending; open: provider failing, sends wait; half-open: one test send in progress. */
+  circuit: 'closed' | 'open' | 'half-open' | null
+  reopensAt: string | null
+  /** Requests in flight and their cap, where one is applied; null where not. */
+  inFlight: number | null
+  limit: number | null
+}
+
 export interface QueueMonitoring {
   generatedAt: string
   status: HealthStatus
@@ -150,8 +176,9 @@ export interface QueueMonitoring {
   redis: RedisStats
   messages: MessageChannelStats[]
   queues: QueueStats[]
-  activeBatches: ActiveBatch[]
+  sendsInProgress: SendInProgress[]
   workers: WorkerPod[]
   reconciler: ReconcilerStats
+  providers: ProviderStats[]
   recentFailures: RecentFailure[]
 }

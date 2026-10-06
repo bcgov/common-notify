@@ -1,5 +1,6 @@
 import { Inject, Injectable, Optional, ServiceUnavailableException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ConfigService } from '@nestjs/config'
 import { In, Repository } from 'typeorm'
 import type Bull from 'bull'
 import type Redis from 'ioredis'
@@ -27,6 +28,13 @@ import {
 } from '../../../queue/worker-heartbeat'
 import type { WorkerHeartbeatPayload } from '../../../queue/worker-heartbeat'
 import { readReconcileActivity } from '../../../queue/reconcile-activity'
+import { readCircuitState } from '../../../common/redis/circuit-breaker'
+import type { CircuitState } from '../../../common/redis/circuit-breaker'
+import {
+  CHES_CIRCUIT_KEY,
+  CHES_IN_FLIGHT_KEY,
+  SMS_CIRCUIT_KEY,
+} from '../../../adapters/delivery-keys'
 import type { ReconcileActivity } from '../../../queue/reconcile-activity'
 import { MONITORING_THRESHOLDS } from './monitoring-thresholds'
 import type {
@@ -36,7 +44,9 @@ import type {
   QueueMonitoringResponseDto,
   QueueStatsDto,
   ReconcilerStatsDto,
+  ProviderStatsDto,
   RedisStatsDto,
+  SendInProgressDto,
   WorkerPodDto,
 } from './schemas/queue-monitoring.dto'
 
@@ -57,6 +67,7 @@ const MIN_RATE_MESSAGES = 10
 const MIN_RATE_BUSY_SECONDS = 5
 const DEFAULT_MESSAGE_CHANNELS = [NotificationChannel.EMAIL, NotificationChannel.SMS]
 const RECENT_FAILURES_LIMIT = 20
+const SENDS_IN_PROGRESS_LIMIT = 20
 /** A failure rate over a handful of jobs is noise; below this many finished jobs it is ignored. */
 const MIN_JOBS_FOR_FAILURE_RATE = 10
 
@@ -158,7 +169,49 @@ export function averageOfWholeMinutes(series: number[], window: number): number 
 
 type QueueEvaluationInput = Omit<QueueStatsDto, 'status' | 'reasons' | 'estimatedDrainMinutes'>
 
-export function evaluateQueue(input: QueueEvaluationInput): QueueStatsDto {
+/** Minutes, current one included, in which something finishing counts as the queue moving. */
+const MOVING_WINDOW_MINUTES = 2
+/** Whole minutes in a row that arrivals must beat completions before it is reported. */
+const SUSTAINED_GROWTH_MINUTES = 3
+
+/** The delivery queue's channel, whose sent messages show progress inside a long batch job. */
+const QUEUE_CHANNELS: Record<string, string> = {
+  'email-delivery': NotificationChannel.EMAIL,
+  'sms-delivery': NotificationChannel.SMS,
+}
+
+const sumLast = (series: number[], minutes: number) =>
+  series.slice(-minutes).reduce((sum, value) => sum + value, 0)
+
+/**
+ * Arrivals beat completions in each of the last few whole minutes. One burst - a large send
+ * queueing all its batches at once - is a single minute and does not count.
+ */
+export function sustainedGrowth(throughput: QueueStatsDto['throughput']): boolean {
+  const { added, completed, failed } = throughput
+  const end = added.length - 1
+  if (end < SUSTAINED_GROWTH_MINUTES) return false
+  for (let minute = end - SUSTAINED_GROWTH_MINUTES; minute < end; minute++) {
+    if (added[minute] <= (completed[minute] ?? 0) + (failed[minute] ?? 0)) return false
+  }
+  return true
+}
+
+/**
+ * @param messagesMoving recipients on this queue's channel were sent or failed recently. A merge
+ * batch finishes only after its last recipient, so a queue of them can be sending steadily for
+ * minutes before any job completes.
+ */
+function messagesMoving(queueName: string, messages: MessageChannelStatsDto[]): boolean {
+  const channel = QUEUE_CHANNELS[queueName]
+  const stats = channel && messages.find((m) => m.channel === channel)
+  return (
+    !!stats &&
+    sumLast(stats.sent, MOVING_WINDOW_MINUTES) + sumLast(stats.failed, MOVING_WINDOW_MINUTES) > 0
+  )
+}
+
+export function evaluateQueue(input: QueueEvaluationInput, messagesMoving = false): QueueStatsDto {
   const { counts, throughput, oldestWaitingAgeMs, isPaused, liveWorkerPods } = input
   const t = MONITORING_THRESHOLDS
   const statuses: HealthStatus[] = []
@@ -179,12 +232,24 @@ export function evaluateQueue(input: QueueEvaluationInput): QueueStatsDto {
     statuses.push('critical')
     reasons.push('Jobs are waiting but no pod is processing this queue')
   }
-  if (oldestWaitingAgeMs !== null && oldestWaitingAgeMs >= t.oldestWaitingCriticalMs) {
+  // A waiting job is only a problem when nothing is moving: during a large send, batches wait
+  // their turn for many minutes while the queue works steadily through them.
+  const moving =
+    messagesMoving ||
+    sumLast(throughput.completed, MOVING_WINDOW_MINUTES) +
+      sumLast(throughput.failed, MOVING_WINDOW_MINUTES) >
+      0
+  const stalledFor = `nothing has finished in the last ${MOVING_WINDOW_MINUTES} minutes`
+  if (!moving && oldestWaitingAgeMs !== null && oldestWaitingAgeMs >= t.oldestWaitingCriticalMs) {
     statuses.push('critical')
-    reasons.push('Oldest job has waited longer than the critical threshold')
-  } else if (oldestWaitingAgeMs !== null && oldestWaitingAgeMs >= t.oldestWaitingWarningMs) {
+    reasons.push(`Oldest job has waited longer than the critical threshold and ${stalledFor}`)
+  } else if (
+    !moving &&
+    oldestWaitingAgeMs !== null &&
+    oldestWaitingAgeMs >= t.oldestWaitingWarningMs
+  ) {
     statuses.push('warning')
-    reasons.push('Oldest job has waited longer than the warning threshold')
+    reasons.push(`Oldest job has waited longer than the warning threshold and ${stalledFor}`)
   }
 
   const recentFinished = throughput.outPerMinute * t.rateWindowMinutes
@@ -198,10 +263,11 @@ export function evaluateQueue(input: QueueEvaluationInput): QueueStatsDto {
     }
   }
 
-  const growing = throughput.inPerMinute > throughput.outPerMinute
-  if (backlog > 0 && growing) {
+  if (backlog > 0 && sustainedGrowth(throughput)) {
     statuses.push('warning')
-    reasons.push('Jobs are arriving faster than they are finishing')
+    reasons.push(
+      `Jobs have arrived faster than they finish for ${SUSTAINED_GROWTH_MINUTES} minutes running`,
+    )
   }
 
   let estimatedDrainMinutes: number | null = null
@@ -242,6 +308,55 @@ function activeBatches(
       }),
     )
     .sort((a, b) => (a.job.processedOn ?? 0) - (b.job.processedOn ?? 0))
+}
+
+export interface SendInProgressRow {
+  id: string
+  tenant_id: string
+  accepted_at: Date | string
+  channels: string | null
+  total: string
+  sent: string
+  failed: string
+  remaining: string
+  batches: string
+  batches_open: string
+  recent_finished: string
+}
+
+/** Roll recipient counts up per request, with how many of its batches are being worked now. */
+export function buildSendsInProgress(
+  rows: SendInProgressRow[],
+  activeJobs: Array<QueuedJob & { progress: BatchProgress }>,
+  tenantNames: Map<string, string>,
+): SendInProgressDto[] {
+  const sending = new Map<string, number>()
+  for (const { job } of activeJobs) {
+    const notifyId = asString((job.data as JobIdentifiers)?.notifyId)
+    if (notifyId) sending.set(notifyId, (sending.get(notifyId) ?? 0) + 1)
+  }
+  const window = MONITORING_THRESHOLDS.rateWindowMinutes
+  return rows.map((row) => {
+    const remaining = Number(row.remaining) || 0
+    const batches = Number(row.batches) || 0
+    const perMinute = Math.round(((Number(row.recent_finished) || 0) / window) * 10) / 10
+    return {
+      notificationId: row.id,
+      tenantId: row.tenant_id,
+      tenantName: tenantNames.get(row.tenant_id) ?? null,
+      channels: row.channels ? row.channels.split(',') : [],
+      acceptedAt: new Date(row.accepted_at).toISOString(),
+      total: Number(row.total) || 0,
+      sent: Number(row.sent) || 0,
+      failed: Number(row.failed) || 0,
+      remaining,
+      batches,
+      batchesDone: batches - (Number(row.batches_open) || 0),
+      batchesSending: sending.get(row.id) ?? 0,
+      perMinute,
+      estimatedMinutesLeft: perMinute > 0 ? Math.ceil(remaining / perMinute) : null,
+    }
+  })
 }
 
 /**
@@ -305,6 +420,27 @@ export function buildOverview(
   }
 }
 
+const SMS_PROVIDER_NAMES: Record<string, string> = { acs: 'ACS', twilio: 'Twilio' }
+
+export function buildProviderStats(
+  provider: Pick<ProviderStatsDto, 'name' | 'channel' | 'inFlight' | 'limit'>,
+  circuit: CircuitState | null,
+): ProviderStatsDto {
+  const reasons: string[] = []
+  if (circuit?.state === 'open') {
+    reasons.push('Failing; sends are waiting, and resume once a test send succeeds')
+  } else if (circuit?.state === 'half-open') {
+    reasons.push('Was failing; one test send is checking whether it has recovered')
+  }
+  return {
+    ...provider,
+    status: reasons.length > 0 ? 'warning' : 'healthy',
+    reasons,
+    circuit: circuit?.state ?? null,
+    reopensAt: circuit?.state === 'open' ? circuit.reopensAt : null,
+  }
+}
+
 export function buildReconcilerStats(
   activity: ReconcileActivity,
   now: number,
@@ -364,6 +500,7 @@ export class MonitoringService {
     @InjectRepository(Tenant) private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(NotificationRequestDetail)
     private readonly detailRepository: Repository<NotificationRequestDetail>,
+    @Optional() private readonly configService?: ConfigService,
   ) {
     this.queues = [ingestionQueue, emailQueue, smsQueue, webhookQueue].filter(
       (queue): queue is Bull.Queue => !!queue,
@@ -387,6 +524,8 @@ export class MonitoringService {
       deliveryTime,
       sendingRate,
       reconcileActivity,
+      sendRows,
+      providers,
     ] = await Promise.all([
       this.redis.info(),
       this.getWorkers(now),
@@ -396,19 +535,20 @@ export class MonitoringService {
       this.getDeliveryTime(now),
       this.getSendingRate(now),
       readReconcileActivity(this.redis, now, MONITORING_WINDOW_MINUTES),
+      this.getSendsInProgress(now),
+      this.getProviderStats(now),
     ])
     const redis = buildRedisStats(parseRedisInfo(info))
     const queues = await Promise.all(
       this.queues.map((queue) =>
-        this.getQueueStats(queue, workers, activeByQueue.get(queue.name) ?? [], now),
+        this.getQueueStats(queue, workers, activeByQueue.get(queue.name) ?? [], messages, now),
       ),
     )
     const activeJobs = activeBatches(activeByQueue)
     const tenantNames = await this.getTenantNames([
-      ...[...failedJobs, ...activeJobs].map(({ job }) =>
-        asString((job.data as JobIdentifiers)?.tenantId),
-      ),
+      ...failedJobs.map(({ job }) => asString((job.data as JobIdentifiers)?.tenantId)),
       ...reconcileActivity.recent.map((action) => action.tenantId),
+      ...sendRows.map((row) => row.tenant_id),
     ])
     const reconciler = buildReconcilerStats(reconcileActivity, now, tenantNames)
 
@@ -417,21 +557,17 @@ export class MonitoringService {
       status: worstStatus([
         redis.status,
         reconciler.status,
+        ...providers.map((provider) => provider.status),
         ...queues.map((queue) => queue.status),
       ]),
       overview: buildOverview(messages, queues, deliveryTime, sendingRate),
       redis,
       messages,
       queues,
-      activeBatches: activeJobs.map(({ queue, job, progress }) => ({
-        queue,
-        jobId: String(job.id),
-        ...jobIdentifiers(job, tenantNames),
-        ...progress,
-        startedAt: job.processedOn ? new Date(job.processedOn).toISOString() : null,
-      })),
+      sendsInProgress: buildSendsInProgress(sendRows, activeJobs, tenantNames),
       workers,
       reconciler,
+      providers,
       recentFailures: failedJobs.map(({ queue, job }) => ({
         queue,
         jobId: String(job.id),
@@ -447,6 +583,7 @@ export class MonitoringService {
     queue: Bull.Queue,
     workers: WorkerPodDto[],
     activeJobs: Bull.Job[],
+    messages: MessageChannelStatsDto[],
     now: number,
   ): Promise<QueueStatsDto> {
     const [counts, isPaused, oldestWaitingAgeMs, added, completed, failed] = await Promise.all([
@@ -467,29 +604,32 @@ export class MonitoringService {
     const failureRatePercent =
       outPerMinute > 0 ? Math.round((failedPerMinute / outPerMinute) * 1000) / 10 : 0
 
-    return evaluateQueue({
-      name: queue.name,
-      isPaused,
-      counts: {
-        waiting: counts.waiting,
-        active: counts.active,
-        delayed: counts.delayed,
-        failed: counts.failed,
-        paused: (counts as Bull.JobCounts & { paused?: number }).paused ?? 0,
+    return evaluateQueue(
+      {
+        name: queue.name,
+        isPaused,
+        counts: {
+          waiting: counts.waiting,
+          active: counts.active,
+          delayed: counts.delayed,
+          failed: counts.failed,
+          paused: (counts as Bull.JobCounts & { paused?: number }).paused ?? 0,
+        },
+        oldestWaitingAgeMs,
+        throughput: {
+          added,
+          completed: completedSeries,
+          failed: failedSeries,
+          inPerMinute: averageOfWholeMinutes(added, window),
+          outPerMinute,
+          failureRatePercent,
+        },
+        liveWorkerPods: workers.filter((pod) => pod.queues.some((q) => q.queue === queue.name))
+          .length,
+        unheldActiveJobs: countUnheldActiveJobs(queue.name, activeJobs, workers, now),
       },
-      oldestWaitingAgeMs,
-      throughput: {
-        added,
-        completed: completedSeries,
-        failed: failedSeries,
-        inPerMinute: averageOfWholeMinutes(added, window),
-        outPerMinute,
-        failureRatePercent,
-      },
-      liveWorkerPods: workers.filter((pod) => pod.queues.some((q) => q.queue === queue.name))
-        .length,
-      unheldActiveJobs: countUnheldActiveJobs(queue.name, activeJobs, workers, now),
-    })
+      messagesMoving(queue.name, messages),
+    )
   }
 
   /**
@@ -623,6 +763,78 @@ export class MonitoringService {
     )) as Array<{ busy_messages: string; busy_seconds: string }>
 
     return sendingRateFrom(Number(row?.busy_messages ?? 0), Number(row?.busy_seconds ?? 0))
+  }
+
+  /**
+   * Requests with recipients still in flight, oldest first, each counted across all its rows.
+   * Requests are found through in-flight rows in the lookback window - the same rows, and index,
+   * the pending count uses - and scheduled sends are left out until they fall due.
+   */
+  private async getSendsInProgress(now: number): Promise<SendInProgressRow[]> {
+    const detail = this.detailRepository.metadata
+    const request =
+      detail.findRelationWithPropertyPath('notificationRequest')?.inverseEntityMetadata.tablePath
+    if (!request) return []
+    return (await this.detailRepository.query(
+      `SELECT d.notification_request_id AS id,
+              r.tenant_id,
+              r.created_at AS accepted_at,
+              string_agg(DISTINCT d.channel, ',') AS channels,
+              COUNT(*) FILTER (WHERE d.status <> 'blocked') AS total,
+              COUNT(*) FILTER (WHERE d.status = 'sent') AS sent,
+              COUNT(*) FILTER (WHERE d.status = 'failed') AS failed,
+              COUNT(*) FILTER (WHERE d.status = ANY($2)) AS remaining,
+              COUNT(DISTINCT d.batch_id) AS batches,
+              COUNT(DISTINCT d.batch_id) FILTER (WHERE d.status = ANY($2)) AS batches_open,
+              COUNT(*) FILTER (WHERE d.status IN ('sent', 'failed') AND d.last_attempt_at >= $3)
+                AS recent_finished
+         FROM ${detail.tablePath} d
+         JOIN ${request} r ON r.id = d.notification_request_id
+        WHERE d.notification_request_id IN (
+                SELECT notification_request_id FROM ${detail.tablePath}
+                 WHERE status = ANY($2) AND created_at > $1)
+          AND r.status <> $4
+        GROUP BY d.notification_request_id, r.tenant_id, r.created_at
+        ORDER BY r.created_at ASC
+        LIMIT ${SENDS_IN_PROGRESS_LIMIT}`,
+      [
+        new Date(now - PENDING_LOOKBACK_MS),
+        IN_FLIGHT_DETAIL_STATUSES,
+        new Date(now - MONITORING_THRESHOLDS.rateWindowMinutes * 60_000),
+        NotificationStatus.SCHEDULED,
+      ],
+    )) as SendInProgressRow[]
+  }
+
+  private async getProviderStats(now: number): Promise<ProviderStatsDto[]> {
+    const redis = this.redis as Redis
+    const [chesCircuit, smsCircuit, chesInFlight] = await Promise.all([
+      readCircuitState(redis, CHES_CIRCUIT_KEY),
+      readCircuitState(redis, SMS_CIRCUIT_KEY),
+      // Leases are scored by expiry; an expired one is a pod that died, not a call in flight.
+      redis.zcount(CHES_IN_FLIGHT_KEY, now, '+inf').catch(() => 0),
+    ])
+    const smsAdapter = (this.configService?.get<string>('delivery.sms') ?? 'acs').split(':')[0]
+    return [
+      buildProviderStats(
+        {
+          name: 'CHES',
+          channel: 'EMAIL',
+          inFlight: chesInFlight,
+          limit: this.configService?.get<number>('ches.maxConcurrentRequests') ?? 0,
+        },
+        chesCircuit,
+      ),
+      buildProviderStats(
+        {
+          name: SMS_PROVIDER_NAMES[smsAdapter] ?? smsAdapter,
+          channel: 'SMS',
+          inFlight: null,
+          limit: null,
+        },
+        smsCircuit,
+      ),
+    ]
   }
 
   private async getTenantNames(ids: Array<string | null>): Promise<Map<string, string>> {

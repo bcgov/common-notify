@@ -73,17 +73,22 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
         estimatedClearMinutes: 0,
       },
     ],
-    activeBatches: [
+    sendsInProgress: [
       {
-        queue: 'email-delivery',
-        jobId: 'req-1-EMAIL-0',
         notificationId: 'req-1',
         tenantId: 't-1',
         tenantName: 'Health Ministry',
-        sent: 37,
+        channels: ['EMAIL'],
+        acceptedAt: new Date(now - 300_000).toISOString(),
+        total: 2000,
+        sent: 398,
         failed: 2,
-        total: 100,
-        startedAt: new Date(now - 30_000).toISOString(),
+        remaining: 1600,
+        batches: 80,
+        batchesDone: 16,
+        batchesSending: 20,
+        perMinute: 64,
+        estimatedMinutesLeft: 25,
       },
     ],
     queues: [
@@ -123,6 +128,28 @@ function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoring
             lastFinishedAt: new Date(now - 2_000).toISOString(),
           },
         ],
+      },
+    ],
+    providers: [
+      {
+        name: 'CHES',
+        channel: 'EMAIL',
+        status: 'healthy',
+        reasons: [],
+        circuit: 'closed',
+        reopensAt: null,
+        inFlight: 3,
+        limit: 5,
+      },
+      {
+        name: 'ACS',
+        channel: 'SMS',
+        status: 'healthy',
+        reasons: [],
+        circuit: 'closed',
+        reopensAt: null,
+        inFlight: null,
+        limit: null,
       },
     ],
     reconciler: {
@@ -254,24 +281,44 @@ describe('QueueMonitoring', () => {
     expect(within(sms).getByText('Nothing pending')).toBeInTheDocument()
   })
 
-  it('shows per-recipient progress for a batch that is one job', async () => {
+  it('rolls a merge send up into one row with its batches and time left', async () => {
     mockedGet.mockResolvedValue(snapshot())
     renderPage()
 
-    const table = await screen.findByRole('table', { name: 'Batches in progress' })
-    const meter = within(table).getByRole('meter', { name: 'Batch req-1-EMAIL-0 progress' })
-    expect(meter).toHaveAttribute('aria-valuenow', '39')
-    expect(meter).toHaveAttribute('aria-valuetext', '37 of 100 sent, 2 failed')
+    const table = await screen.findByRole('table', { name: 'Sends in progress' })
+    const meter = within(table).getByRole('meter', { name: 'Notification req-1 progress' })
+    expect(meter).toHaveAttribute('aria-valuenow', '20')
+    expect(meter).toHaveAttribute('aria-valuetext', '398 of 2,000 sent, 2 failed')
+    expect(within(table).getByText('16 of 80 done, 20 sending, 44 waiting')).toBeInTheDocument()
+    expect(within(table).getByText('~25 min at 64/min')).toBeInTheDocument()
     expect(within(table).getByText('Health Ministry')).toBeInTheDocument()
   })
 
-  it('says so when no batch is sending', async () => {
-    mockedGet.mockResolvedValue(snapshot({ activeBatches: [] }))
+  it('shows a plain send without batches, and one not sending yet', async () => {
+    const data = snapshot()
+    data.sendsInProgress = [
+      {
+        ...data.sendsInProgress[0],
+        batches: 0,
+        batchesDone: 0,
+        batchesSending: 0,
+        perMinute: 0,
+        estimatedMinutesLeft: null,
+      },
+    ]
+    mockedGet.mockResolvedValue(data)
     renderPage()
 
-    expect(
-      (await screen.findAllByText('No batches are sending right now.')).length,
-    ).toBeGreaterThan(0)
+    const table = await screen.findByRole('table', { name: 'Sends in progress' })
+    expect(within(table).getByText('Not sending yet')).toBeInTheDocument()
+    expect(within(table).getAllByText('—').length).toBeGreaterThan(0)
+  })
+
+  it('says so when nothing is sending', async () => {
+    mockedGet.mockResolvedValue(snapshot({ sendsInProgress: [] }))
+    renderPage()
+
+    expect((await screen.findAllByText('Nothing is sending right now.')).length).toBeGreaterThan(0)
   })
 
   it('shows each queue with its backlog, rates and drain estimate on the System tab', async () => {
@@ -392,6 +439,42 @@ describe('QueueMonitoring', () => {
     await userEvent.setup().click(screen.getByText('View details on the System tab'))
     expect(await screen.findByText('Not run yet')).toBeInTheDocument()
     expect(screen.getAllByText('Nothing has needed recovering.')).not.toHaveLength(0)
+  })
+
+  it('shows each provider sending normally, with CHES requests in flight, on the System tab', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    renderPage('system')
+
+    expect(await screen.findByText('CHES (Email)')).toBeInTheDocument()
+    expect(screen.getByText('ACS (SMS)')).toBeInTheDocument()
+    expect(screen.getAllByText('Sending')).toHaveLength(2)
+    expect(screen.getByText('3 of 5')).toBeInTheDocument()
+    // ACS has no concurrency cap, so no in-flight tile.
+    expect(screen.getAllByText('Requests in flight')).toHaveLength(1)
+  })
+
+  it('raises a paused provider in the banner and on the System tab', async () => {
+    const data = snapshot()
+    data.providers = [
+      data.providers[0],
+      {
+        ...data.providers[1],
+        status: 'warning',
+        reasons: ['Failing; sends are waiting, and resume once a test send succeeds'],
+        circuit: 'open',
+        reopensAt: '2026-10-01T18:00:30.000Z',
+      },
+    ]
+    mockedGet.mockResolvedValue(data)
+    renderPage('system')
+
+    expect(
+      await screen.findByText(
+        'ACS (SMS): Failing; sends are waiting, and resume once a test send succeeds',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Paused: provider failing')).toBeInTheDocument()
+    expect(screen.getByText(/^Test send at /)).toBeInTheDocument()
   })
 
   it('labels a pod that is shutting down', async () => {

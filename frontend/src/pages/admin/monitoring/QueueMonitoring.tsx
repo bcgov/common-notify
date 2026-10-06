@@ -17,11 +17,12 @@ import type { HealthStatus } from '@/interfaces/queueMonitoring.interface'
 import { HEALTH_LABELS, formatQueueName } from '@/utils/monitoring'
 import OverviewCards from './sections/OverviewCards'
 import MessagesSection from './sections/MessagesSection'
-import ActiveBatchesSection from './sections/ActiveBatchesSection'
+import SendsInProgressSection from './sections/SendsInProgressSection'
 import RedisSection from './sections/RedisSection'
 import QueuesSection from './sections/QueuesSection'
 import WorkersSection from './sections/WorkersSection'
 import ReconcilerSection from './sections/ReconcilerSection'
+import ProvidersSection, { providerLabel } from './sections/ProvidersSection'
 import RecentFailuresSection from './sections/RecentFailuresSection'
 import '@/scss/components/queue-monitoring.scss'
 
@@ -95,6 +96,9 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
     ? [
         ...data.redis.reasons.map((reason) => `Redis: ${reason}`),
         ...data.reconciler.reasons.map((reason) => `Delivery recovery: ${reason}`),
+        ...data.providers.flatMap((provider) =>
+          provider.reasons.map((reason) => `${providerLabel(provider)}: ${reason}`),
+        ),
         ...data.queues.flatMap((queue) =>
           queue.reasons.map((reason) => `${formatQueueName(queue.name)}: ${reason}`),
         ),
@@ -182,7 +186,7 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
             <>
               <OverviewCards overview={data.overview} messages={data.messages} redis={data.redis} />
               <MessagesSection messages={data.messages} />
-              <ActiveBatchesSection batches={data.activeBatches} now={now} />
+              <SendsInProgressSection sends={data.sendsInProgress} now={now} />
             </>
           )}
 
@@ -192,6 +196,7 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
             <>
               <QueuesSection queues={data.queues} />
               <WorkersSection workers={data.workers} now={now} />
+              <ProvidersSection providers={data.providers} />
               <ReconcilerSection reconciler={data.reconciler} now={now} />
               <RedisSection redis={data.redis} />
             </>

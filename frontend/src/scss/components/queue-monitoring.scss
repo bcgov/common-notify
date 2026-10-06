@@ -31,6 +31,13 @@
   max-width: 640px;
 }
 
+// One delivery provider's caption, reasons and tiles, stacked like the Redis memory block.
+.queue-monitoring__provider {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
 .queue-monitoring__memory-caption {
   @include flex-between;
   font-size: $font-size-sm;
