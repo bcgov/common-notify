@@ -56,6 +56,18 @@ describe('EmailLogoService', () => {
     await expect(service.findByIdIfApproved('unavailable')).resolves.toBeNull()
   })
 
+  it('resolves the default using its flag rather than its name', async () => {
+    repository.findApproved.mockResolvedValue([
+      { id: 'default-id', name: 'Renamed mark', isDefault: true },
+    ])
+    await expect(service.getDefault()).resolves.toMatchObject({ id: 'default-id' })
+  })
+
+  it('fails rather than sending unbranded email when no default is configured', async () => {
+    repository.findApproved.mockResolvedValue([])
+    await expect(service.getDefault()).rejects.toThrow('Default email logo is not configured')
+  })
+
   it('builds an image URL against the public API gateway', () => {
     expect(service.buildPublicImageUrl('logo-id')).toBe(
       'https://gateway.example.test/logos/logo-id/image',

@@ -2,6 +2,7 @@ export const EMAIL_LOGO_STORAGE = 'EMAIL_LOGO_STORAGE'
 export const EMAIL_LOGO_STORAGE_PREFIX = 'logos/'
 
 export const SYSTEM_EMAIL_LOGO_KEYS = [
+  'logos/BCID_H_RGB_pos.svg',
   'logos/BC_AF_H_RGB_pos.svg',
   'logos/BC_AG_H_RGB_pos.svg',
   'logos/BC_CFD_H_RGB_pos.svg',

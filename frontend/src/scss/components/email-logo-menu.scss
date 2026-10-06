@@ -1,0 +1,164 @@
+@import '../variables.scss';
+
+.email-logo-menu {
+  position: relative;
+  width: 100%;
+  color: var(--typography-color-primary, #{$dark-text});
+}
+
+.email-logo-menu__label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--typography-color-secondary, #{$text-secondary});
+  font: var(--typography-bold-small-body, 700 14px/21px 'BC Sans', sans-serif);
+}
+
+.email-logo-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--layout-margin-small, 8px);
+  width: 100%;
+  min-height: 84px;
+  padding: var(--layout-padding-small, 8px);
+  border: var(--layout-border-width-small, 1px) solid
+    var(--surface-color-border-base, #{$border-default});
+  border-radius: var(--layout-border-radius-medium, 4px);
+  background: var(--surface-color-forms-default, #{$white});
+  color: var(--typography-color-primary, #{$dark-text});
+  font: var(--typography-regular-body, 400 16px/27px 'BC Sans', sans-serif);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--surface-color-border-prominent, #{$border-dark});
+  }
+
+  &:focus-visible {
+    outline: var(--layout-border-width-medium, 2px) solid
+      var(--surface-color-border-active, #{$border-active});
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    background: var(--surface-color-forms-disabled, #f1f1f1);
+    color: var(--typography-color-disabled, #{$text-disabled});
+    cursor: not-allowed;
+  }
+}
+
+.email-logo-menu__trigger-image,
+.email-logo-menu__option-image {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 68px;
+  object-fit: contain;
+}
+
+.email-logo-menu__trigger-name,
+.email-logo-menu__option-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.email-logo-menu__chevron,
+.email-logo-menu__check {
+  display: inline-flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.email-logo-menu__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(34rem, calc(100vh - 10rem));
+  padding: var(--layout-padding-xsmall, 4px);
+  overflow: hidden;
+  border-radius: var(--layout-border-radius-medium, 4px);
+  background: var(--surface-color-background-white, #{$white});
+  box-shadow:
+    0 1.2px 3.6px rgb(0 0 0 / 10%),
+    0 6.4px 14.4px rgb(0 0 0 / 13%);
+}
+
+.email-logo-menu__search {
+  flex: 0 0 auto;
+  padding: 0 var(--layout-padding-xsmall, 4px);
+
+  .bcds-react-aria-TextField {
+    width: 100%;
+  }
+}
+
+.email-logo-menu__divider {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: var(--layout-padding-xsmall, 4px) 0;
+  background: var(--surface-color-border-base, #{$border-default});
+}
+
+.email-logo-menu__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.email-logo-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.email-logo-menu__section-heading {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding: var(--layout-padding-small, 8px);
+  color: var(--typography-color-secondary, #{$text-secondary});
+  font: var(--typography-regular-small-body, 400 14px/21px 'BC Sans', sans-serif);
+}
+
+.email-logo-menu__option {
+  display: flex;
+  align-items: center;
+  gap: var(--layout-margin-small, 8px);
+  width: 100%;
+  min-height: 84px;
+  padding: var(--layout-padding-small, 8px);
+  overflow: hidden;
+  border-radius: var(--layout-borderwidth-large, 4px);
+  background: var(--surface-color-menus-default, #{$white});
+  color: var(--typography-color-primary, #{$dark-text});
+  font: var(--typography-regular-body, 400 16px/27px 'BC Sans', sans-serif);
+  cursor: pointer;
+
+  &--active {
+    background: var(--surface-color-menus-hover, #edebe9);
+  }
+
+  &--active:focus-visible {
+    outline: var(--layout-border-width-medium, 2px) solid
+      var(--surface-color-border-focus, #{$border-active});
+    outline-offset: -2px;
+  }
+
+  &--no-image .email-logo-menu__option-name {
+    padding-left: 0;
+  }
+}
+
+.email-logo-menu__empty {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: var(--layout-padding-medium, 16px);
+  color: var(--typography-color-secondary, #{$text-secondary});
+  font: var(--typography-regular-small-body, 400 14px/21px 'BC Sans', sans-serif);
+}

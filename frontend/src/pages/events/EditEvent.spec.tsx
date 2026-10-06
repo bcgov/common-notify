@@ -28,6 +28,8 @@ const navigateMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  // The email tab guards unsaved changes with a route blocker; nothing here navigates for real.
+  useBlocker: () => ({ status: 'idle' }),
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
@@ -48,6 +50,10 @@ vi.mock('@/api/settings.api', async () => {
   const actual = await vi.importActual<typeof SettingsApi>('@/api/settings.api')
   return { ...actual, getSettings: vi.fn(), getApprovedEmailLogos: vi.fn() }
 })
+
+vi.mock('@/api/cstar.api', () => ({
+  cstarApi: { fetchTenantGroups: vi.fn().mockResolvedValue([]) },
+}))
 
 vi.mock('@/api/templates.api', async () => {
   const actual = await vi.importActual<typeof TemplatesApi>('@/api/templates.api')
@@ -89,6 +95,9 @@ const configuredEmail = {
   to: ['alice@gov.bc.ca'],
   cc: [],
   bcc: [],
+  cstarGroupIdsTo: [],
+  cstarGroupIdsCc: [],
+  cstarGroupIdsBcc: [],
   useCustomHeader: false,
   headerLogoId: null,
   headerTitle: null,
@@ -250,6 +259,52 @@ describe('EditEvent', () => {
       expect(getEventById).toHaveBeenCalledTimes(1)
     })
 
+    it('asks before a switch would discard unsaved email settings', async () => {
+      renderPage({ initialTab: 'email' })
+
+      // Switching the channel on is an unsaved change in its own right.
+      await userEvent.click(await screen.findByRole('switch', { name: 'Activate channel' }))
+      await userEvent.click(screen.getByRole('radio', { name: 'SMS Notification' }))
+
+      expect(await screen.findByText('Unsaved changes')).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'Email Notification' })).toBeChecked()
+    })
+
+    it('stays on the email tab when the switch is called off', async () => {
+      renderPage({ initialTab: 'email' })
+
+      await userEvent.click(await screen.findByRole('switch', { name: 'Activate channel' }))
+      await userEvent.click(screen.getByRole('radio', { name: 'SMS Notification' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Stay on page' }))
+
+      await waitFor(() => expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument())
+      expect(screen.getByRole('radio', { name: 'Email Notification' })).toBeChecked()
+      expect(screen.getByRole('switch', { name: 'Activate channel' })).toBeChecked()
+    })
+
+    it('switches once the unsaved email settings are abandoned', async () => {
+      renderPage({ initialTab: 'email' })
+
+      await userEvent.click(await screen.findByRole('switch', { name: 'Activate channel' }))
+      await userEvent.click(screen.getByRole('radio', { name: 'SMS Notification' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave without saving' }))
+
+      await waitFor(() => expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument())
+      expect(screen.getByRole('radio', { name: 'SMS Notification' })).toBeChecked()
+      // The email channel was never switched on for real, so the SMS tab opens on its own state.
+      expect(screen.getByRole('switch', { name: 'Activate channel' })).not.toBeChecked()
+    })
+
+    it('does not ask when the email tab has nothing unsaved', async () => {
+      renderPage({ initialTab: 'email' })
+
+      await screen.findByRole('switch', { name: 'Activate channel' })
+      await userEvent.click(screen.getByRole('radio', { name: 'SMS Notification' }))
+
+      expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'SMS Notification' })).toBeChecked()
+    })
+
     it('shows the third-party channel as not available yet', async () => {
       renderPage()
 
@@ -315,6 +370,9 @@ describe('EditEvent', () => {
           to: ['alice@gov.bc.ca'],
           cc: [],
           bcc: [],
+          cstarGroupIdsTo: [],
+          cstarGroupIdsCc: [],
+          cstarGroupIdsBcc: [],
           useCustomHeader: false,
           headerLogoId: null,
           headerTitle: null,

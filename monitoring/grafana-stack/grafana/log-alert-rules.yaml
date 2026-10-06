@@ -1,0 +1,572 @@
+# Grafana-managed LOG-BASED alert rules (Loki datasource)
+# ---------------------------------------------------------------------------
+# WHY THIS FILE EXISTS
+#   These rules previously lived in monitoring/grafana-stack/loki/alert-rules.yaml
+#   and were evaluated by Loki's own ruler, which forwards alerts to an
+#   Alertmanager. No Alertmanager is deployed — the Prometheus chart sets
+#   `alertmanager: enabled: false` ("Grafana handles alerting -> n8n") and the
+#   ruler pointed at a placeholder `alertmanager_url: http://localhost:9093`.
+#   Loki evaluated these rules and posted the alerts nowhere, so none of them
+#   could ever notify.
+#
+#   They are now Grafana-managed, evaluated by Grafana against the Loki
+#   datasource and routed through the same notification policy as the metric
+#   rules — one alerting path, one contact point (n8n webhook).
+#
+# DATA SOURCE  (UID: loki — keep in sync with values-tools-sso.yaml)
+#
+# THRESHOLDS ARE DERIVED FROM REAL DATA, NOT GUESSED
+#   The original rules used per-second rates with thresholds of 1-50/sec. Measured
+#   against 7 days of actual logs, almost none of them could ever fire: prod
+#   backend produces ~9k lines/WEEK, and the specific patterns matched at most
+#   12 lines per 10m (QueueJobFailures), 4 (ChesDeliveryFailures) or 1
+#   (EmailSendingFailures). A ">2/sec" threshold is two orders of magnitude above
+#   anything the service emits.
+#
+#   So these rules count MATCHING LINES IN A 10 MINUTE WINDOW rather than a
+#   per-second rate — a far more meaningful unit at this volume — and the
+#   thresholds sit above observed normal with headroom. Max observed per 10m over
+#   7 days, for reference when retuning:
+#     HighErrorRate/CriticalErrorRate 5151 · QueueJobFailures 12 ·
+#     ChesDeliveryFailures 4 · EmailSendingFailures 1 · all others 0
+#
+#   The rules with 0 observed matches are set to a low but non-trivial count
+#   (5-20 per 10m) so they remain reachable when the condition actually occurs.
+#   VirusDetected and QueueNotDraining stay at >0: a single occurrence matters.
+#
+# REMOVED: LokiIngestionLag / LokiErrors
+#   Both selected {namespace="f6bc3f-tools", app="loki"}. Neither label value
+#   exists — Loki does not ship its own logs into itself, so the rules could
+#   never fire under any circumstances. Loki self-monitoring belongs on metrics
+#   (Prometheus scrapes Loki) rather than logs; tracked separately.
+#
+# CONVERSION NOTE
+#   A Loki ruler rule embeds its threshold in the expression
+#   (`... > 10`). Grafana splits this: the query returns the value, and a
+#   threshold expression (refId C) holds the comparison. Queries, selectors,
+#   windows, `for` durations, labels and annotations are otherwise unchanged
+#   from the ruler versions.
+#
+#   noDataState/execErrState are OK by design: for a log rule, "no matching
+#   lines" is the healthy state and must not page.
+#
+# SCOPE
+#   f6bc3f-TEST and f6bc3f-PROD only (plus f6bc3f-tools for the Loki
+#   self-monitoring rules). Dev is excluded — constant redeploys make its log
+#   noise expected rather than actionable.
+# ---------------------------------------------------------------------------
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: common-notify-errors
+    folder: Common Notify Logs
+    interval: 1m
+    rules:
+      - uid: cn-log-error-rate
+        title: HighErrorRate
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [10m])) by (namespace, app)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [500] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} error rate elevated"
+          summary: "High error rate detected in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "{{ $value }} error/exception log lines in {{ $labels.namespace }}/{{ $labels.app }} over the last 10 minutes"
+
+      - uid: cn-log-error-rate-crit
+        title: CriticalErrorRate
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(error|exception|fatal)" [10m])) by (namespace, app)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [2000] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} very high error rate"
+          summary: "CRITICAL: Very high error rate in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "{{ $value }} error/exception log lines in {{ $labels.namespace }}/{{ $labels.app }} over the last 10 minutes - immediate attention required!"
+
+      - uid: cn-log-db-errors
+        title: DatabaseConnectionErrors
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 3m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(database|postgres|connection).*(?i)(error|fail|timeout)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "database"
+        annotations:
+          short: "{{ $labels.namespace }} database connection errors"
+          summary: "Database connection errors in {{ $labels.namespace }}"
+          description: "{{ $value }} database connection error log lines in {{ $labels.namespace }} over the last 10 minutes"
+
+      - uid: cn-log-redis-errors
+        title: RedisConnectionErrors
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 3m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)redis.*(?i)(error|fail|timeout|disconnect)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "redis"
+        annotations:
+          short: "{{ $labels.namespace }} Redis connection errors"
+          summary: "Redis connection errors in {{ $labels.namespace }}"
+          description: "{{ $value }} Redis connection error log lines in {{ $labels.namespace }} over the last 10 minutes"
+
+      - uid: cn-log-email-failures
+        title: EmailSendingFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "email"
+        annotations:
+          short: "{{ $labels.namespace }} email send failures elevated"
+          summary: "Email sending failures in {{ $labels.namespace }}"
+          description: "{{ $value }} email send failure log lines in {{ $labels.namespace }} over the last 10 minutes"
+
+  - orgId: 1
+    name: common-notify-performance
+    folder: Common Notify Logs
+    interval: 1m
+    rules:
+      - uid: cn-log-slow-api
+        title: SlowAPIResponses
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "performance"
+        annotations:
+          short: "{{ $labels.namespace }} slow API responses (>5s)"
+          summary: "Slow API responses detected in {{ $labels.namespace }}"
+          description: "High rate of slow responses (>5s) detected in {{ $labels.namespace }}"
+
+      - uid: cn-log-mem-warnings
+        title: HighMemoryUsageWarnings
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(memory|heap).*(?i)(warning|high|limit)" [10m])) by (namespace, app)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "resources"
+        annotations:
+          short: "{{ $labels.namespace }}/{{ $labels.app }} memory warnings in logs"
+          summary: "Memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
+          description: "Application reporting memory warnings in {{ $labels.namespace }}/{{ $labels.app }}"
+
+  - orgId: 1
+    name: common-notify-security
+    folder: Common Notify Logs
+    interval: 1m
+    rules:
+      - uid: cn-log-auth-failures
+        title: HighAuthenticationFailureRate
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app=~"backend|frontend"} |~ "(?i)(auth|login).*(?i)(fail|unauthorized|forbidden)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "security"
+        annotations:
+          short: "{{ $labels.namespace }} high auth failure rate"
+          summary: "High authentication failure rate in {{ $labels.namespace }}"
+          description: "{{ $value }} authentication failure log lines in {{ $labels.namespace }} over the last 10 minutes - possible brute force attack"
+
+      - uid: cn-log-virus
+        title: VirusDetected
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(virus|malware|clamav).*(?i)(detected|found|infected)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "security"
+        annotations:
+          short: "{{ $labels.namespace }} ClamAV detected a virus"
+          summary: "VIRUS DETECTED in {{ $labels.namespace }}"
+          description: "ClamAV detected a virus in uploaded file in {{ $labels.namespace }} - immediate investigation required!"
+
+  - orgId: 1
+    name: common-notify-delivery
+    folder: Common Notify Logs
+    interval: 1m
+    rules:
+      - uid: cn-log-ches-failures
+        title: ChesDeliveryFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "ches"
+        annotations:
+          short: "{{ $labels.namespace }} repeated CHES delivery failures"
+          summary: "CHES delivery failures in {{ $labels.namespace }}"
+          description: "Repeated CHES (email provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). Email delivery may be degraded."
+
+      - uid: cn-log-acs-failures
+        title: AcsDeliveryFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(acs|communication.?services).*(?i)(fail|error|timeout|unavailable)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "acs"
+        annotations:
+          short: "{{ $labels.namespace }} repeated ACS delivery failures"
+          summary: "ACS delivery failures in {{ $labels.namespace }}"
+          description: "Repeated ACS (SMS provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). SMS delivery may be degraded."
+
+      - uid: cn-log-sms-failures
+        title: SmsSendingFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "sms"
+        annotations:
+          short: "{{ $labels.namespace }} SMS send failures elevated"
+          summary: "SMS sending failures in {{ $labels.namespace }}"
+          description: "{{ $value }} SMS send failure log lines in {{ $labels.namespace }} over the last 10 minutes."
+
+      - uid: cn-log-webhook-failures
+        title: WebhookDeliveryFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "webhook"
+        annotations:
+          short: "{{ $labels.namespace }} webhook/callback failures elevated"
+          summary: "Webhook delivery failures in {{ $labels.namespace }}"
+          description: "Webhook/callback delivery failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m)."
+
+      - uid: cn-log-queue-failures
+        title: QueueJobFailures
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [25] }
+              refId: C
+        labels:
+          severity: "warning"
+          service: "common-notify"
+          component: "queue"
+        annotations:
+          short: "{{ $labels.namespace }} queue jobs failing"
+          summary: "Queue job failures in {{ $labels.namespace }}"
+          description: "BullMQ job failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). Check the failed/dead-letter queue."
+
+      - uid: cn-log-queue-stalled
+        title: QueueNotDraining
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(queue|worker).*(?i)(stalled|stuck|backlog|not draining)" [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "queue"
+        annotations:
+          short: "{{ $labels.namespace }} queue not draining / jobs stuck"
+          summary: "Queue not draining in {{ $labels.namespace }}"
+          description: "Signs of a stalled/stuck queue in {{ $labels.namespace }} over 10m — notifications may be sitting queued longer than expected. Verify worker health and Redis."
+
