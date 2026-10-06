@@ -42,6 +42,10 @@ export class NotificationRequestDetail {
   @Column({ name: 'provider_response', type: 'jsonb', nullable: true })
   providerResponse?: any
 
+  /** Mail merge personalisation for this recipient; null for non-merge sends. */
+  @Column({ type: 'jsonb', nullable: true })
+  params?: Record<string, unknown> | null
+
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage?: string
 

@@ -1,4 +1,5 @@
 import { BadRequestException, Logger } from '@nestjs/common'
+import { TransientDeliveryError } from '../../adapters/delivery-errors'
 import Bull from 'bull'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EmailDeliveryWorker } from './email-delivery.worker'
@@ -39,8 +40,10 @@ describe('EmailDeliveryWorker', () => {
       markFailed: vi.fn().mockResolvedValue(undefined),
       markRecipientSent: vi.fn().mockResolvedValue(undefined),
       markRecipientFailed: vi.fn().mockResolvedValue(undefined),
+      markBatchUnsentFailed: vi.fn().mockResolvedValue(undefined),
       countByStatus: vi.fn().mockResolvedValue(0),
-      findSentAddresses: vi.fn().mockResolvedValue(new Set<string>()),
+      findSentAddresses: vi.fn().mockResolvedValue(new Set()),
+      findBatchRecipients: vi.fn().mockResolvedValue([]),
     }
 
     // Mock the notification service
@@ -944,6 +947,47 @@ describe('EmailDeliveryWorker', () => {
       )
     })
 
+    it('leaves a plain send owed after a CHES outage outlasts every attempt', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+      const outage = new TransientDeliveryError('CHES email: upstream 503', 502)
+      vi.mocked(mockEmailAdapter.send).mockRejectedValue(outage)
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-outage',
+          tenantId: 'tenant-1',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Hi', body: 'Hello', bodyType: 'html' },
+          },
+          attempt: 2,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 2,
+      }
+
+      await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toBe(outage)
+      await failedCallback({ ...job, attemptsMade: 3 } as Bull.Job<DeliveryJobPayload>, outage)
+
+      expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).not.toHaveBeenCalledWith(
+        'notify-outage',
+        'tenant-1',
+        expect.objectContaining({ status: NotificationStatus.FAILED }),
+      )
+    })
+
     it('should NOT mark notification as FAILED on non-final attempts', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
@@ -1514,6 +1558,74 @@ describe('EmailDeliveryWorker', () => {
         )
       })
 
+      it('should report batch progress before the first send and after each recipient', async () => {
+        vi.mocked(mockEmailAdapter.send)
+          .mockResolvedValueOnce({ messageId: 'ext-1' })
+          .mockRejectedValueOnce(new Error('rejected'))
+        const progress = vi.fn().mockResolvedValue(undefined)
+        const job = { ...makeBulkJob(['alice@example.com', 'bob@example.com']), progress }
+
+        await processHandler(job as unknown as Bull.Job<DeliveryJobPayload>)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(progress.mock.calls.map(([value]) => value)).toEqual([
+          { sent: 0, failed: 0, total: 2 },
+          { sent: 1, failed: 0, total: 2 },
+          { sent: 1, failed: 1, total: 2 },
+        ])
+      })
+
+      it('should not re-send to recipients an earlier attempt of the batch delivered', async () => {
+        // A pod replaced mid-batch leaves the job to be retried from the top.
+        mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['alice@example.com']))
+        const progress = vi.fn().mockResolvedValue(undefined)
+        const job = { ...makeBulkJob(['alice@example.com', 'bob@example.com']), progress }
+
+        const result = await processHandler(job as unknown as Bull.Job<DeliveryJobPayload>)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(mockRequestDetailService.findSentAddresses).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+        )
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          'bob@example.com',
+          'ext-123',
+        )
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
+        // The bar resumes where the earlier attempt left off.
+        expect(progress.mock.calls.map(([value]) => value)).toEqual([
+          { sent: 1, failed: 0, total: 2 },
+          { sent: 2, failed: 0, total: 2 },
+        ])
+      })
+
+      it("reads a batch's recipients and their params from its rows when the job carries none", async () => {
+        mockRequestDetailService.findBatchRecipients.mockResolvedValue([
+          { address: 'alice@example.com', params: { name: 'Alice' }, status: 'sent' },
+          { address: 'bob@example.com', params: { name: 'Bob' }, status: 'pending' },
+        ])
+        const job = makeBulkJob([])
+        delete (job.data!.mailMergeData as { recipients?: unknown }).recipients
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockRequestDetailService.findBatchRecipients).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+        )
+        // Alice was sent by an earlier attempt; only Bob goes out, rendered with his own params.
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+        expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ name: 'Bob' }),
+        )
+        expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
+      })
+
       it('should render inline content per recipient when no templateId is given', async () => {
         mockInlineRenderingService.renderEmail.mockResolvedValue({
           subject: 'Hi',
@@ -1646,6 +1758,79 @@ describe('EmailDeliveryWorker', () => {
           "Template 'template-uuid' is not an EMAIL template",
         )
         expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      })
+
+      it('pauses the batch on a CHES outage, leaving unsent recipients owed rather than failed', async () => {
+        vi.mocked(mockEmailAdapter.send)
+          .mockResolvedValueOnce({ messageId: 'ext-1' } as any)
+          .mockRejectedValueOnce(new TransientDeliveryError('CHES email: upstream 503', 502))
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toBeInstanceOf(
+          TransientDeliveryError,
+        )
+        expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledTimes(1)
+        expect(mockRequestDetailService.markRecipientFailed).not.toHaveBeenCalled()
+        expect(mockRequestDetailService.markBatchUnsentFailed).not.toHaveBeenCalled()
+        // Carol is never tried: the batch stops at the first sign of trouble.
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(2)
+        expect(mockNotificationService.update).not.toHaveBeenCalled()
+      })
+
+      it('leaves a CHES outage owed even on the final attempt, for the reconciler', async () => {
+        vi.mocked(mockEmailAdapter.send).mockRejectedValue(
+          new TransientDeliveryError('CHES email: upstream 503', 502),
+        )
+        const job = { ...makeBulkJob(['alice@example.com']), attemptsMade: 2, discard: vi.fn() }
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow('503')
+        expect(mockRequestDetailService.markBatchUnsentFailed).not.toHaveBeenCalled()
+        expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+      })
+
+      it('fails only this batch, never the whole send, once a systemic error exhausts retries', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(null)
+        // pending=0, failed=1, sent=24 once this batch is settled
+        mockRequestDetailService.countByStatus
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(1)
+          .mockResolvedValueOnce(24)
+        const job = { ...makeBulkJob(['alice@example.com']), attemptsMade: 2, discard: vi.fn() }
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow(
+          'not found',
+        )
+        expect(mockRequestDetailService.markBatchUnsentFailed).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+          expect.stringContaining('not found'),
+        )
+        expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+        expect(mockNotificationService.update).toHaveBeenCalledWith('notify-bulk', 'tenant-bulk', {
+          status: NotificationStatus.PARTIALLY_COMPLETED,
+          updatedBy: 'email-delivery-worker',
+        })
+      })
+
+      it('leaves a systemic error to be retried before the final attempt', async () => {
+        mockTemplatesRepository.findById.mockResolvedValue(null)
+        const job = makeBulkJob(['alice@example.com'])
+
+        await expect(processHandler(job as Bull.Job<DeliveryJobPayload>)).rejects.toThrow()
+        expect(mockRequestDetailService.markBatchUnsentFailed).not.toHaveBeenCalled()
+      })
+
+      it('does not fail the whole send when a batch job is exhausted', async () => {
+        const job = { ...makeBulkJob(['alice@example.com']), attemptsMade: 3 }
+
+        await failedCallback(
+          job as Bull.Job<DeliveryJobPayload>,
+          new Error('job stalled more than allowable limit'),
+        )
+
+        expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+        expect(mockNotificationService.update).not.toHaveBeenCalled()
       })
 
       it('should resolve template once and render content per recipient', async () => {
