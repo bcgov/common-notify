@@ -9,6 +9,7 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common'
+import { describeError } from '../../../../../common/utils/describe-error'
 import { ConfigService } from '@nestjs/config'
 import type Redis from 'ioredis'
 import { RedisCircuitBreaker } from '../../../../../common/redis/circuit-breaker'
@@ -88,7 +89,7 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModu
   constructor(private readonly configService: ConfigService) {
     const redisConfig = this.configService.get<RedisConfig>('redis')
     const limit = this.configService.get<number>('ches.maxConcurrentRequests') ?? 0
-    if (!redisConfig || !(limit > 0)) return
+    if (!redisConfig || limit <= 0) return
 
     this.redis = createRedisClient(redisConfig, ChesEmailTransport.name, {
       // On the send path: a Redis outage has to fall back to unlimited sending in milliseconds.
@@ -288,11 +289,11 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModu
     let data: ChesEmailResponse
     try {
       data = (await response.json()) as ChesEmailResponse
-    } catch (caught: unknown) {
+    } catch (error: unknown) {
       const errMeta =
-        caught instanceof Error
-          ? { name: caught.name, message: caught.message }
-          : { message: String(caught) }
+        error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { message: describeError(error) }
       this.logger.error(errMeta, 'CHES email: success response was not valid JSON')
       throw new BadGatewayException('CHES email returned a non-JSON response body')
     }
@@ -320,21 +321,21 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModu
     const timeoutMs = this.configService.get<number>('ches.timeoutMs') ?? 120_000
     try {
       return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
-    } catch (caught: unknown) {
+    } catch (error: unknown) {
       if (
-        caught instanceof Error &&
-        (caught.name === 'TimeoutError' || caught.name === 'AbortError')
+        error instanceof Error &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')
       ) {
         this.logger.error(`[CHES] ${operation} request timed out after ${timeoutMs}ms`)
         const message = `CHES ${operation} request timed out after ${timeoutMs / 1000}s`
         if (operation === 'token') throw new TransientDeliveryError(message, 504)
         throw new GatewayTimeoutException(message)
       }
-      if (isNotSentNetworkError(caught)) {
-        const code = (caught as { cause: { code: string } }).cause.code
+      if (isNotSentNetworkError(error)) {
+        const code = (error as { cause: { code: string } }).cause.code
         throw new TransientDeliveryError(`CHES ${operation} unreachable: ${code}`)
       }
-      throw caught
+      throw error
     }
   }
 
@@ -368,11 +369,11 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModu
     let data: ChesTokenResponse
     try {
       data = (await response.json()) as ChesTokenResponse
-    } catch (caught: unknown) {
+    } catch (error: unknown) {
       const errMeta =
-        caught instanceof Error
-          ? { name: caught.name, message: caught.message }
-          : { message: String(caught) }
+        error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { message: describeError(error) }
       this.logger.error(errMeta, 'CHES token: success response was not valid JSON')
       throw new BadGatewayException('CHES token endpoint returned a non-JSON response body')
     }

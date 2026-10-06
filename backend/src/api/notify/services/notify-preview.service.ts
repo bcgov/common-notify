@@ -31,15 +31,12 @@ export class NotifyPreviewService {
     private readonly phoneNumberService: PhoneNumberService,
   ) {}
 
-  async render(
-    tenantId: string,
-    request: NotifySimpleRequest,
-    original: NotifySimpleRequest,
-  ): Promise<NotifyPreviewResponse> {
-    // Check every channel before doing any rendering or template reads.
+  /** Everything a preview cannot do, checked before any template read or render. */
+  private assertPreviewable(request: NotifySimpleRequest, original: NotifySimpleRequest): void {
     for (const name of CHANNELS) {
       const channel = request[name]
       if (!channel) continue
+
       if (channel.attachments?.length) {
         throw new BadRequestException([`${name}.attachments are not supported in preview`])
       }
@@ -48,7 +45,7 @@ export class NotifyPreviewService {
       }
       // Transformed DTOs can own optional fields with undefined values. Inspect the
       // submitted object to distinguish an absent mergeArray from a supplied one.
-      if (Object.prototype.hasOwnProperty.call(original[name]?.recipients ?? {}, 'mergeArray')) {
+      if (Object.hasOwn(original[name]?.recipients ?? {}, 'mergeArray')) {
         throw new BadRequestException([
           `${name}.recipients.mergeArray mail-merge preview is not yet supported`,
         ])
@@ -60,61 +57,108 @@ export class NotifyPreviewService {
         ])
       }
     }
+  }
+
+  /** A stored template, rendered through the same path the send uses. */
+  private async renderStoredTemplate(
+    tenantId: string,
+    name: (typeof CHANNELS)[number],
+    templateId: string,
+    params: Record<string, unknown>,
+  ): Promise<Partial<NotifyContent>> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) throw new NotFoundException(`Template ${templateId} not found`)
+    if (template.channelCode !== CHANNEL_CODES[name]) {
+      throw new BadRequestException([
+        `${name}.content.templateId must reference a ${CHANNEL_CODES[name]} template`,
+      ])
+    }
+
+    const templateContent = await this.templatesService.renderTemplateContent(template, params)
+    return name === 'email'
+      ? await this.templatesService.applyEmailLayout(template, templateContent)
+      : templateContent
+  }
+
+  /** Inline content, rendered by the engine the request names. */
+  private async renderInline(
+    name: (typeof CHANNELS)[number],
+    content: NotifyContent,
+    params: Record<string, unknown>,
+  ): Promise<Partial<NotifyContent>> {
+    if (name === 'email') return this.inlineRenderingService.renderEmail(content, params)
+    if (name === 'sms') return this.inlineRenderingService.renderSms(content, params)
+    return this.inlineRenderingService.renderMsgApp(content, params)
+  }
+
+  /** The SMS entry, with recipients normalised and segments counted on the rendered body. */
+  private smsPreview(request: NotifySimpleRequest, rendered: Partial<NotifyContent>) {
+    return {
+      recipients: {
+        to: request.sms!.recipients.to!.map((number) => {
+          const normalized = this.phoneNumberService.normalize(number)
+          if (!normalized) throw new BadRequestException(['Invalid SMS recipient'])
+          return normalized
+        }),
+      },
+      content: { body: rendered.body },
+      // Same calculation as SmsSegmentService billing, on the already-rendered body.
+      segmentsPerRecipient: countSmsSegments(rendered.body),
+    }
+  }
+
+  /** The already-rendered content for one channel, whatever route produced it. */
+  private async renderContent(
+    tenantId: string,
+    name: (typeof CHANNELS)[number],
+    content: NotifyContent,
+    params: Record<string, unknown>,
+  ): Promise<Partial<NotifyContent>> {
+    if (content.templateId) {
+      return this.renderStoredTemplate(tenantId, name, content.templateId, params)
+    }
+    if (content.renderer) {
+      return this.renderInline(name, content, params)
+    }
+    return content
+  }
+
+  /** Email and MsgApp keep the submitted recipients and fill in what the render did not set. */
+  private contentPreview(content: NotifyContent, rendered: Partial<NotifyContent>) {
+    return {
+      subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
+      body: rendered.body,
+      bodyType: rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
+      encoding: 'encoding' in content ? content.encoding : undefined,
+    }
+  }
+
+  async render(
+    tenantId: string,
+    request: NotifySimpleRequest,
+    original: NotifySimpleRequest,
+  ): Promise<NotifyPreviewResponse> {
+    this.assertPreviewable(request, original)
 
     const result: NotifyPreviewResponse = {}
     for (const name of CHANNELS) {
       const channel = request[name]
       if (!channel) continue
+
       const content = channel.content!
       const params = { ...request.params, ...channel.params }
-      let rendered: Partial<NotifyContent>
-      if (content.templateId) {
-        const template = await this.templatesRepository.findById(tenantId, content.templateId)
-        if (!template) throw new NotFoundException(`Template ${content.templateId} not found`)
-        if (template.channelCode !== CHANNEL_CODES[name]) {
-          throw new BadRequestException([
-            `${name}.content.templateId must reference a ${CHANNEL_CODES[name]} template`,
-          ])
-        }
-        const templateContent = await this.templatesService.renderTemplateContent(template, params)
-        rendered =
-          name === 'email'
-            ? await this.templatesService.applyEmailLayout(template, templateContent)
-            : templateContent
-      } else if (content.renderer) {
-        if (name === 'email')
-          rendered = await this.inlineRenderingService.renderEmail(content, params)
-        else if (name === 'sms')
-          rendered = await this.inlineRenderingService.renderSms(content, params)
-        else rendered = await this.inlineRenderingService.renderMsgApp(content, params)
-      } else {
-        rendered = content
-      }
+      const rendered = await this.renderContent(tenantId, name, content, params)
+
       if (name === 'sms') {
-        result.sms = {
-          recipients: {
-            to: request.sms!.recipients.to!.map((number) => {
-              const normalized = this.phoneNumberService.normalize(number)
-              if (!normalized) throw new BadRequestException(['Invalid SMS recipient'])
-              return normalized
-            }),
-          },
-          content: { body: rendered.body },
-          // Same calculation as SmsSegmentService billing, on the already-rendered body.
-          segmentsPerRecipient: countSmsSegments(rendered.body),
-        }
+        result.sms = this.smsPreview(request, rendered)
       } else {
         result[name] = {
           recipients: original[name]!.recipients,
-          content: {
-            subject: rendered.subject ?? ('subject' in content ? content.subject : undefined),
-            body: rendered.body,
-            bodyType: rendered.bodyType ?? ('bodyType' in content ? content.bodyType : undefined),
-            encoding: 'encoding' in content ? content.encoding : undefined,
-          },
+          content: this.contentPreview(content, rendered),
         }
       }
     }
+
     return result
   }
 }

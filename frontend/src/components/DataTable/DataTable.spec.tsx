@@ -158,6 +158,59 @@ describe('DataTable', () => {
       expect(screen.getByRole('button', { name: /column options for name/i })).toBeInTheDocument()
     })
 
+    it('opens the column options menu from the keyboard and reports its expanded state', async () => {
+      render(<DataTable columns={sortableColumns} data={data} keyExtractor={keyExtractor} />)
+
+      const trigger = screen.getByRole('button', { name: /column options for name/i })
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+      trigger.focus()
+      await userEvent.keyboard('{Enter}')
+
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+      expect(await screen.findByRole('menuitem', { name: 'A to Z' })).toBeInTheDocument()
+    })
+
+    it('filters a column using only the keyboard', async () => {
+      const onFilter = vi.fn()
+      const filterColumns = [
+        { key: 'name' as const, label: 'Name' },
+        {
+          key: 'status' as const,
+          label: 'Status',
+          filterOptions: [
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+          ],
+        },
+      ]
+      render(
+        <DataTable
+          columns={filterColumns}
+          data={data}
+          keyExtractor={keyExtractor}
+          onFilter={onFilter}
+        />,
+      )
+
+      screen.getByRole('button', { name: /column options for status/i }).focus()
+      await userEvent.keyboard('{Enter}')
+      const filterBy = await screen.findByRole('menuitem', { name: /filter by/i })
+      expect(filterBy).toHaveAttribute('aria-expanded', 'false')
+
+      filterBy.focus()
+      await userEvent.keyboard('{Enter}')
+      expect(filterBy).toHaveAttribute('aria-expanded', 'true')
+
+      await userEvent.tab()
+      expect(screen.getByRole('checkbox', { name: 'Active' })).toHaveFocus()
+      await userEvent.keyboard(' ')
+      screen.getByRole('button', { name: 'Apply' }).focus()
+      await userEvent.keyboard('{Enter}')
+
+      expect(onFilter).toHaveBeenCalledWith('status', ['active'])
+    })
+
     it('does not render a column options button for non-sortable columns', () => {
       render(<DataTable columns={sortableColumns} data={data} keyExtractor={keyExtractor} />)
 

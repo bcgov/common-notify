@@ -173,10 +173,10 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
   private heartbeat?: WorkerHeartbeat
 
   constructor(
-    @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
-    @Inject(QueueName.EMAIL_DELIVERY) private emailQueue?: Bull.Queue,
-    @Inject(QueueName.SMS_DELIVERY) private smsQueue?: Bull.Queue,
-    @Inject(QueueName.WEBHOOK_DELIVERY) private webhookQueue?: Bull.Queue,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Bull.Queue,
+    @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Bull.Queue,
+    @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Bull.Queue,
+    @Inject(QueueName.WEBHOOK_DELIVERY) private readonly webhookQueue?: Bull.Queue,
     @InjectRepository(NotificationRequest)
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
@@ -226,7 +226,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     const queues = stages.flat()
     if (queues.length === 0) return
 
-    const drainMs = parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
+    const drainMs = Number.parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
     this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
 
     const drain = async (): Promise<void> => {

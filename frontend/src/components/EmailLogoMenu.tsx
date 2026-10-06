@@ -206,9 +206,15 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               iconLeft={<SearchIcon fontSize="small" aria-hidden="true" />}
               size="medium"
               type="text"
-              {...({ placeholder: 'Search logo...', role: 'combobox' } as {
+              {...({
+                placeholder: 'Search logo...',
+                role: 'combobox',
+                // On the combobox, which holds focus — not the listbox, which never does.
+                'aria-activedescendant': activeOptionId,
+              } as {
                 placeholder?: string
                 role?: 'combobox'
+                'aria-activedescendant'?: string
               })}
               value={searchQuery}
               onChange={(query) => {
@@ -219,14 +225,13 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               onKeyDown={handleSearchKeyDown}
             />
           </div>
-          <div className="email-logo-menu__divider" role="separator" />
+          <hr className="email-logo-menu__divider" />
           <div
             ref={listRef}
             id={listboxId}
             className="email-logo-menu__list"
             role="listbox"
             aria-label="Email logo options"
-            aria-activedescendant={activeOptionId}
           >
             {filteredRecommended.length > 0 && (
               <div
@@ -242,9 +247,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
             )}
             {filteredMinistries.length > 0 && (
               <>
-                {filteredRecommended.length > 0 && (
-                  <div className="email-logo-menu__divider" role="separator" />
-                )}
+                {filteredRecommended.length > 0 && <hr className="email-logo-menu__divider" />}
                 <div
                   className="email-logo-menu__group"
                   role="group"

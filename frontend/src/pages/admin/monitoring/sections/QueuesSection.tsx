@@ -105,11 +105,10 @@ const QueuesSection: FC<QueuesSectionProps> = ({ queues }) => {
         multiline
       />
       <p className="queue-monitoring__legend">
-        <span className="sparkline-key sparkline-key--in" aria-hidden="true" />
-        Jobs added
-        <span className="sparkline-key sparkline-key--out ms-3" aria-hidden="true" />
-        Jobs finished, over the last 60 minutes. Rates average the last 5 whole minutes. Failed jobs
-        are kept for 7 days.
+        <span className="sparkline-key sparkline-key--in" aria-hidden="true" /> Jobs added{' '}
+        <span className="sparkline-key sparkline-key--out ms-3" aria-hidden="true" /> Jobs finished,
+        over the last 60 minutes. Rates average the last 5 whole minutes. Failed jobs are kept for 7
+        days.
       </p>
     </section>
   )

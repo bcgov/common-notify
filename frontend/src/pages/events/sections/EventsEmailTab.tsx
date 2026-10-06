@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
@@ -237,12 +238,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   const previewLogoId =
     headerMode === HEADER_CUSTOM_ID ? (headerLogoId ?? defaultLogoId) : defaultLogoId
   const previewLogo = approvedLogos.find((logo) => logo.id === previewLogoId)
-  const previewTitle =
-    headerMode === HEADER_CUSTOM_ID
-      ? headerTitle
-      : tenantShowsHeaderTitle
-        ? previewLogo?.displayTitle || 'Government of British Columbia'
-        : ''
+  const previewTitle = resolveEmailHeaderTitle({
+    useCustomTitle: headerMode === HEADER_CUSTOM_ID,
+    customTitle: headerTitle,
+    tenantShowsHeaderTitle,
+    logoDisplayTitle: previewLogo?.displayTitle,
+  })
 
   const trimmedSenderEmail = senderEmail.trim()
   const senderEmailFormatError = senderEmailProblem(trimmedSenderEmail)
