@@ -79,7 +79,6 @@ describe('SmsDeliveryWorker', () => {
       markRecipientSent: vi.fn().mockResolvedValue(undefined),
       markRecipientFailed: vi.fn().mockResolvedValue(undefined),
       markBatchUnsentFailed: vi.fn().mockResolvedValue(undefined),
-      findSentAddresses: vi.fn().mockResolvedValue(new Set()),
       countByStatus: vi.fn().mockResolvedValue(1),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       findSentAddresses: vi.fn().mockResolvedValue(new Set<string>()),
