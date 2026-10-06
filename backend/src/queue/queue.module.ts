@@ -351,4 +351,56 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       this.logger.debug(error)
     }
   }
+
+  /**
+   * Let this pod's running jobs finish before it exits. Without this a stopping pod (a rolling
+   * deploy, an HPA scale-down) abandons its active jobs, and Bull re-runs them on another pod once
+   * their lock lapses. Every queue stops taking new work first; then ingestion drains ahead of the
+   * delivery queues it feeds, and delivery ahead of the webhooks it triggers.
+   *
+   * Bounded below Kubernetes' default 30s termination grace period. A job still running at the
+   * deadline is re-run elsewhere, which the delivery workers' already-sent checks make safe.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
+    const stages = [
+      [this.ingestionQueue],
+      [this.emailQueue, this.smsQueue],
+      [this.webhookQueue],
+    ].map((stage) => stage.filter((queue): queue is Bull.Queue => !!queue))
+    const queues = stages.flat()
+    if (queues.length === 0) return
+
+    const timeoutMs = parseInt(process.env.QUEUE_SHUTDOWN_TIMEOUT_MS || '20000', 10)
+    this.logger.log(`Draining queue workers before shutdown (timeout ${timeoutMs}ms)`)
+
+    const drain = async (): Promise<void> => {
+      // Local pause without waiting: stops fetching new jobs on this pod only.
+      await Promise.all(queues.map((queue) => queue.pause(true, true)))
+      for (const stage of stages) {
+        await Promise.all(stage.map((queue) => queue.close()))
+      }
+    }
+
+    let timer: NodeJS.Timeout | undefined
+    const deadline = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), timeoutMs)
+    })
+
+    try {
+      const outcome = await Promise.race([drain().then(() => 'drained' as const), deadline])
+      if (outcome === 'timeout') {
+        this.logger.warn(
+          `Queue drain did not finish within ${timeoutMs}ms; remaining jobs will be re-run by another pod`,
+        )
+      } else {
+        this.logger.log('Queue workers drained')
+      }
+    } catch (error) {
+      this.logger.error(
+        `Queue drain failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    } finally {
+      clearTimeout(timer)
+    }
+  }
 }

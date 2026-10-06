@@ -82,6 +82,7 @@ describe('SmsDeliveryWorker', () => {
       findSentAddresses: vi.fn().mockResolvedValue(new Set()),
       countByStatus: vi.fn().mockResolvedValue(1),
       updateStatus: vi.fn().mockResolvedValue(undefined),
+      findSentAddresses: vi.fn().mockResolvedValue(new Set<string>()),
     }
 
     // Mock the SMS queue
@@ -245,6 +246,45 @@ describe('SmsDeliveryWorker', () => {
         'notify-plain',
         'tenant-123',
         expect.objectContaining({ status: 'completed' }),
+      )
+    })
+
+    it('skips recipients an earlier run delivered even when Bull did not count it as a retry', async () => {
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+      mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['+16135551234']))
+
+      // attemptsMade 0: a stalled job re-run after its pod stopped mid-send.
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-stalled',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234', '+16135555678'] },
+            content: { body: 'Test SMS', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockRequestDetailService.resetForRetry).not.toHaveBeenCalled()
+      expect(mockSmsAdapter.send).toHaveBeenCalledTimes(1)
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ recipients: expect.objectContaining({ to: ['+16135555678'] }) }),
       )
     })
 

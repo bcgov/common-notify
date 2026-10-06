@@ -184,6 +184,23 @@ export class EmailDeliveryWorker {
           await requestDetailService.resetForRetry(notifyId)
         }
 
+        // Checked on every run, not only on a counted retry: Bull re-runs a job whose pod stopped
+        // mid-send (a rolling deploy, an HPA scale-down) without incrementing attemptsMade. A
+        // single email is one message to all of its recipients, so it was delivered in full or
+        // not at all.
+        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
+        if (
+          alreadySent.size > 0 &&
+          emailPayload.recipients.to.every((address) => alreadySent.has(address))
+        ) {
+          logger.log(`[${notifyId}] Delivered on an earlier attempt; nothing to re-send`)
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.COMPLETED,
+            updatedBy: 'system',
+          })
+          return { success: true, notifyId }
+        }
+
         if (emailTemplateId) {
           logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
@@ -317,7 +334,9 @@ export class EmailDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
+          preserveCompleted: true,
+        })
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter

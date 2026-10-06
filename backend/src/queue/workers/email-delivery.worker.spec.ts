@@ -1842,6 +1842,88 @@ describe('EmailDeliveryWorker', () => {
         expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledTimes(3)
         expect(mockEmailAdapter.send).toHaveBeenCalledTimes(3)
       })
+      it('skips addresses an earlier run of the batch already delivered', async () => {
+        mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['alice@example.com']))
+        // attemptsMade 0: Bull re-runs a stalled job without counting it as a retry.
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockRequestDetailService.findSentAddresses).toHaveBeenCalledWith(
+          'notify-bulk',
+          'notify-bulk-EMAIL-0',
+        )
+        expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+        expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+          expect.objectContaining({ recipients: { to: ['bob@example.com'] } }),
+        )
+        expect(result).toEqual(expect.objectContaining({ sent: 1, failed: 0 }))
+      })
+    })
+  })
+  describe('redelivery', () => {
+    beforeEach(async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+    })
+
+    // attemptsMade stays 0 on these jobs: Bull re-runs a stalled job (its pod stopped mid-send)
+    // without counting it as a retry, so the check cannot depend on the attempt count.
+    function makeJob(attemptsMade = 0): Partial<Bull.Job<DeliveryJobPayload>> {
+      return {
+        data: {
+          notifyId: 'notify-redelivered',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['a@example.com', 'b@example.com'] },
+            content: { subject: 'Subject', body: 'Body', bodyType: 'html' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 } as any,
+        attemptsMade,
+      }
+    }
+
+    it('does not send again when an earlier run already delivered the email', async () => {
+      mockRequestDetailService.findSentAddresses.mockResolvedValue(
+        new Set(['a@example.com', 'b@example.com']),
+      )
+
+      const result = await processHandler(makeJob() as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(result).toEqual({ success: true, notifyId: 'notify-redelivered' })
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-redelivered',
+        'tenant-123',
+        { status: NotificationStatus.COMPLETED, updatedBy: 'system' },
+      )
+      expect(mockRequestDetailService.markSent).not.toHaveBeenCalled()
+    })
+
+    it('sends when nothing was delivered yet, without rewriting delivered rows', async () => {
+      const result = await processHandler(makeJob(1) as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockRequestDetailService.resetForRetry).toHaveBeenCalledWith('notify-redelivered')
+      expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+      expect(mockRequestDetailService.updateStatus).toHaveBeenCalledWith(
+        'notify-redelivered',
+        NotificationStatus.SENDING,
+        { preserveCompleted: true },
+      )
+      expect(result).toEqual(expect.objectContaining({ success: true, provider: 'ches' }))
     })
   })
 })
