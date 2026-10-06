@@ -6,7 +6,7 @@ import { WebhookService } from '../../api/webhook/webhook.service'
 import { WebhookJobPayload } from '../queue.types'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationRequestDto } from '../../api/notification/schemas/notification-request'
-import { FAILED_JOB_RETENTION } from '../job-retention'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
 
 /**
  * Webhook Trigger Service
@@ -146,7 +146,9 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
           jobId,
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
-          removeOnComplete: true,
+          // Every pod receives each status change and adds this job. Keeping the completed job is
+          // what lets Bull drop a slower pod's add as a duplicate instead of delivering it again.
+          removeOnComplete: COMPLETED_JOB_RETENTION,
           removeOnFail: FAILED_JOB_RETENTION,
         })
         this.logger.log(
