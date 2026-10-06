@@ -8,14 +8,17 @@
 # reviewable in git.
 #
 # Quota headroom (f6bc3f-test: 3000m CPU / 12Gi memory):
-#   backend  50m + 200Mi per pod, frontend 30m + 50Mi per pod
-#   at maxReplicas 4+4 that is 320m CPU / 1000Mi memory total.
+#   backend  50m + 384Mi per pod, frontend 30m + 50Mi per pod
+#   at maxReplicas 4+4 that is 320m CPU / 1736Mi memory total.
 
 global:
   #-- required for the HPAs to be rendered at all; see hpa.yaml
   autoscaling: true
 
 backend:
+  #-- requested memory per pod: room for a pod's working set under bulk-send load, below the
+  #-- 512MB heap cap (backend.heapMb) so the scheduler places pods where they actually fit
+  memoryRequest: 384Mi
   #-- rolling, so a test deploy does not drop the service between pods
   deploymentStrategy: RollingUpdate
   autoscaling:

@@ -8,14 +8,17 @@
 # reviewable in git.
 #
 # Quota headroom (f6bc3f-prod: 4000m CPU / 16Gi memory, ~2060m CPU in use):
-#   backend  50m + 200Mi per pod, frontend 30m + 50Mi per pod
-#   at maxReplicas 7+7 that is 560m CPU / 1750Mi memory total.
+#   backend  50m + 384Mi per pod, frontend 30m + 50Mi per pod
+#   at maxReplicas 7+7 that is 560m CPU / 3038Mi memory total.
 
 global:
   #-- required for the HPAs to be rendered at all; see hpa.yaml
   autoscaling: true
 
 backend:
+  #-- requested memory per pod: room for a pod's working set under bulk-send load, below the
+  #-- 512MB heap cap (backend.heapMb) so the scheduler places pods where they actually fit
+  memoryRequest: 384Mi
   #-- rolling, so a prod deploy never drops the service
   deploymentStrategy: RollingUpdate
   autoscaling:

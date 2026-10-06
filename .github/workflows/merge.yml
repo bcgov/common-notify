@@ -229,7 +229,6 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=2 --set backend.autoscaling.maxReplicas=2 --set frontend.autoscaling.minReplicas=2 --set frontend.autoscaling.maxReplicas=2 --set frontend.secrets.enabled=true --set frontend.promtail.enabled=true --set backend.memoryRequest=384Mi --set frontend.secrets.enabled=true
       # Replica counts, rollout strategy and PDBs now live in
       # charts/app/values-test.yaml so the deployed shape of TEST is reviewable
       # in git rather than spread across --set flags here.
@@ -309,7 +308,6 @@ jobs:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=5 --set backend.autoscaling.maxReplicas=5 --set frontend.autoscaling.minReplicas=5 --set frontend.autoscaling.maxReplicas=5 --set frontend.pdb.enabled=true --set backend.pdb.enabled=true --set frontend.promtail.enabled=true --set backend.memoryRequest=384Mi --set backend.pdb.enabled=true
       # Replica counts, rollout strategy and PDBs now live in
       # charts/app/values-prod.yaml so the deployed shape of PROD is reviewable
       # in git rather than spread across --set flags here.
