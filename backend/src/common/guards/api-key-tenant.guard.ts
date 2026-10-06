@@ -66,7 +66,7 @@ export abstract class ApiKeyTenantGuard implements CanActivate {
 
     const credentialIdentifier = credentialHeaders.credentialIdentifier
 
-    let mapping: ApiKeyConsumer | null = null
+    let mapping: ApiKeyConsumer | null
     try {
       mapping = await resolveApiKeyConsumer(
         this.apiKeyConsumerRepository,

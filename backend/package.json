@@ -47,7 +47,7 @@
     "express-prom-bundle": "^8.0.0",
     "handlebars": "^4.7.9",
     "helmet": "^8.0.0",
-    "ioredis": "^6.0.0",
+    "ioredis": "^5.3.7",
     "jose": "^6.2.2",
     "jwks-rsa": "^4.0.1",
     "libphonenumber-js": "^1.13.11",
@@ -89,10 +89,10 @@
     "istanbul-badges-readme": "^1.9.0",
     "prettier": "^3.8.3",
     "supertest": "^7.0.0",
-    "typescript": "^7.0.0",
+    "typescript": "~6.0.3",
     "typescript-eslint": "^8.46.2",
     "unplugin-swc": "^2.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^5.0.0"
   },
   "overrides": {
     "hono@<4.11.7": "4.11.7",

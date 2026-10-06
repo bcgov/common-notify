@@ -235,7 +235,7 @@ export class NotificationService {
     // Reload with tenant relation for full data in SSE stream
     const fullNotification = await this.notificationRepository.findOne({
       where: { id: saved.id },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     return fullNotification || saved
   }
@@ -449,7 +449,7 @@ export class NotificationService {
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
     const notification = await this.notificationRepository.findOne({
       where: { id, tenantId },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)

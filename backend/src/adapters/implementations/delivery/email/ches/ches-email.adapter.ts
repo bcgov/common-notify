@@ -212,7 +212,7 @@ export class ChesEmailTransport implements IEmailTransport, OnModuleInit, OnModu
 
     // Convert body to HTML if markdown type
     let finalBody = body
-    let chesBodyType: 'text' | 'html' = 'html'
+    let chesBodyType: 'text' | 'html'
 
     if (bodyType === 'text') {
       chesBodyType = 'text'
