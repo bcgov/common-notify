@@ -146,7 +146,12 @@ const BulkNotifications: FC = () => {
 
   const isUsableTemplate = selectedTemplate !== undefined && unsupported.length === 0
   const isValid =
-    isUsableTemplate && csv.parsed !== null && csv.fileIssue === null && csv.rowIssues.length === 0
+    isUsableTemplate &&
+    !isLoadingTemplate &&
+    csv.readProgress === 100 &&
+    csv.parsed !== null &&
+    csv.fileIssue === null &&
+    csv.rowIssues.length === 0
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId)
@@ -173,7 +178,7 @@ const BulkNotifications: FC = () => {
   }
 
   const handleSend = async () => {
-    if (!selectedTemplateId || !csv.parsed) {
+    if (!selectedTemplateId || !csv.parsed || !isValid || !canSend || isSending) {
       setSubmitAttempted(true)
       return
     }
@@ -300,6 +305,14 @@ const BulkNotifications: FC = () => {
             errorMessage={csv.fileIssue ?? missingFileError}
             hint="Max file size: 5 MB"
           />
+
+          {channel === 'sms' && (
+            <p className="bulk-notifications__hint">
+              Use digits with optional spaces, hyphens, periods, or parentheses, for example{' '}
+              +1-778-123-1234. Canadian numbers may omit +1. Letters and extensions are not
+              supported.
+            </p>
+          )}
 
           <CsvIssuesTable issues={csv.rowIssues} />
 

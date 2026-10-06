@@ -85,7 +85,7 @@ const CsvIssuesTable: FC<Props> = ({ issues }) => {
   )
 
   return (
-    <>
+    <div className="bulk-notifications__issues">
       <InlineAlert
         variant="warning"
         title={
@@ -107,7 +107,7 @@ const CsvIssuesTable: FC<Props> = ({ issues }) => {
         // The Issue cell is a title over its fix, so rows are taller than one line.
         multiline
       />
-    </>
+    </div>
   )
 }
 
