@@ -65,6 +65,10 @@ interface NotificationPreviewModalProps {
 
   /** Primary action in the modal footer, such as "Send notification (63)". */
   footer?: ReactNode
+  variablesHeading?: string
+  notice?: ReactNode
+  outputFooter?: ReactNode
+  closeButton?: ReactNode
 }
 
 /**
@@ -95,6 +99,10 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   isLoading = false,
   error = null,
   footer,
+  variablesHeading = 'Preview data',
+  notice,
+  outputFooter,
+  closeButton,
 }) => {
   return (
     <Modal
@@ -110,7 +118,10 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
             <h5 className="notification-preview__title" id="notification-preview-title">
               {title}
             </h5>
+            {closeButton}
           </div>
+
+          {notice}
 
           <div className="notification-preview__body">
             <div className="notification-preview__data">
@@ -140,7 +151,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                 </div>
               )}
 
-              <h6 className="notification-preview__heading">Preview data</h6>
+              <h6 className="notification-preview__heading">{variablesHeading}</h6>
               <p className="notification-preview__intro">{variablesIntro}</p>
 
               {variables.length === 0 ? (
@@ -261,6 +272,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
               ) : (
                 <pre className="notification-preview__text">{bodyText}</pre>
               )}
+              {!error && !isLoading && outputFooter}
             </div>
           </div>
 

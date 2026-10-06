@@ -1,5 +1,12 @@
 @import '../variables.scss';
 
+.events__sms-preview-notice {
+  margin: $spacing-md $spacing-lg 0;
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+}
+
 // Events list page
 .events-page__description {
   display: inline-block;

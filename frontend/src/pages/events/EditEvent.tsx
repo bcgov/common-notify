@@ -8,7 +8,7 @@ import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
 import type { EmailApplyValues } from './sections/EventsEmailTab'
-import EventsSmsTab from './sections/EventsSmsTab'
+import EventsSmsTab, { UNSAVED_SMS_CHANGES_MESSAGE } from './sections/EventsSmsTab'
 import type { SmsApplyValues } from './sections/EventsSmsTab'
 import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
 import UnsavedChanges from '@/components/UnsavedChanges'
@@ -48,6 +48,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   )
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
+  const smsNotificationsEnabled = useAppSelector(
+    (state) => state.smsSettings?.smsNotificationsEnabled,
+  )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [selectedTab, setSelectedTab] = useState<EventTab>(initialTab)
   const [event, setEvent] = useState<EventResponse | null>(null)
@@ -56,6 +59,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   // email tab mid-edit drops the edits. The tab reports when it has any; the switch that would
   // discard them waits here until it has been confirmed.
   const [emailHasUnsavedChanges, setEmailHasUnsavedChanges] = useState(false)
+  const [smsHasUnsavedChanges, setSmsHasUnsavedChanges] = useState(false)
   const [pendingTab, setPendingTab] = useState<EventTab | null>(null)
 
   // Placeholder only, for the email tab's sender field and custom header. Failures are not
@@ -102,7 +106,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   }, [eventId, selectedTenantId])
 
   function handleSelectTab(tab: EventTab) {
-    if (selectedTab === 'email' && emailHasUnsavedChanges) {
+    if (
+      (selectedTab === 'email' && emailHasUnsavedChanges) ||
+      (selectedTab === 'sms' && smsHasUnsavedChanges)
+    ) {
       setPendingTab(tab)
       return
     }
@@ -112,6 +119,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   function leavePendingTab() {
     if (pendingTab) setSelectedTab(pendingTab)
     setEmailHasUnsavedChanges(false)
+    setSmsHasUnsavedChanges(false)
     setPendingTab(null)
   }
 
@@ -173,7 +181,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
       <PageHeading
         title={event?.name ?? 'Event'}
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
+          ...(selectedTab === 'sms' ? [] : [{ label: 'Home', to: '/dashboard' as const }]),
           { label: 'Event', to: '/events' },
           { label: event?.name ?? 'Event' },
         ]}
@@ -185,7 +193,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
         isBlocked={pendingTab !== null}
         onLeave={leavePendingTab}
         onStay={() => setPendingTab(null)}
-        modalMessage={UNSAVED_EMAIL_CHANGES_MESSAGE}
+        modalMessage={
+          selectedTab === 'sms' ? UNSAVED_SMS_CHANGES_MESSAGE : UNSAVED_EMAIL_CHANGES_MESSAGE
+        }
       />
 
       <section className="events__section">
@@ -231,6 +241,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
         ) : selectedTab === 'sms' ? (
           // The SMS channel starts disabled until the tab has been saved with it switched on.
           <EventsSmsTab
+            key={selectedTenantId}
+            onUnsavedChangesChange={setSmsHasUnsavedChanges}
+            smsNotificationsEnabled={smsNotificationsEnabled}
             values={{
               active: event.smsSettings?.active ?? false,
               templateId: event.smsSettings?.templateId ?? null,
