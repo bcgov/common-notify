@@ -1,13 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate configuration for common-notify: non-major updates batched into one manually-reviewed PR, every major on its own",
+  "description": "Renovate configuration for common-notify: all updates consolidated into a single manually-reviewed PR",
   "extends": ["github>bcgov/renovate-config#2025.10.1"],
   "schedule": ["before 4am on Monday"],
-  "prConcurrentLimit": 5,
+  "prConcurrentLimit": 1,
   "prHourlyLimit": 0,
   "packageRules": [
     {
-      "description": "Consolidate non-major updates (all managers) into a single PR; always reviewed manually, never auto-merged",
+      "description": "Consolidate every update (all managers, all update types incl. major) into a single PR; always reviewed manually, never auto-merged",
       "matchManagers": [
         "npm",
         "dockerfile",
@@ -16,34 +16,27 @@
         "helm-values",
         "helmv3"
       ],
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "bump"],
-      "groupName": "all non-major dependencies",
-      "automerge": false
-    },
-    {
-      "description": "One PR per major. Grouped, a single library whose ecosystem has not caught up (typescript-eslint vs ESLint 10, typeorm vs ioredis 6) blocks every other update behind it, security fixes included",
-      "matchManagers": [
-        "npm",
-        "dockerfile",
-        "docker-compose",
-        "github-actions",
-        "helm-values",
-        "helmv3"
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "bump"
       ],
-      "matchUpdateTypes": ["major"],
-      "groupName": null,
+      "groupName": "all dependencies",
       "automerge": false
     }
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["security"],
-    "groupName": null,
+    "groupName": "all dependencies",
     "automerge": false
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "groupName": "lock file maintenance",
+    "groupName": "all dependencies",
     "automerge": false
   },
   "helm-values": {
