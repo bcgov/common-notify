@@ -89,7 +89,36 @@ function isValidPhone(value: string): boolean {
 }
 
 function isPhoneFormat(value: string): boolean {
-  return /^\+?(?:\d+|\(\d+\))(?:[\s.-]*(?:\d+|\(\d+\)))*$/.test(value.trim())
+  const input = value.trim()
+  let index = input.startsWith('+') ? 1 : 0
+
+  // Consume each character once. Nested repetitions in a regex can backtrack
+  // exponentially when a long run of digits ends with an invalid character.
+  while (index < input.length) {
+    const parenthesized = input[index] === '('
+    if (parenthesized) index++
+
+    const digitsStart = index
+    while (index < input.length && input[index] >= '0' && input[index] <= '9') index++
+    if (index === digitsStart) return false
+
+    if (parenthesized) {
+      if (input[index] !== ')') return false
+      index++
+    }
+
+    if (index === input.length) return true
+
+    while (
+      index < input.length &&
+      (input[index] === '.' || input[index] === '-' || /\s/.test(input[index]))
+    ) {
+      index++
+    }
+    // A separator must be followed by another digit group.
+  }
+
+  return false
 }
 
 /** Is this cell a usable recipient for the channel? */
