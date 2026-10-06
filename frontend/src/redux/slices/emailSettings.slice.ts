@@ -9,6 +9,7 @@ import type { ApprovedEmailLogo, EmailSettingsValues } from '@/interfaces/tenant
 /** Matches the tenant_settings column defaults, used until a row exists for the tenant. */
 export const defaultEmailSettings: EmailSettingsValues = {
   emailLogoId: null,
+  useCustomEmailHeader: false,
   emailNotificationsEnabled: true,
   replyToEmail: null,
   emailAttachmentsEnabled: true,
@@ -40,6 +41,7 @@ export const emailSettingsSlice = createSlice({
       // A new load starts: drop the previous tenant's values and any stale save error, so
       // the section can only ever mount against data for the tenant now on screen.
       .addCase(fetchSettings.pending, (state) => {
+        state.useCustomEmailHeader = false
         state.emailLogoId = defaultEmailSettings.emailLogoId
         state.emailNotificationsEnabled = defaultEmailSettings.emailNotificationsEnabled
         state.replyToEmail = defaultEmailSettings.replyToEmail
@@ -47,6 +49,7 @@ export const emailSettingsSlice = createSlice({
         state.error = undefined
       })
       .addCase(fetchSettings.fulfilled, (state, action) => {
+        state.useCustomEmailHeader = action.payload?.useCustomEmailHeader ?? false
         state.emailLogoId = action.payload?.emailLogoId ?? defaultEmailSettings.emailLogoId
         state.emailNotificationsEnabled =
           action.payload?.emailNotificationsEnabled ??
@@ -73,6 +76,7 @@ export const emailSettingsSlice = createSlice({
         state.error = undefined
       })
       .addCase(updateEmailSettings.fulfilled, (state, action) => {
+        state.useCustomEmailHeader = action.payload.useCustomEmailHeader ?? false
         state.emailLogoId = action.payload.emailLogoId
         state.emailNotificationsEnabled = action.payload.emailNotificationsEnabled
         state.replyToEmail = action.payload.replyToEmail

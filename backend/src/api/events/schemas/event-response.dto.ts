@@ -67,7 +67,7 @@ export class EventEmailSettingsDto {
 
   /**
    * Approved email logo shown in the custom header. Null when there is no custom header, or when
-   * the custom header has no logo.
+   * the tenant or system default logo is used.
    * @example "550e8400-e29b-41d4-a716-446655440000"
    */
   headerLogoId: string | null

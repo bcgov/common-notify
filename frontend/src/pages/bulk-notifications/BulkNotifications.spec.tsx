@@ -10,6 +10,7 @@ import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import type * as BulkNotificationsApi from '@/api/bulkNotifications.api'
 import BulkNotifications from './BulkNotifications'
+import { showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
@@ -23,6 +24,7 @@ vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
 
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
+  showInfoToast: vi.fn(),
   showSuccessToast: vi.fn(),
 }))
 
@@ -547,6 +549,32 @@ describe('BulkNotifications', () => {
 
     expect(await screen.findByText('1 notification queued')).toBeInTheDocument()
     expect(screen.getByText(/not on this tenant safelist/)).toBeInTheDocument()
+  })
+
+  it('says a repeat of a recent batch was already sent, rather than queued again', async () => {
+    sendBulkMock.mockResolvedValue({
+      notifyId: 'original-notify-id',
+      status: 'completed',
+      channels: ['email'],
+      createdAt: '2026-08-28T00:00:00.000Z',
+      message: 'An identical notification was already accepted',
+      duplicate: true,
+    })
+
+    renderPage()
+    await chooseTemplate()
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,parking,Alice\nbob@gov.bc.ca,parking,Bob'),
+    )
+    await screen.findByText('All required data passed validation.')
+    await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
+
+    expect(await screen.findByRole('heading', { name: 'Already sent' })).toBeInTheDocument()
+    expect(screen.getByText(/nothing new was sent/)).toBeInTheDocument()
+    expect(screen.queryByText(/queued/)).not.toBeInTheDocument()
+    expect(showInfoToast).toHaveBeenCalledWith('Already sent. Nothing new was sent.')
+    expect(showSuccessToast).not.toHaveBeenCalled()
   })
 
   it('previews a recipient with that row values substituted', async () => {

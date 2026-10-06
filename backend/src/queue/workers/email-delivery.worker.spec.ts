@@ -273,6 +273,51 @@ describe('EmailDeliveryWorker', () => {
       expect(sent).not.toHaveProperty('from')
     })
 
+    it('brands inline emails before handing them to the adapter', async () => {
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+      )
+      mockTemplatesService.applyEmailLayout.mockResolvedValueOnce({
+        subject: 'Inline',
+        body: '<img src="default-logo"><p>Hello</p>',
+        bodyType: 'html',
+      })
+      await processHandler({
+        data: {
+          notifyId: 'inline-logo',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Inline', body: 'Hello', bodyType: 'text' },
+          },
+          attempt: 0,
+        },
+        attemptsMade: 0,
+      } as Bull.Job<DeliveryJobPayload>)
+      expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(
+        { tenantId: 'tenant-123', channelCode: 'EMAIL' },
+        { subject: 'Inline', body: 'Hello', bodyType: 'text' },
+      )
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            body: '<img src="default-logo"><p>Hello</p>',
+            bodyType: 'html',
+          }),
+        }),
+      )
+    })
+
     it('should handle multiple recipients', async () => {
       await EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
