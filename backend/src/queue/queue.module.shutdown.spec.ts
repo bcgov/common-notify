@@ -6,7 +6,10 @@ import type { WorkerHeartbeat } from './worker-heartbeat'
 type Heartbeat = Pick<WorkerHeartbeat, 'markDraining' | 'remove'>
 
 function moduleWith(close: () => Promise<void>) {
-  const queue = { close: vi.fn(close) } as unknown as Bull.Queue
+  const queue = {
+    pause: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(close),
+  } as unknown as Bull.Queue
   const heartbeat: Heartbeat = {
     markDraining: vi.fn(),
     remove: vi.fn().mockResolvedValue(undefined),
@@ -34,7 +37,9 @@ describe('QueueModule shutdown', () => {
 
     await module.beforeApplicationShutdown()
 
-    // Three queues present (webhook absent), each closed so it finishes its active jobs.
+    // Three queues present (webhook absent): each stops taking work, then closes once its
+    // active jobs finish.
+    expect(queue.pause).toHaveBeenCalledTimes(3)
     expect(queue.close).toHaveBeenCalledTimes(3)
     expect(heartbeat.remove).toHaveBeenCalled()
   })
