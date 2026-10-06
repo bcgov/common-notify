@@ -5,6 +5,7 @@ import { NodemailerEmailTransport } from './implementations/delivery/email/nodem
 import { LogEmailTransport } from './implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter'
 import { AcsSmsTransport } from './implementations/delivery/sms/acs/acs-sms.adapter'
+import { SmsCircuitBreaker } from './implementations/delivery/sms/sms-circuit-breaker'
 import {
   EMAIL_ADAPTER,
   EMAIL_ADAPTER_MAP,
@@ -37,6 +38,7 @@ export class AdaptersModule {
         LogEmailTransport,
         TwilioSmsTransport,
         AcsSmsTransport,
+        SmsCircuitBreaker,
         {
           provide: EMAIL_ADAPTER_MAP,
           useFactory: (
@@ -83,16 +85,17 @@ export class AdaptersModule {
           useFactory: (
             map: Record<string, ISmsTransport>,
             configService: ConfigService,
+            breaker: SmsCircuitBreaker,
           ): ISmsTransport => {
             const key = configService.get<string>('delivery.sms') ?? 'acs'
             // As above: a `:passthrough` suffix names no ISmsTransport, so fall back for DI.
             if (key?.includes(':passthrough')) {
-              return map['acs']
+              return breaker.wrap(map['acs'])
             }
             const provider = key?.includes(':') ? key.split(':')[0] : key
-            return map[provider] ?? map['acs']
+            return breaker.wrap(map[provider] ?? map['acs'])
           },
-          inject: [SMS_ADAPTER_MAP, ConfigService],
+          inject: [SMS_ADAPTER_MAP, ConfigService, SmsCircuitBreaker],
         },
         InMemoryTemplateStore,
         { provide: SENDER_STORE, useClass: InMemorySenderStore },

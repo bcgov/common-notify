@@ -1,0 +1,49 @@
+# PROD environment overrides for the app chart.
+#
+# Layered on top of values.yaml (the chart's own defaults, which are the
+# DEV/PR profile — single replica, Recreate, no PDB). Only the deltas live here.
+#
+# Replica counts, rollout strategy and PDBs for production live here rather than as
+# `--set` flags in .github/workflows/merge.yml, so the deployed shape is
+# reviewable in git.
+#
+# Quota headroom (f6bc3f-prod: 4000m CPU / 16Gi memory, ~2060m CPU in use):
+#   backend  50m + 384Mi per pod, frontend 30m + 50Mi per pod
+#   at maxReplicas 7+7 that is 560m CPU / 3038Mi memory total.
+
+global:
+  #-- required for the HPAs to be rendered at all; see hpa.yaml
+  autoscaling: true
+
+backend:
+  #-- requested memory per pod: room for a pod's working set under bulk-send load, below the
+  #-- 512MB heap cap (backend.heapMb) so the scheduler places pods where they actually fit
+  memoryRequest: 384Mi
+  #-- rolling, so a prod deploy never drops the service
+  deploymentStrategy: RollingUpdate
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    #-- above minReplicas so the HPA can actually scale; min == max makes the
+    #-- HPA a fixed replica count and targetCPUUtilizationPercentage inert
+    maxReplicas: 7
+  pdb:
+    enabled: true
+    #-- 2 keeps redundancy through a node drain while staying well below
+    #-- minReplicas (5) so drains still complete
+    minAvailable: 2
+
+frontend:
+  deploymentStrategy: RollingUpdate
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 7
+  pdb:
+    enabled: true
+    minAvailable: 2
+  #-- ships caddy's access log to Loki; was a `--set` flag in merge.yml before
+  #-- the deploy shape moved into this file. Without it the frontend log alerts
+  #-- have no data for this environment.
+  promtail:
+    enabled: true

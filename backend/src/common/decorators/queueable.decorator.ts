@@ -28,6 +28,7 @@ import type {
   DuplicateNotification,
   NotificationDedupService,
 } from '../../api/notify/services/notification-dedup.service'
+import { mergeRequestChannel } from '../../queue/merge-batch-builder'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
@@ -283,18 +284,6 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
 }
 
 /**
- * Detect a mail-merge email payload: an email channel whose recipients use `mergeArray`. The global
- * ValidationPipe has already validated the body, so the presence of `email.recipients.mergeArray` is
- * sufficient to route the request through the mail merge fan-out flow.
- */
-function mergeRequestChannel(payload: unknown): NotificationChannel | null {
-  const request = payload as NotifySimpleRequest | undefined
-  if (Array.isArray(request?.email?.recipients?.mergeArray)) return NotificationChannel.EMAIL
-  if (Array.isArray(request?.sms?.recipients?.mergeArray)) return NotificationChannel.SMS
-  return null
-}
-
-/**
  * Billable message count for a merge.
  *
  * Email is one message per recipient. SMS is billed in segments and every recipient of a merge
@@ -540,10 +529,11 @@ export async function handleMerge(
         requestedAt: new Date().toISOString(),
         mailMerge: true,
         mailMergeChannel: channel,
+        // Recipients are not carried: ingestion reads them from the request stored above, so a
+        // large merge is not held in Redis.
         mailMergeData: {
           content: channelPayload.content,
           params: globalParams,
-          recipients,
         },
         ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
       }
@@ -886,7 +876,7 @@ export function Queueable(
 
         // Fire off queueing asynchronously - don't block the response
         // If queuing succeeds, status updates to QUEUED
-        // If queuing fails, PendingNotificationRetryService will pick it up and retry
+        // If queuing fails, the record stays PENDING and DeliveryReconcilerService queues it
         setImmediate(async () => {
           try {
             const jobPayload = {
@@ -943,7 +933,7 @@ export function Queueable(
             }
           } catch (queueError) {
             // Redis unavailable... that's OK, status stays PENDING
-            // PendingNotificationRetryService will pick it up once Redis is back
+            // DeliveryReconcilerService queues it once Redis is back
             logger.warn(`Failed to enqueue job (will be retried): ${notificationRecord.id}`, {
               tenantId,
               error: (queueError as Error).message,

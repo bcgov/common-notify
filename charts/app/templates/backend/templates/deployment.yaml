@@ -9,7 +9,15 @@ metadata:
 spec:
   strategy:
     type: {{ .Values.backend.deploymentStrategy }}
-  {{- if not .Values.backend.autoscaling.enabled }}
+  {{- /*
+    Must match hpa.yaml's condition exactly. The HPA is only created when BOTH
+    global.autoscaling AND backend.autoscaling.enabled are true, so `replicas`
+    has to be omitted under that same condition — otherwise Helm and the HPA
+    fight over the field on every deploy. Gating on backend.autoscaling.enabled
+    alone would, with the shipped defaults, render neither: Kubernetes silently
+    defaults to 1 replica and replicaCount becomes dead config.
+  */}}
+  {{- if not (and .Values.global.autoscaling .Values.backend.autoscaling.enabled) }}
   replicas: {{ .Values.backend.replicaCount }}
   {{- end }}
   selector:
@@ -25,6 +33,9 @@ spec:
       labels:
         {{- include "backend.labels" . | nindent 8 }}
     spec:
+      # Time for queue workers to finish in-flight jobs on shutdown (QueueModule
+      # beforeApplicationShutdown). QUEUE_SHUTDOWN_DRAIN_MS below stops waiting 15s short of it.
+      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds | default 120 }}
       securityContext:
         runAsNonRoot: true
       initContainers:
@@ -119,6 +130,12 @@ spec:
               value: "0"
             - name: INGESTION_WORKER_CONCURRENCY
               value: "1"
+            # V8 heap cap. Exceeding it crashes the whole pod rather than failing one request; a
+            # 50,000-recipient merge holds ~40 MB+ while it is accepted. Reserves nothing up front.
+            - name: NODE_OPTIONS
+              value: {{ printf "--max-old-space-size=%v" (.Values.backend.heapMb | default 512) | quote }}
+            - name: QUEUE_SHUTDOWN_DRAIN_MS
+              value: {{ mul (sub (.Values.backend.terminationGracePeriodSeconds | default 120) 15) 1000 | quote }}
             - name: NOTIFICATION_DEDUP_WINDOW_SECONDS
               value: {{ .Values.backend.dedupWindowSeconds | quote }}
             - name: CLAMAV_HOST
@@ -263,7 +280,7 @@ spec:
           resources: # this is optional
             requests:
               cpu: 50m
-              memory: 200Mi
+              memory: {{ .Values.backend.memoryRequest | default "200Mi" }}
             limits:
               cpu: 4
               memory: 8Gi

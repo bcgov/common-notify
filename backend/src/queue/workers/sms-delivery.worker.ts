@@ -2,6 +2,9 @@ import { BadRequestException, HttpException, Logger, NotFoundException } from '@
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
+import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
+import { loadBatchRecipients } from './merge-batch-recipients'
+import { TransientDeliveryError, isTransientDeliveryError } from '../../adapters/delivery-errors'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -97,6 +100,7 @@ export class SmsDeliveryWorker {
             smsAdapter,
             requestDetailService,
             notificationService,
+            batchProgressReporter(job),
           )
         }
 
@@ -125,13 +129,13 @@ export class SmsDeliveryWorker {
 
         // A redelivered job (a stalled worker, a rolling deploy) must not send again to anyone a
         // previous attempt already reached. resetForRetry keeps their rows; this filters them out
-        // of the send list, which comes from the payload rather than from those rows.
-        const isRetry = (job.attemptsMade ?? 0) > 0
-        let alreadySent = new Set<string>()
-        if (isRetry) {
+        // of the send list, which comes from the payload rather than from those rows. The lookup
+        // runs on every attempt because Bull re-runs a stalled job without incrementing
+        // attemptsMade.
+        if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
-          alreadySent = await requestDetailService.findSentAddresses(notifyId)
         }
+        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
 
         let resolvedPayload = payload
         const smsTemplateId = payload.content?.templateId
@@ -259,6 +263,8 @@ export class SmsDeliveryWorker {
         let finalStatus = NotificationStatus.COMPLETED
         if (result.results && result.results.length > 0) {
           for (const recipient of result.results) {
+            // The provider could not take it: still owed, not failed. Sent again below.
+            if (recipient.transient) continue
             if (recipient.success) {
               await requestDetailService.markRecipientSent(
                 notifyId,
@@ -274,6 +280,16 @@ export class SmsDeliveryWorker {
                 recipient.error ?? 'Send failed',
               )
             }
+          }
+
+          // Who was sent is recorded above, so the retry skips them; the rest are sent again once
+          // the provider is back.
+          const owed = result.results.filter((recipient) => recipient.transient)
+          if (owed.length > 0) {
+            throw new TransientDeliveryError(
+              `${owed.length} recipient(s) not sent, provider unavailable: ${owed[0].error ?? ''}`,
+              502,
+            )
           }
 
           const failedCount = result.results.filter((recipient) => !recipient.success).length
@@ -306,10 +322,35 @@ export class SmsDeliveryWorker {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         const attempt = (job.attemptsMade || 0) + 1
+        const finalAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1
         logger.error(
           `[${notifyId}] Failed to send SMS delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
+
+        // The provider could not take it right now. Nothing is marked failed, even on the last
+        // attempt: the recipients stay owed, and the delivery reconciler re-queues the job once
+        // Bull's retries are spent.
+        if (isTransientDeliveryError(error)) throw error
+
+        // A merge batch settles only itself: its sent rows, and every other batch, are not its
+        // to fail.
+        const batchId = job.data.mailMerge ? job.data.batchId : undefined
+        if (batchId) {
+          if (finalAttempt || SmsDeliveryWorker.isPermanentValidationError(error)) {
+            await requestDetailService.markBatchUnsentFailed(notifyId, batchId, errorMessage)
+            await SmsDeliveryWorker.settleMergeRequest(
+              notifyId,
+              tenantId,
+              requestDetailService,
+              notificationService,
+              logger,
+            )
+            job.discard()
+            logger.error(`[${notifyId}] Batch ${batchId} failed; its unsent recipients are FAILED`)
+          }
+          throw error
+        }
 
         if (SmsDeliveryWorker.isPermanentValidationError(error)) {
           await notificationService.update(notifyId, tenantId, {
@@ -326,7 +367,7 @@ export class SmsDeliveryWorker {
         }
 
         // Update status to FAILED only on final attempt (when no retries left)
-        if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {
+        if (finalAttempt) {
           await notificationService.update(notifyId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',
@@ -405,8 +446,15 @@ export class SmsDeliveryWorker {
     smsAdapter: ISmsTransport,
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
+    reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { content, params, recipients } = mailMergeData
+    const { content, params } = mailMergeData
+    const { recipients, alreadySent } = await loadBatchRecipients(
+      requestDetailService,
+      notifyId,
+      batchId,
+      mailMergeData.recipients,
+    )
     const templateId = content?.templateId
     const hasInlineContent = !!content?.body
 
@@ -439,7 +487,6 @@ export class SmsDeliveryWorker {
 
     // The merge branch returns before the retry handling above, so a redelivered batch filters
     // here instead. Addresses delivered by an earlier attempt keep their rows and are skipped.
-    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
     const pending = alreadySent.size
       ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
       : recipients
@@ -452,6 +499,9 @@ export class SmsDeliveryWorker {
 
     let sent = 0
     let failed = 0
+    // Recipients delivered by an earlier attempt count as sent, so a retried batch resumes its bar.
+    const progress = () => ({ sent: alreadySent.size + sent, failed, total: recipients.length })
+    reportProgress?.(progress())
 
     for (const recipient of pending) {
       try {
@@ -477,6 +527,14 @@ export class SmsDeliveryWorker {
         )
         sent++
       } catch (recipientError) {
+        // The provider, not this recipient: stop the batch and leave the rest owed. The job is
+        // retried, skipping whoever was sent, and the circuit breaker holds it until it is back.
+        if (isTransientDeliveryError(recipientError)) {
+          logger.warn(
+            `[${notifyId}] Batch ${batchId} paused after ${sent} sent: ${recipientError.message}`,
+          )
+          throw recipientError
+        }
         const errorMessage =
           recipientError instanceof Error ? recipientError.message : String(recipientError)
         logger.error(
@@ -490,11 +548,29 @@ export class SmsDeliveryWorker {
         )
         failed++
       }
+      reportProgress?.(progress())
     }
 
     logger.log(`[${notifyId}] SMS merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+    await SmsDeliveryWorker.settleMergeRequest(
+      notifyId,
+      tenantId,
+      requestDetailService,
+      notificationService,
+      logger,
+    )
 
-    // Reconcile the parent request once no recipients remain pending across all batches.
+    return { success: failed === 0, batchId, sent, failed }
+  }
+
+  /** Settle the parent request once no recipients remain pending across all batches. */
+  private static async settleMergeRequest(
+    notifyId: string,
+    tenantId: string,
+    requestDetailService: NotificationRequestDetailService,
+    notificationService: NotificationService,
+    logger: Logger,
+  ): Promise<void> {
     const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
     if (pendingRemaining === 0) {
       const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
@@ -515,8 +591,6 @@ export class SmsDeliveryWorker {
         `[${notifyId}] All SMS merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
       )
     }
-
-    return { success: failed === 0, batchId, sent, failed }
   }
 
   private static async sendSmsViaAdapter(
