@@ -1,3 +1,21 @@
 # Production environment overrides
+#
+# Storage here MUST match the PVCs PROD already has. volumeClaimTemplates is
+# immutable on a StatefulSet, so a different class or a smaller size is not a
+# change Helm can make - the upgrade fails outright. PROD was created on
+# netapp-file-standard at 8Gi, while the base values target the
+# netapp-block-standard 1Gi that DEV and TEST run on.
+#
+# Verified live: redis-data-common-notify-redis-master-0 = 8Gi,
+# netapp-file-standard.
+global:
+  storageClass: netapp-file-standard
+master:
+  persistence:
+    size: 8Gi
+    storageClass: netapp-file-standard
 replica:
   replicaCount: 2
+  persistence:
+    size: 8Gi
+    storageClass: netapp-file-standard

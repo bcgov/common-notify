@@ -21,13 +21,17 @@ image:
   # deleted the old numbered tags from Docker Hub, so this chart's config had been
   # silently falling back to :latest). A floating tag let the on-disk RDB format
   # upgrade underneath the running server, corrupting the AOF and causing
-  # "Can't handle RDB format version 15" crash loops. This digest is the image
-  # PROD is currently running (verified pullable); pinning it makes the version
-  # stable across restarts and environments.
+  # "Can't handle RDB format version 15" crash loops.
+  #
+  # This digest is what PROD resolves :latest to TODAY (Redis 8.10.2, verified
+  # on common-notify-redis-master-0). Pinning forward rather than back matters:
+  # PROD's appendonlydir was written by 8.10.2, so deploying an older image
+  # would hit the very RDB-format failure this pin exists to prevent. TEST and
+  # DEV move up to the same version, which is the safe direction.
   registry: registry-1.docker.io
   repository: bitnami/redis
   tag: latest
-  digest: "sha256:23289a4f4765da46419590fb80d8803363b07e5783ef45396ff85c641db81a0e"
+  digest: "sha256:33a5a129cadcc5dfa294e5a1fe622efcbe3774a8b85c731ac14d0532877b7d16"
 master:
   podSecurityContext:
     enabled: true
