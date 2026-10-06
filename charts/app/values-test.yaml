@@ -1,0 +1,47 @@
+# TEST environment overrides for the app chart.
+#
+# Layered on top of values.yaml (the chart's own defaults, which are the
+# DEV/PR profile — single replica, Recreate, no PDB). Only the deltas live here.
+#
+# Replica counts, rollout strategy and PDBs for test live here rather than as
+# `--set` flags in .github/workflows/merge.yml, so the deployed shape is
+# reviewable in git.
+#
+# Quota headroom (f6bc3f-test: 3000m CPU / 12Gi memory):
+#   backend  50m + 200Mi per pod, frontend 30m + 50Mi per pod
+#   at maxReplicas 4+4 that is 320m CPU / 1000Mi memory total.
+
+global:
+  #-- required for the HPAs to be rendered at all; see hpa.yaml
+  autoscaling: true
+
+backend:
+  #-- rolling, so a test deploy does not drop the service between pods
+  deploymentStrategy: RollingUpdate
+  autoscaling:
+    enabled: true
+    #-- min 2 so a single node drain or pod restart cannot take test to zero
+    minReplicas: 2
+    #-- above minReplicas so the HPA can actually scale; min == max makes the
+    #-- HPA decorative and targetCPUUtilizationPercentage inert
+    maxReplicas: 4
+  pdb:
+    #-- without it a node drain can evict both pods at once
+    enabled: true
+    #-- must stay BELOW minReplicas or drains block forever
+    minAvailable: 1
+
+frontend:
+  deploymentStrategy: RollingUpdate
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+  pdb:
+    enabled: true
+    minAvailable: 1
+  #-- ships caddy's access log to Loki; was a `--set` flag in merge.yml before
+  #-- the deploy shape moved into this file. Without it the frontend log alerts
+  #-- have no data for this environment.
+  promtail:
+    enabled: true

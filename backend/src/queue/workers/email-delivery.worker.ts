@@ -180,6 +180,23 @@ export class EmailDeliveryWorker {
           await requestDetailService.resetForRetry(notifyId)
         }
 
+        // Checked on every run, not only on a counted retry: Bull re-runs a job whose pod stopped
+        // mid-send (a rolling deploy, an HPA scale-down) without incrementing attemptsMade. A
+        // single email is one message to all of its recipients, so it was delivered in full or
+        // not at all.
+        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
+        if (
+          alreadySent.size > 0 &&
+          emailPayload.recipients.to.every((address) => alreadySent.has(address))
+        ) {
+          logger.log(`[${notifyId}] Delivered on an earlier attempt; nothing to re-send`)
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.COMPLETED,
+            updatedBy: 'system',
+          })
+          return { success: true, notifyId }
+        }
+
         if (emailTemplateId) {
           logger.debug(`[${notifyId}] Resolving template: ${emailTemplateId}`)
           try {
@@ -255,6 +272,19 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid email payload: recipient email address is missing or invalid')
         }
 
+        // Template sends are branded above; inline and pre-rendered sends need the same layout.
+        if (!emailTemplateId) {
+          const branded = await templatesService.applyEmailLayout(
+            { tenantId, channelCode: 'EMAIL' },
+            {
+              subject: emailPayload.content?.subject,
+              body: emailPayload.content?.body,
+              bodyType: emailPayload.content?.bodyType ?? 'text',
+            },
+          )
+          emailPayload = { ...emailPayload, content: { ...emailPayload.content, ...branded } }
+        }
+
         if (!emailPayload.content?.subject || typeof emailPayload.content.subject !== 'string') {
           throw new Error('Invalid email payload: subject is missing or invalid')
         }
@@ -300,7 +330,9 @@ export class EmailDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
+          preserveCompleted: true,
+        })
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
@@ -497,10 +529,23 @@ export class EmailDeliveryWorker {
       `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
     )
 
+    // A redelivered batch restarts from the top of the payload, so addresses an earlier attempt
+    // delivered are filtered out here. Their rows keep status 'sent'.
+    const alreadySent = await requestDetailService.findSentAddresses(notifyId, batchId)
+    const pending = alreadySent.size
+      ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
+      : recipients
+
+    if (alreadySent.size > 0) {
+      logger.log(
+        `[${notifyId}] Batch ${batchId}: skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+      )
+    }
+
     let sent = 0
     let failed = 0
 
-    for (const recipient of recipients) {
+    for (const recipient of pending) {
       try {
         // Merge global params with per-recipient params; per-recipient takes precedence
         const mergedParams = { ...(params || {}), ...recipient.params }
@@ -519,9 +564,13 @@ export class EmailDeliveryWorker {
           bodyType = rendered.bodyType
         } else {
           const rendered = await inlineRenderingService.renderEmail(inlineContent!, mergedParams)
-          subject = rendered.subject
-          body = rendered.body
-          bodyType = inlineContent!.bodyType
+          const branded = await templatesService.applyEmailLayout(
+            { tenantId, channelCode: 'EMAIL' },
+            { ...rendered, bodyType: inlineContent!.bodyType ?? 'text' },
+          )
+          subject = branded.subject
+          body = branded.body
+          bodyType = branded.bodyType
         }
 
         const emailPayload = {

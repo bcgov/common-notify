@@ -3,7 +3,15 @@ import { ApiProperty } from '@nestjs/swagger'
 
 export class UpdateEmailSettingsDto {
   @ApiProperty({
-    description: 'Approved email logo to use, or null to clear the selection',
+    required: false,
+    description: 'Show the selected logo display title beside the logo',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  useCustomEmailHeader?: boolean
+
+  @ApiProperty({
+    description: 'Approved email logo to use, or null to use the system default logo',
     format: 'uuid',
     nullable: true,
   })

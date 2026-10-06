@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger, OnApplicationShutdown, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 import { Observable, Subject } from 'rxjs'
@@ -17,7 +17,7 @@ import { buildRedisOptions } from '../../queue/redis-connection'
  * A separate publisher connection sends updates from any pod.
  */
 @Injectable()
-export class NotificationPubSubService implements OnModuleDestroy {
+export class NotificationPubSubService implements OnModuleDestroy, OnApplicationShutdown {
   private readonly logger = new Logger(NotificationPubSubService.name)
   private readonly subscriber: Redis
   private readonly publisher: Redis
@@ -92,6 +92,13 @@ export class NotificationPubSubService implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await this.subscriber.punsubscribe()
     await this.subscriber.quit()
+  }
+
+  /**
+   * The publisher outlives the queue drain in QueueModule.beforeApplicationShutdown: a job that
+   * finishes during shutdown still has to announce its status, which is what triggers webhooks.
+   */
+  async onApplicationShutdown(): Promise<void> {
     await this.publisher.quit()
   }
 }

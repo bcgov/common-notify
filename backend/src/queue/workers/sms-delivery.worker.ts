@@ -125,13 +125,13 @@ export class SmsDeliveryWorker {
 
         // A redelivered job (a stalled worker, a rolling deploy) must not send again to anyone a
         // previous attempt already reached. resetForRetry keeps their rows; this filters them out
-        // of the send list, which comes from the payload rather than from those rows.
-        const isRetry = (job.attemptsMade ?? 0) > 0
-        let alreadySent = new Set<string>()
-        if (isRetry) {
+        // of the send list, which comes from the payload rather than from those rows. The lookup
+        // runs on every attempt because Bull re-runs a stalled job without incrementing
+        // attemptsMade.
+        if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
-          alreadySent = await requestDetailService.findSentAddresses(notifyId)
         }
+        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
 
         let resolvedPayload = payload
         const smsTemplateId = payload.content?.templateId
