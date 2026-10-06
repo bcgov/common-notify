@@ -240,11 +240,14 @@ frontend:
     environment: ~
     #-- Job name for logs (auto-generated if not set)
     jobName: ~
-    #-- Resource requests and limits for Promtail sidecar
+    #-- Resource requests and limits for Promtail sidecar.
+    #-- 128Mi was too tight: promtail idles at 60-110Mi in prod, so pods sat at
+    #-- 85% of the limit and ContainerMemoryHigh fired. An OOMKill here is silent
+    #-- (the app container is unaffected) and stops frontend logs reaching Loki.
     resources:
       requests:
         cpu: 50m
-        memory: 64Mi
+        memory: 128Mi
       limits:
         cpu: 200m
-        memory: 128Mi
+        memory: 256Mi
