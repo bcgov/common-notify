@@ -146,7 +146,7 @@ const FileUpload: FC<FileUploadProps> = ({
                 aria-label={`Remove ${file.name}`}
                 isDisabled={isReading}
               >
-                Remove
+                <i className="bi bi-trash file-upload__delete-icon" aria-hidden="true" />
               </Button>
             </div>
 
