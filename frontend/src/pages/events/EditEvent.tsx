@@ -6,11 +6,12 @@ import EventTabs from './components/EventTabs'
 import type { EventTab } from './components/EventTabs'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
-import EventsEmailTab from './sections/EventsEmailTab'
+import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
 import type { EmailApplyValues } from './sections/EventsEmailTab'
 import EventsSmsTab from './sections/EventsSmsTab'
 import type { SmsApplyValues } from './sections/EventsSmsTab'
 import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
+import UnsavedChanges from '@/components/UnsavedChanges'
 import {
   getEventById,
   updateEvent,
@@ -42,12 +43,20 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
+  const tenantShowsHeaderTitle = useAppSelector(
+    (state) => state.emailSettings.useCustomEmailHeader ?? false,
+  )
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const tenantName = useAppSelector((state) => state.tenant.selectedTenant?.name)
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [selectedTab, setSelectedTab] = useState<EventTab>(initialTab)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Each tab keeps its own form state and is unmounted when another is opened, so leaving the
+  // email tab mid-edit drops the edits. The tab reports when it has any; the switch that would
+  // discard them waits here until it has been confirmed.
+  const [emailHasUnsavedChanges, setEmailHasUnsavedChanges] = useState(false)
+  const [pendingTab, setPendingTab] = useState<EventTab | null>(null)
 
   // Placeholder only, for the email tab's sender field and custom header. Failures are not
   // surfaced here since the page's own load state doesn't depend on either. Both thunks return
@@ -91,6 +100,20 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
       active = false
     }
   }, [eventId, selectedTenantId])
+
+  function handleSelectTab(tab: EventTab) {
+    if (selectedTab === 'email' && emailHasUnsavedChanges) {
+      setPendingTab(tab)
+      return
+    }
+    setSelectedTab(tab)
+  }
+
+  function leavePendingTab() {
+    if (pendingTab) setSelectedTab(pendingTab)
+    setEmailHasUnsavedChanges(false)
+    setPendingTab(null)
+  }
 
   async function handleSave(values: EventSettingsValues) {
     try {
@@ -156,7 +179,14 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
         ]}
       />
 
-      <EventTabs selected={selectedTab} onSelect={setSelectedTab} />
+      <EventTabs selected={selectedTab} onSelect={handleSelectTab} />
+
+      <UnsavedChanges
+        isBlocked={pendingTab !== null}
+        onLeave={leavePendingTab}
+        onStay={() => setPendingTab(null)}
+        modalMessage={UNSAVED_EMAIL_CHANGES_MESSAGE}
+      />
 
       <section className="events__section">
         {loadError ? (
@@ -193,7 +223,9 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
             defaultSenderEmail={defaultSenderEmail}
             approvedLogos={approvedLogos}
             tenantEmailLogoId={tenantEmailLogoId}
+            tenantShowsHeaderTitle={tenantShowsHeaderTitle}
             tenantName={tenantName}
+            onUnsavedChangesChange={setEmailHasUnsavedChanges}
             cstarGroups={cstarGroups}
           />
         ) : selectedTab === 'sms' ? (

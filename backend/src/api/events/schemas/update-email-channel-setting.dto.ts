@@ -132,7 +132,7 @@ export class UpdateEmailChannelSettingDto {
   useCustomHeader?: boolean
 
   /**
-   * Approved email logo shown in the custom header. Null for a custom header with no logo.
+   * Approved email logo shown in the custom header. Null inherits the tenant or system default logo.
    * Ignored unless useCustomHeader is true.
    * @example "550e8400-e29b-41d4-a716-446655440000"
    */

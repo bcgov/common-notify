@@ -104,7 +104,7 @@ export class EventChannelSetting {
   useCustomHeader: boolean
 
   /**
-   * Approved email logo shown in the custom header. Null means the custom header has no logo.
+   * Approved email logo shown in the custom header. Null inherits the tenant or system default logo.
    */
   @Column({ name: 'header_logo_id', type: 'uuid', nullable: true })
   headerLogoId: string | null

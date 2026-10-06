@@ -86,6 +86,11 @@
   background: $light-bg;
 }
 
+// Nothing was sent, so not the success green.
+.bulk-notifications__result--duplicate {
+  border-left-color: $primary-color;
+}
+
 .bulk-notifications__result-title {
   margin: 0 0 $spacing-sm;
   font-size: $font-size-lg;

@@ -16,6 +16,11 @@ on:
     workflows:
       - "Merge"
       - "PR"
+      # Added after the monitoring deploy failed twice in a row on exactly the
+      # fault this workflow exists for ("dial tcp ...:6443: i/o timeout"). It was
+      # never in scope, so those runs went red on a transient blip even though the
+      # helm upgrade itself had already succeeded.
+      - "Deploy Monitoring Stack"
     types: [completed]
 
 permissions: {}

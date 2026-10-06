@@ -38,11 +38,27 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: bcgov/action-builder-ghcr@cb2629351c87dd1c2130073e4ebb7233a9653a63 # v4.4.1
+        id: build
         with:
           package: ${{ matrix.package }}
           tags: dev
-          tag_fallback: latest
+          # Diff the merge commit against the previous main; diff_branch defaults to
+          # main, which on a push to main is always empty so nothing ever built.
+          diff_branch: HEAD^
+          # :latest is whichever image was tagged most recently by any build.
+          tag_fallback: dev
           triggers: ('${{ matrix.package }}/')
+
+      - name: Report deployed image
+        shell: bash
+        env:
+          PKG: ${{ matrix.package }}
+          TRIGGERED: ${{ steps.build.outputs.triggered }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          [ "${TRIGGERED}" = "true" ] && SRC="fresh build of ${GITHUB_SHA}" || SRC="retagged existing :dev (unchanged)"
+          echo "${PKG}: ${SRC} (digest ${DIGEST:-none})"
+          echo "- **${PKG}**: ${SRC} — \`${DIGEST:-none}\`" >> "${GITHUB_STEP_SUMMARY}"
 
   import:
     name: Import to ImageStream
@@ -213,7 +229,7 @@ jobs:
       environment: TEST
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=2 --set backend.autoscaling.maxReplicas=2 --set frontend.autoscaling.minReplicas=2 --set frontend.autoscaling.maxReplicas=2 --set frontend.secrets.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=2 --set backend.autoscaling.maxReplicas=2 --set frontend.autoscaling.minReplicas=2 --set frontend.autoscaling.maxReplicas=2 --set frontend.secrets.enabled=true --set frontend.promtail.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: test
@@ -288,7 +304,7 @@ jobs:
       environment: PROD
       oc_server: ${{ vars.oc_server }}
       db_user: appproxy # appproxy is the user which works with pgbouncer.
-      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=5 --set backend.autoscaling.maxReplicas=5 --set frontend.autoscaling.minReplicas=5 --set frontend.autoscaling.maxReplicas=5 --set frontend.pdb.enabled=true --set backend.pdb.enabled=true
+      params: --set backend.deploymentStrategy=RollingUpdate --set frontend.deploymentStrategy=RollingUpdate --set global.autoscaling=true --set backend.autoscaling.minReplicas=5 --set backend.autoscaling.maxReplicas=5 --set frontend.autoscaling.minReplicas=5 --set frontend.autoscaling.maxReplicas=5 --set frontend.pdb.enabled=true --set backend.pdb.enabled=true --set frontend.promtail.enabled=true
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
       tag: prod

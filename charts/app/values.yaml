@@ -90,6 +90,9 @@ backend:
     #-- Both report per-recipient outcomes, so a partial failure marks only the recipients that
     #-- actually failed and the queue retry does not re-send to the rest.
     smsAdapter: acs
+  #-- Seconds within which an identical send (same tenant, recipients and content) is answered
+  #-- with the original notifyId instead of being sent again. 0 disables deduplication.
+  dedupWindowSeconds: 300
   #-- ClamAV antivirus scanning configuration
   clamav:
     #-- enable or disable ClamAV deployment
@@ -228,11 +231,14 @@ frontend:
     environment: ~
     #-- Job name for logs (auto-generated if not set)
     jobName: ~
-    #-- Resource requests and limits for Promtail sidecar
+    #-- Resource requests and limits for Promtail sidecar.
+    #-- 128Mi was too tight: promtail idles at 60-110Mi in prod, so pods sat at
+    #-- 85% of the limit and ContainerMemoryHigh fired. An OOMKill here is silent
+    #-- (the app container is unaffected) and stops frontend logs reaching Loki.
     resources:
       requests:
         cpu: 50m
-        memory: 64Mi
+        memory: 128Mi
       limits:
         cpu: 200m
-        memory: 128Mi
+        memory: 256Mi
