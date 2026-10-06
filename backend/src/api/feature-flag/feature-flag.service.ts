@@ -178,7 +178,7 @@ export class FeatureFlagService {
    */
   async getByCodeAndTenant(code: string, tenantId?: string): Promise<FeatureFlag | null> {
     return this.featureFlagRepository.findOne({
-      where: { code, tenantId: tenantId ?? null },
+      where: { code, tenantId: tenantId ?? IsNull() },
     })
   }
 }
