@@ -44,7 +44,7 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
-    label: 'Bulk Notifications',
+    label: 'Send Batch Notification',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
   },
