@@ -55,12 +55,18 @@ describe('FeatureFlagService (database)', () => {
     await dataSource.query('CREATE SCHEMA IF NOT EXISTS notify')
     await dataSource.synchronize()
 
-    const now = new Date()
-    await dataSource.getRepository(TenantStatusCode).save({ code: 'active', description: 'Active' })
-    await dataSource.getRepository(Tenant).save([
-      { id: TENANT_ID, name: 'Tenant A', slug: 'tenant-a', createdAt: now, updatedAt: now },
-      { id: OTHER_TENANT_ID, name: 'Tenant B', slug: 'tenant-b', createdAt: now, updatedAt: now },
-    ])
+    // Raw SQL for the tenants: `status` is insert: false on the entity, so neither the column
+    // nor the relation writes it. These rows only exist to satisfy feature_flag's tenant FK.
+    await dataSource.query(
+      `INSERT INTO tenant_status_code (code, description, created_at, updated_at, sort_order)
+       VALUES ('active', 'Active', now(), now(), 1)`,
+    )
+    await dataSource.query(
+      `INSERT INTO tenant (id, name, slug, status, created_at, updated_at, is_deleted)
+       VALUES ($1, 'Tenant A', 'tenant-a', 'active', now(), now(), false),
+              ($2, 'Tenant B', 'tenant-b', 'active', now(), now(), false)`,
+      [TENANT_ID, OTHER_TENANT_ID],
+    )
     await dataSource.getRepository(FeatureFlagCode).save(
       ['global_on', 'global_off', 'overridden_off', 'no_rows'].map((code) => ({
         code,
