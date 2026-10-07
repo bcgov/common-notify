@@ -33,10 +33,18 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
     steps:
+      # action-test-and-analyse guards its scan with `if: inputs.sonar_token`,
+      # so an unset token skips SonarQube silently and the job still reports
+      # success. Without this the pipeline looks like it is analysing when it
+      # is not. Warn rather than fail, so PRs stay green until the token lands.
+      - name: Warn when SonarQube analysis is skipped
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::warning title=SonarQube analysis skipped::SONAR_TOKEN_BACKEND is not set, so the scan did not run. Lint and tests did run. See CCP ticket / bcgov devops-requests to provision the SonarCloud project and tokens."
       - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
         with:
           commands: |
             npm ci
@@ -47,7 +55,7 @@ jobs:
           sonar_args: >
             -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
             -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_backend
+            -Dsonar.projectKey=bcgov_common-notify_backend
             -Dsonar.sources=src
             -Dsonar.test.inclusions=**/*spec.ts
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
@@ -61,10 +69,18 @@ jobs:
     if: (! github.event.pull_request.draft)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
     steps:
+      # action-test-and-analyse guards its scan with `if: inputs.sonar_token`,
+      # so an unset token skips SonarQube silently and the job still reports
+      # success. Without this the pipeline looks like it is analysing when it
+      # is not. Warn rather than fail, so PRs stay green until the token lands.
+      - name: Warn when SonarQube analysis is skipped
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::warning title=SonarQube analysis skipped::SONAR_TOKEN_FRONTEND is not set, so the scan did not run. Lint and tests did run. See CCP ticket / bcgov devops-requests to provision the SonarCloud project and tokens."
       - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
         with:
           commands: |
             npm ci
@@ -75,7 +91,7 @@ jobs:
           sonar_args: >
             -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
             -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_frontend
+            -Dsonar.projectKey=bcgov_common-notify_frontend
             -Dsonar.sources=src
             -Dsonar.test.inclusions=**/*spec.ts
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
