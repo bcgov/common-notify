@@ -18,6 +18,7 @@ import EventEmailPreview from '../components/EventEmailPreview'
 import type { RenderedNotification } from '../components/EventEmailPreview'
 import EventEmailPreviewModal from '../components/EventEmailPreviewModal'
 import type { AppliedNotification } from '../components/EventEmailPreviewModal'
+import EventEmailCsvPreviewModal from '../components/EventEmailCsvPreviewModal'
 // Lives with the batch send screen, the only other place a recipient CSV is uploaded.
 import CsvIssuesTable from '@/pages/bulk-notifications/sections/CsvIssuesTable'
 import { getEventById, sendEventTestEmail } from '@/api/events.api'
@@ -222,13 +223,9 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
     await csv.handleFileChange(nextFile)
   }
 
-  /**
-   * A spreadsheet send has its own values per row, so editing them is not the single-value modal
-   * the other paths open. Until that modal exists the button is inert on this path.
-   */
-  const handleEditValues = () => {
-    if (!isManyRecipients) setEditValuesOpen(true)
-  }
+  // Which modal opens depends on where the values came from: typed in and editable, or read off
+  // the uploaded row and only reviewable.
+  const handleEditValues = () => setEditValuesOpen(true)
 
   const isReviewable = Boolean(template) && (Boolean(recipientEmail) || isCsvReady)
   const recipientCount = isManyRecipients ? csvRowCount : 1
@@ -424,19 +421,34 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   />
                 </div>
 
-                {recipientEmail && (
-                  <EventEmailPreviewModal
+                {isCsvReady && parsed ? (
+                  <EventEmailCsvPreviewModal
                     isOpen={isEditValuesOpen}
                     onClose={() => setEditValuesOpen(false)}
-                    template={template}
+                    emailSettings={emailSettings}
+                    parsed={parsed}
+                    rowIndex={previewRow}
+                    onRowChange={setPreviewRow}
                     from={emailSettings.senderEmail ?? ''}
-                    to={recipientEmail}
-                    values={applied?.values ?? {}}
-                    onApply={(next) => {
-                      setApplied(next)
-                      setEditValuesOpen(false)
-                    }}
+                    rendered={rowRendered}
+                    isLoading={isRowLoading}
                   />
+                ) : (
+                  recipientEmail && (
+                    <EventEmailPreviewModal
+                      isOpen={isEditValuesOpen}
+                      onClose={() => setEditValuesOpen(false)}
+                      template={template}
+                      emailSettings={emailSettings}
+                      from={emailSettings.senderEmail ?? ''}
+                      to={recipientEmail}
+                      values={applied?.values ?? {}}
+                      onApply={(next) => {
+                        setApplied(next)
+                        setEditValuesOpen(false)
+                      }}
+                    />
+                  )
                 )}
               </>
             )}

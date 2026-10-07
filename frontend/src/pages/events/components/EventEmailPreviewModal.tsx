@@ -4,7 +4,9 @@ import { Button, InlineAlert } from '@bcgov/design-system-react-components'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import type { EventEmailSettings } from '@/api/events.api'
 import { detectVariables } from '@/utils/templateVariables'
+import EventEmailHeader from './EventEmailHeader'
 import type { RenderedNotification } from './EventEmailPreview'
 
 export interface AppliedNotification {
@@ -16,6 +18,8 @@ interface EventEmailPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   template: TemplateResponse
+  /** The event's header settings, shown above the body as the email will carry it. */
+  emailSettings: EventEmailSettings
   from: string
   to: string
   values: Record<string, string>
@@ -26,6 +30,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
   isOpen,
   onClose,
   template,
+  emailSettings,
   from,
   to,
   values,
@@ -139,6 +144,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
       from={from || undefined}
       to={to || undefined}
       subject={subject}
+      outputHeader={<EventEmailHeader emailSettings={emailSettings} />}
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       isLoading={loading}
