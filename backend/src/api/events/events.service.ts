@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type { EntityManager } from 'typeorm'
+import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
@@ -118,6 +119,8 @@ export class EventsService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
     private readonly cstarApiClient: CstarApiClient,
+    @InjectRepository(ProvisionedPhoneNumber)
+    private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
   ) {}
 
   /**
@@ -194,7 +197,14 @@ export class EventsService {
    */
   async getEvent(tenantId: string, eventId: string): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
-    return this.toResponseDto(event)
+    const number = await this.findTenantPhoneNumber(tenantId)
+    return { ...this.toResponseDto(event), senderPhoneNumber: number?.phoneNumber ?? null }
+  }
+
+  private findTenantPhoneNumber(tenantId: string) {
+    return this.provisionedPhoneNumberRepository.findOne({
+      where: { tenantId, isDeleted: false },
+    })
   }
 
   /**
@@ -405,9 +415,8 @@ export class EventsService {
    * the tab's active toggle is local until the settings are applied, so `active` arrives here
    * alongside the data it depends on.
    *
-   * `fromPhoneNumberId` is not settable yet (the pool claim flow is a follow-up), so it stays
-   * permanently null - meaning an active SMS channel is not reachable until that flow lands,
-   * the same way an EMAIL channel can't be activated without a sender email.
+   * The sender is resolved from the tenant's live provisioned number; the caller cannot
+   * select another tenant's number or supply a sender ID.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -432,13 +441,21 @@ export class EventsService {
     await this.assertWithinRecipientCap('SMS', recipients.length)
 
     const setting = this.findOrCreateSmsSetting(event, userId)
+    const number = await this.findTenantPhoneNumber(tenantId)
+    setting.fromPhoneNumberId = number?.id ?? null
+    const temporarySender = updateDto.senderPhoneNumber
+    if (temporarySender && number && temporarySender !== number.phoneNumber) {
+      throw new BadRequestException('This tenant already has an assigned sender number.')
+    }
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
     if (
       updateDto.active &&
-      (!this.hasToRecipient(recipients) || !templateId || !setting.fromPhoneNumberId)
+      (!this.hasToRecipient(recipients) ||
+        !templateId ||
+        (!setting.fromPhoneNumberId && !temporarySender))
     ) {
       throw new BadRequestException(
         'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
@@ -450,7 +467,38 @@ export class EventsService {
     setting.isDeleted = false
     setting.updatedBy = userId
 
-    await this.saveWithRecipients(setting, recipients, userId)
+    if (temporarySender && !number) {
+      // Assign the tenant number and save settings atomically. The unique tenant and
+      // number indexes prevent concurrent assignments and cross-tenant reuse.
+      try {
+        await this.eventRepository.manager.transaction(async (manager) => {
+          const assigned = await manager.save(
+            ProvisionedPhoneNumber,
+            manager.create(ProvisionedPhoneNumber, {
+              phoneNumber: temporarySender,
+              tenantId,
+              allocatedAt: new Date(),
+              provider: 'temporary',
+              createdBy: userId,
+              updatedBy: userId,
+              isDeleted: false,
+            }),
+          )
+          setting.fromPhoneNumberId = assigned.id
+          const saved = await manager.save(EventChannelSetting, setting)
+          await this.syncRecipients(manager, saved, recipients, userId)
+        })
+      } catch (error) {
+        if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
+          throw new ConflictException(
+            'The number or tenant already has an assignment. Refresh the page and try again.',
+          )
+        }
+        throw error
+      }
+    } else {
+      await this.saveWithRecipients(setting, recipients, userId)
+    }
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)

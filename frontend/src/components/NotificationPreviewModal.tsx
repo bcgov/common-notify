@@ -69,6 +69,7 @@ interface NotificationPreviewModalProps {
   notice?: ReactNode
   outputFooter?: ReactNode
   closeButton?: ReactNode
+  className?: string
 }
 
 /**
@@ -103,6 +104,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   notice,
   outputFooter,
   closeButton,
+  className,
 }) => {
   return (
     <Modal
@@ -113,7 +115,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
       }}
     >
       <Dialog aria-labelledby="notification-preview-title">
-        <div className="notification-preview">
+        <div className={['notification-preview', className].filter(Boolean).join(' ')}>
           <div className="notification-preview__header">
             <h5 className="notification-preview__title" id="notification-preview-title">
               {title}

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { EventsService } from './events.service'
+import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
@@ -111,6 +112,8 @@ describe('EventsService', () => {
   }
 
   /** Unset by default, so getMaxRecipients falls back to its built-in 100. */
+  const mockProvisionedPhoneNumberRepository = { findOne: vi.fn() }
+
   const mockConfigurationRepository = {
     findOne: vi.fn(),
   }
@@ -165,6 +168,10 @@ describe('EventsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
+        {
+          provide: getRepositoryToken(ProvisionedPhoneNumber),
+          useValue: mockProvisionedPhoneNumberRepository,
+        },
         PhoneNumberService,
         { provide: getRepositoryToken(NotifyEvent), useValue: mockEventRepository },
         {
@@ -205,6 +212,28 @@ describe('EventsService', () => {
     mockManager.find.mockResolvedValue([])
     mockManager.create.mockImplementation((_entity: unknown, data: object) => ({ ...data }))
     mockManager.save.mockImplementation((_entity: unknown, data: unknown) => Promise.resolve(data))
+  })
+
+  describe('tenant SMS sender', () => {
+    it('returns the tenant number even before SMS settings exist', async () => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent())
+      mockProvisionedPhoneNumberRepository.findOne.mockResolvedValue({
+        id: 'number-1',
+        phoneNumber: '+15551234567',
+      })
+      const result = await service.getEvent(tenantId, eventId)
+      expect(result.senderPhoneNumber).toBe('+15551234567')
+      expect(result.smsSettings).toBeNull()
+      expect(mockProvisionedPhoneNumberRepository.findOne).toHaveBeenCalledWith({
+        where: { tenantId, isDeleted: false },
+      })
+    })
+
+    it('returns no sender when the tenant has no live allocation', async () => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent())
+      mockProvisionedPhoneNumberRepository.findOne.mockResolvedValue(null)
+      expect((await service.getEvent(tenantId, eventId)).senderPhoneNumber).toBeNull()
+    })
   })
 
   describe('createEvent', () => {
@@ -1443,8 +1472,47 @@ describe('EventsService', () => {
       ])
     })
 
+    it('assigns a temporary sender to the tenant in the same transaction as event settings', async () => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent([smsSetting()]))
+      mockTemplatesRepository.findById.mockResolvedValue(smsTemplate)
+      mockManager.save.mockImplementation((entity: unknown, data: unknown) =>
+        Promise.resolve(
+          entity === ProvisionedPhoneNumber ? { ...(data as object), id: 'new-number' } : data,
+        ),
+      )
+      await service.updateSmsChannelSetting(
+        tenantId,
+        eventId,
+        { active: true, templateId, to: ['2505551234'], senderPhoneNumber: '+15551234567' },
+        'editor',
+      )
+      expect(mockManager.save).toHaveBeenCalledWith(
+        ProvisionedPhoneNumber,
+        expect.objectContaining({ phoneNumber: '+15551234567', tenantId, createdBy: 'editor' }),
+      )
+      expect(savedSetting()?.fromPhoneNumberId).toBe('new-number')
+    })
+
+    it('does not replace an existing tenant number from an event form', async () => {
+      mockEventRepository.findOne.mockResolvedValue(buildEvent([smsSetting()]))
+      mockTemplatesRepository.findById.mockResolvedValue(smsTemplate)
+      mockProvisionedPhoneNumberRepository.findOne.mockResolvedValue({
+        id: 'number',
+        phoneNumber: '+15551234567',
+      })
+      await expect(
+        service.updateSmsChannelSetting(tenantId, eventId, {
+          active: true,
+          templateId,
+          to: ['2505551234'],
+          senderPhoneNumber: '+15557654321',
+        }),
+      ).rejects.toThrow('already has an assigned sender')
+      expect(mockManager.transaction).not.toHaveBeenCalled()
+    })
+
     it('rejects activating the channel while no sender number is claimed', async () => {
-      // fromPhoneNumberId is not settable yet, so an SMS channel cannot be switched on at all.
+      // A stale event association cannot substitute for a current tenant allocation.
       mockEventRepository.findOne.mockResolvedValueOnce(buildEvent([smsSetting()]))
       mockTemplatesRepository.findById.mockResolvedValueOnce(smsTemplate)
 
@@ -1486,6 +1554,12 @@ describe('EventsService', () => {
     })
 
     it('switches the channel on when the submitted settings are complete', async () => {
+      mockProvisionedPhoneNumberRepository.findOne.mockResolvedValue({
+        id: 'number-uuid-1',
+        phoneNumber: '+15551234567',
+        tenantId,
+        isDeleted: false,
+      })
       const claimed = smsSetting({ fromPhoneNumberId: 'number-uuid-1' })
       mockEventRepository.findOne
         .mockResolvedValueOnce(buildEvent([claimed]))
@@ -1511,7 +1585,9 @@ describe('EventsService', () => {
         to: ['250 555 1234'],
       })
 
-      expect(savedSetting()).toEqual(expect.objectContaining({ active: true, templateId }))
+      expect(savedSetting()).toEqual(
+        expect.objectContaining({ active: true, templateId, fromPhoneNumberId: 'number-uuid-1' }),
+      )
       expect(result.channelCodes).toEqual([NotificationChannel.SMS])
       expect(result.smsSettings).toEqual({ active: true, templateId, to: ['+12505551234'] })
       expect(result.status).toBe(EventStatus.ACTIVE)

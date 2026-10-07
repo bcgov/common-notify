@@ -2,9 +2,6 @@
 
 .events__sms-preview-notice {
   margin: $spacing-md $spacing-lg 0;
-  padding: $spacing-md;
-  border: 1px solid $border-default;
-  border-radius: 4px;
 }
 
 // Events list page
@@ -263,5 +260,38 @@
   }
   .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag.blue:not([data-disabled]) {
     background-color: var(--theme-blue-20, #d8eafd);
+  }
+}
+
+// Event SMS preview uses a compact plain-text pane and a single footer action.
+.notification-preview--sms-event {
+  .notification-preview__body {
+    height: min(55vh, 560px);
+  }
+
+  .notification-preview__text {
+    border: 0;
+    padding: 0;
+  }
+
+  .notification-preview__output-pane > .events__help {
+    background: var(--surface-color-background-light-gray, #faf9f8);
+    padding: $spacing-sm;
+  }
+
+  .notification-preview__footer {
+    align-items: center;
+    flex-wrap: wrap;
+
+    .events__help {
+      margin: 0 auto 0 0;
+    }
+  }
+
+  @media (max-width: $breakpoint-md) {
+    .notification-preview__body {
+      height: auto;
+      max-height: 55vh;
+    }
   }
 }

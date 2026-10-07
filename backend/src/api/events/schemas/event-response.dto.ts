@@ -107,6 +107,9 @@ export class EventSmsSettingsDto {
  * DTO for event responses from the API
  */
 export class EventResponseDto {
+  /** Tenant-assigned SMS sender, included on event detail responses even before SMS is configured. */
+  senderPhoneNumber?: string | null
+
   /**
    * Event ID (UUID)
    * @example "550e8400-e29b-41d4-a716-446655440000"

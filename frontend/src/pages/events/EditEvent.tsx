@@ -127,7 +127,8 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
     try {
       const updated = await updateEvent(eventId, values)
       // Re-sync to exactly what was persisted; this also moves the tab's change baseline.
-      setEvent(updated)
+      // General event updates do not include the detail-only tenant sender lookup.
+      setEvent((previous) => ({ ...updated, senderPhoneNumber: previous?.senderPhoneNumber }))
       showSuccessToast('Event updated successfully')
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : 'Failed to update event')
@@ -164,6 +165,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
 
   async function handleSaveSmsSettings(values: SmsApplyValues) {
     const updated = await updateEventSmsSettings(eventId, {
+      senderPhoneNumber: values.senderPhoneNumber,
       active: values.active,
       templateId: values.templateId,
       to: values.to,
@@ -244,6 +246,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
             key={selectedTenantId}
             onUnsavedChangesChange={setSmsHasUnsavedChanges}
             smsNotificationsEnabled={smsNotificationsEnabled}
+            senderPhoneNumber={event.senderPhoneNumber ?? null}
             values={{
               active: event.smsSettings?.active ?? false,
               templateId: event.smsSettings?.templateId ?? null,

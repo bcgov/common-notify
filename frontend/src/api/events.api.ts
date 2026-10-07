@@ -104,6 +104,8 @@ export interface EventSmsSettings {
 }
 
 export interface EventResponse {
+  /** Tenant-assigned sender returned by the event detail endpoint. */
+  senderPhoneNumber?: string | null
   id: string
   name: string
   description: string
@@ -287,7 +289,7 @@ export async function deactivateEventEmailChannel(eventId: string): Promise<Even
   }
 }
 
-export type EventSmsSettingsUpdate = EventSmsSettings
+export type EventSmsSettingsUpdate = EventSmsSettings & { senderPhoneNumber?: string }
 
 /**
  * Update an event's SMS channel settings (SMS Notification tab)

@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsOptional, IsUUID, ValidateIf } from 'class-validator'
+import { IsArray, IsBoolean, Matches, IsOptional, IsUUID, ValidateIf } from 'class-validator'
 import { IsNormalizablePhoneNumber } from '../../notify/schemas/validators/normalizable-phone-number.validator'
 import { HasUniqueNormalizedPhoneNumbers } from '../../notify/schemas/validators/unique-normalized-phone-numbers.validator'
 
@@ -16,6 +16,13 @@ import { HasUniqueNormalizedPhoneNumbers } from '../../notify/schemas/validators
  * chk_event_channel_setting_active_complete.
  */
 export class UpdateSmsChannelSettingDto {
+  /** Initial temporary sender assignment for a tenant without a provisioned number. */
+  @IsOptional()
+  @Matches(/^\+[1-9]\d{7,14}$/, {
+    message: 'Enter a sender number in international format, for example +15551234567.',
+  })
+  senderPhoneNumber?: string
+
   /**
    * Whether the event should send on the SMS channel once these settings are saved.
    * @example true

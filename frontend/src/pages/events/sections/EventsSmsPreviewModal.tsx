@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button } from '@bcgov/design-system-react-components'
+import { Button, InlineAlert, SvgCloseIcon } from '@bcgov/design-system-react-components'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
@@ -9,6 +9,7 @@ import EventsSmsEstimate from '../components/EventsSmsEstimate'
 interface Props {
   template: TemplateResponse
   to: string[]
+  senderPhoneNumber?: string | null
   initialValues: Record<string, string>
   onClose: () => void
   onSaveValues: (values: Record<string, string>) => void
@@ -18,6 +19,7 @@ export default function EventsSmsPreviewModal({
   template,
   to,
   initialValues,
+  senderPhoneNumber,
   onClose,
   onSaveValues,
 }: Props) {
@@ -38,6 +40,7 @@ export default function EventsSmsPreviewModal({
     error: null,
     loading: true,
   })
+  const [noticeVisible, setNoticeVisible] = useState(true)
   const [attempted, setAttempted] = useState(false)
 
   useEffect(() => {
@@ -78,17 +81,31 @@ export default function EventsSmsPreviewModal({
       isOpen
       onClose={onClose}
       title="SMS Notification Preview"
+      className="notification-preview--sms-event"
       variablesHeading="Notification values"
       variablesIntro="Provide values for all variables in your template. The preview updates automatically as you make changes."
       notice={
-        <p className="events__sms-preview-notice">
-          These sample values are kept for this editing session only. They do not change the
-          template or send a notification.
-        </p>
+        noticeVisible && (
+          <div className="events__sms-preview-notice">
+            <InlineAlert
+              variant="info"
+              isCloseable
+              onClose={() => setNoticeVisible(false)}
+              description="Preview your notification using sample values and your event settings. Nothing is sent from this preview."
+            />
+          </div>
+        )
       }
       closeButton={
-        <Button type="button" variant="tertiary" onPress={onClose} aria-label="Close SMS preview">
-          Close
+        <Button
+          type="button"
+          variant="tertiary"
+          isIconButton
+          size="small"
+          onPress={onClose}
+          aria-label="Close SMS preview"
+        >
+          <SvgCloseIcon />
         </Button>
       }
       variables={variables.map((variable) => ({
@@ -103,24 +120,29 @@ export default function EventsSmsPreviewModal({
         setResult((previous) => ({ ...previous, loading: true, error: null }))
         setValues((previous) => ({ ...previous, [name]: value }))
       }}
-      from="Not assigned"
+      from={senderPhoneNumber ?? 'Not assigned'}
       to={to.join(', ')}
       bodyText={result.body}
       isLoading={result.loading}
       error={result.error}
       outputFooter={<EventsSmsEstimate body={result.body} />}
       footer={
-        <Button
-          type="button"
-          variant="primary"
-          onPress={() => {
-            setAttempted(true)
-            if (variables.some((variable) => missing(variable.name))) return
-            onSaveValues(values)
-          }}
-        >
-          Save notification values
-        </Button>
+        <>
+          <p className="events__help">
+            Notification values are kept for this editing session only.
+          </p>
+          <Button
+            type="button"
+            variant="primary"
+            onPress={() => {
+              setAttempted(true)
+              if (variables.some((variable) => missing(variable.name))) return
+              onSaveValues(values)
+            }}
+          >
+            Save notification values
+          </Button>
+        </>
       }
     />
   )

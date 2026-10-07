@@ -21,14 +21,26 @@ vi.mock('@/hooks/useChannelTemplates', () => ({
 vi.mock('./EventsSmsPreviewModal', () => ({ default: () => <div role="dialog">SMS preview</div> }))
 const onSave = vi.fn()
 const onDeactivate = vi.fn()
-const configured = { active: false, templateId: 'sms-template', to: ['+12505551234'] }
+const configured = { active: true, templateId: 'sms-template', to: ['+12505551234'] }
 
 function setup(
-  options: { empty?: boolean; disabled?: boolean; onDirty?: (value: boolean) => void } = {},
+  options: {
+    sender?: string
+    active?: boolean
+    temporary?: boolean
+    empty?: boolean
+    disabled?: boolean
+    onDirty?: (value: boolean) => void
+  } = {},
 ) {
   return render(
     <EventsSmsTab
-      values={options.empty ? { active: false, templateId: null, to: [] } : configured}
+      values={
+        options.empty
+          ? { active: options.active ?? true, templateId: null, to: [] }
+          : { ...configured, active: options.active ?? true }
+      }
+      senderPhoneNumber={options.temporary ? null : (options.sender ?? '+15551234567')}
       onSave={onSave}
       onDeactivate={onDeactivate}
       isConfigured={false}
@@ -41,14 +53,74 @@ function setup(
 beforeEach(() => {
   vi.clearAllMocks()
   onSave.mockResolvedValue(undefined)
+  onDeactivate.mockResolvedValue(undefined)
 })
 
 describe('SMS event MVP', () => {
+  it('allows a temporary tenant sender and includes it only when Save is clicked', async () => {
+    setup({ temporary: true })
+    const input = screen.getByRole('textbox', { name: /Sender phone number/ })
+    await userEvent.type(input, '+15551234567')
+    expect(onSave).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({ ...configured, senderPhoneNumber: '+15551234567' }),
+    )
+  })
+
+  it('uses the assigned sender and saves activation only after Save', async () => {
+    setup({ sender: '+15551234567', active: false })
+    expect(screen.queryByRole('textbox', { name: /Sender phone number/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
+    expect(screen.getByRole('textbox', { name: /Sender phone number/ })).toHaveValue('+15551234567')
+    expect(onSave).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ ...configured, active: true }))
+  })
+
+  it('explains the initial off state when Save or Preview is clicked', async () => {
+    setup({ sender: '+15551234567', empty: true, active: false })
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(showErrorToast).toHaveBeenLastCalledWith('Channel is off', expect.any(String))
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onSave).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByText('Please select at least one recipient.')).toBeVisible()
+    expect(screen.getByText('Please select a template.')).toBeVisible()
+  })
+
+  it('returns to the saved summary and confirms deactivation before disabling retained fields', async () => {
+    render(
+      <EventsSmsTab
+        values={{ ...configured, active: true }}
+        senderPhoneNumber="+15551234567"
+        isConfigured
+        onSave={onSave}
+        onDeactivate={onDeactivate}
+      />,
+    )
+    expect(screen.getByText('Ready to send?')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
+    await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
+    expect(onDeactivate).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('switch', { name: 'Activate channel' })).toBeChecked()
+    await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Deactivate$/ }))
+    await waitFor(() => expect(onDeactivate).toHaveBeenCalledOnce())
+    expect(screen.getByRole('switch', { name: 'Activate channel' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Additional recipient(s)' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: /Sender phone number/ })).toHaveValue('+15551234567')
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled()
+  })
+
   it('keeps empty Save and Preview enabled and validates on click without saving', async () => {
     setup({ empty: true })
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled()
-    expect(screen.getByRole('switch', { name: 'Activate channel' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Activate channel' })).toBeEnabled()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('Please select at least one recipient.')).toBeVisible()
     expect(screen.getByText('Please select a template.')).toBeVisible()
@@ -61,11 +133,11 @@ describe('SMS event MVP', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('saves an unchanged complete configuration inactive and displays the saved summary', async () => {
+  it('saves an unchanged complete configuration and displays the saved summary', async () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(configured))
-    expect(await screen.findByText('SMS settings saved')).toBeVisible()
+    expect(await screen.findByText('Ready to send?')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Continue to test notification' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
@@ -96,7 +168,7 @@ describe('SMS event MVP', () => {
       expect(showErrorToast).toHaveBeenCalledWith('Unable to save settings', 'Unavailable'),
     )
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-    expect(screen.queryByText('SMS settings saved')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ready to send?')).not.toBeInTheDocument()
   })
 
   it('prevents read-only users from saving or previewing', () => {
