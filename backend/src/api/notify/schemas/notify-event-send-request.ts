@@ -1,7 +1,11 @@
 import { ArrayMaxSize, IsArray, IsEmail, IsObject, IsOptional, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger'
+import { IsValidMergeArray } from './validators/merge-array.validator'
 
 export const TEST_SEND_MAX_RECIPIENTS = 5
+
+/** The header row plus one row per recipient. */
+export const TEST_SEND_MAX_MERGE_ROWS = TEST_SEND_MAX_RECIPIENTS + 1
 
 @ApiSchema({
   description:
@@ -43,4 +47,22 @@ export class NotifyEventTestSendRequest extends NotifyEventSendRequest {
   @ArrayMaxSize(TEST_SEND_MAX_RECIPIENTS)
   @IsEmail({}, { each: true })
   to?: string[]
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'array', items: { type: 'string' } },
+    description:
+      'Rows to send a personalised test to, one message per row. The first row is the header ' +
+      'and must include a "to" column; the other columns supply that row’s own template values, ' +
+      'overriding `params`. Mutually exclusive with `to`.',
+    example: [
+      ['to', 'firstName'],
+      ['someone@gov.bc.ca', 'Alice'],
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(TEST_SEND_MAX_MERGE_ROWS)
+  @IsValidMergeArray()
+  mergeArray?: string[][]
 }

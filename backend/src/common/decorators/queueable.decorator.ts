@@ -267,7 +267,22 @@ async function resolveEventSend(
     })
   }
 
-  // TODO: should be using a recipients list not grabbing caller email
+  // Test Send
+  // Recipients chosen on the test send screen. The resolver decides which of them are allowed.
+  // Merge rows carry a value set per recipient, so each one receives a different message.
+  if (request.mergeArray?.length) {
+    return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+      mergeArray: request.mergeArray,
+    })
+  }
+
+  if (request.to?.length) {
+    return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+      to: request.to,
+    })
+  }
+
+  // None given, so the test goes back to whoever asked for it.
   const callerEmail = req?.user?.email
   if (typeof callerEmail !== 'string' || !callerEmail.trim()) {
     throw new BadRequestException(
@@ -275,8 +290,9 @@ async function resolveEventSend(
     )
   }
 
-  const to = request.to?.length ? request.to : [callerEmail]
-  return resolver.resolveTestSend(tenantId, request.eventId, request.params, to, callerEmail)
+  return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+    to: [callerEmail],
+  })
 }
 
 /**
@@ -352,6 +368,7 @@ export async function handleMerge(
   apiKeyConsumerId: string | undefined,
   requestRoute: string | undefined,
   channel: NotificationChannel,
+  eventId?: string,
 ) {
   const isSms = channel === NotificationChannel.SMS
   const logger = new Logger(`Queueable[${queueName}][${isSms ? 'smsMerge' : 'emailMerge'}]`)
@@ -419,6 +436,9 @@ export async function handleMerge(
     createdBy: tenantId,
     payload: dto as any,
     requestRoute,
+    // An event merge is still an event send: without this the delivery worker has nothing to
+    // read the event's sender and header back from.
+    eventId,
   })
   logger.debug(
     `${isSms ? 'SMS' : 'Email'} merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
@@ -690,6 +710,7 @@ export function Queueable(
             req?.apiKeyConsumerId,
             requestRoute,
             mergeChannel,
+            eventId,
           )
         }
 

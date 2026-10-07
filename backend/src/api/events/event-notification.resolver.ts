@@ -1,10 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
@@ -19,6 +13,12 @@ import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-reques
 /** Global cap on recipients per channel, seeded by V62. Mirrors EventsService. */
 const MAX_RECIPIENTS_KEY = 'event_max_recipients'
 const DEFAULT_MAX_RECIPIENTS = 100
+
+/**
+ * Who a test send is addressed to: a plain list, or merge rows carrying a value set per row.
+ * A merge row's values override `params`, which is how each recipient gets a different message.
+ */
+export type TestRecipients = { to: string[] } | { mergeArray: string[][] }
 
 /** The pieces of an event's email settings the delivery worker reads back at send time. */
 export interface EventEmailSendSettings {
@@ -112,13 +112,22 @@ export class EventNotificationResolver {
     tenantId: string,
     eventId: string,
     params: Record<string, unknown> | undefined,
-    to: string[],
-    callerEmail: string,
+    recipients: TestRecipients,
   ): Promise<NotifySimpleRequest> {
     const setting = await this.findSendableEmailSetting(tenantId, eventId)
-    this.assertPermittedTestRecipients(to, callerEmail)
 
-    return this.toRequest(setting, params, { to })
+    if ('mergeArray' in recipients) {
+      const [header, ...rows] = recipients.mergeArray
+      // Guaranteed present by the mergeArray validator on the request.
+      const toColumn = header.findIndex((column) => column.trim().toLowerCase() === 'to')
+      const permitted = new Set(this.verifyTestRecipients(rows.map((row) => row[toColumn])))
+
+      return this.toRequest(setting, params, {
+        mergeArray: [header, ...rows.filter((row) => permitted.has(row[toColumn]))],
+      })
+    }
+
+    return this.toRequest(setting, params, { to: this.verifyTestRecipients(recipients.to) })
   }
 
   /**
@@ -146,21 +155,11 @@ export class EventNotificationResolver {
   }
 
   /**
-   * Who a test notification may be sent to.
-   *
-   * Right now this is only the user's email, in future it
-   * will be expanded to 'team members'.
-   *
+   * The addresses a test notification may be sent to, design around
+   * is TBD so this is just a passthrough right now.
    */
-  private assertPermittedTestRecipients(addresses: string[], callerEmail: string): void {
-    const caller = callerEmail.trim().toLowerCase()
-    const notPermitted = addresses.filter((address) => address.trim().toLowerCase() !== caller)
-
-    if (notPermitted.length > 0) {
-      throw new ForbiddenException(
-        `A test notification can only be sent to your own address. Not permitted: ${notPermitted.join(', ')}`,
-      )
-    }
+  private verifyTestRecipients(addresses: string[]): string[] {
+    return addresses
   }
 
   /** The event's live EMAIL channel setting, or the reason it cannot be sent. */
@@ -233,16 +232,19 @@ export class EventNotificationResolver {
   private toRequest(
     setting: EventChannelSetting,
     params: Record<string, unknown> | undefined,
-    recipients: { to: string[]; cc?: string[]; bcc?: string[] },
+    recipients: { to: string[]; cc?: string[]; bcc?: string[] } | { mergeArray: string[][] },
   ): NotifySimpleRequest {
     return {
       params,
       email: {
-        recipients: {
-          to: recipients.to,
-          ...(recipients.cc?.length ? { cc: recipients.cc } : {}),
-          ...(recipients.bcc?.length ? { bcc: recipients.bcc } : {}),
-        },
+        recipients:
+          'mergeArray' in recipients
+            ? { mergeArray: recipients.mergeArray }
+            : {
+                to: recipients.to,
+                ...(recipients.cc?.length ? { cc: recipients.cc } : {}),
+                ...(recipients.bcc?.length ? { bcc: recipients.bcc } : {}),
+              },
         // The sender and the header are not carried here: they have no home on this schema, and
         // adding one would expose them on the public send routes that share it. The request
         // records its event instead, and the delivery worker reads them back from that.

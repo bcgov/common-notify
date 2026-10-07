@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import { Repository } from 'typeorm'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
@@ -213,13 +213,14 @@ describe('EventNotificationResolver', () => {
       )
     })
 
-    it("sends to the caller rather than the event's own recipients", async () => {
+    it("sends to the addresses given rather than the event's own recipients", async () => {
       const result = await resolver.resolveTestSend(
         'tenant-id',
         'event-id',
         { name: 'Ada' },
-        ['me@gov.bc.ca'],
-        'me@gov.bc.ca',
+        {
+          to: ['me@gov.bc.ca'],
+        },
       )
 
       expect(result).toEqual({
@@ -234,39 +235,54 @@ describe('EventNotificationResolver', () => {
     })
 
     it('does not expand CSTAR groups', async () => {
-      await resolver.resolveTestSend(
-        'tenant-id',
-        'event-id',
-        undefined,
-        ['me@gov.bc.ca'],
-        'me@gov.bc.ca',
-      )
+      await resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+        to: ['me@gov.bc.ca'],
+      })
 
       expect(cstarApiClient.getGroupMemberEmails).not.toHaveBeenCalled()
     })
 
-    it('refuses an address that is not the caller', async () => {
-      await expect(
-        resolver.resolveTestSend(
-          'tenant-id',
-          'event-id',
-          undefined,
-          ['someone.else@gov.bc.ca'],
-          'me@gov.bc.ca',
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException)
+    // Verification is a pass-through until there is a team member list to check against.
+    it('sends to an address that is not the caller', async () => {
+      const result = await resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+        to: ['someone.else@gov.bc.ca'],
+      })
+
+      expect(result.email?.recipients.to).toEqual(['someone.else@gov.bc.ca'])
     })
 
-    it('matches the caller regardless of case or padding', async () => {
-      await expect(
-        resolver.resolveTestSend(
-          'tenant-id',
-          'event-id',
-          undefined,
-          ['  Me@GOV.bc.ca '],
-          'me@gov.bc.ca',
-        ),
-      ).resolves.toBeDefined()
+    it('passes merge rows through as a mail merge, so each row renders on its own', async () => {
+      const mergeArray = [
+        ['to', 'name'],
+        ['one@gov.bc.ca', 'Ada'],
+        ['two@gov.bc.ca', 'Grace'],
+      ]
+
+      const result = await resolver.resolveTestSend(
+        'tenant-id',
+        'event-id',
+        { name: 'fallback' },
+        { mergeArray },
+      )
+
+      expect(result.email?.recipients).toEqual({ mergeArray })
+      // A merge addresses its rows, so there is no to list to contradict them.
+      expect(result.email?.recipients.to).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain('event@gov.bc.ca')
+    })
+
+    it('keeps merge rows whatever column the address sits in', async () => {
+      const result = await resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+        mergeArray: [
+          ['name', 'to'],
+          ['Ada', 'one@gov.bc.ca'],
+        ],
+      })
+
+      expect(result.email?.recipients.mergeArray).toEqual([
+        ['name', 'to'],
+        ['Ada', 'one@gov.bc.ca'],
+      ])
     })
   })
 
