@@ -9,7 +9,11 @@ metadata:
 spec:
   strategy:
     type: {{ .Values.frontend.deploymentStrategy }}
-  {{- if not .Values.frontend.autoscaling.enabled }}
+  {{- /*
+    Must match hpa.yaml's condition exactly — see the note in the backend
+    deployment.
+  */}}
+  {{- if not (and .Values.global.autoscaling .Values.frontend.autoscaling.enabled) }}
   replicas: {{ .Values.frontend.replicaCount }}
   {{- end }}
   selector:

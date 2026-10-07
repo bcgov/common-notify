@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { Logger } from '@nestjs/common'
 import { AcsSmsTransport } from '../../../../../../src/adapters/implementations/delivery/sms/acs/acs-sms.adapter'
 import type { SendSmsResult } from '../../../../../../src/adapters/interfaces'
+import { TransientDeliveryError } from '../../../../../../src/adapters/delivery-errors'
 
 const mockSend = vi.fn()
 vi.mock('@azure/communication-sms', () => ({
@@ -194,5 +195,47 @@ describe('AcsSmsTransport', () => {
     await expect(
       transport.send({ to: ['+15559876543', '+15550000001'], body: 'Hello' }),
     ).rejects.toThrow('ACS send failed for all 2 recipient(s)')
+  })
+
+  describe('provider outages', () => {
+    const configured = () =>
+      createModule({ connectionString: 'endpoint=https://example;accesskey=key' })
+    const send = (t: AcsSmsTransport, to: string[] = ['+15559876543']) =>
+      t.send({ to, body: 'Hello' } as never)
+
+    it.each([503, 429, 500])('treats a %i from ACS as transient', async (statusCode) => {
+      mockSend.mockRejectedValue(Object.assign(new Error('Service Unavailable'), { statusCode }))
+      await expect(send(await configured())).rejects.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('treats ACS being unreachable as transient', async () => {
+      mockSend.mockRejectedValue(
+        Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      )
+      await expect(send(await configured())).rejects.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('leaves a 400 from ACS as a problem with the request', async () => {
+      mockSend.mockRejectedValue(Object.assign(new Error('Bad request'), { statusCode: 400 }))
+      const error = await send(await configured()).catch((caught: unknown) => caught)
+      expect(error).not.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('flags a throttled recipient as owed, not failed, alongside one that was sent', async () => {
+      mockSend.mockResolvedValue([
+        { to: '+15559876543', successful: true, messageId: 'm1', httpStatusCode: 202 },
+        { to: '+15550000000', successful: false, httpStatusCode: 429, errorMessage: 'throttled' },
+      ])
+      const result = await send(await configured(), ['+15559876543', '+15550000000'])
+      expect(result.results?.[1]).toMatchObject({ success: false, transient: true })
+      expect(result.results?.[0]).not.toHaveProperty('transient')
+    })
+
+    it('throws transient when ACS could take none of the recipients', async () => {
+      mockSend.mockResolvedValue([
+        { to: '+15559876543', successful: false, httpStatusCode: 503, errorMessage: 'down' },
+      ])
+      await expect(send(await configured())).rejects.toBeInstanceOf(TransientDeliveryError)
+    })
   })
 })

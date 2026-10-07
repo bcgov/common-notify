@@ -42,12 +42,12 @@ export interface NotificationRequest {
 }
 
 /**
- * Mail-merge payload carried by ingestion and delivery jobs for the
- * /notifysimple/email merge flow (a request whose email recipients use `mergeArray`).
- * On the ingestion job `recipients` holds every recipient; on a delivery job it holds only
- * the recipients of a single batch (identified by `batchId`). Content is rendered from either a
- * server `templateId` or inline `content`. `params` are global params applied when rendering;
- * per-recipient `params` override them on a per-key basis.
+ * Mail-merge payload carried by ingestion and delivery jobs for the merge flow (a request whose
+ * recipients use `mergeArray`). It holds what every batch shares: content, rendered from either
+ * a server `templateId` or inline `content`, and global `params`. Recipients are not in it -
+ * they live in Postgres (the stored request, then one detail row per recipient with its own
+ * `params`), so a merge of any size is a few hundred bytes per job in Redis. Per-recipient
+ * params override the global ones on a per-key basis.
  */
 export interface MailMergeJobData {
   content?: {
@@ -58,7 +58,11 @@ export interface MailMergeJobData {
     renderer?: 'handlebars' | 'mustache' | 'legacy_gc_notify' | 'mjml'
   }
   params?: Record<string, unknown>
-  recipients: Array<{ address: string; params: Record<string, unknown> }>
+  /**
+   * Absent on jobs queued now: ingestion reads recipients from the stored request, and delivery
+   * workers from their batch's detail rows. Only jobs queued before that change carry them.
+   */
+  recipients?: Array<{ address: string; params: Record<string, unknown> }>
 }
 
 /**
@@ -70,7 +74,7 @@ export interface IngestionJobPayload {
   request: NotifyRequest
   requestedAt: string
   scheduledFor?: string // ISO datetime for delayed sends (optional).  Works by delaying the ingestion job, which in turn delays all downstream delivery jobs.  This simplifies handling of scheduled notifications by centralizing the scheduling logic in one place (ingestion worker) rather than needing to handle scheduling in each delivery worker.
-  mailMerge?: boolean // When true, this is a merge send and `mailMergeData` carries the recipients
+  mailMerge?: boolean // When true, this is a merge send; recipients are read from the stored request
   mailMergeChannel?: NotificationChannel // Which channel the merge fans out to (defaults to EMAIL)
   mailMergeData?: MailMergeJobData
 }
@@ -87,7 +91,7 @@ export interface DeliveryJobPayload {
   attempt: number
   mailMerge?: boolean // When true, this is one batch of a merge send
   batchId?: string // Identifies the batch within the parent notification_request (mail merge only)
-  mailMergeData?: MailMergeJobData // Recipients for this batch (mail merge only)
+  mailMergeData?: MailMergeJobData // Shared content and params; recipients are the batch's detail rows
 }
 
 /**
