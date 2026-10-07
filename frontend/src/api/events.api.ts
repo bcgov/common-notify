@@ -359,16 +359,22 @@ export interface EventSendResponse {
  *
  * @param eventId Event to send the test for
  * @param params Values substituted into the template's placeholders
+ * @param recipients Addresses to send to, or merge rows carrying a value set per recipient.
+ *   Omitted, the test goes to the signed-in user.
  * @returns The accepted request, whose notifyId links to its status
  * @throws Error if the send is rejected
  */
 export async function sendEventTestEmail(
   eventId: string,
   params: Record<string, string>,
+  recipients?: { to: string[] } | { mergeArray: string[][] },
 ): Promise<EventSendResponse> {
   try {
     const apiParams = generateApiParameters('/api/v1/frontend/notifysimple/event/test')
-    return await post<EventSendResponse>({ ...apiParams, data: { eventId, params } })
+    return await post<EventSendResponse>({
+      ...apiParams,
+      data: { eventId, params, ...recipients },
+    })
   } catch (error) {
     throw toEventApiError(error, {
       action: 'Failed to send the test notification',

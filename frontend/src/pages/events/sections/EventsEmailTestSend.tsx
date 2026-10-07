@@ -1,16 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Button, Callout, Radio, RadioGroup } from '@bcgov/design-system-react-components'
+import {
+  Button,
+  Callout,
+  InlineAlert,
+  Radio,
+  RadioGroup,
+  SvgChevronLeftIcon,
+  SvgChevronRightIcon,
+  TextField,
+} from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
+import FileUpload from '@/components/FileUpload'
 import EventEmailPreview from '../components/EventEmailPreview'
+import type { RenderedNotification } from '../components/EventEmailPreview'
 import EventEmailPreviewModal from '../components/EventEmailPreviewModal'
 import type { AppliedNotification } from '../components/EventEmailPreviewModal'
+// Lives with the batch send screen, the only other place a recipient CSV is uploaded.
+import CsvIssuesTable from '@/pages/bulk-notifications/sections/CsvIssuesTable'
 import { getEventById, sendEventTestEmail } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
-import { getTemplateById } from '@/api/templates.api'
+import { getTemplateById, previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import { useCsvUpload } from '@/hooks/useCsvUpload'
+import {
+  buildSampleCsv,
+  csvFilenameFor,
+  downloadCsv,
+  rowParams,
+  rowRecipient,
+  toMergeArray,
+  MAX_FILE_BYTES,
+} from '@/utils/bulkNotificationsCsv'
 import { useAppSelector } from '@/redux/hooks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/components/events.scss'
@@ -19,8 +42,23 @@ interface EventsEmailTestSendProps {
   eventId: string
 }
 
-/** Sending to anyone but the signed-in user is not supported yet - see the radio group below. */
 type Recipient = 'myself' | 'other'
+type AddRecipients = 'one' | 'many'
+
+/**
+ * Recipients one test send may reach, matching TEST_SEND_MAX_RECIPIENTS on the API.
+ *
+ * A longer file is trimmed to its first rows rather than rejected, which is what the tip above
+ * the upload control promises.
+ */
+const MAX_TEST_RECIPIENTS = 5
+
+const EMAIL_PATTERN =
+  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
+
+function isValidEmail(value: string): boolean {
+  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
+}
 
 /**
  * Sends a test of the event's email notification, so its content and formatting can be checked
@@ -36,12 +74,18 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   const [loadError, setLoadError] = useState<string | null>(null)
   // Nothing is selected to begin with, so the review below only appears once a choice is made.
   const [recipient, setRecipient] = useState<Recipient | null>(null)
+  const [addRecipients, setAddRecipients] = useState<AddRecipients | null>(null)
+  const [otherEmail, setOtherEmail] = useState('')
   const [isEditValuesOpen, setEditValuesOpen] = useState(false)
   // The values the test will be sent with, and the notification they render to. Held here rather
   // than in the modal so they outlive it: the preview below shows the render, and the values are
   // ready for the send once there is an endpoint to send through.
   const [applied, setApplied] = useState<AppliedNotification | null>(null)
   const [isSending, setSending] = useState(false)
+  // Which uploaded row the review is showing, and that row rendered.
+  const [previewRow, setPreviewRow] = useState(0)
+  const [rowRendered, setRowRendered] = useState<RenderedNotification | null>(null)
+  const [isRowLoading, setRowLoading] = useState(false)
 
   // The page is landed on from the saved page and on a refresh, so it fetches the event itself
   // rather than being handed the settings it shows. Tenant-scoped, the same way the saved page is.
@@ -89,12 +133,121 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
     }
   }, [templateId])
 
+  // The columns a file has to carry, as the API reports them rather than as the browser reads
+  // them out of the template body - the same source the batch send screen uses.
+  const placeholders = template?.placeholders?.paths ?? []
+  const csv = useCsvUpload(placeholders, 'email')
+  const { reset: resetCsv } = csv
+
+  const isManyRecipients = recipient === 'other' && addRecipients === 'many'
+
+  const typedEmail = otherEmail.trim()
+  // Only once something has been typed, so the field is not red before it has been used.
+  const typedEmailError =
+    typedEmail !== '' && !isValidEmail(typedEmail) ? 'Enter a valid email address.' : ''
+
+  // The one address a test goes to, or null on the paths that do not have one: both single
+  // recipient paths end here, while a spreadsheet addresses its own rows instead.
+  const recipientEmail =
+    recipient === 'myself'
+      ? (userEmail ?? null)
+      : recipient === 'other' && addRecipients === 'one' && typedEmail !== '' && !typedEmailError
+        ? typedEmail
+        : null
+
+  // The upload is read and checked in full, then cut down to the recipients a test send may
+  // reach - which is what the tip above the upload control promises.
+  const parsed = useMemo(
+    () =>
+      csv.parsed ? { ...csv.parsed, rows: csv.parsed.rows.slice(0, MAX_TEST_RECIPIENTS) } : null,
+    [csv.parsed],
+  )
+
+  // Problems on the rows that were cut cannot be acted on, and would otherwise block a send that
+  // never reaches them. Row numbers count the header as row 1, so the last one kept is the cap + 1.
+  const rowIssues = csv.rowIssues.filter((issue) => issue.row <= MAX_TEST_RECIPIENTS + 1)
+
+  const isCsvReady =
+    isManyRecipients && parsed !== null && csv.fileIssue === null && rowIssues.length === 0
+  const csvRowCount = parsed?.rows.length ?? 0
+
+  // Nothing checked against the previous choice still applies once the choice changes.
+  const clearUpload = useCallback(() => {
+    resetCsv()
+    setPreviewRow(0)
+    setRowRendered(null)
+  }, [resetCsv])
+
+  // Render the row the review is showing. The subject line is where a missing value hides, so
+  // each row is rendered by the API rather than shown as the raw template.
+  useEffect(() => {
+    if (!isCsvReady || !parsed || !templateId) return
+
+    let active = true
+    setRowLoading(true)
+
+    previewTemplate(templateId, rowParams(parsed, previewRow, 'email'))
+      .then((response) => {
+        if (!active) return
+        setRowRendered({
+          subject: response.subject ?? '',
+          bodyHtml: response.html,
+          bodyText: response.body,
+        })
+      })
+      .catch(() => {
+        if (active) setRowRendered(null)
+      })
+      .finally(() => {
+        if (active) setRowLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [isCsvReady, parsed, previewRow, templateId])
+
+  const handleDownloadSample = () => {
+    if (!template) return
+    downloadCsv(csvFilenameFor(template.name), buildSampleCsv(placeholders, 'email'))
+    showSuccessToast(
+      'Sample CSV downloaded.',
+      'Complete the file and upload it to continue with the test send.',
+    )
+  }
+
+  const handleFileChange = async (nextFile: File | null) => {
+    setPreviewRow(0)
+    setRowRendered(null)
+    await csv.handleFileChange(nextFile)
+  }
+
+  /**
+   * A spreadsheet send has its own values per row, so editing them is not the single-value modal
+   * the other paths open. Until that modal exists the button is inert on this path.
+   */
+  const handleEditValues = () => {
+    if (!isManyRecipients) setEditValuesOpen(true)
+  }
+
+  const isReviewable = Boolean(template) && (Boolean(recipientEmail) || isCsvReady)
+  const recipientCount = isManyRecipients ? csvRowCount : 1
+
   const handleSend = async () => {
     setSending(true)
     try {
       // The values the preview was rendered from, so what arrives is what was reviewed. Sending
       // none is allowed: the API answers with the placeholders the template still needs.
-      await sendEventTestEmail(eventId, applied?.values ?? {})
+      // Recipients are only sent when they were chosen; the API defaults to the signed-in user.
+      await sendEventTestEmail(
+        eventId,
+        applied?.values ?? {},
+        isCsvReady && parsed
+          ? { mergeArray: toMergeArray(parsed, 'email') }
+          : recipient === 'other' && recipientEmail
+            ? { to: [recipientEmail] }
+            : undefined,
+      )
       showSuccessToast('Test notification queued.')
     } catch (error) {
       showErrorToast(
@@ -136,16 +289,85 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
               isRequired
               description="Choose who will receive the test notification"
               value={recipient ?? ''}
-              onChange={(value) => setRecipient(value as Recipient)}
+              onChange={(value) => {
+                setRecipient(value as Recipient)
+                clearUpload()
+              }}
             >
               <Radio value="myself">Myself</Radio>
-              {/* Shown even though it cannot be picked, so it is clear the option is coming. */}
-              <Radio value="other" isDisabled>
-                Another recipient
-              </Radio>
+              <Radio value="other">Another recipient</Radio>
             </RadioGroup>
 
-            {recipient === 'myself' && template && (
+            {recipient === 'other' && (
+              <>
+                <RadioGroup
+                  label="Add recipient(s)"
+                  isRequired
+                  value={addRecipients ?? ''}
+                  onChange={(value) => {
+                    setAddRecipients(value as AddRecipients)
+                    clearUpload()
+                  }}
+                >
+                  <Radio value="one">One recipient</Radio>
+                  <Radio value="many">Many recipients (upload a spreadsheet/CSV)</Radio>
+                </RadioGroup>
+
+                {addRecipients === 'one' && (
+                  <TextField
+                    label="Recipient email address"
+                    isRequired
+                    value={otherEmail}
+                    onChange={setOtherEmail}
+                    isInvalid={Boolean(typedEmailError)}
+                    errorMessage={typedEmailError}
+                    size="small"
+                  />
+                )}
+              </>
+            )}
+
+            {isManyRecipients && template && (
+              <>
+                <Callout
+                  variant="lightGrey"
+                  title="Tip"
+                  description={`Download the sample CSV to see the expected columns and format. Add the information needed for your template and upload the completed CSV below. Only the first ${MAX_TEST_RECIPIENTS} recipients in the CSV will be processed.`}
+                />
+
+                <div>
+                  <Button variant="secondary" onPress={handleDownloadSample}>
+                    Download sample CSV
+                  </Button>
+                </div>
+
+                <FileUpload
+                  label="Upload CSV file"
+                  isRequired
+                  accept=".csv,text/csv"
+                  allowedExtensions={['.csv']}
+                  file={csv.file}
+                  onFileChange={(nextFile) => void handleFileChange(nextFile)}
+                  maxSizeBytes={MAX_FILE_BYTES}
+                  progress={csv.readProgress}
+                  successMessage={csv.file && parsed ? 'File uploaded successfully' : undefined}
+                  errorMessage={csv.fileIssue ?? undefined}
+                  hint="Max file size: 5 MB"
+                />
+
+                <CsvIssuesTable issues={rowIssues} />
+
+                {isCsvReady && (
+                  <InlineAlert
+                    variant="success"
+                    title="All required data passed validation."
+                    description="You can continue to the next step."
+                  />
+                )}
+              </>
+            )}
+
+            {isReviewable && template && (
               <>
                 <div className="events__subsection">
                   <h2 className="events__subheading">Review Notification</h2>
@@ -155,14 +377,37 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   </p>
                 </div>
 
-                <Button
-                  size="medium"
-                  variant="secondary"
-                  onPress={() => setEditValuesOpen(true)}
-                  style={{ width: '120px' }}
-                >
-                  Edit values
-                </Button>
+                <div className="events__test-send-review-bar">
+                  {isCsvReady && (
+                    <>
+                      <span className="events__test-send-position" aria-live="polite">
+                        Email notification {previewRow + 1} of {csvRowCount}
+                      </span>
+                      <button
+                        type="button"
+                        className="events__test-send-nav"
+                        onClick={() => setPreviewRow((row) => Math.max(0, row - 1))}
+                        disabled={previewRow === 0 || isRowLoading}
+                        aria-label="Previous"
+                      >
+                        <SvgChevronLeftIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className="events__test-send-nav"
+                        onClick={() => setPreviewRow((row) => Math.min(csvRowCount - 1, row + 1))}
+                        disabled={previewRow >= csvRowCount - 1 || isRowLoading}
+                        aria-label="Next"
+                      >
+                        <SvgChevronRightIcon />
+                      </button>
+                    </>
+                  )}
+
+                  <Button size="medium" variant="secondary" onPress={handleEditValues}>
+                    Edit values
+                  </Button>
+                </div>
 
                 <div className="events__preview-card">
                   <EventEmailPreview
@@ -170,31 +415,36 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                     template={template}
                     envelope={{
                       from: emailSettings.senderEmail ?? '',
-                      to: userEmail ?? '',
+                      to:
+                        isCsvReady && parsed
+                          ? rowRecipient(parsed, previewRow, 'email')
+                          : (recipientEmail ?? ''),
                     }}
-                    rendered={applied?.rendered}
+                    rendered={isCsvReady ? (rowRendered ?? undefined) : applied?.rendered}
                   />
                 </div>
 
-                <EventEmailPreviewModal
-                  isOpen={isEditValuesOpen}
-                  onClose={() => setEditValuesOpen(false)}
-                  template={template}
-                  from={emailSettings.senderEmail ?? ''}
-                  to={userEmail ?? ''}
-                  values={applied?.values ?? {}}
-                  onApply={(next) => {
-                    setApplied(next)
-                    setEditValuesOpen(false)
-                  }}
-                />
+                {recipientEmail && (
+                  <EventEmailPreviewModal
+                    isOpen={isEditValuesOpen}
+                    onClose={() => setEditValuesOpen(false)}
+                    template={template}
+                    from={emailSettings.senderEmail ?? ''}
+                    to={recipientEmail}
+                    values={applied?.values ?? {}}
+                    onApply={(next) => {
+                      setApplied(next)
+                      setEditValuesOpen(false)
+                    }}
+                  />
+                )}
               </>
             )}
 
             {/* Before a recipient is picked the page is short enough that the action bar sits
                 just under the radio group; this holds it down where it sits once the review
                 below appears. */}
-            {recipient !== 'myself' && <div className="events__test-send-spacer" aria-hidden />}
+            {!isReviewable && <div className="events__test-send-spacer" aria-hidden />}
 
             <StickyBar>
               <Button
@@ -214,9 +464,9 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                 variant="primary"
                 type="button"
                 onPress={() => void handleSend()}
-                isDisabled={recipient !== 'myself' || !template || isSending}
+                isDisabled={!isReviewable || isSending}
               >
-                {isSending ? 'Sending...' : 'Send test email (1)'}
+                {isSending ? 'Sending...' : `Send test email (${recipientCount})`}
               </Button>
             </StickyBar>
           </>

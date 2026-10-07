@@ -319,6 +319,52 @@
   min-height: 320px;
 }
 
+// Which uploaded row is on show, and the controls for the review below it. Without an upload
+// only the Edit values button is here, which is why it sits at the end rather than the start.
+.events__test-send-review-bar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.events__test-send-position {
+  font-weight: 700;
+  margin-right: auto;
+}
+
+// Icon buttons, not links: these step between messages rather than navigating away.
+.events__test-send-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xs;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: $dark-text;
+  cursor: pointer;
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  &:hover:not(:disabled) {
+    background: $light-bg;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $border-active;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
 // DS default is a white square, override this to give the rounded blue tags from the design
 .events__cstar-groups {
   .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag {
