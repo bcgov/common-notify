@@ -1,4 +1,5 @@
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import type { MockInstance } from 'vitest'
 import { Repository } from 'typeorm'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
@@ -283,6 +284,58 @@ describe('EventNotificationResolver', () => {
         ['name', 'to'],
         ['Ada', 'one@gov.bc.ca'],
       ])
+    })
+
+    // Nothing is rejected yet, so these stub the rule to prove the request fails rather than
+    // sending to whoever is left.
+    describe('when an address is not permitted', () => {
+      let rule: MockInstance | undefined
+
+      const reject = (address: string) => {
+        rule = vi
+          .spyOn(resolver as any, 'verifyTestRecipients')
+          .mockImplementation((addresses: any) =>
+            (addresses as string[]).filter((candidate) => candidate === address),
+          )
+      }
+
+      // clearAllMocks leaves a spy's implementation in place, and every other test here expects
+      // the real rule.
+      afterEach(() => rule?.mockRestore())
+
+      it('fails the send rather than sending to the addresses that are permitted', async () => {
+        reject('blocked@gov.bc.ca')
+
+        await expect(
+          resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+            to: ['ok@gov.bc.ca', 'blocked@gov.bc.ca'],
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException)
+      })
+
+      it('names the addresses that were rejected, so they can be removed', async () => {
+        reject('blocked@gov.bc.ca')
+
+        await expect(
+          resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+            to: ['blocked@gov.bc.ca'],
+          }),
+        ).rejects.toThrow(/blocked@gov\.bc\.ca/)
+      })
+
+      it('fails a merge rather than dropping the row it sits on', async () => {
+        reject('blocked@gov.bc.ca')
+
+        await expect(
+          resolver.resolveTestSend('tenant-id', 'event-id', undefined, {
+            mergeArray: [
+              ['name', 'to'],
+              ['Ada', 'ok@gov.bc.ca'],
+              ['Grace', 'blocked@gov.bc.ca'],
+            ],
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException)
+      })
     })
   })
 
