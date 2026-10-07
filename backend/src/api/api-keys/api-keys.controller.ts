@@ -3,16 +3,15 @@ import {
   Post,
   Req,
   Version,
-  UnauthorizedException,
-  NotFoundException,
   HttpCode,
   HttpStatus,
   Logger,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiExcludeController } from '@nestjs/swagger'
-import { ConfigService } from '@nestjs/config'
 import { Request } from 'express'
 import { ApiKeysService } from './api-keys.service'
+import { LoadtestAutobindGuard } from '../../common/guards/loadtest-autobind.guard'
 
 /**
  * Load-test-only API key binding.
@@ -28,7 +27,7 @@ import { ApiKeysService } from './api-keys.service'
  * user to authenticate as. It self-binds a pre-provisioned key to a throwaway tenant.
  *
  * Three things keep this from becoming a back door into tenant onboarding:
- *   - it only responds when `LOADTEST_AUTOBIND_ENABLED` is set,
+ *   - it only responds when `LOADTEST_AUTOBIND_ENABLED` is set (LoadtestAutobindGuard),
  *   - that flag is forced off in any `-test` or `-prod` namespace (see configuration.ts),
  *   - and the service refuses to run there regardless, as defence in depth.
  *
@@ -44,29 +43,16 @@ import { ApiKeysService } from './api-keys.service'
 export class ApiKeysController {
   private readonly logger = new Logger(ApiKeysController.name)
 
-  constructor(
-    private readonly apiKeysService: ApiKeysService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Version('1')
   @Post('bind')
   @HttpCode(HttpStatus.OK)
+  // Without a guard the global JwtGuard rejects the route outright; this one also carries the
+  // enabled-flag and came-through-the-gateway checks.
+  @UseGuards(LoadtestAutobindGuard)
   async autoBindForLoadTest(@Req() request: Request): Promise<{ message: string }> {
-    // Behave as though the route does not exist anywhere it is not enabled, rather than
-    // advertising a disabled endpoint to anyone probing for it.
-    if (!this.configService.get<boolean>('loadtest.autobindEnabled')) {
-      throw new NotFoundException('Cannot POST /api/v1/service/api-key/bind')
-    }
-
-    // Set by Kong's key-auth plugin. Absent means the request did not come through the
-    // gateway with a valid key.
     const credentialIdentifier = request.headers['x-credential-identifier'] as string
-    if (!credentialIdentifier) {
-      throw new UnauthorizedException(
-        'Request must be made through the API gateway with a valid API key in the X-API-KEY header',
-      )
-    }
 
     const consumerId = (request.headers['x-consumer-id'] as string) || ''
 

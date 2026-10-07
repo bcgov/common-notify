@@ -60,6 +60,8 @@ interface NotificationPreviewModalProps {
   bodyOverride?: ReactNode
   /** Control above the output, such as a Rendered/Raw toggle. */
   outputHeader?: ReactNode
+  /** Rendered SMS body with counts, shown only after a successful preview. */
+  smsPreview?: ReactNode
   isLoading?: boolean
   error?: string | null
 
@@ -92,6 +94,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   bodyText,
   bodyOverride,
   outputHeader,
+  smsPreview,
   isLoading = false,
   error = null,
   footer,
@@ -248,6 +251,8 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                   <ProgressCircle isIndeterminate aria-label="Rendering preview" size="medium" />
                   <p className="notification-preview__placeholder">Rendering preview...</p>
                 </div>
+              ) : smsPreview ? (
+                smsPreview
               ) : bodyHtml !== undefined ? (
                 // A sandboxed iframe with no allow-* tokens: the template is tenant-authored, so
                 // its markup runs with no script, no forms and no access to this document, and its

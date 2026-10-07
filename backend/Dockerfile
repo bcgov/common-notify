@@ -27,6 +27,7 @@ COPY --from=build /app/dist ./dist
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
 
-# Nonroot user, limit heap size to 150 MB
+# Nonroot user. The heap limit is set per environment by the Helm chart (NODE_OPTIONS from
+# backend.heapMb), not baked in here, so it can be raised without rebuilding the image.
 USER nonroot
-CMD ["--max-old-space-size=150", "/app/dist/main"]
+CMD ["/app/dist/main"]

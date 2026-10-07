@@ -7,6 +7,11 @@ import {
   SendSmsResult,
   SmsRecipientResult,
 } from '../../../../interfaces'
+import {
+  TransientDeliveryError,
+  isTransientHttpStatus,
+  transientFromProviderError,
+} from '../../../../delivery-errors'
 
 @Injectable()
 export class AcsSmsTransport implements ISmsTransport {
@@ -63,22 +68,28 @@ export class AcsSmsTransport implements ISmsTransport {
       }
     }
 
-    const results = await this.client.send(
-      {
-        from: resolvedFrom,
-        to: toNumbers,
-        message: body,
-      },
-      {
-        // ACS only emits SMSDeliveryReportReceived events when this is set at send time, so it has
-        // to be on now for those reports to exist later. Nothing consumes them yet: acceptance by
-        // ACS is not delivery, and a number pending regulatory approval is accepted and then
-        // dropped by the carrier with no signal back to us.
-        enableDeliveryReport: true,
-        // Comes back on the delivery report, so it can be matched to our notification.
-        tag: opts.tag,
-      },
-    )
+    // The SDK has already retried 429, 5xx and network errors by the time this throws. One that
+    // means ACS took nothing is transient, so the worker leaves the recipients owed.
+    const results = await this.client
+      .send(
+        {
+          from: resolvedFrom,
+          to: toNumbers,
+          message: body,
+        },
+        {
+          // ACS only emits SMSDeliveryReportReceived events when this is set at send time, so it has
+          // to be on now for those reports to exist later. Nothing consumes them yet: acceptance by
+          // ACS is not delivery, and a number pending regulatory approval is accepted and then
+          // dropped by the carrier with no signal back to us.
+          enableDeliveryReport: true,
+          // Comes back on the delivery report, so it can be matched to our notification.
+          tag: opts.tag,
+        },
+      )
+      .catch((error: unknown) => {
+        throw transientFromProviderError(error, 'ACS SMS') ?? error
+      })
 
     // ACS reports each recipient separately, so report them onward rather than collapsing the
     // send into one success or failure. Throwing on a partial failure used to fail the whole job,
@@ -90,6 +101,9 @@ export class AcsSmsTransport implements ISmsTransport {
       error: result.successful
         ? undefined
         : (result.errorMessage ?? `ACS returned HTTP ${result.httpStatusCode}`),
+      // ACS throttling or failing for this recipient: not the number's fault.
+      ...(!result.successful &&
+        isTransientHttpStatus(result.httpStatusCode) && { transient: true }),
     }))
 
     const failed = recipientResults.filter((result) => !result.success)
@@ -102,7 +116,9 @@ export class AcsSmsTransport implements ISmsTransport {
     // Every recipient failing is systemic - a bad credential, a disabled number - and worth a
     // retry of the whole job. A partial failure is not: the successes must not be repeated.
     if (failed.length === recipientResults.length && recipientResults.length > 0) {
-      throw new Error(`ACS send failed for all ${recipientResults.length} recipient(s)`)
+      const message = `ACS send failed for all ${recipientResults.length} recipient(s)`
+      if (failed.every((result) => result.transient)) throw new TransientDeliveryError(message, 502)
+      throw new Error(message)
     }
 
     const succeeded = recipientResults.filter((result) => result.success)

@@ -44,14 +44,14 @@ const navItems = [
     icon: <WorkspacesOutlinedIcon />,
   },
   {
-    label: 'Templates',
-    to: '/templates',
-    icon: <FolderOutlinedIcon />,
-  },
-  {
     label: 'Send Batch Notification',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
+  },
+  {
+    label: 'Templates',
+    to: '/templates',
+    icon: <FolderOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
@@ -76,6 +76,10 @@ const adminItems = {
     {
       label: 'Usage & Limits',
       to: '/admin/usage',
+    },
+    {
+      label: 'Monitoring',
+      to: '/admin/monitoring',
     },
   ],
 } as const
@@ -208,6 +212,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Usage &amp; Limits</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/monitoring"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">Monitoring</span>
                   </Link>
                 )}
               </div>

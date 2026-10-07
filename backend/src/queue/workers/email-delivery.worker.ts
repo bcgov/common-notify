@@ -2,6 +2,9 @@ import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
 import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
+import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
+import { loadBatchRecipients } from './merge-batch-recipients'
+import { isTransientDeliveryError } from '../../adapters/delivery-errors'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -134,6 +137,7 @@ export class EmailDeliveryWorker {
             requestDetailService,
             notificationService,
             fromAddress,
+            batchProgressReporter(job),
           )
         }
 
@@ -178,6 +182,23 @@ export class EmailDeliveryWorker {
 
         if ((job.attemptsMade ?? 0) > 0) {
           await requestDetailService.resetForRetry(notifyId)
+        }
+
+        // Checked on every run, not only on a counted retry: Bull re-runs a job whose pod stopped
+        // mid-send (a rolling deploy, an HPA scale-down) without incrementing attemptsMade. A
+        // single email is one message to all of its recipients, so it was delivered in full or
+        // not at all.
+        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
+        if (
+          alreadySent.size > 0 &&
+          emailPayload.recipients.to.every((address) => alreadySent.has(address))
+        ) {
+          logger.log(`[${notifyId}] Delivered on an earlier attempt; nothing to re-send`)
+          await notificationService.update(notifyId, tenantId, {
+            status: NotificationStatus.COMPLETED,
+            updatedBy: 'system',
+          })
+          return { success: true, notifyId }
         }
 
         if (emailTemplateId) {
@@ -313,7 +334,9 @@ export class EmailDeliveryWorker {
           status: NotificationStatus.SENDING,
           updatedBy: 'system',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
+          preserveCompleted: true,
+        })
         logger.debug(`[${notifyId}] Updated notification status to SENDING`)
 
         // Send email using the injected adapter
@@ -349,10 +372,35 @@ export class EmailDeliveryWorker {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         const attempt = (job.attemptsMade || 0) + 1
+        const finalAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1
         logger.error(
           `[${notifyId}] Failed to send email delivery job (attempt ${attempt}/3): ${errorMessage}`,
           error instanceof Error ? error.stack : '',
         )
+
+        // CHES could not take it right now. Nothing is marked failed, even on the last attempt:
+        // the recipients stay owed, and the delivery reconciler re-queues the job once Bull's
+        // retries are spent, until its own attempts run out.
+        if (isTransientDeliveryError(error)) throw error
+
+        // A merge batch settles only itself: its sent rows, and every other batch, are not its
+        // to fail.
+        const batchId = job.data.mailMerge ? job.data.batchId : undefined
+        if (batchId) {
+          if (finalAttempt || EmailDeliveryWorker.isPermanentValidationError(error)) {
+            await requestDetailService.markBatchUnsentFailed(notifyId, batchId, errorMessage)
+            await EmailDeliveryWorker.settleMergeRequest(
+              notifyId,
+              tenantId,
+              requestDetailService,
+              notificationService,
+              logger,
+            )
+            job.discard()
+            logger.error(`[${notifyId}] Batch ${batchId} failed; its unsent recipients are FAILED`)
+          }
+          throw error
+        }
 
         if (EmailDeliveryWorker.isPermanentValidationError(error)) {
           await notificationService.update(notifyId, tenantId, {
@@ -369,7 +417,7 @@ export class EmailDeliveryWorker {
         }
 
         // Update status to FAILED only on final attempt (when no retries left)
-        if ((job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1) {
+        if (finalAttempt) {
           await notificationService.update(notifyId, tenantId, {
             status: NotificationStatus.FAILED,
             updatedBy: 'system',
@@ -428,6 +476,9 @@ export class EmailDeliveryWorker {
       // send error always reaches a terminal status — even if the in-processor final-attempt
       // handler didn't run (e.g. a job enqueued without a retry count, or a different worker
       // processed the last attempt).
+      // Not for a transient error - the recipients stay owed for the reconciler - nor for a merge
+      // batch, which the processor settled itself, scoped to that batch.
+      if (isTransientDeliveryError(err) || (job.data.mailMerge && job.data.batchId)) return
       const attemptsMade = job.attemptsMade ?? 0
       const maxAttempts = job.opts.attempts ?? 1
       if (attemptsMade >= maxAttempts) {
@@ -477,8 +528,15 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
     fromAddress: string | null,
+    reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { content, params, recipients } = mailMergeData
+    const { content, params } = mailMergeData
+    const { recipients, alreadySent } = await loadBatchRecipients(
+      requestDetailService,
+      notifyId,
+      batchId,
+      mailMergeData.recipients,
+    )
     const templateId = content?.templateId
     const hasInlineContent = !!(content && (content.subject || content.body))
 
@@ -510,10 +568,25 @@ export class EmailDeliveryWorker {
       `[${notifyId}] Processing mail merge batch ${batchId}: ${recipients.length} recipient(s)`,
     )
 
+    // A retried batch (a pod replaced mid-send, a crash, a provider error) starts again from
+    // the top. Addresses an earlier attempt delivered keep their rows and are skipped, or they
+    // would get the email twice. Mirrors SmsDeliveryWorker.processMergeBatch.
+    const pending = alreadySent.size
+      ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
+      : recipients
+
+    if (alreadySent.size > 0) {
+      logger.log(
+        `[${notifyId}] Batch ${batchId}: skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+      )
+    }
+
     let sent = 0
     let failed = 0
+    const progress = () => ({ sent: alreadySent.size + sent, failed, total: recipients.length })
+    reportProgress?.(progress())
 
-    for (const recipient of recipients) {
+    for (const recipient of pending) {
       try {
         // Merge global params with per-recipient params; per-recipient takes precedence
         const mergedParams = { ...(params || {}), ...recipient.params }
@@ -562,6 +635,14 @@ export class EmailDeliveryWorker {
         )
         sent++
       } catch (recipientError) {
+        // CHES, not this recipient: stop the batch and leave the rest owed. The job is retried,
+        // skipping whoever was sent, and the circuit breaker holds the retry until CHES is back.
+        if (isTransientDeliveryError(recipientError)) {
+          logger.warn(
+            `[${notifyId}] Batch ${batchId} paused after ${sent} sent: ${recipientError.message}`,
+          )
+          throw recipientError
+        }
         const errorMessage =
           recipientError instanceof Error ? recipientError.message : String(recipientError)
         logger.error(
@@ -575,12 +656,32 @@ export class EmailDeliveryWorker {
         )
         failed++
       }
+      reportProgress?.(progress())
     }
 
     logger.log(`[${notifyId}] Mail merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
+    await EmailDeliveryWorker.settleMergeRequest(
+      notifyId,
+      tenantId,
+      requestDetailService,
+      notificationService,
+      logger,
+    )
 
-    // Reconcile the parent request once no recipients remain pending across all batches.
-    // all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+    return { success: true, batchId, sent, failed }
+  }
+
+  /**
+   * Settle the parent request once no recipients remain pending across all batches.
+   * all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+   */
+  private static async settleMergeRequest(
+    notifyId: string,
+    tenantId: string,
+    requestDetailService: NotificationRequestDetailService,
+    notificationService: NotificationService,
+    logger: Logger,
+  ): Promise<void> {
     const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
     if (pendingRemaining === 0) {
       const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
@@ -601,8 +702,6 @@ export class EmailDeliveryWorker {
         `[${notifyId}] All mail merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
       )
     }
-
-    return { success: true, batchId, sent, failed }
   }
 
   /**

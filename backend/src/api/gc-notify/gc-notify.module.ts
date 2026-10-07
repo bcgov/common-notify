@@ -1,4 +1,4 @@
-import { DynamicModule, Module, forwardRef } from '@nestjs/common'
+import { DynamicModule, Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { GcNotifyController } from './gc-notify.controller'
 import { TenantsModule } from '../admin/tenants/tenants.module'
@@ -43,8 +43,8 @@ export class GcNotifyModule {
         TypeOrmModule.forFeature([NotifyConfiguration, MimeTypeCode]),
         SafelistModule,
         TenantSettingsModule,
-        forwardRef(() => NotifyModule),
-        forwardRef(() => QueueModule),
+        NotifyModule,
+        QueueModule,
       ],
       controllers: [GcNotifyController],
       providers: [

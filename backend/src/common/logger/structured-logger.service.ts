@@ -1,6 +1,7 @@
 import { Injectable, LoggerService } from '@nestjs/common'
 import * as winston from 'winston'
 import { LokiTransport } from './loki-transport'
+import { recordError } from '../shutdown-diagnostics'
 
 export interface LogContext {
   notificationId?: string
@@ -210,10 +211,13 @@ export class StructuredLoggerService implements LoggerService {
    */
   error(message: string, context?: LogContext | string, nestContext?: string) {
     if (typeof context === 'string') {
+      recordError({ message, context: nestContext, stack: context })
       this.writeLog('error', message, { context: nestContext, stack: context })
       return
     }
-    this.writeLog('error', message, this.toContext(context))
+    const logContext = this.toContext(context)
+    recordError({ message, context: logContext?.context as string | undefined })
+    this.writeLog('error', message, logContext)
   }
 
   /**

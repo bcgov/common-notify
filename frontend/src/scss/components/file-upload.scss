@@ -58,24 +58,61 @@
 }
 
 // Selected state: the chip replaces the drop prompt, so the control always shows where it is.
+.file-upload__zone:has(.file-upload__selected) {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 20px;
+}
+
 .file-upload__selected {
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
   width: 100%;
+  max-width: 359px;
 }
 
 .file-upload__chip {
   display: flex;
-  align-items: center;
+  padding: 4px 0;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex: 1 0 0;
+  align-self: stretch;
   gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
   border-radius: 4px;
   background: $light-bg;
+
+  > button {
+    display: flex;
+    box-sizing: border-box;
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    padding: 0;
+    flex: 0 0 48px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
 }
 
 .file-upload__file-icon {
   flex-shrink: 0;
+  align-self: center;
+  margin-left: 12px;
+  color: $dark-text;
+}
+
+.file-upload__delete-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
   color: $dark-text;
 }
 
@@ -85,6 +122,16 @@
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
+  align-self: center;
+}
+
+.file-upload__file-name {
+  overflow-wrap: anywhere;
+}
+
+.file-upload__file-size {
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .file-upload__progress {
@@ -173,7 +220,7 @@
 }
 
 .file-upload__file-name {
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .file-upload__file-size {
