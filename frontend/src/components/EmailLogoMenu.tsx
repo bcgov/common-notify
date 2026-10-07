@@ -262,14 +262,10 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
             )}
           </div>
           {filteredOptions.length === 0 && (
-            <p className="email-logo-menu__empty" role="status">
-              No logos match your search.
-            </p>
+            <output className="email-logo-menu__empty">No logos match your search.</output>
           )}
           {logos.length === 0 && !normalizedQuery && (
-            <p className="email-logo-menu__empty" role="status">
-              No approved logos available.
-            </p>
+            <output className="email-logo-menu__empty">No approved logos available.</output>
           )}
         </div>
       )}

@@ -9,9 +9,10 @@ export const DEFAULT_EMAIL_HEADER_TITLE = 'Government of British Columbia'
  */
 export function resolveEmailHeaderTitle(options: {
   useCustomTitle: boolean
-  customTitle?: string
+  /** Null as well as undefined: settings rows carry an unset title as null. */
+  customTitle?: string | null
   tenantShowsHeaderTitle: boolean
-  logoDisplayTitle?: string
+  logoDisplayTitle?: string | null
 }): string {
   if (options.useCustomTitle) return options.customTitle ?? ''
   if (options.tenantShowsHeaderTitle) {
