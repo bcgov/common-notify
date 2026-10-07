@@ -110,7 +110,7 @@ describe('QueueModule', () => {
     })
 
     afterEach(() => {
-      delete process.env.QUEUE_SHUTDOWN_TIMEOUT_MS
+      delete process.env.QUEUE_SHUTDOWN_DRAIN_MS
       vi.restoreAllMocks()
     })
 
@@ -133,7 +133,7 @@ describe('QueueModule', () => {
     })
 
     it('gives up at the deadline rather than holding the pod past its grace period', async () => {
-      process.env.QUEUE_SHUTDOWN_TIMEOUT_MS = '20'
+      process.env.QUEUE_SHUTDOWN_DRAIN_MS = '20'
       const stuck = mockQueue('ingestion', () => new Promise<void>(() => {}))
       const module = new QueueModule(stuck, mockQueue('email'), mockQueue('sms'), undefined)
 

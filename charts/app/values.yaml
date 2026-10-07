@@ -41,9 +41,16 @@ backend:
   #-- shared namespace, where RollingUpdate's surge pod is more expensive than the
   #-- brief restart is painful. TEST and PROD use RollingUpdate (see values-*.yaml).
   deploymentStrategy: Recreate
-  #-- the number of replicas. Only applied when autoscaling is off for this
-  #-- component (global.autoscaling AND backend.autoscaling.enabled); when
-  #-- autoscaling is on, the HPA owns the replica count instead.
+  #-- V8 heap limit in MB, passed as NODE_OPTIONS. Only used memory counts against the pod, so
+  #-- raising it costs no quota; it must stay well under the container's memory limit.
+  heapMb: 512
+  #-- memory the scheduler reserves for each backend pod. Kept low by default because DEV
+  #-- hosts every PR environment under one quota; TEST and PROD raise it in merge.yml.
+  memoryRequest: 200Mi
+  #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
+  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
+  terminationGracePeriodSeconds: 120
+  #-- the number of replicas when autoscaling is disabled
   replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.
   #-- NOTE: enabled:true alone does nothing — global.autoscaling gates it too.
