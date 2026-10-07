@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
@@ -106,7 +112,8 @@ export class EventNotificationResolver {
   }
 
   /**
-   * Test send: sent to specific recipients that have been verified.
+   * Test send: sent to the recipients given rather than the event's own, and only if every one of
+   * them is permitted. One address that is not fails the request.
    */
   async resolveTestSend(
     tenantId: string,
@@ -116,18 +123,28 @@ export class EventNotificationResolver {
   ): Promise<NotifySimpleRequest> {
     const setting = await this.findSendableEmailSetting(tenantId, eventId)
 
+    // A merge addresses its own rows, so the addresses sit in each row's "to" column rather than
+    // in a list of their own.
+    let addresses: string[]
     if ('mergeArray' in recipients) {
       const [header, ...rows] = recipients.mergeArray
       // Guaranteed present by the mergeArray validator on the request.
       const toColumn = header.findIndex((column) => column.trim().toLowerCase() === 'to')
-      const permitted = new Set(this.verifyTestRecipients(rows.map((row) => row[toColumn])))
-
-      return this.toRequest(setting, params, {
-        mergeArray: [header, ...rows.filter((row) => permitted.has(row[toColumn]))],
-      })
+      addresses = rows.map((row) => row[toColumn])
+    } else {
+      addresses = recipients.to
     }
 
-    return this.toRequest(setting, params, { to: this.verifyTestRecipients(recipients.to) })
+    // Fail fast if any addresses included are not allowed
+    const rejected = this.verifyTestRecipients(addresses)
+    if (rejected.length > 0) {
+      throw new ForbiddenException(
+        `A test notification cannot be sent to ${rejected.join(', ')}. ` +
+          'Remove them and send the test again.',
+      )
+    }
+
+    return this.toRequest(setting, params, recipients)
   }
 
   /**
@@ -155,11 +172,11 @@ export class EventNotificationResolver {
   }
 
   /**
-   * The addresses a test notification may be sent to, design around
-   * is TBD so this is just a passthrough right now.
+   * The addresses out of those given that a test may not be sent to. What makes an address
+   * permitted is TBD, so nothing is rejected yet.
    */
-  private verifyTestRecipients(addresses: string[]): string[] {
-    return addresses
+  private verifyTestRecipients(_addresses: string[]): string[] {
+    return []
   }
 
   /** The event's live EMAIL channel setting, or the reason it cannot be sent. */
