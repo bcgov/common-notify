@@ -178,7 +178,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   }
 
   return (
-    <div className="page events">
+    <div className={`page events${selectedTab === 'sms' ? ' events--sms' : ''}`}>
       <PageHeading
         title={event?.name ?? 'Event'}
         breadcrumbs={[

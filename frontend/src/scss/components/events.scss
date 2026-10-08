@@ -62,6 +62,38 @@
   }
 }
 
+// Fill short SMS pages so the actions sit at the bottom; longer forms still scroll
+// within the shared layout and retain the existing sticky action bar.
+.events--sms {
+  min-height: 100%;
+
+  > .events__section,
+  .events__form {
+    flex: 1 0 auto;
+  }
+
+  .events__section > .sticky-bar,
+  .events__form > .sticky-bar {
+    margin-top: auto;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .events__form > *:not(.sticky-bar) {
+    width: 100%;
+    max-width: 500px;
+    min-width: 0;
+  }
+
+  .events__form > .bcds-react-aria-TextField {
+    max-width: 418px;
+  }
+
+  .events__additional-recipients {
+    gap: 2px;
+  }
+}
+
 // Borrowed from templates info icon scss
 .events__tooltip-trigger {
   display: inline-flex;
