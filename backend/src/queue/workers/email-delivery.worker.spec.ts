@@ -1474,6 +1474,52 @@ describe('EmailDeliveryWorker', () => {
         )
       })
 
+      it("applies the event's header and sender to every recipient of a merge batch", async () => {
+        mockNotificationService.findOne = vi
+          .fn()
+          .mockResolvedValue({ id: 'notify-bulk', eventId: 'event-uuid' })
+        const mockEventNotificationResolver = {
+          findEmailSendSettings: vi.fn().mockResolvedValue({
+            senderEmail: 'events@gov.bc.ca',
+            useCustomHeader: true,
+            headerLogoId: 'event-logo-id',
+            headerTitle: 'Permits',
+          }),
+        }
+
+        await EmailDeliveryWorker.initialize(
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockConfigService,
+          mockTemplatesRepository,
+          mockTemplatesService,
+          mockInlineRenderingService,
+          mockAttachmentResolverService as AttachmentResolverService,
+          mockEmailAdapter,
+          mockRequestDetailService,
+          2,
+          undefined,
+          undefined,
+          mockEventNotificationResolver as any,
+        )
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toMatchObject({ success: true, sent: 2, failed: 0 })
+        // An event test send is addressed by merge rows, so the event's own logo and title have
+        // to reach this path as well as the single-send one.
+        expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledTimes(2)
+        for (const call of mockTemplatesService.applyEmailLayout.mock.calls) {
+          expect(call[2]).toEqual({ logoId: 'event-logo-id', title: 'Permits' })
+        }
+        // ...and the event's sender with them, rather than the tenant's.
+        expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+          expect.objectContaining({ from: 'events@gov.bc.ca' }),
+        )
+      })
+
       it('should render inline content per recipient when no templateId is given', async () => {
         mockInlineRenderingService.renderEmail.mockResolvedValue({
           subject: 'Hi',

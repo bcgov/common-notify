@@ -155,30 +155,14 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
-        // Mail merge batch: resolve the template once, then render + send per recipient
-        // individually. Taken before the event lookup below because a merge never comes from an
-        // event - there is no bulk upload on an event - so it would be a read per batch for a
-        // result that is always null.
-        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
-          return await EmailDeliveryWorker.processMailMergeBatch(
-            job.data.batchId,
-            job.data.mailMergeData,
-            notifyId,
-            tenantId,
-            logger,
-            templatesRepository,
-            templatesService,
-            inlineRenderingService,
-            emailAdapter,
-            requestDetailService,
-            notificationService,
-            (await tenantSettingsService?.getSenderAddress(tenantId)) ?? null,
-          )
-        }
-
         // An event-sourced send carries its own sender and header, which have no home on the
         // request payload - the request records which event it came from and they are read back
         // here. Null for every other send, which leaves the tenant's own settings in place.
+        //
+        // Resolved before the merge branch below because an event test send can be a merge: the
+        // test send screen takes merge rows, so a merge does come from an event and needs the
+        // event's header as much as a single send does. That costs one read per batch, which is
+        // a read per 100 recipients rather than per recipient.
         const eventSettings = await EmailDeliveryWorker.resolveEventSettings(
           notifyId,
           tenantId,
@@ -195,6 +179,26 @@ export class EmailDeliveryWorker {
           (await tenantSettingsService?.getSenderAddress(tenantId)) ??
           null
         const headerOverride = EmailDeliveryWorker.toHeaderOverride(eventSettings)
+
+        // Mail merge batch: resolve the template once, then render + send per recipient
+        // individually.
+        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
+          return await EmailDeliveryWorker.processMailMergeBatch(
+            job.data.batchId,
+            job.data.mailMergeData,
+            notifyId,
+            tenantId,
+            logger,
+            templatesRepository,
+            templatesService,
+            inlineRenderingService,
+            emailAdapter,
+            requestDetailService,
+            notificationService,
+            fromAddress,
+            headerOverride,
+          )
+        }
 
         // Single delivery path: emit a structured lifecycle "start" event.
         structuredLogger?.logNotificationStart(notifyId, tenantId, 'email', workerContext)
@@ -527,6 +531,7 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
     fromAddress: string | null,
+    headerOverride: EmailHeaderOverride | undefined,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params, recipients } = mailMergeData
     const templateId = content?.templateId
@@ -576,7 +581,11 @@ export class EmailDeliveryWorker {
             template,
             mergedParams,
           )
-          const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
+          const rendered = await templatesService.applyEmailLayout(
+            template,
+            renderedTemplate,
+            headerOverride,
+          )
           subject = rendered.subject
           body = rendered.body
           bodyType = rendered.bodyType

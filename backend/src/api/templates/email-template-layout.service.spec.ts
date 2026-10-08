@@ -99,8 +99,8 @@ describe('EmailTemplateLayoutService', () => {
       // Left unconstrained, a logo arrives at whatever size it was uploaded at. The preview caps
       // its height, so the email has to as well - as an attribute and a style, since mail
       // clients disagree about which they honour.
-      expect(result.body).toContain('height="72"')
-      expect(result.body).toContain('height:72px;width:auto;')
+      expect(result.body).toContain('height="108"')
+      expect(result.body).toContain('height:108px;width:auto;')
       // The preview's title is not bold, and the rule between the halves is 16px out either side.
       expect(result.body).not.toContain('font-weight:bold')
       expect(result.body).toContain('padding-right:16px')
