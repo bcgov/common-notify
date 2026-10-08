@@ -48,11 +48,11 @@ function setupStore(cachedUsage: TenantUsageResponse | null = null) {
 describe('fetchSettings rate limit', () => {
   it('refreshes the displayed limit after generating a key without resetting settings', async () => {
     const store = setupStore(usage([]))
-    vi.mocked(getApiKeyUsage).mockResolvedValue(usage([1000, 1000]))
+    vi.mocked(getApiKeyUsage).mockResolvedValue(usage([1000, 750]))
     vi.mocked(issueApiKeyApi).mockResolvedValue({} as Awaited<ReturnType<typeof issueApiKeyApi>>)
     await store.dispatch(issueApiKey(undefined)).unwrap()
     await vi.waitFor(() => {
-      expect(store.getState().tenantSettings.rateLimitPerMinute).toBe(1000)
+      expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 1000, SMS: 750 })
     })
     expect(getApiKeyUsage).toHaveBeenCalledTimes(1)
     expect(getSettings).not.toHaveBeenCalled()
@@ -64,9 +64,9 @@ describe('fetchSettings rate limit', () => {
   })
 
   it.each([
-    [[1000, 750], 1000],
-    [[0, 1000], 0],
-    [[], null],
+    [[1000, 750], { EMAIL: 1000, SMS: 750 }],
+    [[0, 1000], { EMAIL: 0, SMS: 1000 }],
+    [[], { EMAIL: null, SMS: null }],
   ])('loads limits %j even without a settings row', async (limits, expected) => {
     vi.mocked(getApiKeyUsage).mockResolvedValue(usage(limits as number[]))
     const store = setupStore()
@@ -79,7 +79,7 @@ describe('fetchSettings rate limit', () => {
   it('reuses usage already loaded for the selected tenant', async () => {
     const store = setupStore(usage([750]))
     await store.dispatch(fetchSettings()).unwrap()
-    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual(750)
+    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 750, SMS: null })
     expect(getApiKeyUsage).not.toHaveBeenCalled()
   })
 
@@ -87,7 +87,7 @@ describe('fetchSettings rate limit', () => {
     const store = setupStore(usage([750], 'tenant-2'))
     vi.mocked(getApiKeyUsage).mockResolvedValue(usage([1000]))
     await store.dispatch(fetchSettings()).unwrap()
-    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual(1000)
+    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 1000, SMS: null })
     expect(getApiKeyUsage).toHaveBeenCalledTimes(1)
   })
 

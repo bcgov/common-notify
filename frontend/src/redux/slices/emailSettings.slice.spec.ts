@@ -75,7 +75,11 @@ describe('emailSettingsSlice', () => {
     it('should take its own fields from the shared payload', () => {
       const state = emailSettingsReducer(
         initialState,
-        fetchSettings.fulfilled({ ...tenantSettings, rateLimitPerMinute: 750 }, '', undefined),
+        fetchSettings.fulfilled(
+          { ...tenantSettings, rateLimitPerMinute: { EMAIL: 750, SMS: 1000 } },
+          '',
+          undefined,
+        ),
       )
 
       expect(state.emailNotificationsEnabled).toBe(false)
