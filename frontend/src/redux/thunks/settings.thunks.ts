@@ -22,8 +22,7 @@ import type { RootState } from '../store'
  * Reuses cached usage for this tenant. Resolves to null when no tenant is selected.
  */
 export const fetchSettings = createAsyncThunk<
-  | (Partial<TenantSettings> & { rateLimitPerMinute: { EMAIL: number | null; SMS: number | null } })
-  | null,
+  (Partial<TenantSettings> & { rateLimitPerMinute: number | null }) | null,
   void,
   { state: RootState; rejectValue: string }
 >('settings/fetch', async (_, { getState, dispatch, rejectWithValue }) => {
@@ -39,12 +38,9 @@ export const fetchSettings = createAsyncThunk<
         : dispatch(fetchApiKeyUsage()).unwrap(),
     ])
 
-    // Missing channel limits are unconfigured; preserve numeric zero.
-    const rateLimitPerMinute = {
-      EMAIL:
-        usage.channels.find((channel) => channel.channel === 'EMAIL')?.rateLimitPerMinute ?? null,
-      SMS: usage.channels.find((channel) => channel.channel === 'SMS')?.rateLimitPerMinute ?? null,
-    }
+    // Email represents the shared rate limit; Email and SMS are managed together.
+    const rateLimitPerMinute =
+      usage.channels.find((channel) => channel.channel === 'EMAIL')?.rateLimitPerMinute ?? null
     return { ...settings, rateLimitPerMinute }
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load settings')

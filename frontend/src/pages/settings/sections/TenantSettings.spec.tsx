@@ -63,7 +63,7 @@ vi.mock('@bcgov/design-system-react-components', () => ({
 
 function renderWithRoles(
   roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN],
-  rateLimitPerMinute?: { EMAIL: number | null; SMS: number | null },
+  rateLimitPerMinute?: number | null,
 ) {
   state = {
     tenantSettings: {
@@ -88,18 +88,6 @@ describe('API key field', () => {
 })
 
 describe('TenantSettings section', () => {
-  it('shows the limit for each channel', () => {
-    renderWithRoles(undefined, { EMAIL: 1000, SMS: 750 })
-    expect(screen.getByText('Email: 1,000 calls/minute')).toBeInTheDocument()
-    expect(screen.getByText('SMS: 750 calls/minute')).toBeInTheDocument()
-  })
-
-  it('shows an unconfigured channel independently', () => {
-    renderWithRoles(undefined, { EMAIL: 750, SMS: null })
-    expect(screen.getByText('Email: 750 calls/minute')).toBeInTheDocument()
-    expect(screen.getByText('SMS: No limit configured')).toBeInTheDocument()
-  })
-
   it.each([
     [750, '750 calls/minute'],
     [1000, '1,000 calls/minute'],
@@ -107,9 +95,8 @@ describe('TenantSettings section', () => {
     [null, 'No limit configured'],
     [undefined, 'Loading…'],
   ])('renders the rate limit %s as %s', (value, expected) => {
-    renderWithRoles(undefined, value === undefined ? undefined : { EMAIL: value, SMS: value })
-    expect(screen.getByText(`Email: ${expected}`)).toBeInTheDocument()
-    expect(screen.getByText(`SMS: ${expected}`)).toBeInTheDocument()
+    renderWithRoles(undefined, value)
+    expect(screen.getByText(expected)).toBeInTheDocument()
   })
 
   beforeEach(() => {

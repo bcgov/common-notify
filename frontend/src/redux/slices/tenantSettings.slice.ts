@@ -1,3 +1,4 @@
+import { fetchApiKeyUsage } from '../thunks/apiKeyUsage.thunks'
 import { createSlice } from '@reduxjs/toolkit'
 import { fetchSettings, updateTenantSettings } from '../thunks/settings.thunks'
 import type { TenantSettingsValues } from '@/interfaces/tenant-settings.interface'
@@ -9,7 +10,7 @@ export const defaultTenantSettings: TenantSettingsValues = {
 }
 
 interface TenantSettingsState extends TenantSettingsValues {
-  rateLimitPerMinute: { EMAIL: number | null; SMS: number | null } | undefined
+  rateLimitPerMinute: number | null | undefined
   /** True while a tenant-tab PATCH is in flight. Loading is owned by Settings.tsx. */
   saving: boolean
   /** Save error only; load errors are surfaced by Settings.tsx. */
@@ -37,10 +38,15 @@ export const tenantSettingsSlice = createSlice({
         state.error = undefined
       })
       .addCase(fetchSettings.fulfilled, (state, action) => {
-        state.rateLimitPerMinute = action.payload?.rateLimitPerMinute ?? { EMAIL: null, SMS: null }
+        state.rateLimitPerMinute = action.payload?.rateLimitPerMinute ?? null
         state.alertEmail = action.payload?.alertEmail ?? defaultTenantSettings.alertEmail
         state.defaultSenderEmail =
           action.payload?.defaultSenderEmail ?? defaultTenantSettings.defaultSenderEmail
+      })
+      .addCase(fetchApiKeyUsage.fulfilled, (state, action) => {
+        state.rateLimitPerMinute =
+          action.payload.channels.find((channel) => channel.channel === 'EMAIL')
+            ?.rateLimitPerMinute ?? null
       })
       .addCase(updateTenantSettings.pending, (state) => {
         state.saving = true

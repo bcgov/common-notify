@@ -164,19 +164,13 @@ const TenantSettings: FC = () => {
             </Tooltip>
           </TooltipTrigger>
         </span>
-        {(['EMAIL', 'SMS'] as const).map((channel) => {
-          const limit = rateLimitPerMinute?.[channel]
-          return (
-            <p className="settings__rate-limit-value" key={channel}>
-              {channel === 'EMAIL' ? 'Email' : 'SMS'}:{' '}
-              {limit === undefined
-                ? 'Loading…'
-                : limit === null
-                  ? 'No limit configured'
-                  : `${limit.toLocaleString()} calls/minute`}
-            </p>
-          )
-        })}
+        <p className="settings__rate-limit-value">
+          {rateLimitPerMinute === undefined
+            ? 'Loading\u2026'
+            : rateLimitPerMinute === null
+              ? 'No limit configured'
+              : `${rateLimitPerMinute.toLocaleString()} calls/minute`}
+        </p>
         <Link className="settings__external-link" href="#">
           Request increase limit
           <SvgUpRightFromSquareIcon />
