@@ -352,6 +352,7 @@ export class EmailDeliveryWorker {
               body: emailPayload.content?.body,
               bodyType: emailPayload.content?.bodyType ?? 'text',
             },
+            headerOverride,
           )
           emailPayload = { ...emailPayload, content: { ...emailPayload.content, ...branded } }
         }
@@ -680,6 +681,7 @@ export class EmailDeliveryWorker {
           const branded = await templatesService.applyEmailLayout(
             { tenantId, channelCode: 'EMAIL' },
             { ...rendered, bodyType: inlineContent!.bodyType ?? 'text' },
+            headerOverride,
           )
           subject = branded.subject
           body = branded.body

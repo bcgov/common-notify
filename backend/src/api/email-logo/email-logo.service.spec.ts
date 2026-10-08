@@ -74,6 +74,12 @@ describe('EmailLogoService', () => {
     )
   })
 
+  it('builds an email image URL that asks for the email rendition', () => {
+    expect(service.buildEmailImageUrl('logo-id')).toBe(
+      'https://gateway.example.test/logos/logo-id/image?format=email',
+    )
+  })
+
   it('includes the configured gateway path prefix for PR deployments', () => {
     configService.get.mockImplementation((key: string) => {
       const values: Record<string, string> = {

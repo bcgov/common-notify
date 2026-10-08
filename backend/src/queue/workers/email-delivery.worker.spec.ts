@@ -310,6 +310,7 @@ describe('EmailDeliveryWorker', () => {
       expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(
         { tenantId: 'tenant-123', channelCode: 'EMAIL' },
         { subject: 'Inline', body: 'Hello', bodyType: 'text' },
+        undefined,
       )
       expect(mockEmailAdapter.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -318,6 +319,56 @@ describe('EmailDeliveryWorker', () => {
             bodyType: 'html',
           }),
         }),
+      )
+    })
+
+    it("brands an inline email from an event with the event's header", async () => {
+      mockNotificationService.findOne = vi
+        .fn()
+        .mockResolvedValue({ id: 'inline-event', eventId: 'event-uuid' })
+      const mockEventNotificationResolver = {
+        findEmailSendSettings: vi.fn().mockResolvedValue({
+          senderEmail: null,
+          useCustomHeader: true,
+          headerLogoId: 'event-logo-id',
+          headerTitle: 'Permits',
+        }),
+      }
+      await EmailDeliveryWorker.initialize(
+        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockAttachmentResolverService as AttachmentResolverService,
+        mockEmailAdapter,
+        mockRequestDetailService,
+        2,
+        undefined,
+        undefined,
+        mockEventNotificationResolver as any,
+      )
+
+      await processHandler({
+        data: {
+          notifyId: 'inline-event',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Inline', body: 'Hello', bodyType: 'text' },
+          },
+          attempt: 0,
+        },
+        attemptsMade: 0,
+      } as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(
+        { tenantId: 'tenant-123', channelCode: 'EMAIL' },
+        { subject: 'Inline', body: 'Hello', bodyType: 'text' },
+        { logoId: 'event-logo-id', title: 'Permits' },
       )
     })
 
@@ -1656,6 +1707,78 @@ describe('EmailDeliveryWorker', () => {
           { firstname: 'Alice' },
         )
         expect(mockEmailAdapter.send).toHaveBeenCalledTimes(1)
+      })
+
+      /** Re-initialise the worker as if this batch came from an event with a custom header. */
+      async function initializeForEvent(): Promise<void> {
+        mockNotificationService.findOne = vi
+          .fn()
+          .mockResolvedValue({ id: 'notify-bulk', eventId: 'event-uuid' })
+        const mockEventNotificationResolver = {
+          findEmailSendSettings: vi.fn().mockResolvedValue({
+            senderEmail: 'events@gov.bc.ca',
+            useCustomHeader: true,
+            headerLogoId: 'event-logo-id',
+            headerTitle: 'Permits',
+          }),
+        }
+
+        await EmailDeliveryWorker.initialize(
+          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          mockNotificationService,
+          mockConfigService,
+          mockTemplatesRepository,
+          mockTemplatesService,
+          mockInlineRenderingService,
+          mockAttachmentResolverService as AttachmentResolverService,
+          mockEmailAdapter,
+          mockRequestDetailService,
+          2,
+          undefined,
+          undefined,
+          mockEventNotificationResolver as any,
+        )
+      }
+
+      it("applies the event's header and sender to every recipient of a merge batch", async () => {
+        await initializeForEvent()
+
+        const job = makeBulkJob(['alice@example.com', 'bob@example.com'])
+
+        const result = await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(result).toMatchObject({ success: true, sent: 2, failed: 0 })
+        // An event test send is addressed by merge rows, so the event's own logo and title have
+        // to reach this path as well as the single-send one.
+        expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledTimes(2)
+        for (const call of mockTemplatesService.applyEmailLayout.mock.calls) {
+          expect(call[2]).toEqual({ logoId: 'event-logo-id', title: 'Permits' })
+        }
+        // ...and the event's sender with them, rather than the tenant's.
+        expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+          expect.objectContaining({ from: 'events@gov.bc.ca' }),
+        )
+      })
+
+      it("applies the event's header to an inline-content merge batch", async () => {
+        await initializeForEvent()
+        mockInlineRenderingService.renderEmail.mockResolvedValue({ subject: 'Hi', body: 'Dear' })
+
+        const job = makeBulkJob(['alice@example.com'], {
+          mailMergeData: {
+            content: { subject: 'Hi', body: 'Dear {{firstname}}', bodyType: 'text' },
+            params: {},
+            recipients: [{ address: 'alice@example.com', params: { firstname: 'Alice' } }],
+          },
+        } as Partial<DeliveryJobPayload>)
+
+        await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+        expect(mockTemplatesService.applyEmailLayout).toHaveBeenCalledWith(
+          { tenantId: 'tenant-bulk', channelCode: 'EMAIL' },
+          expect.anything(),
+          { logoId: 'event-logo-id', title: 'Permits' },
+        )
       })
 
       it('should mark parent COMPLETED when all recipients sent and no pending remain', async () => {
