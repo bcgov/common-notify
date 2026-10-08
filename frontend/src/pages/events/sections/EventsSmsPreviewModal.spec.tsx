@@ -38,7 +38,7 @@ describe('SMS event preview', () => {
       />,
     )
     expect(await screen.findByText('Hello Alice')).toBeVisible()
-    const input = screen.getByRole('textbox', { name: 'name' })
+    const input = screen.getByRole('textbox', { name: /^name(?:\s*\(required\))?$/i })
     await userEvent.clear(input)
     await userEvent.type(input, 'Bob')
     expect(await screen.findByText('Hello Bob')).toBeVisible()
@@ -65,7 +65,7 @@ describe('SMS event preview', () => {
       />,
     )
     await waitFor(() => expect(previewTemplate).toHaveBeenCalledTimes(1))
-    const input = screen.getByRole('textbox', { name: 'name' })
+    const input = screen.getByRole('textbox', { name: /^name(?:\s*\(required\))?$/i })
     await userEvent.clear(input)
     await userEvent.type(input, 'Bob')
     expect(await screen.findByText('Hello Bob')).toBeVisible()

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * config.js prefers the values Caddy injects at runtime (window.VITE_*) over the
@@ -19,7 +19,13 @@ const loadConfig = async () => {
 }
 
 describe('config.CSTAR_TENANT_SETUP_URL', () => {
+  beforeEach(() => {
+    // Exercise the fallback independently of local .env values loaded by Vite.
+    vi.stubEnv('VITE_CSTAR_TENANT_SETUP_URL', '')
+  })
+
   afterEach(() => {
+    vi.unstubAllEnvs()
     delete injected.VITE_CSTAR_TENANT_SETUP_URL
     vi.resetModules()
   })

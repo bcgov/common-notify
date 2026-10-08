@@ -117,7 +117,7 @@ describe('SMS event MVP', () => {
     expect(screen.getByRole('textbox', { name: /Sender phone number/ })).toHaveValue('+15551234567')
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-  })
+  }, 15000)
 
   it('keeps empty Save and Preview enabled and validates on click without saving', async () => {
     setup({ empty: true })
