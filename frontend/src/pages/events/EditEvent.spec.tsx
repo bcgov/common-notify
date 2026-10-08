@@ -26,6 +26,8 @@ import type { Tenant } from '@/interfaces/CstarTenant'
 
 const navigateMock = vi.fn()
 
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
+
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
   // The email tab guards unsaved changes with a route blocker; nothing here navigates for real.

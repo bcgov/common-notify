@@ -81,11 +81,10 @@ describe('SMS event MVP', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ ...configured, active: true }))
   })
 
-  it('explains the initial off state when Save or Preview is clicked', async () => {
+  it('hides actions initially off and validates after switching on', async () => {
     setup({ sender: '+15551234567', empty: true, active: false })
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(showErrorToast).toHaveBeenLastCalledWith('Channel is off', expect.any(String))
-    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(onSave).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
@@ -104,7 +103,7 @@ describe('SMS event MVP', () => {
         onDeactivate={onDeactivate}
       />,
     )
-    expect(screen.getByText('Ready to send?')).toBeVisible()
+    expect(screen.getByText('SMS settings saved')).toBeVisible()
     await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
     expect(onDeactivate).not.toHaveBeenCalled()
@@ -116,7 +115,8 @@ describe('SMS event MVP', () => {
     expect(screen.getByRole('switch', { name: 'Activate channel' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Additional recipient(s)' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: /Sender phone number/ })).toHaveValue('+15551234567')
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it('keeps empty Save and Preview enabled and validates on click without saving', async () => {
@@ -140,7 +140,7 @@ describe('SMS event MVP', () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(configured))
-    expect(await screen.findByText('Ready to send?')).toBeVisible()
+    expect(await screen.findByText('SMS settings saved')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Continue to test notification' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
@@ -171,7 +171,7 @@ describe('SMS event MVP', () => {
       expect(showErrorToast).toHaveBeenCalledWith('Unable to save settings', 'Unavailable'),
     )
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-    expect(screen.queryByText('Ready to send?')).not.toBeInTheDocument()
+    expect(screen.queryByText('SMS settings saved')).not.toBeInTheDocument()
   })
 
   it('prevents read-only users from saving or previewing', () => {

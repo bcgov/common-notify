@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { EventsService } from './events.service'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
@@ -113,6 +114,7 @@ describe('EventsService', () => {
 
   /** Unset by default, so getMaxRecipients falls back to its built-in 100. */
   const mockProvisionedPhoneNumberRepository = { findOne: vi.fn() }
+  const mockFeatureFlagService = { getFlagsForTenant: vi.fn() }
 
   const mockConfigurationRepository = {
     findOne: vi.fn(),
@@ -168,6 +170,7 @@ describe('EventsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
+        { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         {
           provide: getRepositoryToken(ProvisionedPhoneNumber),
           useValue: mockProvisionedPhoneNumberRepository,
@@ -194,6 +197,7 @@ describe('EventsService', () => {
     // Reset rather than clear: the mocks are shared across the file, so a queued
     // mockResolvedValueOnce a failing expectation left unconsumed would surface in another test.
     vi.resetAllMocks()
+    mockFeatureFlagService.getFlagsForTenant.mockResolvedValue({ sms_notifications: true })
 
     mockQueryBuilder.leftJoinAndSelect.mockReturnThis()
     mockQueryBuilder.where.mockReturnThis()
