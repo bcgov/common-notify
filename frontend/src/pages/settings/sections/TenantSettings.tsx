@@ -159,17 +159,24 @@ const TenantSettings: FC = () => {
               <SvgInfoIcon />
             </Button>
             <Tooltip className="bcds-react-aria-Tooltip settings__tooltip--wide" placement="right">
-              This is the max API calls per minute for your tenant. Managed by the system.
+              These are the maximum API calls per minute for each channel in your tenant. Managed by
+              the system.
             </Tooltip>
           </TooltipTrigger>
         </span>
-        <p className="settings__rate-limit-value">
-          {rateLimitPerMinute === undefined
-            ? 'Loading…'
-            : rateLimitPerMinute === null
-              ? 'No limit configured'
-              : `${rateLimitPerMinute.toLocaleString()} calls/minute`}
-        </p>
+        {(['EMAIL', 'SMS'] as const).map((channel) => {
+          const limit = rateLimitPerMinute?.[channel]
+          return (
+            <p className="settings__rate-limit-value" key={channel}>
+              {channel === 'EMAIL' ? 'Email' : 'SMS'}:{' '}
+              {limit === undefined
+                ? 'Loading…'
+                : limit === null
+                  ? 'No limit configured'
+                  : `${limit.toLocaleString()} calls/minute`}
+            </p>
+          )
+        })}
         <Link className="settings__external-link" href="#">
           Request increase limit
           <SvgUpRightFromSquareIcon />

@@ -49,14 +49,14 @@ describe('fetchSettings rate limit', () => {
   })
 
   it.each([
-    [[1000, 750], 750],
-    [[0, 1000], 0],
-    [[], null],
+    [[1000, 750], { EMAIL: 1000, SMS: 750 }],
+    [[0, 1000], { EMAIL: 0, SMS: 1000 }],
+    [[], { EMAIL: null, SMS: null }],
   ])('loads limits %j even without a settings row', async (limits, expected) => {
     vi.mocked(getApiKeyUsage).mockResolvedValue(usage(limits as number[]))
     const store = setupStore()
     await store.dispatch(fetchSettings()).unwrap()
-    expect(store.getState().tenantSettings.rateLimitPerMinute).toBe(expected)
+    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual(expected)
     expect(getSettings).toHaveBeenCalledTimes(1)
     expect(getApiKeyUsage).toHaveBeenCalledTimes(1)
   })
@@ -64,7 +64,7 @@ describe('fetchSettings rate limit', () => {
   it('reuses usage already loaded for the selected tenant', async () => {
     const store = setupStore(usage([750]))
     await store.dispatch(fetchSettings()).unwrap()
-    expect(store.getState().tenantSettings.rateLimitPerMinute).toBe(750)
+    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 750, SMS: null })
     expect(getApiKeyUsage).not.toHaveBeenCalled()
   })
 
@@ -72,7 +72,7 @@ describe('fetchSettings rate limit', () => {
     const store = setupStore(usage([750], 'tenant-2'))
     vi.mocked(getApiKeyUsage).mockResolvedValue(usage([1000]))
     await store.dispatch(fetchSettings()).unwrap()
-    expect(store.getState().tenantSettings.rateLimitPerMinute).toBe(1000)
+    expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 1000, SMS: null })
     expect(getApiKeyUsage).toHaveBeenCalledTimes(1)
   })
 
