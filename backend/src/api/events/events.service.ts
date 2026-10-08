@@ -443,19 +443,12 @@ export class EventsService {
     const setting = this.findOrCreateSmsSetting(event, userId)
     const number = await this.findTenantPhoneNumber(tenantId)
     setting.fromPhoneNumberId = number?.id ?? null
-    const temporarySender = updateDto.senderPhoneNumber
-    if (temporarySender && number && temporarySender !== number.phoneNumber) {
-      throw new BadRequestException('This tenant already has an assigned sender number.')
-    }
-
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
     if (
       updateDto.active &&
-      (!this.hasToRecipient(recipients) ||
-        !templateId ||
-        (!setting.fromPhoneNumberId && !temporarySender))
+      (!this.hasToRecipient(recipients) || !templateId || !setting.fromPhoneNumberId)
     ) {
       throw new BadRequestException(
         'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
@@ -467,38 +460,7 @@ export class EventsService {
     setting.isDeleted = false
     setting.updatedBy = userId
 
-    if (temporarySender && !number) {
-      // Assign the tenant number and save settings atomically. The unique tenant and
-      // number indexes prevent concurrent assignments and cross-tenant reuse.
-      try {
-        await this.eventRepository.manager.transaction(async (manager) => {
-          const assigned = await manager.save(
-            ProvisionedPhoneNumber,
-            manager.create(ProvisionedPhoneNumber, {
-              phoneNumber: temporarySender,
-              tenantId,
-              allocatedAt: new Date(),
-              provider: 'temporary',
-              createdBy: userId,
-              updatedBy: userId,
-              isDeleted: false,
-            }),
-          )
-          setting.fromPhoneNumberId = assigned.id
-          const saved = await manager.save(EventChannelSetting, setting)
-          await this.syncRecipients(manager, saved, recipients, userId)
-        })
-      } catch (error) {
-        if ((error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
-          throw new ConflictException(
-            'The number or tenant already has an assignment. Refresh the page and try again.',
-          )
-        }
-        throw error
-      }
-    } else {
-      await this.saveWithRecipients(setting, recipients, userId)
-    }
+    await this.saveWithRecipients(setting, recipients, userId)
 
     // Re-read so the derived channelCodes and status reflect the row that was just written.
     return this.getEvent(tenantId, eventId)

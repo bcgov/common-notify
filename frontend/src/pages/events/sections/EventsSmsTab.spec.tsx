@@ -27,7 +27,7 @@ function setup(
   options: {
     sender?: string
     active?: boolean
-    temporary?: boolean
+    unassigned?: boolean
     empty?: boolean
     disabled?: boolean
     onDirty?: (value: boolean) => void
@@ -40,7 +40,7 @@ function setup(
           ? { active: options.active ?? true, templateId: null, to: [] }
           : { ...configured, active: options.active ?? true }
       }
-      senderPhoneNumber={options.temporary ? null : (options.sender ?? '+15551234567')}
+      senderPhoneNumber={options.unassigned ? null : (options.sender ?? '+15551234567')}
       onSave={onSave}
       onDeactivate={onDeactivate}
       isConfigured={false}
@@ -57,15 +57,18 @@ beforeEach(() => {
 })
 
 describe('SMS event MVP', () => {
-  it('allows a temporary tenant sender and includes it only when Save is clicked', async () => {
-    setup({ temporary: true })
+  it('never allows sender entry and rejects activation without a tenant assignment', async () => {
+    setup({ unassigned: true })
     const input = screen.getByRole('textbox', { name: /Sender phone number/ })
-    await userEvent.type(input, '+15551234567')
-    expect(onSave).not.toHaveBeenCalled()
+    expect(input).toHaveAttribute('readonly')
+    expect(input).toHaveValue('Not assigned')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() =>
-      expect(onSave).toHaveBeenCalledWith({ ...configured, senderPhoneNumber: '+15551234567' }),
-    )
+    expect(onSave).not.toHaveBeenCalled()
+    expect(
+      screen.getByText(
+        'A sender number must be assigned to your tenant before SMS can be activated.',
+      ),
+    ).toBeVisible()
   })
 
   it('uses the assigned sender and saves activation only after Save', async () => {

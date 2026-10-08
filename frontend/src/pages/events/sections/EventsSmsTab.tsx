@@ -26,7 +26,7 @@ import EventsSmsEstimate from '../components/EventsSmsEstimate'
 export const UNSAVED_SMS_CHANGES_MESSAGE =
   'You have unsaved changes to your SMS notification settings. If you leave this page, your changes will be lost.'
 export type SmsSettingsValues = { active: boolean; templateId: string | null; to: string[] }
-export type SmsApplyValues = SmsSettingsValues & { senderPhoneNumber?: string }
+export type SmsApplyValues = SmsSettingsValues
 const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
 
 // Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
@@ -92,11 +92,9 @@ export default function EventsSmsTab({
   smsNotificationsEnabled,
   senderPhoneNumber,
 }: EventsSmsTabProps) {
-  const [senderInput, setSenderInput] = useState(senderPhoneNumber ?? '')
-  const displayedSender = senderPhoneNumber ?? senderInput.trim()
-  const senderError = /^\+[1-9]\d{7,14}$/.test(displayedSender)
+  const senderError = senderPhoneNumber
     ? ''
-    : 'Enter a sender number in international format, for example +15551234567.'
+    : 'A sender number must be assigned to your tenant before SMS can be activated.'
   const [channelActive, setChannelActive] = useState(values.active)
   const [to, setTo] = useState(values.to)
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>(
@@ -125,8 +123,7 @@ export default function EventsSmsTab({
   const fieldsDisabled = disabled || !channelActive
   const hasUnsavedChanges =
     !showSaved &&
-    ((!senderPhoneNumber && Boolean(senderInput)) ||
-      channelActive !== values.active ||
+    (channelActive !== values.active ||
       (templateId ?? null) !== values.templateId ||
       !sameAddresses(submittedTo, values.to) ||
       selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) !== Boolean(values.to.length))
@@ -165,7 +162,6 @@ export default function EventsSmsTab({
         active: channelActive,
         templateId: templateId ?? null,
         to: submittedTo,
-        ...(!senderPhoneNumber ? { senderPhoneNumber: displayedSender } : {}),
       })
       setValidationAttempted(false)
       setShowSaved(true)
@@ -251,19 +247,18 @@ export default function EventsSmsTab({
             <>
               <TextField
                 label="Sender phone number"
-                value={senderPhoneNumber ?? senderInput}
-                onChange={setSenderInput}
+                value={senderPhoneNumber ?? 'Not assigned'}
                 isRequired
                 validationBehavior="aria"
                 isInvalid={validationAttempted && Boolean(senderError)}
                 errorMessage={senderError}
                 size="small"
-                isReadOnly={Boolean(senderPhoneNumber)}
+                isReadOnly
                 isDisabled={fieldsDisabled}
                 description={
                   senderPhoneNumber
                     ? 'This number is assigned to your tenant and is shared by its SMS events.'
-                    : 'Enter the temporary sender number for your tenant. This number will be shared by all SMS events for this tenant.'
+                    : 'Your administrator assigns the sender number for your tenant.'
                 }
               />
               <CheckboxGroup
@@ -354,7 +349,7 @@ export default function EventsSmsTab({
           key={selectedTemplate.id}
           template={selectedTemplate}
           to={submittedTo}
-          senderPhoneNumber={displayedSender}
+          senderPhoneNumber={senderPhoneNumber}
           initialValues={sampleValues}
           onClose={() => setPreviewOpen(false)}
           onSaveValues={(next) => {

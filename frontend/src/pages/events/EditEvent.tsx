@@ -165,7 +165,6 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
 
   async function handleSaveSmsSettings(values: SmsApplyValues) {
     const updated = await updateEventSmsSettings(eventId, {
-      senderPhoneNumber: values.senderPhoneNumber,
       active: values.active,
       templateId: values.templateId,
       to: values.to,

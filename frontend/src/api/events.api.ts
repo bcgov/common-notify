@@ -289,7 +289,7 @@ export async function deactivateEventEmailChannel(eventId: string): Promise<Even
   }
 }
 
-export type EventSmsSettingsUpdate = EventSmsSettings & { senderPhoneNumber?: string }
+export type EventSmsSettingsUpdate = EventSmsSettings
 
 /**
  * Update an event's SMS channel settings (SMS Notification tab)
