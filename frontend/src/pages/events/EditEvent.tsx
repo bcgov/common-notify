@@ -24,6 +24,7 @@ import type { EventResponse } from '@/api/events.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useCstarGroups } from '@/hooks/useCstarGroups'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import '@/scss/components/events.scss'
@@ -52,7 +53,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
     (state) => state.smsSettings?.smsNotificationsEnabled,
   )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
-  const [selectedTab, setSelectedTab] = useState<EventTab>(initialTab)
+  const smsFeatureEnabled = useFeatureFlag('sms_notifications', selectedTenantId)
+  const [requestedTab, setSelectedTab] = useState<EventTab>(initialTab)
+  // Also guard direct tab entry and a flag being disabled while the page is open.
+  const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   // Each tab keeps its own form state and is unmounted when another is opened, so leaving the
@@ -106,6 +110,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   }, [eventId, selectedTenantId])
 
   function handleSelectTab(tab: EventTab) {
+    if (tab === 'sms' && !smsFeatureEnabled) return
     if (
       (selectedTab === 'email' && emailHasUnsavedChanges) ||
       (selectedTab === 'sms' && smsHasUnsavedChanges)

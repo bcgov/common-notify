@@ -107,7 +107,7 @@ export class EventSmsSettingsDto {
  * DTO for event responses from the API
  */
 export class EventResponseDto {
-  /** Tenant-assigned SMS sender, included on event detail responses even before SMS is configured. */
+  /** Tenant-assigned SMS sender on detail responses when the SMS feature is enabled, even before configuration. */
   senderPhoneNumber?: string | null
 
   /**

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -32,6 +33,8 @@ import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-l
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
 /**
  * Filters on values derived from an event's channel settings rather than stored on the event.
@@ -121,6 +124,7 @@ export class EventsService {
     private readonly cstarApiClient: CstarApiClient,
     @InjectRepository(ProvisionedPhoneNumber)
     private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
   /**
@@ -197,8 +201,20 @@ export class EventsService {
    */
   async getEvent(tenantId: string, eventId: string): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
+    if (!(await this.isSmsEnabled(tenantId))) return this.toResponseDto(event)
     const number = await this.findTenantPhoneNumber(tenantId)
     return { ...this.toResponseDto(event), senderPhoneNumber: number?.phoneNumber ?? null }
+  }
+
+  private async isSmsEnabled(tenantId: string): Promise<boolean> {
+    const flags = await this.featureFlagService.getFlagsForTenant(tenantId)
+    return flags[FeatureFlagCode.SMS_NOTIFICATIONS] ?? false
+  }
+
+  private async assertSmsEnabled(tenantId: string): Promise<void> {
+    if (!(await this.isSmsEnabled(tenantId))) {
+      throw new ForbiddenException('SMS notifications are not enabled for this tenant')
+    }
   }
 
   private findTenantPhoneNumber(tenantId: string) {
@@ -429,6 +445,7 @@ export class EventsService {
     updateDto: UpdateSmsChannelSettingDto,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
+    await this.assertSmsEnabled(tenantId)
     const event = await this.findEvent(tenantId, eventId)
     const templateId = updateDto.templateId ?? null
     // SMS has no cc/bcc - chk_event_channel_recipient_sms_kind rejects anything but TO.
@@ -484,6 +501,7 @@ export class EventsService {
     eventId: string,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
+    await this.assertSmsEnabled(tenantId)
     return this.deactivateChannel(tenantId, eventId, NotificationChannel.SMS, userId)
   }
 

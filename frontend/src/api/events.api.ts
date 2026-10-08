@@ -104,7 +104,7 @@ export interface EventSmsSettings {
 }
 
 export interface EventResponse {
-  /** Tenant-assigned sender returned by the event detail endpoint. */
+  /** Tenant-assigned sender; omitted when the SMS feature is disabled. */
   senderPhoneNumber?: string | null
   id: string
   name: string
