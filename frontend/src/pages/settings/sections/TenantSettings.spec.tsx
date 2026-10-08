@@ -61,9 +61,13 @@ vi.mock('@bcgov/design-system-react-components', () => ({
   SvgUpRightFromSquareIcon: () => null,
 }))
 
-function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
+function renderWithRoles(
+  roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN],
+  rateLimitPerMinute?: number | null,
+) {
   state = {
     tenantSettings: {
+      rateLimitPerMinute,
       alertEmail: 'saved@example.com',
       defaultSenderEmail: 'noreply',
       saving: false,
@@ -84,6 +88,17 @@ describe('API key field', () => {
 })
 
 describe('TenantSettings section', () => {
+  it.each([
+    [750, '750 calls/minute'],
+    [1000, '1,000 calls/minute'],
+    [0, '0 calls/minute'],
+    [null, 'No limit configured'],
+    [undefined, 'Loading…'],
+  ])('renders the rate limit %s as %s', (value, expected) => {
+    renderWithRoles(undefined, value)
+    expect(screen.getByText(expected)).toBeInTheDocument()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     dispatchMock.mockImplementation((action) => ({

@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
+import { fetchApiKeyUsage } from './apiKeyUsage.thunks'
 import {
   getApprovedEmailLogos,
   getSettings,
@@ -16,20 +17,33 @@ import type {
 import type { RootState } from '../store'
 
 /**
- * Loads the whole tenant_settings row. Dispatched ONLY by Settings.tsx, which owns the
+ * Loads the tenant settings and usage limit. Dispatched ONLY by Settings.tsx, which owns the
  * page-level loading gate; every settings slice seeds its values from this one action.
- * Resolves to null when no tenant is selected or no settings row exists yet.
+ * Reuses cached usage for this tenant. Resolves to null when no tenant is selected.
  */
 export const fetchSettings = createAsyncThunk<
-  TenantSettings | null,
+  (Partial<TenantSettings> & { rateLimitPerMinute: number | null }) | null,
   void,
   { state: RootState; rejectValue: string }
->('settings/fetch', async (_, { getState, rejectWithValue }) => {
+>('settings/fetch', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
     const tenantId = getState().tenant.selectedTenant?.id
     if (!tenantId) return null
 
-    return await getSettings()
+    const cachedUsage = getState().apiKeyUsage.usage
+    const [settings, usage] = await Promise.all([
+      getSettings(),
+      cachedUsage?.tenantId === tenantId
+        ? Promise.resolve(cachedUsage)
+        : dispatch(fetchApiKeyUsage()).unwrap(),
+    ])
+
+    // The API has per-channel limits; summarize with the lowest configured limit.
+    // No configured limits means an empty channels array. Zero is a numeric limit.
+    const rateLimitPerMinute = usage.channels.length
+      ? Math.min(...usage.channels.map((channel) => channel.rateLimitPerMinute))
+      : null
+    return { ...settings, rateLimitPerMinute }
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load settings')
   }

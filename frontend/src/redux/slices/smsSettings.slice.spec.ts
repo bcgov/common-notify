@@ -60,7 +60,7 @@ describe('smsSettingsSlice', () => {
     it('should take its own fields from the shared payload', () => {
       const state = smsSettingsReducer(
         initialState,
-        fetchSettings.fulfilled(tenantSettings, '', undefined),
+        fetchSettings.fulfilled({ ...tenantSettings, rateLimitPerMinute: 750 }, '', undefined),
       )
 
       expect(state.smsNotificationsEnabled).toBe(false)

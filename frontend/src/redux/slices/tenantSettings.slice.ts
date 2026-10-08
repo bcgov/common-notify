@@ -9,6 +9,7 @@ export const defaultTenantSettings: TenantSettingsValues = {
 }
 
 interface TenantSettingsState extends TenantSettingsValues {
+  rateLimitPerMinute: number | null | undefined
   /** True while a tenant-tab PATCH is in flight. Loading is owned by Settings.tsx. */
   saving: boolean
   /** Save error only; load errors are surfaced by Settings.tsx. */
@@ -17,6 +18,7 @@ interface TenantSettingsState extends TenantSettingsValues {
 
 const initialState: TenantSettingsState = {
   ...defaultTenantSettings,
+  rateLimitPerMinute: undefined,
   saving: false,
 }
 
@@ -29,11 +31,13 @@ export const tenantSettingsSlice = createSlice({
       // A new load starts: drop the previous tenant's values and any stale save error, so
       // the section can only ever mount against data for the tenant now on screen.
       .addCase(fetchSettings.pending, (state) => {
+        state.rateLimitPerMinute = undefined
         state.alertEmail = defaultTenantSettings.alertEmail
         state.defaultSenderEmail = defaultTenantSettings.defaultSenderEmail
         state.error = undefined
       })
       .addCase(fetchSettings.fulfilled, (state, action) => {
+        state.rateLimitPerMinute = action.payload?.rateLimitPerMinute ?? null
         state.alertEmail = action.payload?.alertEmail ?? defaultTenantSettings.alertEmail
         state.defaultSenderEmail =
           action.payload?.defaultSenderEmail ?? defaultTenantSettings.defaultSenderEmail

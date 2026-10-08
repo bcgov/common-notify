@@ -33,7 +33,7 @@ const isValidSenderEmail = (value: string): boolean => SENDER_EMAIL_PATTERN.test
 
 const TenantSettings: FC = () => {
   const dispatch = useAppDispatch()
-  const { alertEmail, defaultSenderEmail, saving, error } = useAppSelector(
+  const { alertEmail, defaultSenderEmail, rateLimitPerMinute, saving, error } = useAppSelector(
     (state) => state.tenantSettings,
   )
   const { hasRole } = useCstarRoles()
@@ -163,7 +163,13 @@ const TenantSettings: FC = () => {
             </Tooltip>
           </TooltipTrigger>
         </span>
-        <p className="settings__rate-limit-value">500 calls/minute</p>
+        <p className="settings__rate-limit-value">
+          {rateLimitPerMinute === undefined
+            ? 'Loading…'
+            : rateLimitPerMinute === null
+              ? 'No limit configured'
+              : `${rateLimitPerMinute.toLocaleString()} calls/minute`}
+        </p>
         <Link className="settings__external-link" href="#">
           Request increase limit
           <SvgUpRightFromSquareIcon />
