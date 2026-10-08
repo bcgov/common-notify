@@ -17,8 +17,8 @@ import type {
 import type { RootState } from '../store'
 
 /**
- * Loads the tenant settings and usage limit. Dispatched ONLY by Settings.tsx, which owns the
- * page-level loading gate; every settings slice seeds its values from this one action.
+ * Loads tenant settings and usage limits for Settings.tsx and EditEvent.tsx.
+ * Every settings slice seeds its values from this action; Settings.tsx owns its loading gate.
  * Reuses cached usage for this tenant. Resolves to null when no tenant is selected.
  */
 export const fetchSettings = createAsyncThunk<
