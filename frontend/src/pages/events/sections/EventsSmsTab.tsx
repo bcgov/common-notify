@@ -136,10 +136,7 @@ export default function EventsSmsTab({
   }, [values.to])
 
   function validate(action: 'Save' | 'Preview') {
-    if (!showFields) {
-      showErrorToast('Channel is off', 'Activate the SMS channel to configure its settings.')
-      return false
-    }
+    if (!channelActive) return false
     setValidationAttempted(true)
     if (senderError || recipientError || templateError || invalid.length) {
       showErrorToast(
@@ -321,21 +318,23 @@ export default function EventsSmsTab({
               )}
             </>
           )}
-          <StickyBar>
-            <Button
-              type="button"
-              variant="secondary"
-              isDisabled={disabled}
-              onPress={() => {
-                if (validate('Preview')) setPreviewOpen(true)
-              }}
-            >
-              Preview
-            </Button>
-            <Button type="submit" variant="primary" isDisabled={disabled}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
-          </StickyBar>
+          {showFields && (
+            <StickyBar>
+              <Button
+                type="button"
+                variant="secondary"
+                isDisabled={fieldsDisabled}
+                onPress={() => {
+                  if (validate('Preview')) setPreviewOpen(true)
+                }}
+              >
+                Preview
+              </Button>
+              <Button type="submit" variant="primary" isDisabled={fieldsDisabled}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </StickyBar>
+          )}
         </form>
       )}
       <ConfirmDeactivateDialog
