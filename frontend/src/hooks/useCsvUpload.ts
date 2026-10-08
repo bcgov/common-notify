@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   parseCsv,
   readFileWithProgress,
@@ -37,6 +37,7 @@ export interface CsvUpload {
  * checked - an email address or a phone number.
  */
 export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvUpload {
+  const uploadVersion = useRef(0)
   const [file, setFile] = useState<File | null>(null)
   const [readProgress, setReadProgress] = useState<number | null>(null)
   const [parsed, setParsed] = useState<ParsedCsv | null>(null)
@@ -46,6 +47,7 @@ export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvU
   // Stable: it only calls setState setters, which React guarantees never change. Callers put it
   // in effect dependency arrays, and an identity that changed every render would re-fire them.
   const reset = useCallback(() => {
+    uploadVersion.current += 1
     setFile(null)
     setReadProgress(null)
     setParsed(null)
@@ -54,6 +56,7 @@ export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvU
   }, [])
 
   const handleFileChange = async (nextFile: File | null) => {
+    const version = ++uploadVersion.current
     setFile(nextFile)
 
     if (!nextFile) {
@@ -66,7 +69,10 @@ export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvU
 
     setReadProgress(0)
     try {
-      const text = await readFileWithProgress(nextFile, setReadProgress)
+      const text = await readFileWithProgress(nextFile, (progress) => {
+        if (version === uploadVersion.current) setReadProgress(progress)
+      })
+      if (version !== uploadVersion.current) return
       const nextParsed = parseCsv(text)
       const { fileIssue: nextFileIssue, rowIssues: nextRowIssues } = validateCsv(
         nextParsed,
@@ -90,12 +96,13 @@ export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvU
       setFileIssue(null)
       setRowIssues(nextRowIssues)
     } catch {
+      if (version !== uploadVersion.current) return
       setFile(null)
       setParsed(null)
       setRowIssues([])
       setFileIssue('This file could not be read. Save it as a CSV and try again.')
     } finally {
-      setReadProgress(100)
+      if (version === uploadVersion.current) setReadProgress(100)
     }
   }
 

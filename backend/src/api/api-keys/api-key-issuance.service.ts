@@ -116,10 +116,10 @@ export class ApiKeyIssuanceService {
       labels: {
         'issued-by': 'notify',
         'notify-tenant': tenant.slug,
-        // Which environment issued this. DEV, TEST and every PR share one gateway and one
-        // Product Environment, so without this the Consumers page is a single undifferentiated
-        // list and there is no way to tell a DEV consumer from a TEST one. The Helm release
-        // name is the only thing that separates them — NODE_ENV is 'production' in all three.
+        // Which environment issued this. DEV and every PR share one Product Environment,
+        // so without this their consumers are a single undifferentiated list with no way
+        // to tell one PR's from another's. The Helm release name is the only thing that
+        // separates them — NODE_ENV is 'production' in all of them.
         'notify-environment': this.releaseName,
         // The CSTAR tenant id, not Notify's internal primary key. These labels exist to
         // be read on the Portal Consumers page by someone cross-referencing a consumer

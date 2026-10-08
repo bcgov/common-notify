@@ -25,6 +25,11 @@ export interface SmsRecipientResult {
   messageId?: string
   /** Why this recipient failed, when it did. */
   error?: string
+  /**
+   * Not sent because the provider was unavailable, not because of this recipient: still owed,
+   * to be sent again later rather than marked failed.
+   */
+  transient?: boolean
 }
 
 export interface SendSmsResult {

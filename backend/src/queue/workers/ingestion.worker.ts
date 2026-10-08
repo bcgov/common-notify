@@ -10,6 +10,7 @@ import { ClamavService } from '../../services/clamav.service'
 import { QuarantineDetails } from '../../api/notification/entities/notification-request.entity'
 import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { FAILED_JOB_RETENTION } from '../job-retention'
 
 /**
@@ -26,6 +27,31 @@ import { FAILED_JOB_RETENTION } from '../job-retention'
  */
 export class IngestionWorker {
   private readonly logger = new Logger(IngestionWorker.name)
+
+  /**
+   * Every recipient of a merge, from the request as stored at acceptance, less those the
+   * safelist blocked then (recorded as `blocked` rows). Read here rather than carried on the
+   * job, so a large merge is not held in Redis.
+   */
+  static async loadMergeRecipients(
+    notifyId: string,
+    tenantId: string,
+    channel: NotificationChannel,
+    notificationService: NotificationService,
+    requestDetailService: NotificationRequestDetailService,
+  ): Promise<Array<{ address: string; params: Record<string, unknown> }>> {
+    const [stored, blocked] = await Promise.all([
+      notificationService.findOne(notifyId, tenantId),
+      requestDetailService.findAddressesByStatus(notifyId, 'blocked'),
+    ])
+    return mergeJobDataFromRequest(
+      stored.payload,
+      channel,
+      (mergeArray, mergeChannel) =>
+        notificationService.parseMailMergeRecipients(mergeArray, mergeChannel),
+      (address) => !blocked.has(address),
+    ).recipients!
+  }
 
   private static normalizeSmsRecipients(
     request: IngestionJobPayload['request'],
@@ -96,6 +122,8 @@ export class IngestionWorker {
 
       logger.debug(`[${notifyId}] Processing ingestion job for tenant=${tenantId}`)
 
+      // Set once ingestion finds rows an earlier run wrote; read by both the success and error paths.
+      let resumed = false
       try {
         logger.log(`[${notifyId}] [IngestionWorker] Starting to process job ${job.id}`)
 
@@ -119,10 +147,19 @@ export class IngestionWorker {
         // Mail merge email send: split recipients into fixed-size batches and fan out one
         // email-delivery job per batch. Detail rows are created here, tagged with a batchId.
         if (job.data.mailMerge && job.data.mailMergeData) {
-          const { content, params, recipients } = job.data.mailMergeData
-          const batchSize = configService?.get<number>('queue.batchSize') || 100
+          const { content, params } = job.data.mailMergeData
+          const batchSize = configService?.get<number>('queue.batchSize') || 25
           // Older jobs queued before SMS merge existed carry no channel and are email.
           const mergeChannel = job.data.mailMergeChannel ?? NotificationChannel.EMAIL
+          const recipients =
+            job.data.mailMergeData.recipients ??
+            (await IngestionWorker.loadMergeRecipients(
+              notifyId,
+              tenantId,
+              mergeChannel,
+              notificationService,
+              requestDetailService,
+            ))
           const isSmsMerge = mergeChannel === NotificationChannel.SMS
           const mergeQueue = isSmsMerge ? smsQueue : emailQueue
 
@@ -137,13 +174,17 @@ export class IngestionWorker {
             // so a failed batch is easy to identify and retry.
             const batchId = `${notifyId}-${mergeChannel}-${batchIndex}`
 
-            await requestDetailService.createMergePending(
-              notifyId,
-              batchId,
-              chunk.map((r) => r.address),
-              mergeChannel,
-              tenantId,
-            )
+            // A retried ingestion job re-runs this loop. Rows already written for a batch mean an
+            // earlier run created it; writing them again would send those recipients twice.
+            if ((await requestDetailService.countBatch(notifyId, batchId)) === 0) {
+              await requestDetailService.createMergePending(
+                notifyId,
+                batchId,
+                chunk,
+                mergeChannel,
+                tenantId,
+              )
+            }
 
             const deliveryPayload: DeliveryJobPayload = {
               notifyId,
@@ -154,7 +195,8 @@ export class IngestionWorker {
               attempt: 0,
               mailMerge: true,
               batchId,
-              mailMergeData: { content, params, recipients: chunk },
+              // Recipients stay in Postgres; the worker reads this batch's detail rows.
+              mailMergeData: { content, params },
             }
 
             await mergeQueue.add(deliveryPayload, {
@@ -181,8 +223,12 @@ export class IngestionWorker {
         } else {
           processedRequest = IngestionWorker.normalizeSmsRecipients(request, phoneNumberService)
 
-          // Create notification request detail entries for regular notification request
-          await requestDetailService.createPending(notifyId, processedRequest, tenantId)
+          // A re-run (Bull retry, or recovery by the delivery reconciler) finds its rows already
+          // written; writing them again would double every recipient.
+          resumed = (await requestDetailService.countUnbatched(notifyId)) > 0
+          if (!resumed) {
+            await requestDetailService.createPending(notifyId, processedRequest, tenantId)
+          }
         }
 
         const channelAttachments = [
@@ -318,6 +364,13 @@ export class IngestionWorker {
 
         // Queue delivery jobs with idempotency and tracing
         for (const { queue, channel, payload } of deliveryJobs) {
+          // On a re-run, a channel whose recipients are all sent or failed is done; queueing it
+          // again would re-send it while recovering the other channel.
+          if (resumed && (await requestDetailService.countInFlight(notifyId, channel)) === 0) {
+            logger.log(`[${notifyId}] Skipping ${channel}: delivered on an earlier run`)
+            continue
+          }
+
           const deliveryPayload: DeliveryJobPayload = {
             notifyId,
             tenantId,
@@ -366,7 +419,11 @@ export class IngestionWorker {
           updatedBy: 'ingestion-worker',
         })
 
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+        // Not on a re-run: some rows are already sent or failed, and a blanket update would mark
+        // them in flight again - and the reconciler would then send them twice.
+        if (!resumed) {
+          await requestDetailService.updateStatus(notifyId, NotificationStatus.PROCESSING)
+        }
 
         return { success: true, deliveryJobsQueued: deliveryJobs.length }
       } catch (error) {
@@ -381,7 +438,9 @@ export class IngestionWorker {
           status: NotificationStatus.FAILED,
           updatedBy: 'ingestion-worker',
         })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED)
+        await requestDetailService.updateStatus(notifyId, NotificationStatus.FAILED, {
+          preserveCompleted: resumed,
+        })
 
         // Re-throw to trigger BullMQ retry logic
         throw error

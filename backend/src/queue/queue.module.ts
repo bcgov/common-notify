@@ -1,16 +1,27 @@
-import { Module, OnModuleInit, Inject, Logger, Optional, forwardRef } from '@nestjs/common'
+import {
+  BeforeApplicationShutdown,
+  Module,
+  OnModuleInit,
+  OnModuleDestroy,
+  Inject,
+  Logger,
+  Optional,
+  forwardRef,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type Bull from 'bull'
+import type Redis from 'ioredis'
 import { QueueName } from '../enum/queue-name.enum'
 import { createQueue, createRedisClient } from './redis-connection'
+import { WorkerHeartbeat } from './worker-heartbeat'
 import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { WebhookDeliveryWorker } from './workers/webhook-delivery.worker'
-import { PendingNotificationRetryService } from './services/pending-notification-retry.service'
+import { DeliveryReconcilerService } from './services/delivery-reconciler.service'
 import { WebhookTriggerService } from './services/webhook-trigger.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
 import { NotificationRequestDetail } from '../api/notification/entities/notification-request-detail.entity'
@@ -66,7 +77,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     forwardRef(() => EventsModule),
   ],
   providers: [
-    PendingNotificationRetryService,
+    DeliveryReconcilerService,
     NotificationService,
     NotificationRequestDetailService,
     NotificationPubSubService,
@@ -160,8 +171,9 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     QueueName.WEBHOOK_DELIVERY,
   ],
 })
-export class QueueModule implements OnModuleInit {
+export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplicationShutdown {
   private readonly logger = new Logger(QueueModule.name)
+  private heartbeat?: WorkerHeartbeat
 
   constructor(
     @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
@@ -187,7 +199,70 @@ export class QueueModule implements OnModuleInit {
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
     @Optional() private readonly eventNotificationResolver?: EventNotificationResolver,
+    @Optional()
+    @Inject(ProviderToken.REDIS_CLIENT)
+    private readonly redisClient?: Redis | null,
   ) {}
+
+  onModuleDestroy(): void {
+    // Not stopped yet: the workers keep running until beforeApplicationShutdown drains them,
+    // and the page should show their jobs as held by a pod shutting down, not as stalled.
+    this.heartbeat?.markDraining()
+  }
+
+  /**
+   * Let in-flight jobs finish before the pod exits. Without this a deploy or an HPA scale-down
+   * kills a merge batch part-way through and Bull re-runs it on another pod once its lock lapses.
+   *
+   * Every queue stops taking new work on this pod first; then ingestion drains ahead of the
+   * delivery queues it feeds, and delivery ahead of the webhooks it triggers. Runs before
+   * onApplicationShutdown, where TypeORM closes its connection, so a finishing job can still
+   * record what it sent. The wait is capped below the pod's termination grace period
+   * (QUEUE_SHUTDOWN_DRAIN_MS, set by the chart); a batch still running then is re-run elsewhere,
+   * and the delivery workers skip recipients already sent.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
+    const stages = [
+      [this.ingestionQueue],
+      [this.emailQueue, this.smsQueue],
+      [this.webhookQueue],
+    ].map((stage) => stage.filter((queue): queue is Bull.Queue => !!queue))
+    const queues = stages.flat()
+    if (queues.length === 0) return
+
+    const drainMs = parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
+    this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
+
+    const drain = async (): Promise<void> => {
+      // Local pause without waiting: stops fetching new jobs on this pod only.
+      await Promise.all(queues.map((queue) => queue.pause(true, true)))
+      for (const stage of stages) {
+        await Promise.all(stage.map((queue) => queue.close()))
+      }
+    }
+
+    let timer: NodeJS.Timeout | undefined
+    const drained = await Promise.race([
+      drain().then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), drainMs)
+      }),
+    ]).catch((error: Error) => {
+      this.logger.error(`Queue drain failed: ${error.message}`)
+      return false
+    })
+    if (timer) clearTimeout(timer)
+
+    if (drained) {
+      this.logger.log('Queue workers drained')
+      await this.heartbeat?.remove()
+    } else {
+      // Still holding jobs: keep the heartbeat until the pod is killed so they read as held.
+      this.logger.warn(
+        `Queue drain did not finish within ${drainMs}ms; unfinished jobs will be re-run by another pod`,
+      )
+    }
+  }
 
   async onModuleInit() {
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
@@ -204,6 +279,9 @@ export class QueueModule implements OnModuleInit {
     // Read concurrency configuration
     const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
     this.logger.debug(`Ingestion worker concurrency: ${concurrency}`)
+
+    // Published per pod so the admin monitoring page can list every pod's workers.
+    this.heartbeat = this.redisClient ? new WorkerHeartbeat(this.redisClient) : undefined
 
     // Initialize workers in background - don't block app startup
     // Workers will be ready when first job is queued
@@ -222,6 +300,7 @@ export class QueueModule implements OnModuleInit {
         this.attachmentService,
         this.phoneNumberService,
       )
+      this.heartbeat?.track(this.ingestionQueue, concurrency)
       this.logger.debug('Ingestion worker initialization started')
 
       this.logger.debug('About to initialize email delivery worker...')
@@ -245,6 +324,7 @@ export class QueueModule implements OnModuleInit {
         this.tenantSettingsService,
         this.eventNotificationResolver,
       )
+      this.heartbeat?.track(this.emailQueue, emailConcurrency)
       this.logger.log('Email delivery worker initialization started')
 
       this.logger.log('About to initialize SMS delivery worker...')
@@ -265,6 +345,7 @@ export class QueueModule implements OnModuleInit {
         smsConcurrency,
         this.structuredLogger,
       )
+      this.heartbeat?.track(this.smsQueue, smsConcurrency)
       this.logger.log('SMS delivery worker initialization started')
 
       // Initialize webhook delivery worker — handles HTTP POST callbacks
@@ -277,8 +358,11 @@ export class QueueModule implements OnModuleInit {
           this.webhookDeliveryLogRepository,
           webhookConcurrency,
         )
+        this.heartbeat?.track(this.webhookQueue, webhookConcurrency)
         this.logger.log('Webhook delivery worker initialization started')
       }
+
+      this.heartbeat?.start()
 
       this.logger.log('Queue workers initialized successfully')
     } catch (error) {

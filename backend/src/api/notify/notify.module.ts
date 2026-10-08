@@ -14,6 +14,8 @@ import {
   ChesEmailController,
 } from './notify.controller'
 import { NotifyService } from './notify.service'
+import { NotifyPreviewInterceptor } from './notify-preview.interceptor'
+import { NotifyPreviewService } from './services/notify-preview.service'
 import { NotificationModule } from '../notification/notification.module'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { QueueModule } from '../../queue/queue.module'
@@ -27,6 +29,8 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { NotificationDedupService } from './services/notification-dedup.service'
+import { PhoneNumberService } from './services/phone-number.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { SafelistModule } from '../safelist/safelist.module'
 import { EventsModule } from '../events/events.module'
@@ -55,6 +59,9 @@ import { EventsModule } from '../events/events.module'
     ChesEmailController,
   ],
   providers: [
+    NotifyPreviewInterceptor,
+    NotifyPreviewService,
+    PhoneNumberService,
     NotifyService,
     NotifyFrontendRoleGuard,
     NotifyServiceGuard,
@@ -63,6 +70,7 @@ import { EventsModule } from '../events/events.module'
     AttachmentResolverService,
     LimitAlertNotificationService,
     SmsSegmentService,
+    NotificationDedupService,
   ],
   exports: [
     NotifyService,
@@ -71,6 +79,7 @@ import { EventsModule } from '../events/events.module'
     AttachmentProcessingService,
     AttachmentResolverService,
     SmsSegmentService,
+    NotificationDedupService,
   ],
 })
 export class NotifyModule {}

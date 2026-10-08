@@ -6,10 +6,9 @@
  * stops enqueue altogether, not just this queue. Both sets are bounded by age and count.
  *
  * The completed window is not an audit log; notification_request and its history table are.
- * It exists so that re-adding the same jobId within the window is deduplicated by Bull, which
- * is what stops the pending-notification sweep from queueing a request the original request
- * path has already queued but not yet marked QUEUED. An hour is far longer than that race
- * (the sweep runs every 30s) while still bounding what Redis holds.
+ * It exists so that re-adding the same jobId within the window is deduplicated by Bull - a
+ * request queued twice in quick succession (the original path, then a retry of the same add) runs
+ * once. An hour is far longer than that race while still bounding what Redis holds.
  */
 export interface JobRetention {
   /** Maximum age in seconds. */

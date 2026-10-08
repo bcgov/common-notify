@@ -7,6 +7,7 @@ import {
   SendSmsResult,
   SmsRecipientResult,
 } from '../../../../interfaces'
+import { TransientDeliveryError, transientFromProviderError } from '../../../../delivery-errors'
 
 @Injectable()
 export class TwilioSmsTransport implements ISmsTransport {
@@ -69,7 +70,7 @@ export class TwilioSmsTransport implements ISmsTransport {
     // part-way through threw away the knowledge that earlier recipients had already been sent to,
     // and the queue's retry then messaged them a second time.
     const recipientResults: SmsRecipientResult[] = []
-    for (const recipient of toNumbers) {
+    for (const [index, recipient] of toNumbers.entries()) {
       try {
         const message = await this.client.messages.create({
           body,
@@ -78,6 +79,21 @@ export class TwilioSmsTransport implements ISmsTransport {
         })
         recipientResults.push({ to: recipient, success: true, messageId: message.sid })
       } catch (error) {
+        // Twilio unavailable: stop, and leave this recipient and the rest owed. Carrying on
+        // would only fail them too, and earlier successes must still be reported.
+        const transient = transientFromProviderError(error, 'Twilio SMS')
+        if (transient) {
+          this.logger.warn(`Twilio unavailable, ${toNumbers.length - index} recipient(s) left owed`)
+          for (const owed of toNumbers.slice(index)) {
+            recipientResults.push({
+              to: owed,
+              success: false,
+              error: transient.message,
+              transient: true,
+            })
+          }
+          break
+        }
         const errorMessage = error instanceof Error ? error.message : String(error)
         this.logger.error(`Twilio send failed for one recipient: ${errorMessage}`)
         recipientResults.push({ to: recipient, success: false, error: errorMessage })
@@ -85,6 +101,10 @@ export class TwilioSmsTransport implements ISmsTransport {
     }
 
     const succeeded = recipientResults.filter((result) => result.success)
+    const owed = recipientResults.filter((result) => result.transient)
+    if (succeeded.length === 0 && owed.length > 0 && owed.length === recipientResults.length) {
+      throw new TransientDeliveryError(owed[0].error ?? 'Twilio unavailable', 502)
+    }
 
     // Every recipient failing is systemic and worth a retry; a partial failure is not.
     if (succeeded.length === 0 && recipientResults.length > 0) {

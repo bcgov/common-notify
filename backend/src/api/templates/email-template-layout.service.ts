@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import MarkdownIt from 'markdown-it'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import { TemplateEngine } from '../../enum/template-engine.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { Template } from './entities/template.entity'
@@ -40,12 +39,6 @@ const HEADER_PADDING_BELOW_PX = 0
 /** Gap between that rule and the message itself, which separates the two. */
 const HEADER_MARGIN_BELOW_PX = 28
 
-const LAYOUT_SUPPORTED_ENGINES = new Set<TemplateEngine>([
-  TemplateEngine.HANDLEBARS,
-  TemplateEngine.MUSTACHE,
-  TemplateEngine.LEGACY_GC_NOTIFY,
-])
-
 @Injectable()
 export class EmailTemplateLayoutService {
   private readonly markdown = new MarkdownIt({
@@ -62,11 +55,11 @@ export class EmailTemplateLayoutService {
   /**
    * Put the sender's branding above the rendered body.
    *
-   * @param header Branding to use instead of the tenant's. Omit it and the tenant's own logo is
+   * @param header Branding to use instead of the tenant's. Omit it and the tenant's own header is
    *   used, which is what every send that is not event-sourced does.
    */
   async apply(
-    template: Template,
+    template: Pick<Template, 'tenantId' | 'channelCode'>,
     rendered: RenderedEmailContent,
     header?: EmailHeaderOverride,
   ): Promise<RenderedEmailContent> {
@@ -74,46 +67,46 @@ export class EmailTemplateLayoutService {
       return rendered
     }
 
-    if (template.engineCode === TemplateEngine.MJML) {
-      // Deliberately do not wrap MJML output: it is a complete, self-contained HTML document,
-      // and prepending layout markup could invalidate or break that document.
-      return rendered
-    }
-
-    if (!LAYOUT_SUPPORTED_ENGINES.has(template.engineCode as TemplateEngine)) {
-      return rendered
-    }
-
-    // A sender with its own branding gets the full header; everyone else keeps the tenant logo
-    // exactly as it has always been rendered.
     const headerMarkup = header
       ? this.customHeaderHtml(header.logoId, header.title)
-      : this.tenantLogoHtml(await this.tenantLogoId(template.tenantId))
+      : await this.tenantHeaderHtml(template.tenantId)
 
     if (!headerMarkup) {
       return rendered
     }
 
     const htmlBody = this.toHtml(rendered.body, rendered.bodyType)
-
+    const headerContainer = `<div style="background-color: #ffffff; max-width: 600px; margin: 0 auto;">${headerMarkup}</div>`
+    // Complete HTML documents (including MJML) keep their document structure.
+    const body = /<body\b[^>]*>/i.test(htmlBody)
+      ? htmlBody.replace(/<body\b[^>]*>/i, (openingTag) => `${openingTag}\n${headerContainer}`)
+      : `${headerContainer}\n${htmlBody}`
     return {
       ...rendered,
-      body: `${headerMarkup}\n${htmlBody}`,
+      body,
       bodyType: 'html',
     }
   }
 
-  private async tenantLogoId(tenantId: string): Promise<string | null> {
+  private async tenantHeaderHtml(tenantId: string): Promise<string> {
     const tenantSettings = await this.tenantSettingsService.findByTenantId(tenantId)
-    return tenantSettings?.emailLogoId ?? null
-  }
+    const logoId = tenantSettings?.emailLogoId ?? (await this.emailLogoService.getDefault()).id
+    const imageUrl = this.emailLogoService.buildPublicImageUrl(logoId)
 
-  /** The tenant's logo, unchanged since before senders could carry their own branding. */
-  private tenantLogoHtml(logoId: string | null): string | null {
-    if (!logoId) return null
-
-    const imageUrl = this.escapeHtmlAttribute(this.emailLogoService.buildPublicImageUrl(logoId))
-    return `<img src="${imageUrl}" alt="">`
+    // Supply an HTML width as well as inline CSS for email clients with limited CSS support.
+    // Keep the intrinsic aspect ratio because approved logos have different proportions.
+    const logo = `<img src="${this.escapeHtmlAttribute(imageUrl)}" width="260" alt="Government of British Columbia" style="display:block;width:260px;max-width:100%;height:auto;border:0;margin:0 0 24px 0;font-family:Arial,sans-serif;font-size:16px;color:#003366;">`
+    const selectedLogo = tenantSettings?.useCustomEmailHeader
+      ? await this.emailLogoService.findByIdIfApproved(logoId)
+      : null
+    const title = tenantSettings?.useCustomEmailHeader
+      ? selectedLogo?.displayTitle?.trim() || 'Government of British Columbia'
+      : null
+    // Presentation tables and inline styles work in email clients without flex/grid support.
+    // The title is real text, so it remains readable when remote images are blocked.
+    return title
+      ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;"><tr><td width="260" valign="middle">${logo.replace('margin:0 0 24px 0;', 'margin:0;')}</td><td valign="middle" style="padding-left:16px;font-family:Arial,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#003366;">${this.escapeHtml(title)}</td></tr></table>`
+      : logo
   }
 
   /**
@@ -174,7 +167,6 @@ export class EmailTemplateLayoutService {
 
     if (bodyType === 'markdown') {
       // This pre-conversion is reached only when a logo is actually being injected.
-      // Logo-free messages retain their original body/bodyType and CHES converts them as before.
       return this.markdown.render(body)
     }
 

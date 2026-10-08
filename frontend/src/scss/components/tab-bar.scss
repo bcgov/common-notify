@@ -1,0 +1,15 @@
+@import '../variables';
+
+// Same overrides as .events__tabs, so every tab bar in the app looks alike.
+.tab-bar {
+  .bcds-react-aria-ToggleButtonGroup {
+    width: fit-content;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+
+  // The DS ToggleButton hardcodes 2px 8px regardless of `size`.
+  .bcds-react-aria-ToggleButton {
+    padding: 6px 12px;
+  }
+}

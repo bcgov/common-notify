@@ -24,11 +24,11 @@ export class CancelNotificationDto {
 export class RescheduleNotificationDto {
   @ApiPropertyOptional({
     type: 'string',
-    format: 'date-time A time in the past is rejected rather than sent immediately.',
+    format: 'date-time',
     example: '2027-06-01T16:00:00Z',
     description:
       'New time to deliver at. A timezone is required, the same as `delayedSend` - use a `Z` ' +
-      'suffix or a numeric offset such as `-07:00`.',
+      'suffix or a numeric offset such as `-07:00`. Times more than one minute in the past are rejected.',
   })
   @IsOptional()
   @IsFutureDateString()

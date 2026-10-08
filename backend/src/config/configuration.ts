@@ -59,6 +59,12 @@ export default () => {
       clientSecret: process.env.CHES_CLIENT_SECRET,
       tokenUrl: process.env.CHES_TOKEN_URL,
       from: process.env.DEFAULT_EMAIL_FROM || defaultEmailFrom,
+      // Per request. Without one a CHES that accepts the connection but never answers holds a
+      // worker until Node's own ~5-minute timeout, per message.
+      timeoutMs: parseInt(process.env.CHES_TIMEOUT_MS || '120000', 10),
+      // Across every pod. CHES accepts messages at a fixed rate, so more callers only make each
+      // call wait longer, until they pass timeoutMs. 0 turns the limit off.
+      maxConcurrentRequests: parseInt(process.env.CHES_MAX_CONCURRENT_REQUESTS || '5', 10),
     },
 
     // Notification events
@@ -95,12 +101,10 @@ export default () => {
       // requires the scope to be requested explicitly.
       scope: process.env.APS_TOKEN_SCOPE,
       timeoutMs: parseInt(process.env.APS_TIMEOUT_MS || '15000', 10),
-      // Shared ACL group every issued credential joins, alongside the tenant's own
-      // CSTAR id. Unset by default, and unset means no ACL controls are sent at all:
-      // gw-fe8c5's Environments are kong-api-key-only and the generated routes carry no
-      // acl plugin, so the groups would authorize nothing and only risk the gateway
-      // rejecting a control its flow does not support. Set this when an Environment
-      // moves to the kong-api-key-acl flow and the routes gain an allow-list.
+      // Optional shared ACL group every issued credential joins, alongside the tenant's
+      // own CSTAR id. Unset by default, and unset is fine: the tenant's group is what
+      // carries identity upstream and is always sent. A shared group is only needed if
+      // a route's acl plugin ever gains an allow-list to name.
       aclGroup: process.env.APS_ACL_GROUP,
     },
 
@@ -182,8 +186,9 @@ export default () => {
     // Job Queue Worker Configuration
     queue: {
       ingestionWorkerConcurrency: parseInt(process.env.INGESTION_WORKER_CONCURRENCY || '1', 10),
-      // Number of recipients per mail merge delivery batch
-      batchSize: parseInt(process.env.BATCH_SIZE || '100', 10),
+      // Recipients per merge delivery job. Small enough that a job finishes in seconds, so a
+      // pod stopping mid-send replays little and its drain fits the termination grace period.
+      batchSize: parseInt(process.env.BATCH_SIZE || '25', 10),
       emailDeliveryWorkerConcurrency: parseInt(
         process.env.EMAIL_DELIVERY_WORKER_CONCURRENCY || '20',
         10,
@@ -194,7 +199,12 @@ export default () => {
       ),
       jobRetries: parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
-      pendingRetryInterval: parseInt(process.env.PENDING_RETRY_INTERVAL || '30000', 10),
+    },
+
+    // Identical sends (same tenant, recipients and content) within this window are answered with
+    // the original notifyId instead of being sent again. 0 disables. See NotificationDedupService.
+    dedup: {
+      windowSeconds: parseInt(process.env.NOTIFICATION_DEDUP_WINDOW_SECONDS || '300', 10),
     },
 
     // Encryption

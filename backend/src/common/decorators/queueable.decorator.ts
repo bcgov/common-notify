@@ -25,6 +25,12 @@ import type { NotificationRequestDetailService } from '../../api/notification/no
 import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
 import type { EventNotificationResolver } from '../../api/events/event-notification.resolver'
 import type { NotifyEventTestSendRequest } from '../../api/notify/schemas/notify-event-send-request'
+import type {
+  DedupClaim,
+  DuplicateNotification,
+  NotificationDedupService,
+} from '../../api/notify/services/notification-dedup.service'
+import { mergeRequestChannel } from '../../queue/merge-batch-builder'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
@@ -46,6 +52,7 @@ export interface QueueableContext {
   notificationRequestDetailService?: NotificationRequestDetailService
   smsSegmentService?: SmsSegmentService
   eventNotificationResolver?: EventNotificationResolver
+  notificationDedupService?: NotificationDedupService
   queueMap: Map<QueueName, Bull.Queue>
 }
 
@@ -53,6 +60,54 @@ export type EventSendMode = 'full' | 'test'
 
 export interface QueueableOptions {
   eventSend?: EventSendMode
+}
+
+/**
+ * Fingerprint a send and check it against the dedup window before any expensive work
+ * (attachment upload, per-row SMS rendering). Only a hint: `claimSend` makes the decision.
+ */
+export async function findDuplicateSend(
+  ctx: QueueableContext,
+  tenantId: string,
+  fingerprintSource: unknown,
+): Promise<{ fingerprint?: string; duplicate: DuplicateNotification | null }> {
+  const dedup = ctx.notificationDedupService
+  if (!dedup?.enabled) return { duplicate: null }
+  const fingerprint = dedup.fingerprint(fingerprintSource)
+  return { fingerprint, duplicate: await dedup.findDuplicate(tenantId, fingerprint) }
+}
+
+/**
+ * Reserve the notifyId for a send, or learn that an identical one already holds it. Call after
+ * every check that can reject the request and immediately before creating the row with
+ * `notifyId`; release the claim if that create fails.
+ */
+export async function claimSend(
+  ctx: QueueableContext,
+  tenantId: string,
+  fingerprint: string | undefined,
+): Promise<DedupClaim> {
+  if (!ctx.notificationDedupService || !fingerprint) {
+    return { kind: 'proceed', release: async () => {} }
+  }
+  return ctx.notificationDedupService.claim(tenantId, fingerprint)
+}
+
+/**
+ * The 202 for a request identical to one already accepted in the window. Nothing new is
+ * persisted, queued or counted against the API key; the caller gets the original's id.
+ */
+function duplicateResponse(original: DuplicateNotification, requestedChannels: string[]) {
+  return {
+    notifyId: original.notifyId,
+    status: original.status,
+    channels: original.channels?.length ? original.channels : requestedChannels,
+    createdAt: original.createdAt,
+    duplicate: true,
+    message:
+      'An identical notification was already accepted; returning the original request instead ' +
+      'of sending again',
+  }
 }
 
 /**
@@ -296,18 +351,6 @@ async function resolveEventSend(
 }
 
 /**
- * Detect a mail-merge email payload: an email channel whose recipients use `mergeArray`. The global
- * ValidationPipe has already validated the body, so the presence of `email.recipients.mergeArray` is
- * sufficient to route the request through the mail merge fan-out flow.
- */
-function mergeRequestChannel(payload: unknown): NotificationChannel | null {
-  const request = payload as NotifySimpleRequest | undefined
-  if (Array.isArray(request?.email?.recipients?.mergeArray)) return NotificationChannel.EMAIL
-  if (Array.isArray(request?.sms?.recipients?.mergeArray)) return NotificationChannel.SMS
-  return null
-}
-
-/**
  * Billable message count for a merge.
  *
  * Email is one message per recipient. SMS is billed in segments and every recipient of a merge
@@ -374,6 +417,12 @@ export async function handleMerge(
   const logger = new Logger(`Queueable[${queueName}][${isSms ? 'smsMerge' : 'emailMerge'}]`)
 
   const channelPayload = (isSms ? dto.sms : dto.email)!
+  const channelName = isSms ? 'sms' : 'email'
+
+  // Before validation and segment counting: for a large SMS merge those render every row.
+  const { fingerprint, duplicate } = await findDuplicateSend(ctx, tenantId, dto)
+  if (duplicate) return duplicateResponse(duplicate, [channelName])
+
   const mergeArray = channelPayload.recipients.mergeArray!
   const delayedSendTimestamp = channelPayload.delayedSend
   // Global params cascade: request-level params augmented/overridden by channel-level params
@@ -429,17 +478,27 @@ export async function handleMerge(
   // Enforce daily/annual limits BEFORE accepting the merge request (throws HTTP 429).
   await enforceLimits(ctx, apiKeyConsumerId, [{ channel, count: messageCount }])
 
+  const claim = await claimSend(ctx, tenantId, fingerprint)
+  if (claim.kind === 'duplicate') return duplicateResponse(claim.original, [channelName])
+
   // Persist the parent request (PENDING) for durability before queuing
-  const notificationRecord = await ctx.notificationService.create({
-    tenantId,
-    status: NotificationStatus.PENDING,
-    createdBy: tenantId,
-    payload: dto as any,
-    requestRoute,
-    // An event merge is still an event send: without this the delivery worker has nothing to
-    // read the event's sender and header back from.
-    eventId,
-  })
+  let notificationRecord
+  try {
+    notificationRecord = await ctx.notificationService.create({
+      ...(claim.notifyId && { id: claim.notifyId }),
+      tenantId,
+      status: NotificationStatus.PENDING,
+      createdBy: tenantId,
+      payload: dto as any,
+      requestRoute,
+      // An event merge is still an event send: without this the delivery worker has nothing to
+      // read the event's sender and header back from.
+      eventId,
+    })
+  } catch (error) {
+    await claim.release()
+    throw error
+  }
   logger.debug(
     `${isSms ? 'SMS' : 'Email'} merge notification record created with PENDING status: ${notificationRecord.id} (tenant=${tenantId}, recipients=${recipients.length})`,
   )
@@ -514,7 +573,7 @@ export async function handleMerge(
     notifyId: notificationRecord.id,
     templateId: channelPayload.content?.templateId,
     status: hasDelayedSend ? NotificationStatus.SCHEDULED : NotificationStatus.ACCEPTED,
-    channels: [isSms ? 'sms' : 'email'],
+    channels: [channelName],
     createdAt: notificationRecord.createdAt || new Date(),
     // Accepted recipients only - safelist-blocked rows are reported separately below, so a caller
     // can tell "242 queued" from "250 rows uploaded" without parsing the message string.
@@ -541,10 +600,11 @@ export async function handleMerge(
         requestedAt: new Date().toISOString(),
         mailMerge: true,
         mailMergeChannel: channel,
+        // Recipients are not carried: ingestion reads them from the request stored above, so a
+        // large merge is not held in Redis.
         mailMergeData: {
           content: channelPayload.content,
           params: globalParams,
-          recipients,
         },
         ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
       }
@@ -718,6 +778,20 @@ export function Queueable(
         // (guards run before ValidationPipe in NestJS middleware chain)
         const validatedPayload: NotifySimpleRequest = payload as NotifySimpleRequest
 
+        const channels: string[] = []
+        if (validatedPayload.email) channels.push('email')
+        if (validatedPayload.sms) channels.push('sms')
+        if (validatedPayload.msgApp) channels.push('msgApp')
+
+        // Fingerprinted before attachment processing, which stores each file under a new id and
+        // would make every request look different. Checked first so a duplicate uploads nothing.
+        const { fingerprint, duplicate } = await findDuplicateSend(
+          this as QueueableContext,
+          tenantId,
+          validatedPayload,
+        )
+        if (duplicate) return duplicateResponse(duplicate, channels)
+
         await (this as QueueableContext).attachmentValidationService.validateAttachments(
           validatedPayload,
         )
@@ -785,11 +859,17 @@ export function Queueable(
         // exceed a limit, rejecting the whole request before any record is created.
         await enforceLimits(this as QueueableContext, req?.apiKeyConsumerId, usageEntries)
 
+        // Nothing between here and the create can reject the request, so a duplicate handed this
+        // claim's notifyId while the row is still being written gets an id that will exist.
+        const claim = await claimSend(this as QueueableContext, tenantId, fingerprint)
+        if (claim.kind === 'duplicate') return duplicateResponse(claim.original, channels)
+
         // Create DB record with PENDING status. If redis is unavailable, the scheduled retry job will find this record and attempt to queue it.
         // This is synchronous and required to succeed.
         let notificationRecord
         try {
           notificationRecord = await (this as QueueableContext).notificationService.create({
+            ...(claim.notifyId && { id: claim.notifyId }),
             tenantId,
             status: NotificationStatus.PENDING,
             createdBy: tenantId,
@@ -836,17 +916,12 @@ export function Queueable(
             tenantId,
             error: (dbError as Error).message,
           })
+          await claim.release()
           throw dbError
         }
 
         // Return 202 Accepted immediately without waiting for queue operation
         // Queue operation continues asynchronously in the background
-
-        // Determine which channels are included in the request
-        const channels: string[] = []
-        if (processedPayload.email) channels.push('email')
-        if (processedPayload.sms) channels.push('sms')
-        if (processedPayload.msgApp) channels.push('msgApp')
 
         // Attribute accepted notifications against the API key's usage limits (non-fatal).
         const usageResults = await recordAcceptedUsage(
@@ -888,7 +963,7 @@ export function Queueable(
 
         // Fire off queueing asynchronously - don't block the response
         // If queuing succeeds, status updates to QUEUED
-        // If queuing fails, PendingNotificationRetryService will pick it up and retry
+        // If queuing fails, the record stays PENDING and DeliveryReconcilerService queues it
         setImmediate(async () => {
           try {
             const jobPayload = {
@@ -945,7 +1020,7 @@ export function Queueable(
             }
           } catch (queueError) {
             // Redis unavailable... that's OK, status stays PENDING
-            // PendingNotificationRetryService will pick it up once Redis is back
+            // DeliveryReconcilerService queues it once Redis is back
             logger.warn(`Failed to enqueue job (will be retried): ${notificationRecord.id}`, {
               tenantId,
               error: (queueError as Error).message,

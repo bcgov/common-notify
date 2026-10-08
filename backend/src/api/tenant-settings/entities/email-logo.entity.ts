@@ -8,6 +8,9 @@ export class EmailLogo {
   @Column({ type: 'varchar', nullable: true })
   name: string | null
 
+  @Column({ type: 'varchar', nullable: true, name: 'display_title' })
+  displayTitle: string | null
+
   @Column({ type: 'varchar', nullable: true, name: 'file_key' })
   fileKey: string | null
 
@@ -31,6 +34,9 @@ export class EmailLogo {
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date
+
+  @Column({ type: 'boolean', default: false, name: 'is_default' })
+  isDefault: boolean
 
   @Column({ type: 'boolean', default: false, name: 'is_deleted' })
   isDeleted: boolean

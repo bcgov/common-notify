@@ -6,6 +6,7 @@ import { DeliveryJobPayload } from '../queue.types'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport } from '../../adapters'
+import { TransientDeliveryError } from '../../adapters/delivery-errors'
 
 describe('SmsDeliveryWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
@@ -77,7 +78,10 @@ describe('SmsDeliveryWorker', () => {
       markFailed: vi.fn().mockResolvedValue(undefined),
       markRecipientSent: vi.fn().mockResolvedValue(undefined),
       markRecipientFailed: vi.fn().mockResolvedValue(undefined),
+      markBatchUnsentFailed: vi.fn().mockResolvedValue(undefined),
+      countByStatus: vi.fn().mockResolvedValue(1),
       updateStatus: vi.fn().mockResolvedValue(undefined),
+      findSentAddresses: vi.fn().mockResolvedValue(new Set<string>()),
     }
 
     // Mock the SMS queue
@@ -241,6 +245,45 @@ describe('SmsDeliveryWorker', () => {
         'notify-plain',
         'tenant-123',
         expect.objectContaining({ status: 'completed' }),
+      )
+    })
+
+    it('skips recipients an earlier run delivered even when Bull did not count it as a retry', async () => {
+      await SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+      mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['+16135551234']))
+
+      // attemptsMade 0: a stalled job re-run after its pod stopped mid-send.
+      const job: Partial<Bull.Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-stalled',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234', '+16135555678'] },
+            content: { body: 'Test SMS', bodyType: 'html' },
+          },
+          attempt: 0,
+        },
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      await processHandler(job as Bull.Job<DeliveryJobPayload>)
+
+      expect(mockRequestDetailService.resetForRetry).not.toHaveBeenCalled()
+      expect(mockSmsAdapter.send).toHaveBeenCalledTimes(1)
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ recipients: expect.objectContaining({ to: ['+16135555678'] }) }),
       )
     })
 
@@ -960,6 +1003,138 @@ describe('SmsDeliveryWorker', () => {
 
       // The logger.error should be called
       expect(Logger.prototype.error).toHaveBeenCalled()
+    })
+  })
+
+  describe('provider outages', () => {
+    const init = () =>
+      SmsDeliveryWorker.initialize(
+        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        mockNotificationService,
+        mockConfigService,
+        mockTemplatesRepository,
+        mockTemplatesService,
+        mockInlineRenderingService,
+        mockSmsAdapter,
+        mockRequestDetailService,
+      )
+    const outage = () => new TransientDeliveryError('ACS SMS: upstream 503 - unavailable', 502)
+    const mergeJob = (attemptsMade = 0) =>
+      ({
+        data: {
+          notifyId: 'notify-merge',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          mailMerge: true,
+          batchId: 'notify-merge-SMS-0',
+          mailMergeData: {
+            content: { body: 'Hi {{name}}' },
+            params: {},
+            recipients: ['+16135550001', '+16135550002', '+16135550003'].map((address) => ({
+              address,
+              params: { name: 'A' },
+            })),
+          },
+          request: {},
+          payload: {} as never,
+          attempt: 0,
+        },
+        opts: { attempts: 3 },
+        attemptsMade,
+        discard: vi.fn(),
+      }) as unknown as Bull.Job<DeliveryJobPayload>
+    const plainJob = (attemptsMade = 0) =>
+      ({
+        data: {
+          notifyId: 'notify-plain',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          request: {},
+          payload: {
+            recipients: { to: ['+16135551234', '+16135559999'] },
+            content: { body: 'Test SMS' },
+          },
+          attempt: 0,
+        },
+        opts: { attempts: 3 },
+        attemptsMade,
+      }) as unknown as Bull.Job<DeliveryJobPayload>
+
+    beforeEach(() => {
+      mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
+    })
+
+    it('pauses a merge batch on an outage, leaving unsent recipients owed rather than failed', async () => {
+      mockSmsAdapter.send = vi
+        .fn()
+        .mockResolvedValueOnce({ messageId: 'SM1' })
+        .mockRejectedValueOnce(outage())
+      await init()
+
+      await expect(processHandler(mergeJob())).rejects.toBeInstanceOf(TransientDeliveryError)
+
+      expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledTimes(1)
+      expect(mockRequestDetailService.markRecipientFailed).not.toHaveBeenCalled()
+      expect(mockSmsAdapter.send).toHaveBeenCalledTimes(2)
+      expect(mockRequestDetailService.markBatchUnsentFailed).not.toHaveBeenCalled()
+    })
+
+    it('leaves an outage owed on the final attempt, for the reconciler', async () => {
+      mockSmsAdapter.send = vi.fn().mockRejectedValue(outage())
+      await init()
+
+      await expect(processHandler(mergeJob(2))).rejects.toBeInstanceOf(TransientDeliveryError)
+      await expect(processHandler(plainJob(2))).rejects.toBeInstanceOf(TransientDeliveryError)
+
+      expect(mockRequestDetailService.markBatchUnsentFailed).not.toHaveBeenCalled()
+      expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ status: NotificationStatus.FAILED }),
+      )
+    })
+
+    it('records who was sent, then retries for recipients the provider could not take', async () => {
+      mockSmsAdapter.send = vi.fn().mockResolvedValue({
+        messageId: 'SM1',
+        results: [
+          { to: '+16135551234', success: true, messageId: 'SM1' },
+          { to: '+16135559999', success: false, error: 'throttled', transient: true },
+        ],
+      })
+      await init()
+
+      await expect(processHandler(plainJob())).rejects.toBeInstanceOf(TransientDeliveryError)
+
+      expect(mockRequestDetailService.markRecipientSent).toHaveBeenCalledWith(
+        'notify-plain',
+        null,
+        '+16135551234',
+        'SM1',
+      )
+      expect(mockRequestDetailService.markRecipientFailed).not.toHaveBeenCalled()
+    })
+
+    it('fails only this batch once a systemic error exhausts retries', async () => {
+      mockTemplatesRepository.findById = vi.fn().mockResolvedValue(null)
+      const job = mergeJob(2)
+      ;(job.data.mailMergeData as { content: object }).content = { templateId: 'gone' }
+      mockRequestDetailService.countByStatus = vi
+        .fn()
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(3)
+        .mockResolvedValueOnce(0)
+      await init()
+
+      await expect(processHandler(job)).rejects.toThrow('not found')
+
+      expect(mockRequestDetailService.markBatchUnsentFailed).toHaveBeenCalledWith(
+        'notify-merge',
+        'notify-merge-SMS-0',
+        expect.stringContaining('not found'),
+      )
+      expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
     })
   })
 })

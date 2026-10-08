@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { TwilioSmsTransport } from '../../../../../../src/adapters/implementations/delivery/sms/twilio/twilio-sms.adapter'
 import type { SendSmsResult } from '../../../../../../src/adapters/interfaces'
+import { TransientDeliveryError } from '../../../../../../src/adapters/delivery-errors'
 
 const mockMessagesCreate = vi.fn()
 vi.mock('twilio', () => ({
@@ -150,5 +151,49 @@ describe('TwilioSmsTransport', () => {
     expect(mockMessagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({ from: '+15559999999' }),
     )
+  })
+
+  describe('provider outages', () => {
+    const configured = () => createModule({ accountSid: 'AC123', authToken: 'token' })
+    const unavailable = () => Object.assign(new Error('Service Unavailable'), { status: 503 })
+
+    it('stops at the first outage, reporting who was sent and leaving the rest owed', async () => {
+      mockMessagesCreate.mockResolvedValueOnce({ sid: 'SM1' }).mockRejectedValueOnce(unavailable())
+      const result = await (
+        await configured()
+      ).send({
+        to: ['+15550000001', '+15550000002', '+15550000003'],
+        body: 'Hello',
+      } as never)
+
+      expect(mockMessagesCreate).toHaveBeenCalledTimes(2)
+      expect(result.results).toEqual([
+        { to: '+15550000001', success: true, messageId: 'SM1' },
+        expect.objectContaining({ to: '+15550000002', success: false, transient: true }),
+        expect.objectContaining({ to: '+15550000003', success: false, transient: true }),
+      ])
+    })
+
+    it('throws transient when Twilio took nobody', async () => {
+      mockMessagesCreate.mockRejectedValue(unavailable())
+      await expect(
+        (await configured()).send({ to: ['+15550000001'], body: 'Hello' } as never),
+      ).rejects.toBeInstanceOf(TransientDeliveryError)
+    })
+
+    it('still fails a recipient Twilio rejects, and carries on', async () => {
+      mockMessagesCreate
+        .mockRejectedValueOnce(Object.assign(new Error('Invalid number'), { status: 400 }))
+        .mockResolvedValueOnce({ sid: 'SM2' })
+      const result = await (
+        await configured()
+      ).send({
+        to: ['+15550000001', '+15550000002'],
+        body: 'Hello',
+      } as never)
+      expect(result.results?.[0]).toMatchObject({ success: false, error: 'Invalid number' })
+      expect(result.results?.[0]).not.toHaveProperty('transient')
+      expect(result.results?.[1]).toMatchObject({ success: true })
+    })
   })
 })

@@ -177,12 +177,54 @@ describe('validateCsv row-level problems', () => {
   })
 
   it('explains an invalid phone number in the terms the SMS channel accepts', () => {
-    const parsed = { headers: ['phone', 'firstName'], rows: [['not-a-number', 'Alice']] }
+    const parsed = { headers: ['phone', 'firstName'], rows: [['778-111-223', 'Alice']] }
 
     const [issue] = validateCsv(parsed, placeholders, 'sms').rowIssues
 
-    expect(issue).toMatchObject({ row: 2, column: 'phone', title: 'Invalid format' })
-    expect(issue.detail).toContain('+12505550199')
+    expect(issue).toMatchObject({ row: 2, column: 'phone', title: 'Invalid phone number' })
+    expect(issue.detail).toBe('Check the phone number.')
+  })
+
+  it('reports unsupported destinations before duplicate checks', () => {
+    const parsed = {
+      headers: ['phone'],
+      rows: [['+44 7700 392412'], ['+82 10 2934 4253'], ['+44 7700392412']],
+    }
+    const result = validateCsv(parsed, [], 'sms')
+    expect(result.rowIssues.map(({ row, title }) => ({ row, title }))).toEqual([
+      { row: 2, title: 'Unsupported destination' },
+      { row: 3, title: 'Unsupported destination' },
+      { row: 4, title: 'Unsupported destination' },
+    ])
+  })
+
+  it.each(['+12505551234', '250-555-1234', '(250) 555-1234'])(
+    'accepts supported normalizable SMS recipient %s',
+    (phone) => {
+      expect(validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues).toEqual([])
+    },
+  )
+
+  it.each(['778-111-223', '12345'])('rejects invalid SMS recipient %s', (phone) => {
+    expect(validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues[0].title).toBe(
+      'Invalid phone number',
+    )
+  })
+
+  it.each([
+    'garbage2505551234',
+    '+12505551234 ext. 9',
+    '++12505551234',
+    '(250 555-1234',
+    '250+5551234',
+  ])('distinguishes invalid formatting for %s', (phone) => {
+    expect(
+      validateCsv({ headers: ['phone'], rows: [[phone]] }, [], 'sms').rowIssues[0],
+    ).toMatchObject({
+      title: 'Invalid phone number format',
+      detail:
+        'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
+    })
   })
 
   it('caps how many row problems it reports', () => {

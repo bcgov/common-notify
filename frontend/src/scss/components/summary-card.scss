@@ -1,0 +1,45 @@
+@import '../variables';
+
+.summary-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: $spacing-md;
+  width: 100%;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  padding: $spacing-md $spacing-lg;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background-color: $white;
+
+  .summary-card__title {
+    margin: 0;
+    font-size: $font-size-sm;
+    font-weight: 700;
+    color: $text-secondary;
+  }
+
+  .summary-card__value {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: $dark-text;
+  }
+
+  .summary-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+
+    p {
+      margin: 0;
+    }
+  }
+}

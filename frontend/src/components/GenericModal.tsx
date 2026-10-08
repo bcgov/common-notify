@@ -55,6 +55,25 @@ interface GenericModalProps {
   cancelText?: string
 
   /**
+   * Callback for the cancel button, for the dialogs where cancelling and closing are not
+   * the same thing (e.g. "Leave without saving" next to an X that keeps the user put).
+   * @default onClose
+   */
+  onCancel?: () => void
+
+  /**
+   * Variant for the cancel button, alongside a submit button
+   * @default 'secondary'
+   */
+  cancelVariant?: 'link' | 'primary' | 'secondary' | 'tertiary'
+
+  /**
+   * Whether the cancel button reads as destructive, alongside a submit button
+   * @default false
+   */
+  cancelDanger?: boolean
+
+  /**
    * Modal size
    * @default 'modal-dialog-centered'
    */
@@ -99,6 +118,9 @@ const GenericModal: FC<GenericModalProps> = ({
   submitVariant = 'primary',
   isSubmitLoading = false,
   cancelText = 'Cancel',
+  onCancel,
+  cancelVariant = 'secondary',
+  cancelDanger = false,
   size = 'modal-dialog-centered',
   closeOnBackdropClick: _closeOnBackdropClick = true,
 }) => {
@@ -133,46 +155,46 @@ const GenericModal: FC<GenericModalProps> = ({
               </h5>
               <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
             </div>
-            <div className="modal-body">
-              {onSubmit ? (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    // React portals propagate events through the React tree, not the DOM
-                    // tree, so without this a modal opened from inside a form would submit
-                    // that form too — silently saving whatever the user had half-edited
-                    // behind the dialog.
-                    event.stopPropagation()
-                    return onSubmit(event)
-                  }}
-                  className="d-flex flex-column gap-3"
-                >
-                  {children}
-                  <div className="d-flex gap-2 justify-content-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={onClose}
-                      isDisabled={isSubmitLoading}
-                    >
-                      {cancelText}
-                    </Button>
-                    <Button type="submit" variant={submitVariant} isDisabled={isSubmitLoading}>
-                      {isSubmitLoading ? `${submitText}...` : submitText}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  {children}
-                  <div className="d-flex gap-2 justify-content-end mt-3">
-                    <Button variant="primary" onClick={onClose}>
-                      {cancelText}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Buttons sit in their own footer so a divider separates them from the content,
+                matching the divider the header already has. */}
+            {onSubmit ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  // React portals propagate events through the React tree, not the DOM
+                  // tree, so without this a modal opened from inside a form would submit
+                  // that form too — silently saving whatever the user had half-edited
+                  // behind the dialog.
+                  event.stopPropagation()
+                  return onSubmit(event)
+                }}
+              >
+                <div className="modal-body d-flex flex-column gap-3">{children}</div>
+                <div className="modal-footer">
+                  <Button
+                    type="button"
+                    variant={cancelVariant}
+                    danger={cancelDanger}
+                    onClick={onCancel ?? onClose}
+                    isDisabled={isSubmitLoading}
+                  >
+                    {cancelText}
+                  </Button>
+                  <Button type="submit" variant={submitVariant} isDisabled={isSubmitLoading}>
+                    {isSubmitLoading ? `${submitText}...` : submitText}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="modal-body">{children}</div>
+                <div className="modal-footer">
+                  <Button variant="primary" onClick={onClose}>
+                    {cancelText}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

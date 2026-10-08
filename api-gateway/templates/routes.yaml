@@ -629,6 +629,40 @@ routes:
     response_buffering: true
 
   # ============================================================================
+  # MONITORING ADMIN ROUTES (admin only)
+  # ============================================================================
+  # /api/v1/frontend/admin/monitoring/queues (queue, worker and Redis health)
+  - name: ${ROUTE_PREFIX}admin-monitoring-queues-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/monitoring/queues
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/monitoring/queues/events (SSE change signals)
+  # Buffering off, as for notification-request-events: a buffered stream never reaches the page.
+  - name: ${ROUTE_PREFIX}admin-monitoring-queue-events-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/monitoring/queues/events
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: false
+    response_buffering: false
+
+  # ============================================================================
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
   # /api/v1/frontend/admin/feature-flags (list all)
@@ -1295,8 +1329,9 @@ plugins:
   # every other route in this file) before key-auth's access phase runs - pre-function
   # plugins run first by Kong's plugin priority ordering. The original Authorization
   # header is left untouched so passthrough mode can still forward it to real GC
-  # Notify. NOT YET VALIDATED against a live Kong instance - confirm this works
-  # against the BC Gov-managed gateway (plugin availability/ordering) before merging.
+  # Notify. Verified on the BC Gov-managed gateway: a request carrying only the
+  # Authorization header reaches the backend with x-consumer-username populated, so
+  # key-auth validated the extracted key.
   - name: pre-function
     tags: [${CONFIG_TAG}]
     protocols: [http, https]
@@ -1676,6 +1711,23 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-users-list-frontend
+    config: *jwtConfig
+
+  # ============================================================================
+  # MONITORING ADMIN ROUTES PLUGINS
+  # ============================================================================
+  # Admin Monitoring Queues - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-monitoring-queues-frontend
+    config: *jwtConfig
+
+  # Admin Monitoring Queue Events (SSE) - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-monitoring-queue-events-frontend
     config: *jwtConfig
 
   # ============================================================================

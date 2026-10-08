@@ -4,7 +4,21 @@
 // stacked below it — comes from `.page` in page.scss. All this adds is the width
 // cap on the single-column form.
 .bulk-notifications > * {
-  max-width: 760px;
+  max-width: 572px;
+}
+
+.bulk-notifications > .bulk-notifications__issues {
+  width: 100%;
+  max-width: 1004px;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.bulk-notifications .file-upload__zone {
+  min-height: 240px;
+  box-sizing: border-box;
+  background: $white;
 }
 
 .bulk-notifications__notice {
@@ -84,6 +98,11 @@
   border-left: 4px solid $success-color;
   border-radius: 4px;
   background: $light-bg;
+}
+
+// Nothing was sent, so not the success green.
+.bulk-notifications__result--duplicate {
+  border-left-color: $primary-color;
 }
 
 .bulk-notifications__result-title {

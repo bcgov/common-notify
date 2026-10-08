@@ -37,6 +37,7 @@ describe('TenantSettingsService', () => {
     save: vi.fn(),
   }
   const mockEmailLogoService = {
+    getDefault: vi.fn().mockResolvedValue({ id: 'default-logo' }),
     findByIdIfApproved: vi.fn().mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
     }),
@@ -245,10 +246,29 @@ describe('TenantSettingsService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith({
         tenantId: 'tenant-uuid-1',
         ...emailDto,
+        useCustomEmailHeader: false,
         createdBy: 'updater-guid',
       })
       expect(mockRepository.save).toHaveBeenCalledWith(createdSettings)
       expect(result).toEqual(createdSettings)
+    })
+
+    it('saves header mode and preserves it when an older client omits the field', async () => {
+      const existing = { ...mockTenantSettings, useCustomEmailHeader: false }
+      mockRepository.findOne.mockResolvedValue(existing)
+      mockRepository.save.mockResolvedValue(existing)
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: true,
+      })
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', emailDto)
+      expect(existing.useCustomEmailHeader).toBe(true)
+      await service.upsertEmailSettings('tenant-uuid-1', {
+        ...emailDto,
+        useCustomEmailHeader: false,
+      })
+      expect(existing.useCustomEmailHeader).toBe(false)
     })
 
     it('should update the email fields and updatedBy when settings exist', async () => {
@@ -282,7 +302,7 @@ describe('TenantSettingsService', () => {
       expect(result).toEqual(savedSettings)
     })
 
-    it('should clear emailLogoId without an approval lookup', async () => {
+    it('should use the default logo when a legacy client sends null', async () => {
       const existingSettings = { ...mockTenantSettings, emailLogoId: emailDto.emailLogoId }
       const dto = { ...emailDto, emailLogoId: null }
       mockRepository.findOne.mockResolvedValue(existingSettings)
@@ -290,7 +310,7 @@ describe('TenantSettingsService', () => {
 
       await service.upsertEmailSettings('tenant-uuid-1', dto, 'updater-guid')
 
-      expect(existingSettings.emailLogoId).toBeNull()
+      expect(existingSettings.emailLogoId).toBe('default-logo')
       expect(mockEmailLogoService.findByIdIfApproved).not.toHaveBeenCalled()
     })
 
