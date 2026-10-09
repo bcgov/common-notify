@@ -189,9 +189,12 @@ describe('JwtUserExtractor', () => {
             authorization: 'Bearer header.!!!invalid!!!.signature',
           },
         } as any
+        // The extractor's logger is a static instance created at import, so spy on the prototype.
+        const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
 
-        JwtUserExtractor.extractUser(req)
-        // Logger mock would capture this
+        expect(JwtUserExtractor.extractUser(req)).toBe('system')
+        expect(warn).toHaveBeenCalled()
+        warn.mockRestore()
       })
     })
 

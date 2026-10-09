@@ -118,6 +118,21 @@ describe('User Thunks - Smart Upsert Logic', () => {
           error: null,
         },
       })
+
+      const authUser: AuthUser = {
+        id: 'ext-123',
+        email: 'john@example.com',
+        username: 'john.doe',
+        displayName: 'John Doe',
+        givenName: 'John',
+        familyName: 'Doe',
+      }
+
+      const result = await store.dispatch(upsertCurrentUserAsync(authUser))
+
+      expect(userApi.upsertCurrentUser).not.toHaveBeenCalled()
+      expect(result.payload).toEqual(existingUser)
+      expect(result.meta.requestStatus).toBe('fulfilled')
     })
   })
 
