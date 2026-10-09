@@ -13,6 +13,7 @@ import {
 } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
+import UnsavedChanges from '@/components/UnsavedChanges'
 import FileUpload from '@/components/FileUpload'
 import EventEmailPreview from '../components/EventEmailPreview'
 import type { RenderedNotification } from '../components/EventEmailPreview'
@@ -236,6 +237,10 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
     Boolean(template) && (Boolean(recipientEmail) || isOneRecipient || isCsvReady)
   const recipientCount = isManyRecipients ? csvRowCount : 1
 
+  // Anything chosen, typed, uploaded or applied here is lost on leaving.
+  const hasUnsavedChanges =
+    recipient !== null || otherEmail !== '' || csv.file !== null || applied !== null
+
   const recipientError = submitAttempted && !recipient ? 'Select a recipient.' : undefined
   const addRecipientsError =
     submitAttempted && recipient === 'other' && !addRecipients
@@ -298,6 +303,13 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
 
   return (
     <div className="page events">
+      <UnsavedChanges
+        hasUnsavedChanges={hasUnsavedChanges}
+        modalTitle="Leave test send?"
+        modalMessage="The recipients and/or test values you've entered will be lost if you leave this page."
+        primaryButtonText="Leave page"
+      />
+
       <PageHeading
         title="Test Notification"
         breadcrumbs={[
