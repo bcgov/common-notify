@@ -1,5 +1,9 @@
+# Pulled via mirror.gcr.io, Google's anonymous Docker Hub mirror. Anonymous
+# pulls straight from docker.io are rate limited PER IP, and GitHub's runners
+# share them, so builds failed with 429 Too Many Requests on whichever FROM
+# happened to be unlucky. Same images, same digests, no credentials needed.
 # Build
-FROM node:24.18.0-slim AS build
+FROM mirror.gcr.io/library/node:24.18.0-slim AS build
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -7,7 +11,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
-FROM node:24.18.0-slim AS dependencies
+FROM mirror.gcr.io/library/node:24.18.0-slim AS dependencies
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app

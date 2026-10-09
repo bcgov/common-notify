@@ -53,10 +53,15 @@ jobs:
             exit 0
           fi
 
-          # Signatures of the transient Silver API IP-rejection / connectivity blip.
-          # Kept deliberately specific to network/login failures so genuine
+          # Signatures of the transient Silver API IP-rejection / connectivity blip,
+          # plus Docker Hub's anonymous per-IP pull limit, which GitHub's shared
+          # runner IPs hit periodically and which failed a frontend build on
+          # `FROM alpine`. Most base images now come from mirror.gcr.io instead, but
+          # migrations/ still pulls flyway/flyway from Docker Hub, so the retry
+          # covers what the mirror cannot.
+          # Kept deliberately specific to network/rate-limit failures so genuine
           # deploy failures fall through and are NOT retried.
-          SIGNATURE='dial tcp .*:6443|i/o timeout|connection refused|TLS handshake timeout|Unable to connect to the server|error: You must be logged in to the server|couldn'\''t get current server API group list|the server has asked for the client to provide credentials|Client.Timeout exceeded while awaiting headers|net/http: request canceled'
+          SIGNATURE='dial tcp .*:6443|i/o timeout|connection refused|TLS handshake timeout|Unable to connect to the server|error: You must be logged in to the server|couldn'\''t get current server API group list|the server has asked for the client to provide credentials|Client.Timeout exceeded while awaiting headers|net/http: request canceled|429 Too Many Requests|toomanyrequests|You have reached your (pull rate|unauthenticated) limit'
 
           if echo "${LOG}" | grep -qiE "${SIGNATURE}"; then
             echo "::notice::Transient cluster-API / IP-rejection signature detected — re-running failed jobs."
