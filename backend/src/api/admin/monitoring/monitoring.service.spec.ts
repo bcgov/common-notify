@@ -327,6 +327,24 @@ describe('helpers', () => {
       maskPersonalData('Invalid recipient jane.doe@gov.bc.ca, sms +1 (250) 555-0123 rejected'),
     ).toBe('Invalid recipient [email], sms [phone] rejected')
   })
+
+  it('masks a malformed address rather than letting it through', () => {
+    expect(maskPersonalData('rejected jane@gov..bc.ca (bad domain)')).toBe(
+      'rejected [email] (bad domain)',
+    )
+    expect(maskPersonalData('local part only: jane@host')).toBe('local part only: [email]')
+  })
+
+  it('leaves text with no recipient alone', () => {
+    expect(maskPersonalData('Connection reset by peer')).toBe('Connection reset by peer')
+    expect(maskPersonalData('see @here for details')).toBe('see @here for details')
+  })
+
+  it('masks a long unmatched run without stalling', () => {
+    const started = performance.now()
+    maskPersonalData('a'.repeat(100_000) + '@')
+    expect(performance.now() - started).toBeLessThan(500)
+  })
 })
 
 describe('MonitoringService', () => {

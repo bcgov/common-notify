@@ -25,9 +25,13 @@ const EmailLogoMenuItem: FC<EmailLogoMenuItemProps> = ({
   onActivate,
   onSelect,
 }) => (
-  <div
+  // A button, not a div: focus stays on the combobox input (aria-activedescendant), so this is
+  // only focusable programmatically (tabIndex -1), but it still answers Enter and Space natively.
+  <button
+    type="button"
     id={optionId}
     role="option"
+    tabIndex={-1}
     aria-label={option.name}
     aria-selected={isSelected}
     className={`email-logo-menu__option${isActive ? ' email-logo-menu__option--active' : ''}${
@@ -45,7 +49,7 @@ const EmailLogoMenuItem: FC<EmailLogoMenuItemProps> = ({
         <SvgCheckIcon />
       </span>
     )}
-  </div>
+  </button>
 )
 
 export default EmailLogoMenuItem

@@ -95,14 +95,39 @@ export function parseRedisInfo(info: string): Record<string, string> {
   return fields
 }
 
+/** Minutes to clear the backlog at the current finish rate; null when nothing is finishing. */
+function estimateClearMinutes(pending: number, finishedPerMinute: number): number | null {
+  if (pending === 0) return 0
+  if (finishedPerMinute > 0) return Math.ceil(pending / finishedPerMinute)
+  return null
+}
+
+const TRAILING_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', ')', ']', '}', '>', "'", '"'])
+
 /**
  * Bull's failure reasons are provider error messages, which can quote the recipient. The page
  * is for spotting patterns, so addresses and numbers are masked before they leave the backend.
  */
 export function maskPersonalData(text: string): string {
-  return text
-    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]')
-    .replace(/\+?\d[\d\s().-]{8,}\d/g, '[phone]')
+  // Addresses are masked by splitting on whitespace rather than matching a pattern. Any address
+  // regex either misses malformed recipients (jane@gov..bc.ca, which providers do echo back) or
+  // rescans the token from every position and goes quadratic on a long unbroken run. A split is
+  // linear and masks any token holding an @, which errs towards masking too much.
+  const masked = text
+    .split(/(\s+)/)
+    .map((part) => {
+      // An @ needs something either side of it to be a recipient: "@here" is not one.
+      const at = part.indexOf('@')
+      if (at < 1 || at === part.length - 1) return part
+      // Trailing punctuation is handed back so the surrounding sentence survives. Counted
+      // backwards rather than matched: an anchored [...]* is retried from every position.
+      let end = part.length
+      while (end > 0 && TRAILING_PUNCTUATION.has(part[end - 1])) end--
+      return '[email]' + part.slice(end)
+    })
+    .join('')
+
+  return masked.replace(/\+?\d[\d\s().-]{8,}\d/g, '[phone]')
 }
 
 export function buildRedisStats(info: Record<string, string>): RedisStatsDto {
@@ -211,73 +236,104 @@ function messagesMoving(queueName: string, messages: MessageChannelStatsDto[]): 
   )
 }
 
-export function evaluateQueue(input: QueueEvaluationInput, messagesMoving = false): QueueStatsDto {
-  const { counts, throughput, oldestWaitingAgeMs, isPaused, liveWorkerPods } = input
-  const t = MONITORING_THRESHOLDS
-  const statuses: HealthStatus[] = []
-  const reasons: string[] = []
-  const backlog = counts.waiting + counts.paused
+/** One thing wrong with a queue: the severity, and the sentence the page shows for it. */
+type QueueFinding = { status: HealthStatus; reason: string }
 
-  if (isPaused) {
-    statuses.push('warning')
-    reasons.push('Queue is paused')
-  }
-  if (input.unheldActiveJobs > 0) {
-    statuses.push('warning')
-    reasons.push(
-      `${input.unheldActiveJobs} active job(s) not held by any live worker (possibly stalled; Bull retries stalled jobs within about a minute)`,
-    )
-  }
-  if (backlog > 0 && liveWorkerPods === 0) {
-    statuses.push('critical')
-    reasons.push('Jobs are waiting but no pod is processing this queue')
-  }
-  // A waiting job is only a problem when nothing is moving: during a large send, batches wait
-  // their turn for many minutes while the queue works steadily through them.
-  const moving =
+/**
+ * A waiting job is only a problem when nothing is moving: during a large send, batches wait their
+ * turn for many minutes while the queue works steadily through them.
+ */
+function isMoving(input: QueueEvaluationInput, messagesMoving: boolean): boolean {
+  const { throughput } = input
+  return (
     messagesMoving ||
     sumLast(throughput.completed, MOVING_WINDOW_MINUTES) +
       sumLast(throughput.failed, MOVING_WINDOW_MINUTES) >
       0
-  const stalledFor = `nothing has finished in the last ${MOVING_WINDOW_MINUTES} minutes`
-  if (!moving && oldestWaitingAgeMs !== null && oldestWaitingAgeMs >= t.oldestWaitingCriticalMs) {
-    statuses.push('critical')
-    reasons.push(`Oldest job has waited longer than the critical threshold and ${stalledFor}`)
-  } else if (
-    !moving &&
-    oldestWaitingAgeMs !== null &&
-    oldestWaitingAgeMs >= t.oldestWaitingWarningMs
-  ) {
-    statuses.push('warning')
-    reasons.push(`Oldest job has waited longer than the warning threshold and ${stalledFor}`)
-  }
+  )
+}
 
-  const recentFinished = throughput.outPerMinute * t.rateWindowMinutes
-  if (recentFinished >= MIN_JOBS_FOR_FAILURE_RATE) {
-    if (throughput.failureRatePercent >= t.failureRateCriticalPercent) {
-      statuses.push('critical')
-      reasons.push(`${throughput.failureRatePercent}% of recent jobs failed`)
-    } else if (throughput.failureRatePercent >= t.failureRateWarningPercent) {
-      statuses.push('warning')
-      reasons.push(`${throughput.failureRatePercent}% of recent jobs failed`)
+function checkOldestWaiting(input: QueueEvaluationInput, moving: boolean): QueueFinding | null {
+  const t = MONITORING_THRESHOLDS
+  const { oldestWaitingAgeMs } = input
+  if (moving || oldestWaitingAgeMs === null) return null
+
+  const stalledFor = `nothing has finished in the last ${MOVING_WINDOW_MINUTES} minutes`
+  if (oldestWaitingAgeMs >= t.oldestWaitingCriticalMs) {
+    return {
+      status: 'critical',
+      reason: `Oldest job has waited longer than the critical threshold and ${stalledFor}`,
     }
   }
-
-  if (backlog > 0 && sustainedGrowth(throughput)) {
-    statuses.push('warning')
-    reasons.push(
-      `Jobs have arrived faster than they finish for ${SUSTAINED_GROWTH_MINUTES} minutes running`,
-    )
+  if (oldestWaitingAgeMs >= t.oldestWaitingWarningMs) {
+    return {
+      status: 'warning',
+      reason: `Oldest job has waited longer than the warning threshold and ${stalledFor}`,
+    }
   }
+  return null
+}
 
-  let estimatedDrainMinutes: number | null = null
-  if (backlog === 0) {
-    estimatedDrainMinutes = 0
-  } else if (throughput.outPerMinute > throughput.inPerMinute) {
-    estimatedDrainMinutes = Math.ceil(backlog / (throughput.outPerMinute - throughput.inPerMinute))
+function checkFailureRate(input: QueueEvaluationInput): QueueFinding | null {
+  const t = MONITORING_THRESHOLDS
+  const { throughput } = input
+  const recentFinished = throughput.outPerMinute * t.rateWindowMinutes
+  if (recentFinished < MIN_JOBS_FOR_FAILURE_RATE) return null
+
+  const reason = `${throughput.failureRatePercent}% of recent jobs failed`
+  if (throughput.failureRatePercent >= t.failureRateCriticalPercent) {
+    return { status: 'critical', reason }
   }
+  if (throughput.failureRatePercent >= t.failureRateWarningPercent) {
+    return { status: 'warning', reason }
+  }
+  return null
+}
 
-  return { ...input, status: worstStatus(statuses), reasons, estimatedDrainMinutes }
+/** Minutes for the backlog to clear, or null when it is not shrinking. */
+function estimateDrainMinutes(backlog: number, throughput: QueueEvaluationInput['throughput']) {
+  if (backlog === 0) return 0
+  if (throughput.outPerMinute > throughput.inPerMinute) {
+    return Math.ceil(backlog / (throughput.outPerMinute - throughput.inPerMinute))
+  }
+  return null
+}
+
+export function evaluateQueue(input: QueueEvaluationInput, messagesMoving = false): QueueStatsDto {
+  const { counts, throughput, isPaused, liveWorkerPods } = input
+  const backlog = counts.waiting + counts.paused
+  const moving = isMoving(input, messagesMoving)
+
+  // Reported in this order, so the first reason names the most immediate thing to look at.
+  const findings: Array<QueueFinding | null> = [
+    isPaused ? { status: 'warning', reason: 'Queue is paused' } : null,
+    input.unheldActiveJobs > 0
+      ? {
+          status: 'warning',
+          reason: `${input.unheldActiveJobs} active job(s) not held by any live worker (possibly stalled; Bull retries stalled jobs within about a minute)`,
+        }
+      : null,
+    backlog > 0 && liveWorkerPods === 0
+      ? { status: 'critical', reason: 'Jobs are waiting but no pod is processing this queue' }
+      : null,
+    checkOldestWaiting(input, moving),
+    checkFailureRate(input),
+    backlog > 0 && sustainedGrowth(throughput)
+      ? {
+          status: 'warning',
+          reason: `Jobs have arrived faster than they finish for ${SUSTAINED_GROWTH_MINUTES} minutes running`,
+        }
+      : null,
+  ]
+
+  const present = findings.filter((finding): finding is QueueFinding => finding !== null)
+
+  return {
+    ...input,
+    status: worstStatus(present.map((finding) => finding.status)),
+    reasons: present.map((finding) => finding.reason),
+    estimatedDrainMinutes: estimateDrainMinutes(backlog, throughput),
+  }
 }
 
 type JobIdentifiers = { notifyId?: unknown; notificationId?: unknown; tenantId?: unknown }
@@ -891,8 +947,8 @@ export class MonitoringService {
     const window = MONITORING_THRESHOLDS.rateWindowMinutes
 
     return [...channels].map((channel) => {
-      const sent = Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
-      const failed = Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
+      const sent = new Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
+      const failed = new Array<number>(MONITORING_WINDOW_MINUTES).fill(0)
       for (const row of finishedRows) {
         if (row.channel !== channel) continue
         const index = minuteOf(new Date(row.minute).getTime()) - firstMinute
@@ -916,8 +972,7 @@ export class MonitoringService {
         failed,
         sentPerMinute,
         failedPerMinute,
-        estimatedClearMinutes:
-          pending === 0 ? 0 : finishedPerMinute > 0 ? Math.ceil(pending / finishedPerMinute) : null,
+        estimatedClearMinutes: estimateClearMinutes(pending, finishedPerMinute),
       }
     })
   }

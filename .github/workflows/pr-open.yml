@@ -63,7 +63,7 @@ jobs:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Generate DEV + all open-PR config (preserve DEV)
         env:

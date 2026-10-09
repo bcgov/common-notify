@@ -90,7 +90,7 @@ jobs:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generate DEV gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-for-stage.sh
@@ -186,7 +186,7 @@ jobs:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generate TEST gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-config.sh
@@ -265,7 +265,7 @@ jobs:
       group: gateway-config-apply
       cancel-in-progress: false # Queue instead of canceling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generate PROD gateway configuration
         run: |
           chmod +x api-gateway/scripts/generate-gateway-config.sh
@@ -324,7 +324,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Fetch all history for proper version bumping
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -378,7 +378,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.bump_version.outputs.version }}
           name: Release v${{ steps.bump_version.outputs.version }}
