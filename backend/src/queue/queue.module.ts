@@ -260,7 +260,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     }
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
     if (!this.ingestionQueue || !this.emailQueue || !this.smsQueue) {
       this.logger.debug('Queue configuration not available - skipping worker initialization')

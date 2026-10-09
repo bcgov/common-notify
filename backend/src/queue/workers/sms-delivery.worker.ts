@@ -48,7 +48,7 @@ export class SmsDeliveryWorker {
    * @param smsAdapter SMS transport adapter for sending SMS messages
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
-  static async initialize(
+  static initialize(
     smsQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
@@ -59,7 +59,7 @@ export class SmsDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     concurrency: number = 2,
     structuredLogger?: StructuredLoggerService,
-  ): Promise<void> {
+  ): void {
     const logger = new Logger(SmsDeliveryWorker.name)
     const workerContext = SmsDeliveryWorker.name
 

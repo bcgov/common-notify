@@ -97,7 +97,7 @@ export class IngestionWorker {
    * @param clamavService Service for malware scanning
    * @param concurrency Number of jobs to process in parallel (default: 1)
    */
-  static async initialize(
+  static initialize(
     ingestionQueue: Bull.Queue<IngestionJobPayload>,
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     smsQueue: Bull.Queue<DeliveryJobPayload>,
@@ -108,7 +108,7 @@ export class IngestionWorker {
     concurrency: number = 1,
     attachmentService?: AttachmentService,
     phoneNumberService: PhoneNumberService = new PhoneNumberService(),
-  ): Promise<void> {
+  ): void {
     const logger = new Logger(IngestionWorker.name)
 
     logger.log(`Registering ingestion worker processor (concurrency=${concurrency})`)

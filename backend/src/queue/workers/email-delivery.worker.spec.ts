@@ -101,8 +101,8 @@ describe('EmailDeliveryWorker', () => {
   })
 
   describe('initialize', () => {
-    it('should register a process handler on the email queue', async () => {
-      await EmailDeliveryWorker.initialize(
+    it('should register a process handler on the email queue', () => {
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -117,8 +117,8 @@ describe('EmailDeliveryWorker', () => {
       expect(mockEmailQueue.process).toHaveBeenCalled()
     })
 
-    it('should register event listeners on the email queue', async () => {
-      await EmailDeliveryWorker.initialize(
+    it('should register event listeners on the email queue', () => {
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -135,7 +135,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should process email delivery job successfully', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -200,7 +200,7 @@ describe('EmailDeliveryWorker', () => {
         getSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
       }
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -241,7 +241,7 @@ describe('EmailDeliveryWorker', () => {
         getSenderAddress: vi.fn().mockResolvedValue(null),
       }
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -277,7 +277,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('brands inline emails before handing them to the adapter', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -322,7 +322,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should handle multiple recipients', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -367,7 +367,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email payload is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -406,7 +406,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when recipient email is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -446,7 +446,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email subject is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -487,7 +487,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email body is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -528,7 +528,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should resolve a template-only email whose content has no inline subject/body', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -601,7 +601,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should merge channel-level params over global params when rendering a template email', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -658,7 +658,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should merge channel-level params over global params when rendering inline content', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -722,7 +722,7 @@ describe('EmailDeliveryWorker', () => {
         new BadRequestException('Missing personalisation for template ID template-uuid: firstName'),
       )
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -773,7 +773,7 @@ describe('EmailDeliveryWorker', () => {
       )
     })
     it('should throw error when notifyId is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -814,7 +814,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when tenantId is missing', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -855,7 +855,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when attempt is invalid', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -897,7 +897,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should mark notification as FAILED on final attempt (attempt 2)', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -948,7 +948,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('leaves a plain send owed after a CHES outage outlasts every attempt', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -989,7 +989,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should NOT mark notification as FAILED on non-final attempts', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1056,7 +1056,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should call completed event listener on job success', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1101,7 +1101,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should call failed event listener on job failure', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1144,7 +1144,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should update status to COMPLETED with correct updatedBy', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1191,7 +1191,7 @@ describe('EmailDeliveryWorker', () => {
     it('should log with notifyId for end-to-end tracing', async () => {
       const debugSpy = vi.spyOn(Logger.prototype, 'debug')
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1239,7 +1239,7 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should handle email with CC and BCC', async () => {
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1284,10 +1284,10 @@ describe('EmailDeliveryWorker', () => {
       expect(mockNotificationService.update).toHaveBeenCalledTimes(2)
     })
 
-    it('should use correct concurrency level', async () => {
+    it('should use correct concurrency level', () => {
       const initSpy = vi.spyOn(EmailDeliveryWorker, 'initialize' as any)
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1319,7 +1319,7 @@ describe('EmailDeliveryWorker', () => {
         },
       ])
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1380,7 +1380,7 @@ describe('EmailDeliveryWorker', () => {
         },
       ])
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1436,7 +1436,7 @@ describe('EmailDeliveryWorker', () => {
         new Error('Failed to download attachment'),
       )
 
-      await EmailDeliveryWorker.initialize(
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -1484,7 +1484,7 @@ describe('EmailDeliveryWorker', () => {
         name: 'Test Template',
       }
 
-      beforeEach(async () => {
+      beforeEach(() => {
         mockTemplatesRepository.findById.mockResolvedValue(bulkTemplate)
         mockTemplatesService.renderTemplateContent.mockReturnValue({
           subject: 'Bulk Subject',
@@ -1493,7 +1493,7 @@ describe('EmailDeliveryWorker', () => {
         })
         vi.mocked(mockEmailAdapter.send).mockResolvedValue({ messageId: 'ext-123' })
 
-        await EmailDeliveryWorker.initialize(
+        EmailDeliveryWorker.initialize(
           mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
           mockNotificationService,
           mockConfigService,
@@ -1862,8 +1862,8 @@ describe('EmailDeliveryWorker', () => {
     })
   })
   describe('redelivery', () => {
-    beforeEach(async () => {
-      await EmailDeliveryWorker.initialize(
+    beforeEach(() => {
+      EmailDeliveryWorker.initialize(
         mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,

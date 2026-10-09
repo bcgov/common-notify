@@ -109,8 +109,8 @@ describe('SmsDeliveryWorker', () => {
   })
 
   describe('initialize', () => {
-    it('should register a process handler on the SMS queue', async () => {
-      await SmsDeliveryWorker.initialize(
+    it('should register a process handler on the SMS queue', () => {
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -124,8 +124,8 @@ describe('SmsDeliveryWorker', () => {
       expect(mockSmsQueue.process).toHaveBeenCalled()
     })
 
-    it('should register event listeners on the SMS queue', async () => {
-      await SmsDeliveryWorker.initialize(
+    it('should register event listeners on the SMS queue', () => {
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -152,7 +152,7 @@ describe('SmsDeliveryWorker', () => {
         ],
       })
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -211,7 +211,7 @@ describe('SmsDeliveryWorker', () => {
         .fn()
         .mockResolvedValue({ messageId: 'SM1', providerResponse: 'sent' })
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -249,7 +249,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('skips recipients an earlier run delivered even when Bull did not count it as a retry', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -288,7 +288,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should successfully send SMS and update status', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -347,7 +347,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when SMS payload is missing', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -385,7 +385,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when recipient phone is missing', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -424,7 +424,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should permanently fail a malformed recipient before calling the SMS provider', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -480,7 +480,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when SMS body is missing', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -528,7 +528,7 @@ describe('SmsDeliveryWorker', () => {
         bodyType: 'markdown',
       })
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -584,7 +584,7 @@ describe('SmsDeliveryWorker', () => {
         bodyType: 'markdown',
       })
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -629,7 +629,7 @@ describe('SmsDeliveryWorker', () => {
         body: 'Rendered SMS Body',
       })
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -680,7 +680,7 @@ describe('SmsDeliveryWorker', () => {
         new BadRequestException('Missing personalisation for template ID template-sms-uuid: code'),
       )
 
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -730,7 +730,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when notifyId is missing', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -770,7 +770,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when tenantId is missing', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -810,7 +810,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when attempt is invalid', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -851,7 +851,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should mark notification as FAILED on final attempt (attempt 2)', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -900,7 +900,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should NOT mark notification as FAILED on non-final attempts', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,
@@ -957,7 +957,7 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should call failed callback on job error', async () => {
-      await SmsDeliveryWorker.initialize(
+      SmsDeliveryWorker.initialize(
         mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
         mockNotificationService,
         mockConfigService,

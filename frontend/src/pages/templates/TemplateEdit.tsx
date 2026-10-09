@@ -121,7 +121,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       }
     }
 
-    fetchTemplate()
+    void fetchTemplate()
   }, [templateId])
 
   const handleFieldChange = (field: string) => (value: string) => {

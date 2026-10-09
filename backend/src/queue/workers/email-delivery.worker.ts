@@ -79,7 +79,7 @@ export class EmailDeliveryWorker {
    * @param emailAdapter Email transport adapter for sending emails
    * @param concurrency Number of jobs to process in parallel (default: 2)
    */
-  static async initialize(
+  static initialize(
     emailQueue: Bull.Queue<DeliveryJobPayload>,
     notificationService: NotificationService,
     configService: ConfigService,
@@ -94,7 +94,7 @@ export class EmailDeliveryWorker {
     // Last, and optional, because the parameters above are passed positionally: a new one in the
     // middle silently rebinds every existing call's concurrency argument.
     tenantSettingsService?: TenantSettingsService,
-  ): Promise<void> {
+  ): void {
     const logger = new Logger(EmailDeliveryWorker.name)
     const workerContext = EmailDeliveryWorker.name
 
