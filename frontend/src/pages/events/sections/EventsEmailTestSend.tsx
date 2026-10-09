@@ -18,7 +18,6 @@ import EventEmailPreview from '../components/EventEmailPreview'
 import type { RenderedNotification } from '../components/EventEmailPreview'
 import EventEmailPreviewModal from '../components/EventEmailPreviewModal'
 import type { AppliedNotification } from '../components/EventEmailPreviewModal'
-import EventEmailCsvPreviewModal from '../components/EventEmailCsvPreviewModal'
 // Lives with the batch send screen, the only other place a recipient CSV is uploaded.
 import CsvIssuesTable from '@/pages/bulk-notifications/sections/CsvIssuesTable'
 import { getEventById, sendEventTestEmail } from '@/api/events.api'
@@ -223,10 +222,6 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
     await csv.handleFileChange(nextFile)
   }
 
-  // Which modal opens depends on where the values came from: typed in and editable, or read off
-  // the uploaded row and only reviewable.
-  const handleEditValues = () => setEditValuesOpen(true)
-
   const isReviewable = Boolean(template) && (Boolean(recipientEmail) || isCsvReady)
   const recipientCount = isManyRecipients ? csvRowCount : 1
 
@@ -375,7 +370,9 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                 </div>
 
                 <div className="events__test-send-review-bar">
-                  {isCsvReady && (
+                  {/* Uploaded values come from the file and cannot be edited here, so a CSV send
+                      steps through its rows instead of offering Edit values. */}
+                  {isCsvReady ? (
                     <>
                       <span className="events__test-send-position" aria-live="polite">
                         Email notification {previewRow + 1} of {csvRowCount}
@@ -399,11 +396,15 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                         <SvgChevronRightIcon />
                       </button>
                     </>
+                  ) : (
+                    <Button
+                      size="medium"
+                      variant="secondary"
+                      onPress={() => setEditValuesOpen(true)}
+                    >
+                      Edit values
+                    </Button>
                   )}
-
-                  <Button size="medium" variant="secondary" onPress={handleEditValues}>
-                    Edit values
-                  </Button>
                 </div>
 
                 <div className="events__preview-card">
@@ -421,34 +422,20 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   />
                 </div>
 
-                {isCsvReady && parsed ? (
-                  <EventEmailCsvPreviewModal
+                {!isCsvReady && recipientEmail && (
+                  <EventEmailPreviewModal
                     isOpen={isEditValuesOpen}
                     onClose={() => setEditValuesOpen(false)}
+                    template={template}
                     emailSettings={emailSettings}
-                    parsed={parsed}
-                    rowIndex={previewRow}
-                    onRowChange={setPreviewRow}
                     from={emailSettings.senderEmail ?? ''}
-                    rendered={rowRendered}
-                    isLoading={isRowLoading}
+                    to={recipientEmail}
+                    values={applied?.values ?? {}}
+                    onApply={(next) => {
+                      setApplied(next)
+                      setEditValuesOpen(false)
+                    }}
                   />
-                ) : (
-                  recipientEmail && (
-                    <EventEmailPreviewModal
-                      isOpen={isEditValuesOpen}
-                      onClose={() => setEditValuesOpen(false)}
-                      template={template}
-                      emailSettings={emailSettings}
-                      from={emailSettings.senderEmail ?? ''}
-                      to={recipientEmail}
-                      values={applied?.values ?? {}}
-                      onApply={(next) => {
-                        setApplied(next)
-                        setEditValuesOpen(false)
-                      }}
-                    />
-                  )
                 )}
               </>
             )}
