@@ -131,8 +131,8 @@ export default function EventsSmsTab({
   const invalid = submittedTo.filter(
     (number) => !isValidPhone(number) || duplicates.includes(number),
   )
-  const recipientError = submittedTo.length ? '' : 'Please select at least one recipient.'
-  const templateError = selectedTemplate ? '' : 'Please select a template.'
+  const recipientError = submittedTo.length ? '' : 'Select at least one recipient'
+  const templateError = selectedTemplate ? '' : 'Select a template'
   const busy = saving || isDeactivating
   const disabled = isDisabled || busy
   const showFields = isConfigured || channelActive
@@ -156,7 +156,7 @@ export default function EventsSmsTab({
     setValidationAttempted(true)
     if (senderError || recipientError || templateError || invalid.length) {
       showErrorToast(
-        'Required fields missing or invalid',
+        'Required fields missing',
         action === 'Save'
           ? 'Settings not saved. Complete all required fields before saving.'
           : 'Preview not available. Complete all required fields before previewing.',
@@ -205,10 +205,10 @@ export default function EventsSmsTab({
         <>
           <Callout
             variant="lightGrey"
-            title="SMS settings saved"
+            title={channelActive ? 'Ready to send?' : 'SMS settings saved'}
             description={
               channelActive
-                ? 'Your SMS notification settings are saved. You can review the template below or edit your settings. Test notifications are not available yet.'
+                ? 'Your SMS settings are ready. Continue to select recipients and send a test notification to verify the content and formatting.'
                 : 'Your SMS settings are saved. Activate this channel when you are ready to send notifications.'
             }
           />
@@ -222,6 +222,7 @@ export default function EventsSmsTab({
               The saved template preview is unavailable. Open settings to select a template.
             </p>
           )}
+          <p className="events__help">Test notifications are not available yet.</p>
           <StickyBar>
             <Button type="button" variant="secondary" onPress={() => setShowSaved(false)}>
               Edit settings

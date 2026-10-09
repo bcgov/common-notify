@@ -89,8 +89,8 @@ describe('SMS event MVP', () => {
     expect(onSave).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(screen.getByText('Please select at least one recipient.')).toBeVisible()
-    expect(screen.getByText('Please select a template.')).toBeVisible()
+    expect(screen.getByText('Select at least one recipient')).toBeVisible()
+    expect(screen.getByText('Select a template')).toBeVisible()
   })
 
   it('returns to the saved summary and confirms deactivation before disabling retained fields', async () => {
@@ -103,7 +103,7 @@ describe('SMS event MVP', () => {
         onDeactivate={onDeactivate}
       />,
     )
-    expect(screen.getByText('SMS settings saved')).toBeVisible()
+    expect(screen.getByText('Ready to send?')).toBeVisible()
     await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
     expect(onDeactivate).not.toHaveBeenCalled()
@@ -125,12 +125,12 @@ describe('SMS event MVP', () => {
     expect(screen.getByRole('button', { name: 'Preview' })).toBeEnabled()
     expect(screen.getByRole('switch', { name: 'Activate channel' })).toBeEnabled()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(screen.getByText('Please select at least one recipient.')).toBeVisible()
-    expect(screen.getByText('Please select a template.')).toBeVisible()
+    expect(screen.getByText('Select at least one recipient')).toBeVisible()
+    expect(screen.getByText('Select a template')).toBeVisible()
     expect(onSave).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
     expect(showErrorToast).toHaveBeenLastCalledWith(
-      'Required fields missing or invalid',
+      'Required fields missing',
       expect.stringContaining('Preview not available'),
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -140,7 +140,7 @@ describe('SMS event MVP', () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(configured))
-    expect(await screen.findByText('SMS settings saved')).toBeVisible()
+    expect(await screen.findByText('Ready to send?')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Continue to test notification' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
@@ -153,7 +153,7 @@ describe('SMS event MVP', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(onSave).not.toHaveBeenCalled()
     expect(onDirty).toHaveBeenLastCalledWith(true)
-    expect(screen.getByText('Please select at least one recipient.')).toBeVisible()
+    expect(screen.getByText('Select at least one recipient')).toBeVisible()
   })
 
   it('previews valid settings without saving them', async () => {
@@ -171,7 +171,7 @@ describe('SMS event MVP', () => {
       expect(showErrorToast).toHaveBeenCalledWith('Unable to save settings', 'Unavailable'),
     )
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-    expect(screen.queryByText('SMS settings saved')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ready to send?')).not.toBeInTheDocument()
   })
 
   it('prevents read-only users from saving or previewing', () => {
