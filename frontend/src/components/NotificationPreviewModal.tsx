@@ -75,6 +75,98 @@ interface NotificationPreviewModalProps {
  * Used by both the template editor and the bulk send screen, which differ only in where the values
  * come from (typed in, or read off a spreadsheet row) and what the footer does.
  */
+/** The rendered output, in the order the modal prefers it. */
+const RenderedOutput: FC<{
+  bodyOverride?: ReactNode
+  error?: string | null
+  isLoading?: boolean
+  smsPreview?: ReactNode
+  bodyHtml?: string
+  bodyText?: string
+}> = ({ bodyOverride, error, isLoading, smsPreview, bodyHtml, bodyText }) => {
+  if (bodyOverride) return <>{bodyOverride}</>
+  if (error) return <p className="notification-preview__error">{error}</p>
+  if (isLoading) {
+    // Indeterminate: a render is a single request with no measurable progress, so a
+    // percentage would be invented.
+    return (
+      <div className="notification-preview__loading">
+        <ProgressCircle isIndeterminate aria-label="Rendering preview" size="medium" />
+        <p className="notification-preview__placeholder">Rendering preview...</p>
+      </div>
+    )
+  }
+  if (smsPreview) return <>{smsPreview}</>
+  if (bodyHtml !== undefined) {
+    // A sandboxed iframe with no allow-* tokens: the template is tenant-authored, so its markup
+    // runs with no script, no forms and no access to this document, and its styles cannot leak
+    // into the app.
+    return (
+      <iframe
+        className="notification-preview__frame"
+        title="Rendered email"
+        sandbox=""
+        srcDoc={bodyHtml}
+      />
+    )
+  }
+  return <pre className="notification-preview__text">{bodyText}</pre>
+}
+
+/** One preview value: a True/False pair for a boolean, a text field for anything else. */
+const VariableField: FC<{
+  variable: PreviewVariable
+  isEditable?: boolean
+  onVariableChange?: (name: string, value: string) => void
+}> = ({ variable, isEditable, onVariableChange }) => {
+  if (variable.type === 'boolean') {
+    // A True/False pair rather than a switch: the value is one of two named states the template
+    // branches on, and it reads the same whether the field is editable here or fixed by a
+    // spreadsheet row.
+    return (
+      <div className="notification-preview__field-toggle">
+        <ToggleButtonGroup
+          label={variable.name}
+          size="small"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={[variable.value === 'true' ? 'true' : 'false']}
+          isDisabled={!isEditable}
+          onSelectionChange={(keys) => {
+            const [selected] = keys
+            if (selected != null) {
+              onVariableChange?.(variable.name, String(selected))
+            }
+          }}
+        >
+          <ToggleButton id="true" size="small">
+            True
+          </ToggleButton>
+          <ToggleButton id="false" size="small">
+            False
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+    )
+  }
+
+  // Wrap rather than pass `className`: the design system spreads props over its own class, so a
+  // className here would strip it and break the invalid state.
+  return (
+    <div className="notification-preview__field-text">
+      <TextField
+        label={variable.name}
+        value={variable.value}
+        onChange={(value) => onVariableChange?.(variable.name, value)}
+        isReadOnly={!isEditable}
+        isRequired={isEditable}
+        isInvalid={variable.isInvalid}
+        errorMessage={variable.errorMessage}
+      />
+    </div>
+  )
+}
+
 const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -150,50 +242,14 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                 <p className="notification-preview__intro">No variables found.</p>
               ) : (
                 <div className="notification-preview__fields">
-                  {variables.map((variable) =>
-                    variable.type === 'boolean' ? (
-                      // A True/False pair rather than a switch: the value is one of two named
-                      // states the template branches on, and it reads the same whether the field is
-                      // editable here or fixed by a spreadsheet row.
-                      <div key={variable.name} className="notification-preview__field-toggle">
-                        <ToggleButtonGroup
-                          label={variable.name}
-                          size="small"
-                          selectionMode="single"
-                          disallowEmptySelection
-                          selectedKeys={[variable.value === 'true' ? 'true' : 'false']}
-                          isDisabled={!isEditable}
-                          onSelectionChange={(keys) => {
-                            const [selected] = keys
-                            if (selected != null) {
-                              onVariableChange?.(variable.name, String(selected))
-                            }
-                          }}
-                        >
-                          <ToggleButton id="true" size="small">
-                            True
-                          </ToggleButton>
-                          <ToggleButton id="false" size="small">
-                            False
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-                      </div>
-                    ) : (
-                      // Wrap rather than pass `className`: the design system spreads props over its
-                      // own class, so a className here would strip it and break the invalid state.
-                      <div key={variable.name} className="notification-preview__field-text">
-                        <TextField
-                          label={variable.name}
-                          value={variable.value}
-                          onChange={(value) => onVariableChange?.(variable.name, value)}
-                          isReadOnly={!isEditable}
-                          isRequired={isEditable}
-                          isInvalid={variable.isInvalid}
-                          errorMessage={variable.errorMessage}
-                        />
-                      </div>
-                    ),
-                  )}
+                  {variables.map((variable) => (
+                    <VariableField
+                      key={variable.name}
+                      variable={variable}
+                      isEditable={isEditable}
+                      onVariableChange={onVariableChange}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -240,32 +296,14 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
 
               {outputHeader}
 
-              {bodyOverride ? (
-                bodyOverride
-              ) : error ? (
-                <p className="notification-preview__error">{error}</p>
-              ) : isLoading ? (
-                // Indeterminate: a render is a single request with no measurable progress, so a
-                // percentage would be invented.
-                <div className="notification-preview__loading">
-                  <ProgressCircle isIndeterminate aria-label="Rendering preview" size="medium" />
-                  <p className="notification-preview__placeholder">Rendering preview...</p>
-                </div>
-              ) : smsPreview ? (
-                smsPreview
-              ) : bodyHtml !== undefined ? (
-                // A sandboxed iframe with no allow-* tokens: the template is tenant-authored, so
-                // its markup runs with no script, no forms and no access to this document, and its
-                // styles cannot leak into the app.
-                <iframe
-                  className="notification-preview__frame"
-                  title="Rendered email"
-                  sandbox=""
-                  srcDoc={bodyHtml}
-                />
-              ) : (
-                <pre className="notification-preview__text">{bodyText}</pre>
-              )}
+              <RenderedOutput
+                bodyOverride={bodyOverride}
+                error={error}
+                isLoading={isLoading}
+                smsPreview={smsPreview}
+                bodyHtml={bodyHtml}
+                bodyText={bodyText}
+              />
             </div>
           </div>
 

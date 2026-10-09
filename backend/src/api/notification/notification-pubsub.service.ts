@@ -38,7 +38,10 @@ export class NotificationPubSubService implements OnModuleDestroy, OnApplication
     this.publisher = new Redis(options)
     attachRedisErrorLogging(this.subscriber, `${NotificationPubSubService.name}[subscriber]`)
     attachRedisErrorLogging(this.publisher, `${NotificationPubSubService.name}[publisher]`)
+  }
 
+  // psubscribe is async, so it runs as a lifecycle hook rather than inside the constructor.
+  onModuleInit(): void {
     // Subscribe to all notification:changed events
     this.subscriber.psubscribe('notification:changed:*', (err) => {
       if (err) this.logger.error('Failed to subscribe to notification changes', err)
