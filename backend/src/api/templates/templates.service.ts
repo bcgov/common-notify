@@ -24,7 +24,11 @@ import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
-import { EmailTemplateLayoutService, RenderedEmailContent } from './email-template-layout.service'
+import {
+  EmailHeaderOverride,
+  EmailTemplateLayoutService,
+  RenderedEmailContent,
+} from './email-template-layout.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
   extractTemplatePersonalisationKeys,
@@ -52,8 +56,9 @@ export class TemplatesService {
   public applyEmailLayout(
     template: Pick<Template, 'tenantId' | 'channelCode'>,
     rendered: RenderedEmailContent,
+    header?: EmailHeaderOverride,
   ): Promise<RenderedEmailContent> {
-    return this.emailTemplateLayoutService.apply(template, rendered)
+    return this.emailTemplateLayoutService.apply(template, rendered, header)
   }
 
   /**
@@ -273,7 +278,15 @@ export class TemplatesService {
     }
 
     // Use the same rendering logic as delivery workers to avoid code duplication
-    const rendered = await this.renderTemplateContent(template, previewDto.params || {})
+    // Previews render while values are still being typed, so blanks are allowed here.
+    const rendered = await this.renderTemplateContent(
+      template,
+      previewDto.params || {},
+      undefined,
+      {
+        allowEmptyValues: true,
+      },
+    )
 
     return {
       templateId: template.id,
@@ -344,16 +357,23 @@ export class TemplatesService {
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
    * @param bodyType Optional override for body content type. Ignored for SMS templates.
+   * @param options.allowEmptyValues Accept null or blank values for required placeholders. Only
+   *   for previews; anything that is sent must have every value filled in.
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
     template: Template,
     personalisation: Record<string, any> = {},
     bodyType?: 'markdown',
+    options: { allowEmptyValues?: boolean } = {},
   ): Promise<RenderedEmailContent> {
     const normalizedPersonalisation = personalisation ?? {}
 
-    this.validateTemplatePersonalisation(template, normalizedPersonalisation)
+    this.validateTemplatePersonalisation(
+      template,
+      normalizedPersonalisation,
+      options.allowEmptyValues ?? false,
+    )
 
     // Get the renderer for this template's engine
     const engineName = this.mapEngineToRendererName(template.engineCode as TemplateEngine)
@@ -471,11 +491,17 @@ export class TemplatesService {
   private validateTemplatePersonalisation(
     template: Template,
     personalisation: Record<string, any>,
+    allowEmptyValues: boolean,
   ): void {
     const requiredKeys = extractTemplatePersonalisationKeys(template, personalisation)
 
+    // An empty value renders as nothing, which is as much a gap in the sent message as an absent
+    // key, so both are reported as missing. Previews opt out: they render a template while its
+    // values are still being filled in.
     const missingKeys = requiredKeys.filter(
-      (key) => !Object.prototype.hasOwnProperty.call(personalisation, key),
+      (key) =>
+        !Object.prototype.hasOwnProperty.call(personalisation, key) ||
+        (!allowEmptyValues && isEmptyPersonalisationValue(personalisation[key])),
     )
 
     if (missingKeys.length > 0) {
@@ -506,4 +532,12 @@ export class TemplatesService {
       updatedAt: template.updatedAt,
     }
   }
+}
+
+/**
+ * A value that would render as nothing: null, undefined or a blank string. `false`, `0` and `[]`
+ * are real values a template branches or loops on, so they count as supplied.
+ */
+function isEmptyPersonalisationValue(value: unknown): boolean {
+  return value === null || value === undefined || (typeof value === 'string' && !value.trim())
 }

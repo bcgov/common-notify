@@ -58,6 +58,20 @@
   }
 }
 
+.events__test-send-recipients .bcds-react-aria-RadioGroup--label {
+  font-weight: 700;
+}
+
+// The design system's field labels use the small body size; FileUpload's own label does not.
+.events__section .file-upload__label {
+  font: var(--typography-regular-small-body);
+  font-weight: 700;
+}
+
+.events__test-send-tip .bcds-Callout--Description {
+  white-space: pre-line;
+}
+
 // Borrowed from templates info icon scss
 .events__tooltip-trigger {
   display: inline-flex;
@@ -200,17 +214,31 @@
   gap: var(--layout-padding-xsmall);
 }
 
+// Tight above the rule and generous below it, so the header reads as one block and the message
+// as another. Matches HEADER_PADDING_BELOW_PX / HEADER_MARGIN_BELOW_PX in the backend's
+// email-template-layout.service, which is what the delivered email uses.
 .events__header-preview-row {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-bottom: 16px;
+  // No padding above the rule: the approved logo SVGs carry whitespace around their artwork, so
+  // the image box already supplies that gap.
+  margin-bottom: 28px;
   border-bottom: 1px solid $border-default;
 }
 
+// In the preview modal the header carries its own rule, so the one under the envelope above it
+// is dropped. The modal is shared with other previews, hence keying off the header row.
+.notification-preview__output-pane:has(.events__header-preview-row)
+  .notification-preview__envelope {
+  border-bottom: 0;
+}
+
+// Kept in step with LOGO_HEIGHT_PX in the backend's email-template-layout.service, which is what
+// the delivered email uses - this preview is only honest while the two agree.
 .events__header-preview-logo {
-  height: 48px;
-  max-width: 180px;
+  height: 80px;
+  max-width: 270px;
   object-fit: contain;
   object-position: left center;
 }
@@ -247,6 +275,120 @@
   font: var(--typography-regular-body);
   color: var(--typography-color-primary);
   white-space: pre-wrap;
+}
+
+// Test send page. The notification sits in a card of its own, under the addresses it will
+// be sent between.
+.events__preview-card {
+  padding: 24px;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+}
+
+// The rendered email, once values have been applied. Inlined into the page rather than framed,
+// so the app's own styles reach it - these are the few that would otherwise distort an email.
+.events__preview-body {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+
+  // The card supplies the spacing around the body; the email's own first and last blocks
+  // should not add to it.
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  // Email is laid out at a fixed pixel width that the card may be narrower than.
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  table {
+    max-width: 100%;
+  }
+}
+
+.events__preview-envelope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.events__preview-envelope-line {
+  margin: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}
+
+// A heading and its help text belong together, closer than the 24px the section gives its
+// own children.
+.events__subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.events__subheading {
+  margin: 0;
+  font-size: $font-size-xl;
+  font-weight: 700;
+  color: $dark-text;
+}
+
+// Placeholder height for the review the test send page has yet to show - see the comment
+// on the element itself.
+.events__test-send-spacer {
+  min-height: 320px;
+}
+
+// Which uploaded row is on show, and the controls for the review below it. Without an upload
+// only the Edit values button is here, which is why it sits at the end rather than the start.
+.events__test-send-review-bar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.events__test-send-position {
+  font-weight: 700;
+  margin-right: auto;
+}
+
+// Icon buttons, not links: these step between messages rather than navigating away.
+.events__test-send-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xs;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: $dark-text;
+  cursor: pointer;
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  &:hover:not(:disabled) {
+    background: $light-bg;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $border-active;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
 }
 
 // DS default is a white square, override this to give the rounded blue tags from the design

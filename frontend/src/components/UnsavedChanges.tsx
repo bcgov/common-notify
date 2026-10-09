@@ -28,6 +28,8 @@ type ControlledProps = {
 type UnsavedChangesProps = {
   modalTitle?: string
   modalMessage?: ReactNode
+  /** Label of the button that leaves and drops the edits. */
+  primaryButtonText?: string
 } & (RouteGuardProps | ControlledProps)
 
 /**
@@ -39,6 +41,7 @@ type UnsavedChangesProps = {
 const UnsavedChanges: FC<UnsavedChangesProps> = ({
   modalTitle = 'Unsaved changes',
   modalMessage = 'You have unsaved changes. If you leave this page, your changes will be lost.',
+  primaryButtonText = 'Leave without saving',
   hasUnsavedChanges,
   isSaving,
   isBlocked,
@@ -70,7 +73,7 @@ const UnsavedChanges: FC<UnsavedChangesProps> = ({
       isOpen
       onClose={stay}
       title={modalTitle}
-      cancelText="Leave without saving"
+      cancelText={primaryButtonText}
       onCancel={leave}
       cancelVariant="tertiary"
       cancelDanger

@@ -41,7 +41,7 @@ export class EmailLogoBootstrapService implements OnModuleInit {
       await this.storage.upload({
         storageKey,
         content,
-        mimeType: 'image/svg+xml',
+        mimeType: filename.endsWith('.png') ? 'image/png' : 'image/svg+xml',
       })
       this.logger.log(`Uploaded email logo seed object "${storageKey}"`)
     }

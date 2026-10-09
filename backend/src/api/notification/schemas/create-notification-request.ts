@@ -51,4 +51,12 @@ export class CreateNotificationRequestDto {
   @IsOptional()
   @IsBoolean()
   isInternal?: boolean
+
+  @ApiPropertyOptional({
+    description: 'Event this request was generated from, for an event-sourced send',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  eventId?: string
 }

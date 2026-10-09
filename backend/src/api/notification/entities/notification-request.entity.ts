@@ -58,6 +58,9 @@ export class NotificationRequest {
   @Column({ name: 'payload', type: 'jsonb', nullable: true })
   payload?: any
 
+  @Column({ name: 'event_id', type: 'uuid', nullable: true })
+  eventId?: string
+
   @Column({ name: 'is_internal', type: 'boolean', default: false })
   isInternal: boolean
 

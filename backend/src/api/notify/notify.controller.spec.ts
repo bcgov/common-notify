@@ -41,6 +41,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -214,6 +215,7 @@ describe('Notify Controllers', () => {
           useValue: mockSmsSegmentService,
         },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
+        { provide: EventNotificationResolver, useValue: {} },
       ],
     })
       .overrideGuard(NotifyServiceGuard)

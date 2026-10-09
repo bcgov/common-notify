@@ -39,6 +39,8 @@ interface NotificationPreviewModalProps {
   /** Left pane: the values the body is rendered from. */
   variables: PreviewVariable[]
   variablesIntro: string
+  /** Heading over the value list, where "Preview data" is not what they are. */
+  variablesHeading?: string
   /** When false the values are shown as read-only - they came from somewhere else, e.g. a CSV row. */
   isEditable?: boolean
   onVariableChange?: (name: string, value: string) => void
@@ -67,6 +69,8 @@ interface NotificationPreviewModalProps {
 
   /** Primary action in the modal footer, such as "Send notification (63)". */
   footer?: ReactNode
+  /** Banner across the top of the panes, such as where the values come from. */
+  notice?: ReactNode
 }
 
 /**
@@ -173,6 +177,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   title,
   variables,
   variablesIntro,
+  variablesHeading = 'Preview data',
   isEditable = false,
   onVariableChange,
   variablesFooter,
@@ -190,6 +195,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   isLoading = false,
   error = null,
   footer,
+  notice,
 }) => {
   return (
     <Modal
@@ -206,6 +212,8 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
               {title}
             </h5>
           </div>
+
+          {notice && <div className="notification-preview__notice">{notice}</div>}
 
           <div className="notification-preview__body">
             <div className="notification-preview__data">
@@ -235,7 +243,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                 </div>
               )}
 
-              <h6 className="notification-preview__heading">Preview data</h6>
+              <h6 className="notification-preview__heading">{variablesHeading}</h6>
               <p className="notification-preview__intro">{variablesIntro}</p>
 
               {variables.length === 0 ? (

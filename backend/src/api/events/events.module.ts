@@ -16,6 +16,7 @@ import { EventChannelCstarGroup } from './entities/event-channel-cstar-group.ent
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { EventsFrontendController } from './events-frontend.controller'
 import { EventsService } from './events.service'
+import { EventNotificationResolver } from './event-notification.resolver'
 
 @Module({
   imports: [
@@ -31,12 +32,16 @@ import { EventsService } from './events.service'
     CstarModule,
     FeatureFlagModule,
     EmailLogoModule,
-    // For TemplatesRepository: an event's template must belong to the same tenant, be active,
-    // and match the channel it is selected for.
     TemplatesModule,
   ],
   controllers: [EventsFrontendController],
-  providers: [EventsService, NotifyFrontendRoleGuard, FeatureFlagGuard, PhoneNumberService],
-  exports: [EventsService],
+  providers: [
+    EventsService,
+    EventNotificationResolver,
+    NotifyFrontendRoleGuard,
+    FeatureFlagGuard,
+    PhoneNumberService,
+  ],
+  exports: [EventsService, EventNotificationResolver],
 })
 export class EventsModule {}
