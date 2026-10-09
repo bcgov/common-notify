@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
@@ -89,7 +90,7 @@ describe('FeatureFlagService', () => {
       expect(result).toBe(false)
       expect(mockFeatureFlagRepository.findOne).toHaveBeenCalledTimes(2)
       expect(mockFeatureFlagRepository.findOne).toHaveBeenLastCalledWith({
-        where: { code: 'sms_notifications', tenantId: null },
+        where: { code: 'sms_notifications', tenantId: IsNull() },
       })
     })
 
@@ -117,7 +118,7 @@ describe('FeatureFlagService', () => {
 
       expect(result).toBe(true)
       expect(mockFeatureFlagRepository.findOne).toHaveBeenCalledWith({
-        where: { code: 'dashboard', tenantId: null },
+        where: { code: 'dashboard', tenantId: IsNull() },
       })
     })
 
@@ -354,7 +355,7 @@ describe('FeatureFlagService', () => {
 
       expect(result).toEqual(flag)
       expect(mockFeatureFlagRepository.findOne).toHaveBeenCalledWith({
-        where: { code, tenantId: null },
+        where: { code, tenantId: IsNull() },
       })
     })
   })

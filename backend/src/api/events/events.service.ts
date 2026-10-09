@@ -676,7 +676,7 @@ export class EventsService {
   private async findEvent(tenantId: string, eventId: string): Promise<NotifyEvent> {
     const event = await this.eventRepository.findOne({
       where: { id: eventId, tenantId, isDeleted: false },
-      relations: ['channelSettings', 'channelSettings.recipients', 'channelSettings.cstarGroups'],
+      relations: { channelSettings: { recipients: true, cstarGroups: true } },
     })
 
     if (!event) {

@@ -214,7 +214,7 @@
     background: #fbfbfb;
     color: $dark-text;
     // A note can be a long vault path; wrap rather than stretch the table.
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -324,6 +324,8 @@
 
 .settings__header-preview {
   display: flex;
+  // A <figure>, so the browser's default margin has to go.
+  margin: 0;
   align-items: center;
   gap: $spacing-md;
   color: $primary-color;

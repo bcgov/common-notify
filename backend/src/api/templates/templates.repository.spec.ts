@@ -114,7 +114,7 @@ describe('TemplatesRepository', () => {
       expect(result).toEqual(mockTemplate)
       expect(mockTemplateRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'template-123', tenantId: 'tenant-123', active: true },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
       })
     })
 
@@ -319,7 +319,7 @@ describe('TemplatesRepository', () => {
       expect(result).toEqual(mockTemplate)
       expect(mockTemplateRepository.findOne).toHaveBeenCalledWith({
         where: { tenantId: 'tenant-123', name: 'Welcome Email' },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
       })
     })
 
@@ -503,7 +503,7 @@ describe('TemplatesRepository', () => {
       expect(total).toBe(5)
       expect(mockVersionRepository.findAndCount).toHaveBeenCalledWith({
         where: { templateId: 'template-123' },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
         take: 20,
         skip: 0,
         order: { version: 'DESC' },
@@ -520,7 +520,7 @@ describe('TemplatesRepository', () => {
       expect(total).toBe(10)
       expect(mockVersionRepository.findAndCount).toHaveBeenCalledWith({
         where: { templateId: 'template-123' },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
         take: 5,
         skip: 10,
         order: { version: 'DESC' },
@@ -597,7 +597,7 @@ describe('TemplatesRepository', () => {
       expect(result).toEqual(mockTemplateVersion)
       expect(mockVersionRepository.findOne).toHaveBeenCalledWith({
         where: { templateId: 'template-123', version: 1 },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
       })
     })
 
@@ -618,7 +618,7 @@ describe('TemplatesRepository', () => {
       expect(result.version).toBe(5)
       expect(mockVersionRepository.findOne).toHaveBeenCalledWith({
         where: { templateId: 'template-123', version: 5 },
-        relations: ['channel', 'engine'],
+        relations: { channel: true, engine: true },
       })
     })
   })

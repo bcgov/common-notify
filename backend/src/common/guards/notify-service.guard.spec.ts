@@ -101,7 +101,7 @@ describe('NotifyServiceGuard', () => {
       expect(result).toBe(true)
       expect(mockApiKeyConsumerRepository.findOne).toHaveBeenCalledWith({
         where: { credentialIdentifier: 'cred-123' },
-        relations: ['tenant'],
+        relations: { tenant: true },
       })
     })
   })

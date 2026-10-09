@@ -62,11 +62,9 @@ const MessagesSection: FC<MessagesSectionProps> = ({ messages }) => (
       multiline
     />
     <p className="queue-monitoring__legend">
-      Rates average the last 5 minutes.
-      <span className="sparkline-key sparkline-key--out ms-2" aria-hidden="true" />
-      Sent
-      <span className="sparkline-key sparkline-key--failed ms-3" aria-hidden="true" />
-      Failed
+      Rates average the last 5 minutes.{' '}
+      <span className="sparkline-key sparkline-key--out ms-2" aria-hidden="true" /> Sent{' '}
+      <span className="sparkline-key sparkline-key--failed ms-3" aria-hidden="true" /> Failed
     </p>
   </section>
 )
