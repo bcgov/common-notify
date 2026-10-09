@@ -317,6 +317,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                 bodyHtml={bodyHtml}
                 bodyText={bodyText}
               />
+              {!error && !isLoading && outputFooter}
             </div>
           </div>
 
