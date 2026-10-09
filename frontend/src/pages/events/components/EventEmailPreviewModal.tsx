@@ -145,6 +145,13 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
       to={to || undefined}
       subject={subject}
       outputHeader={<EventEmailHeader emailSettings={emailSettings} />}
+      // Inlined rather than framed, to match the preview on the page. Only once a render has
+      // succeeded, so the modal's own loading and error states still show.
+      bodyOverride={
+        !loading && !error && bodyHtml !== undefined ? (
+          <div className="events__preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+        ) : undefined
+      }
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       isLoading={loading}

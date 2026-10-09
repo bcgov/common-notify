@@ -276,19 +276,21 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
               description="You can only send notifications to team members."
             />
 
-            <RadioGroup
-              label="Recipient(s)"
-              isRequired
-              description="Choose who will receive the test notification"
-              value={recipient ?? ''}
-              onChange={(value) => {
-                setRecipient(value as Recipient)
-                clearUpload()
-              }}
-            >
-              <Radio value="myself">Myself</Radio>
-              <Radio value="other">Another recipient</Radio>
-            </RadioGroup>
+            <div className="events__test-send-recipients">
+              <RadioGroup
+                label="Recipient(s)"
+                isRequired
+                description="Choose who will receive the test notification"
+                value={recipient ?? ''}
+                onChange={(value) => {
+                  setRecipient(value as Recipient)
+                  clearUpload()
+                }}
+              >
+                <Radio value="myself">Myself</Radio>
+                <Radio value="other">Another recipient</Radio>
+              </RadioGroup>
+            </div>
 
             {recipient === 'other' && (
               <>
@@ -321,11 +323,15 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
 
             {isManyRecipients && template && (
               <>
-                <Callout
-                  variant="lightGrey"
-                  title="Tip"
-                  description={`Download the sample CSV to see the expected columns and format. Add the information needed for your template and upload the completed CSV below. Only the first ${MAX_TEST_RECIPIENTS} recipients in the CSV will be processed.`}
-                />
+                {/* The description only takes a string, so its paragraph break is a blank line
+                    the wrapper's styles keep. */}
+                <div className="events__test-send-tip">
+                  <Callout
+                    variant="lightGrey"
+                    title="Tip"
+                    description={`Download the sample CSV to see the expected columns and format. Add the information needed for your template and upload the completed CSV below.\n\nOnly the first ${MAX_TEST_RECIPIENTS} recipients in the CSV will be processed.`}
+                  />
+                </div>
 
                 <div>
                   <Button variant="secondary" onPress={handleDownloadSample}>

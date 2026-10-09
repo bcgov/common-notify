@@ -58,6 +58,20 @@
   }
 }
 
+.events__test-send-recipients .bcds-react-aria-RadioGroup--label {
+  font-weight: 700;
+}
+
+// The design system's field labels use the small body size; FileUpload's own label does not.
+.events__section .file-upload__label {
+  font: var(--typography-regular-small-body);
+  font-weight: 700;
+}
+
+.events__test-send-tip .bcds-Callout--Description {
+  white-space: pre-line;
+}
+
 // Borrowed from templates info icon scss
 .events__tooltip-trigger {
   display: inline-flex;
@@ -211,6 +225,13 @@
   // the image box already supplies that gap.
   margin-bottom: 28px;
   border-bottom: 1px solid $border-default;
+}
+
+// In the preview modal the header carries its own rule, so the one under the envelope above it
+// is dropped. The modal is shared with other previews, hence keying off the header row.
+.notification-preview__output-pane:has(.events__header-preview-row)
+  .notification-preview__envelope {
+  border-bottom: 0;
 }
 
 // Kept in step with LOGO_HEIGHT_PX in the backend's email-template-layout.service, which is what

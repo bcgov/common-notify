@@ -9,48 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as TemplateCreateRouteImport } from './routes/template-create'
-import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as UsageRouteImport } from './routes/usage'
-import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
-import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
-import { Route as AdminUsageRouteImport } from './routes/admin/usage'
-import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
+import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as TemplateCreateRouteImport } from './routes/template-create'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as EventsIndexRouteImport } from './routes/events/index'
-import { Route as EventsCreateRouteImport } from './routes/events/create'
-import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
+import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
+import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
+import { Route as EventsCreateRouteImport } from './routes/events/create'
+import { Route as AdminUsageRouteImport } from './routes/admin/usage'
+import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
+import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as EventsEventIdIndexRouteImport } from './routes/events/$eventId/index'
 import { Route as EventsEventIdSavedRouteImport } from './routes/events/$eventId/saved'
 import { Route as EventsEventIdEmailTestSendRouteImport } from './routes/events/$eventId/email-test-send'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
-  id: '/not-authorized',
-  path: '/not-authorized',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TemplateCreateRoute = TemplateCreateRouteImport.update({
-  id: '/template-create',
-  path: '/template-create',
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TemplatesRoute = TemplatesRouteImport.update({
@@ -58,29 +38,29 @@ const TemplatesRoute = TemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsageRoute = UsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
+const TemplateCreateRoute = TemplateCreateRouteImport.update({
+  id: '/template-create',
+  path: '/template-create',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
-  id: '/admin/feature-flags',
-  path: '/admin/feature-flags',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
-  id: '/admin/monitoring',
-  path: '/admin/monitoring',
+const NotAuthorizedRoute = NotAuthorizedRouteImport.update({
+  id: '/not-authorized',
+  path: '/not-authorized',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminUsageRoute = AdminUsageRouteImport.update({
-  id: '/admin/usage',
-  path: '/admin/usage',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BulkNotificationsIndexRoute = BulkNotificationsIndexRouteImport.update({
-  id: '/bulk-notifications/',
-  path: '/bulk-notifications/',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsIndexRoute = EventsIndexRouteImport.update({
@@ -88,9 +68,14 @@ const EventsIndexRoute = EventsIndexRouteImport.update({
   path: '/events/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsCreateRoute = EventsCreateRouteImport.update({
-  id: '/events/create',
-  path: '/events/create',
+const BulkNotificationsIndexRoute = BulkNotificationsIndexRouteImport.update({
+  id: '/bulk-notifications/',
+  path: '/bulk-notifications/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
+  id: '/template-edit/$templateId',
+  path: '/template-edit/$templateId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RequestStatusNotificationRequestIdRoute =
@@ -99,9 +84,24 @@ const RequestStatusNotificationRequestIdRoute =
     path: '/request-status/$notificationRequestId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
-  id: '/template-edit/$templateId',
-  path: '/template-edit/$templateId',
+const EventsCreateRoute = EventsCreateRouteImport.update({
+  id: '/events/create',
+  path: '/events/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsageRoute = AdminUsageRouteImport.update({
+  id: '/admin/usage',
+  path: '/admin/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
+  id: '/admin/monitoring',
+  path: '/admin/monitoring',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
+  id: '/admin/feature-flags',
+  path: '/admin/feature-flags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsEventIdIndexRoute = EventsEventIdIndexRouteImport.update({
@@ -268,39 +268,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/not-authorized': {
-      id: '/not-authorized'
-      path: '/not-authorized'
-      fullPath: '/not-authorized'
-      preLoaderRoute: typeof NotAuthorizedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/template-create': {
-      id: '/template-create'
-      path: '/template-create'
-      fullPath: '/template-create'
-      preLoaderRoute: typeof TemplateCreateRouteImport
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/templates': {
@@ -310,39 +282,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/usage': {
-      id: '/usage'
-      path: '/usage'
-      fullPath: '/usage'
-      preLoaderRoute: typeof UsageRouteImport
+    '/template-create': {
+      id: '/template-create'
+      path: '/template-create'
+      fullPath: '/template-create'
+      preLoaderRoute: typeof TemplateCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/feature-flags': {
-      id: '/admin/feature-flags'
-      path: '/admin/feature-flags'
-      fullPath: '/admin/feature-flags'
-      preLoaderRoute: typeof AdminFeatureFlagsRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/monitoring': {
-      id: '/admin/monitoring'
-      path: '/admin/monitoring'
-      fullPath: '/admin/monitoring'
-      preLoaderRoute: typeof AdminMonitoringRouteImport
+    '/not-authorized': {
+      id: '/not-authorized'
+      path: '/not-authorized'
+      fullPath: '/not-authorized'
+      preLoaderRoute: typeof NotAuthorizedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/usage': {
-      id: '/admin/usage'
-      path: '/admin/usage'
-      fullPath: '/admin/usage'
-      preLoaderRoute: typeof AdminUsageRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/bulk-notifications/': {
-      id: '/bulk-notifications/'
-      path: '/bulk-notifications'
-      fullPath: '/bulk-notifications/'
-      preLoaderRoute: typeof BulkNotificationsIndexRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/': {
@@ -352,11 +324,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events/create': {
-      id: '/events/create'
-      path: '/events/create'
-      fullPath: '/events/create'
-      preLoaderRoute: typeof EventsCreateRouteImport
+    '/bulk-notifications/': {
+      id: '/bulk-notifications/'
+      path: '/bulk-notifications'
+      fullPath: '/bulk-notifications/'
+      preLoaderRoute: typeof BulkNotificationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/template-edit/$templateId': {
+      id: '/template-edit/$templateId'
+      path: '/template-edit/$templateId'
+      fullPath: '/template-edit/$templateId'
+      preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/request-status/$notificationRequestId': {
@@ -366,11 +345,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RequestStatusNotificationRequestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/template-edit/$templateId': {
-      id: '/template-edit/$templateId'
-      path: '/template-edit/$templateId'
-      fullPath: '/template-edit/$templateId'
-      preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
+    '/events/create': {
+      id: '/events/create'
+      path: '/events/create'
+      fullPath: '/events/create'
+      preLoaderRoute: typeof EventsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/usage': {
+      id: '/admin/usage'
+      path: '/admin/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/monitoring': {
+      id: '/admin/monitoring'
+      path: '/admin/monitoring'
+      fullPath: '/admin/monitoring'
+      preLoaderRoute: typeof AdminMonitoringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/feature-flags': {
+      id: '/admin/feature-flags'
+      path: '/admin/feature-flags'
+      fullPath: '/admin/feature-flags'
+      preLoaderRoute: typeof AdminFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/$eventId/': {
