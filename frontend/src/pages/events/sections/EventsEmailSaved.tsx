@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button, Callout } from '@bcgov/design-system-react-components'
@@ -12,7 +11,7 @@ import { getEventById } from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { useAppSelector } from '@/redux/hooks'
 import '@/scss/components/events.scss'
 
 interface EventsEmailSavedProps {
@@ -25,12 +24,6 @@ interface EventsEmailSavedProps {
  */
 const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
-  const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
-  const tenantShowsHeaderTitle = useAppSelector(
-    (state) => state.emailSettings.useCustomEmailHeader ?? false,
-  )
-  const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const [event, setEvent] = useState<EventResponse | null>(null)
   const [template, setTemplate] = useState<TemplateResponse | null>(null)
@@ -82,22 +75,6 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
       active = false
     }
   }, [templateId])
-
-  // A custom header shows its own logo and title; the tenant default shows the tenant's
-  // configured logo on its own.
-  const useCustomHeader = emailSettings?.useCustomHeader ?? false
-  const headerLogoId = useCustomHeader
-    ? (emailSettings?.headerLogoId ?? tenantEmailLogoId)
-    : tenantEmailLogoId
-  const headerLogo =
-    approvedLogos.find((logo) => logo.id === headerLogoId) ??
-    approvedLogos.find((logo) => logo.isDefault)
-  const headerTitle = resolveEmailHeaderTitle({
-    useCustomTitle: useCustomHeader,
-    customTitle: emailSettings?.headerTitle,
-    tenantShowsHeaderTitle,
-    logoDisplayTitle: headerLogo?.displayTitle,
-  })
 
   function openTab(tab: EventTab) {
     navigate({ to: '/events/$eventId', params: { eventId }, search: { tab } })
