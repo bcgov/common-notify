@@ -60,6 +60,13 @@ function isValidEmail(value: string): boolean {
   return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 }
 
+function showSendBlockedToast() {
+  showErrorToast(
+    'Unable to send test notification',
+    'Complete all required fields before sending a test notification.',
+  )
+}
+
 /**
  * Sends a test of the event's email notification, so its content and formatting can be checked
  * before the event is used for real.
@@ -76,6 +83,10 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   const [recipient, setRecipient] = useState<Recipient | null>(null)
   const [addRecipients, setAddRecipients] = useState<AddRecipients | null>(null)
   const [otherEmail, setOtherEmail] = useState('')
+  // Set when a send is attempted, so the field is not checked while it is being typed in.
+  const [emailError, setEmailError] = useState('')
+  // Send is always pressable, so the choices it still needs are only flagged once it has been.
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const [isEditValuesOpen, setEditValuesOpen] = useState(false)
   // The values the test will be sent with, and the notification they render to. Held here rather
   // than in the modal so they outlive it: the preview below shows the render, and the values are
@@ -141,19 +152,14 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
 
   const isManyRecipients = recipient === 'other' && addRecipients === 'many'
 
+  const isOneRecipient = recipient === 'other' && addRecipients === 'one'
   const typedEmail = otherEmail.trim()
-  // Only once something has been typed, so the field is not red before it has been used.
-  const typedEmailError =
-    typedEmail !== '' && !isValidEmail(typedEmail) ? 'Enter a valid email address.' : ''
 
   // The one address a test goes to, or null on the paths that do not have one: both single
-  // recipient paths end here, while a spreadsheet addresses its own rows instead.
+  // recipient paths end here, while a spreadsheet addresses its own rows instead. A typed address
+  // is only checked when the test is sent.
   const recipientEmail =
-    recipient === 'myself'
-      ? (userEmail ?? null)
-      : recipient === 'other' && addRecipients === 'one' && typedEmail !== '' && !typedEmailError
-        ? typedEmail
-        : null
+    recipient === 'myself' ? (userEmail ?? null) : isOneRecipient ? typedEmail : null
 
   // The upload is read and checked in full, then cut down to the recipients a test send may
   // reach - which is what the tip above the upload control promises.
@@ -174,6 +180,7 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   // Nothing checked against the previous choice still applies once the choice changes.
   const clearUpload = useCallback(() => {
     resetCsv()
+    setSubmitAttempted(false)
     setPreviewRow(0)
     setRowRendered(null)
   }, [resetCsv])
@@ -219,13 +226,53 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
   const handleFileChange = async (nextFile: File | null) => {
     setPreviewRow(0)
     setRowRendered(null)
+    setSubmitAttempted(false)
     await csv.handleFileChange(nextFile)
   }
 
-  const isReviewable = Boolean(template) && (Boolean(recipientEmail) || isCsvReady)
+  // The one recipient path shows its preview before an address is typed, so it is reviewable as
+  // soon as it is chosen.
+  const isReviewable =
+    Boolean(template) && (Boolean(recipientEmail) || isOneRecipient || isCsvReady)
   const recipientCount = isManyRecipients ? csvRowCount : 1
 
+  const recipientError = submitAttempted && !recipient ? 'Select a recipient.' : undefined
+  const addRecipientsError =
+    submitAttempted && recipient === 'other' && !addRecipients
+      ? 'Choose how to add recipients.'
+      : undefined
+  const missingFileError =
+    submitAttempted && isManyRecipients && !csv.file
+      ? 'A CSV file is required to continue.'
+      : undefined
+
   const handleSend = async () => {
+    setSubmitAttempted(true)
+
+    const typedEmailError = !isOneRecipient
+      ? ''
+      : typedEmail === ''
+        ? 'Enter an email address.'
+        : !isValidEmail(typedEmail)
+          ? 'Enter a valid email address.'
+          : ''
+    setEmailError(typedEmailError)
+
+    // Each problem is flagged where it is - the field, the upload control or the issues table -
+    // and the toast says why nothing was sent.
+    const isInvalid =
+      !recipient ||
+      (recipient === 'other' && !addRecipients) ||
+      (isManyRecipients && (!csv.file || csv.fileIssue !== null || rowIssues.length > 0)) ||
+      Boolean(typedEmailError)
+    if (isInvalid) {
+      showSendBlockedToast()
+      return
+    }
+
+    // A file still being read is neither ready nor at fault yet.
+    if (isManyRecipients && !isCsvReady) return
+
     setSending(true)
     try {
       // The values the preview was rendered from, so what arrives is what was reviewed. Sending
@@ -241,10 +288,9 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
             : undefined,
       )
       showSuccessToast('Test notification queued.')
-    } catch (error) {
-      showErrorToast(
-        error instanceof Error ? error.message : 'Failed to send the test notification',
-      )
+    } catch {
+      // The same message as the checks above, so a rejected send reads like any other.
+      showSendBlockedToast()
     } finally {
       setSending(false)
     }
@@ -281,6 +327,8 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                 label="Recipient(s)"
                 isRequired
                 description="Choose who will receive the test notification"
+                isInvalid={Boolean(recipientError)}
+                errorMessage={recipientError}
                 value={recipient ?? ''}
                 onChange={(value) => {
                   setRecipient(value as Recipient)
@@ -297,6 +345,8 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                 <RadioGroup
                   label="Add recipient(s)"
                   isRequired
+                  isInvalid={Boolean(addRecipientsError)}
+                  errorMessage={addRecipientsError}
                   value={addRecipients ?? ''}
                   onChange={(value) => {
                     setAddRecipients(value as AddRecipients)
@@ -312,9 +362,13 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                     label="Recipient email address"
                     isRequired
                     value={otherEmail}
-                    onChange={setOtherEmail}
-                    isInvalid={Boolean(typedEmailError)}
-                    errorMessage={typedEmailError}
+                    onChange={(value) => {
+                      setOtherEmail(value)
+                      // The error answers the last send attempt, not what is being typed now.
+                      setEmailError('')
+                    }}
+                    isInvalid={Boolean(emailError)}
+                    errorMessage={emailError}
                     size="small"
                   />
                 )}
@@ -349,7 +403,7 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   maxSizeBytes={MAX_FILE_BYTES}
                   progress={csv.readProgress}
                   successMessage={csv.file && parsed ? 'File uploaded successfully' : undefined}
-                  errorMessage={csv.fileIssue ?? undefined}
+                  errorMessage={csv.fileIssue ?? missingFileError}
                   hint="Max file size: 5 MB"
                 />
 
@@ -428,14 +482,14 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                   />
                 </div>
 
-                {!isCsvReady && recipientEmail && (
+                {!isCsvReady && (
                   <EventEmailPreviewModal
                     isOpen={isEditValuesOpen}
                     onClose={() => setEditValuesOpen(false)}
                     template={template}
                     emailSettings={emailSettings}
                     from={emailSettings.senderEmail ?? ''}
-                    to={recipientEmail}
+                    to={recipientEmail ?? ''}
                     values={applied?.values ?? {}}
                     onApply={(next) => {
                       setApplied(next)
@@ -469,7 +523,7 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
                 variant="primary"
                 type="button"
                 onPress={() => void handleSend()}
-                isDisabled={!isReviewable || isSending}
+                isDisabled={isSending}
               >
                 {isSending ? 'Sending...' : `Send test email (${recipientCount})`}
               </Button>
