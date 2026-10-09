@@ -264,7 +264,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     }
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
     if (!this.ingestionQueue || !this.emailQueue || !this.smsQueue) {
       this.logger.debug('Queue configuration not available - skipping worker initialization')
@@ -288,18 +288,18 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     try {
       this.logger.debug('About to initialize ingestion worker...')
       // Initialize ingestion worker - orchestrates fan-out to delivery queues
-      IngestionWorker.initialize(
-        this.ingestionQueue,
-        this.emailQueue,
-        this.smsQueue,
-        this.notificationService,
-        this.notificationRequestDetailService,
-        this.configService,
-        this.clamavService,
+      IngestionWorker.initialize({
+        ingestionQueue: this.ingestionQueue,
+        emailQueue: this.emailQueue,
+        smsQueue: this.smsQueue,
+        notificationService: this.notificationService,
+        requestDetailService: this.notificationRequestDetailService,
+        configService: this.configService,
+        clamavService: this.clamavService,
         concurrency,
-        this.attachmentService,
-        this.phoneNumberService,
-      )
+        attachmentService: this.attachmentService,
+        phoneNumberService: this.phoneNumberService,
+      })
       this.heartbeat?.track(this.ingestionQueue, concurrency)
       this.logger.debug('Ingestion worker initialization started')
 
@@ -309,21 +309,20 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       // and returns immediately after setting up listeners
       const emailConcurrency =
         this.configService?.get<number>('queue.emailDeliveryWorkerConcurrency') || 2
-      EmailDeliveryWorker.initialize(
-        this.emailQueue,
-        this.notificationService,
-        this.configService,
-        this.templatesRepository,
-        this.templatesService,
-        this.inlineRenderingService,
-        this.attachmentResolverService,
-        this.emailAdapter,
-        this.notificationRequestDetailService,
-        emailConcurrency,
-        this.structuredLogger,
-        this.tenantSettingsService,
-        this.eventNotificationResolver,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: this.emailQueue,
+        notificationService: this.notificationService,
+        templatesRepository: this.templatesRepository,
+        templatesService: this.templatesService,
+        inlineRenderingService: this.inlineRenderingService,
+        attachmentResolverService: this.attachmentResolverService,
+        emailAdapter: this.emailAdapter,
+        requestDetailService: this.notificationRequestDetailService,
+        concurrency: emailConcurrency,
+        structuredLogger: this.structuredLogger,
+        tenantSettingsService: this.tenantSettingsService,
+        eventNotificationResolver: this.eventNotificationResolver,
+      })
       this.heartbeat?.track(this.emailQueue, emailConcurrency)
       this.logger.log('Email delivery worker initialization started')
 
@@ -333,18 +332,17 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       // and returns immediately after setting up listeners
       const smsConcurrency =
         this.configService?.get<number>('queue.smsDeliveryWorkerConcurrency') || 2
-      SmsDeliveryWorker.initialize(
-        this.smsQueue,
-        this.notificationService,
-        this.configService,
-        this.templatesRepository,
-        this.templatesService,
-        this.inlineRenderingService,
-        this.smsAdapter,
-        this.notificationRequestDetailService,
-        smsConcurrency,
-        this.structuredLogger,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: this.smsQueue,
+        notificationService: this.notificationService,
+        templatesRepository: this.templatesRepository,
+        templatesService: this.templatesService,
+        inlineRenderingService: this.inlineRenderingService,
+        smsAdapter: this.smsAdapter,
+        requestDetailService: this.notificationRequestDetailService,
+        concurrency: smsConcurrency,
+        structuredLogger: this.structuredLogger,
+      })
       this.heartbeat?.track(this.smsQueue, smsConcurrency)
       this.logger.log('SMS delivery worker initialization started')
 

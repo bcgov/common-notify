@@ -11,7 +11,6 @@ import { TransientDeliveryError } from '../../adapters/delivery-errors'
 describe('SmsDeliveryWorker', () => {
   let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
-  let mockConfigService: any
   let mockTemplatesRepository: any
   let mockTemplatesService: any
   let mockInlineRenderingService: any
@@ -34,17 +33,6 @@ describe('SmsDeliveryWorker', () => {
       update: vi.fn().mockResolvedValue({
         id: 'notify-123',
         status: NotificationStatus.COMPLETED,
-      }),
-    }
-
-    // Mock the config service
-    mockConfigService = {
-      get: vi.fn((key: string) => {
-        const config: Record<string, any> = {
-          'queue.jobRetries': 3,
-          'queue.jobBackoffDelay': 2000,
-        }
-        return config[key]
       }),
     }
 
@@ -109,32 +97,30 @@ describe('SmsDeliveryWorker', () => {
   })
 
   describe('initialize', () => {
-    it('should register a process handler on the SMS queue', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+    it('should register a process handler on the SMS queue', () => {
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       expect(mockSmsQueue.process).toHaveBeenCalled()
     })
 
-    it('should register event listeners on the SMS queue', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+    it('should register event listeners on the SMS queue', () => {
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       expect(mockSmsQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
       expect(mockSmsQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
@@ -152,16 +138,15 @@ describe('SmsDeliveryWorker', () => {
         ],
       })
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -211,16 +196,15 @@ describe('SmsDeliveryWorker', () => {
         .fn()
         .mockResolvedValue({ messageId: 'SM1', providerResponse: 'sent' })
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -249,16 +233,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('skips recipients an earlier run delivered even when Bull did not count it as a retry', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
       mockRequestDetailService.findSentAddresses.mockResolvedValue(new Set(['+16135551234']))
 
       // attemptsMade 0: a stalled job re-run after its pod stopped mid-send.
@@ -288,16 +271,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should successfully send SMS and update status', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -347,16 +329,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when SMS payload is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -385,16 +366,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when recipient phone is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -424,16 +404,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should permanently fail a malformed recipient before calling the SMS provider', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -480,16 +459,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when SMS body is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -528,16 +506,15 @@ describe('SmsDeliveryWorker', () => {
         bodyType: 'markdown',
       })
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -584,16 +561,15 @@ describe('SmsDeliveryWorker', () => {
         bodyType: 'markdown',
       })
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -629,16 +605,15 @@ describe('SmsDeliveryWorker', () => {
         body: 'Rendered SMS Body',
       })
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -680,16 +655,15 @@ describe('SmsDeliveryWorker', () => {
         new BadRequestException('Missing personalisation for template ID template-sms-uuid: code'),
       )
 
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -730,16 +704,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when notifyId is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -770,16 +743,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when tenantId is missing', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -810,16 +782,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should throw error when attempt is invalid', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -851,16 +822,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should mark notification as FAILED on final attempt (attempt 2)', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('DB Error'))
 
@@ -900,16 +870,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should NOT mark notification as FAILED on non-final attempts', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -957,16 +926,15 @@ describe('SmsDeliveryWorker', () => {
     })
 
     it('should call failed callback on job error', async () => {
-      await SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       mockNotificationService.update.mockRejectedValueOnce(new Error('Send failed'))
 
@@ -1008,16 +976,15 @@ describe('SmsDeliveryWorker', () => {
 
   describe('provider outages', () => {
     const init = () =>
-      SmsDeliveryWorker.initialize(
-        mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockSmsAdapter,
-        mockRequestDetailService,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
     const outage = () => new TransientDeliveryError('ACS SMS: upstream 503 - unavailable', 502)
     const mergeJob = (attemptsMade = 0) =>
       ({

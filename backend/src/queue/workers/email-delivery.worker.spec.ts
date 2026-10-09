@@ -12,7 +12,6 @@ import { AttachmentResolverService } from '../../api/notify/services/attachment-
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
   let mockNotificationService: any
-  let mockConfigService: any
   let mockTemplatesRepository: any
   let mockTemplatesService: any
   let mockInlineRenderingService: any
@@ -52,10 +51,6 @@ describe('EmailDeliveryWorker', () => {
         id: 'notify-123',
         status: NotificationStatus.COMPLETED,
       }),
-    }
-
-    mockConfigService = {
-      get: vi.fn(),
     }
 
     mockTemplatesRepository = {
@@ -101,51 +96,48 @@ describe('EmailDeliveryWorker', () => {
   })
 
   describe('initialize', () => {
-    it('should register a process handler on the email queue', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+    it('should register a process handler on the email queue', () => {
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       expect(mockEmailQueue.process).toHaveBeenCalled()
     })
 
-    it('should register event listeners on the email queue', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+    it('should register event listeners on the email queue', () => {
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       expect(mockEmailQueue.on).toHaveBeenCalledWith('completed', expect.any(Function))
       expect(mockEmailQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
     })
 
     it('should process email delivery job successfully', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -200,20 +192,18 @@ describe('EmailDeliveryWorker', () => {
         getSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
       }
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-        2,
-        undefined,
-        mockTenantSettingsService as any,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+        concurrency: 2,
+        tenantSettingsService: mockTenantSettingsService as any,
+      })
 
       await processHandler({
         data: {
@@ -241,20 +231,18 @@ describe('EmailDeliveryWorker', () => {
         getSenderAddress: vi.fn().mockResolvedValue(null),
       }
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-        2,
-        undefined,
-        mockTenantSettingsService as any,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+        concurrency: 2,
+        tenantSettingsService: mockTenantSettingsService as any,
+      })
 
       await processHandler({
         data: {
@@ -277,17 +265,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('brands inline emails before handing them to the adapter', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
       mockTemplatesService.applyEmailLayout.mockResolvedValueOnce({
         subject: 'Inline',
         body: '<img src="default-logo"><p>Hello</p>',
@@ -334,21 +321,18 @@ describe('EmailDeliveryWorker', () => {
           headerTitle: 'Permits',
         }),
       }
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-        2,
-        undefined,
-        undefined,
-        mockEventNotificationResolver as any,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+        concurrency: 2,
+        eventNotificationResolver: mockEventNotificationResolver as any,
+      })
 
       await processHandler({
         data: {
@@ -373,17 +357,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should handle multiple recipients', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -418,17 +401,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email payload is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -457,17 +439,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when recipient email is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -497,17 +478,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email subject is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -538,17 +518,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when email body is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -579,17 +558,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should resolve a template-only email whose content has no inline subject/body', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const template = {
         id: 'template-uuid',
@@ -658,17 +636,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should merge channel-level params over global params when rendering a template email', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'template-uuid',
@@ -715,17 +692,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should merge channel-level params over global params when rendering inline content', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       mockInlineRenderingService.renderEmail.mockResolvedValue({
         subject: 'Rendered subject',
@@ -779,17 +755,16 @@ describe('EmailDeliveryWorker', () => {
         new BadRequestException('Missing personalisation for template ID template-uuid: firstName'),
       )
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -830,17 +805,16 @@ describe('EmailDeliveryWorker', () => {
       )
     })
     it('should throw error when notifyId is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -871,17 +845,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when tenantId is missing', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -912,17 +885,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should throw error when attempt is invalid', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -954,17 +926,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should mark notification as FAILED on final attempt (attempt 2)', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       // Simulate final attempt
       mockNotificationService.update.mockRejectedValueOnce(new Error('DB Error'))
@@ -1005,17 +976,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('leaves a plain send owed after a CHES outage outlasts every attempt', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
       const outage = new TransientDeliveryError('CHES email: upstream 503', 502)
       vi.mocked(mockEmailAdapter.send).mockRejectedValue(outage)
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -1046,17 +1016,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should NOT mark notification as FAILED on non-final attempts', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1113,17 +1082,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should call completed event listener on job success', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1158,17 +1126,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should call failed event listener on job failure', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1201,17 +1168,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should update status to COMPLETED with correct updatedBy', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1248,17 +1214,16 @@ describe('EmailDeliveryWorker', () => {
     it('should log with notifyId for end-to-end tracing', async () => {
       const debugSpy = vi.spyOn(Logger.prototype, 'debug')
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1296,17 +1261,16 @@ describe('EmailDeliveryWorker', () => {
     })
 
     it('should handle email with CC and BCC', async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1341,21 +1305,20 @@ describe('EmailDeliveryWorker', () => {
       expect(mockNotificationService.update).toHaveBeenCalledTimes(2)
     })
 
-    it('should use correct concurrency level', async () => {
+    it('should use correct concurrency level', () => {
       const initSpy = vi.spyOn(EmailDeliveryWorker, 'initialize' as any)
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-        5, // Custom concurrency
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+        concurrency: 5,
+      })
 
       expect(mockEmailQueue.process).toHaveBeenCalled()
       // Verify that concurrency was passed (it's in the args)
@@ -1376,17 +1339,16 @@ describe('EmailDeliveryWorker', () => {
         },
       ])
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
         data: {
@@ -1437,17 +1399,16 @@ describe('EmailDeliveryWorker', () => {
         },
       ])
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       await processHandler({
         data: {
@@ -1493,17 +1454,16 @@ describe('EmailDeliveryWorker', () => {
         new Error('Failed to download attachment'),
       )
 
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
 
       await expect(
         processHandler({
@@ -1541,7 +1501,7 @@ describe('EmailDeliveryWorker', () => {
         name: 'Test Template',
       }
 
-      beforeEach(async () => {
+      beforeEach(() => {
         mockTemplatesRepository.findById.mockResolvedValue(bulkTemplate)
         mockTemplatesService.renderTemplateContent.mockReturnValue({
           subject: 'Bulk Subject',
@@ -1550,17 +1510,16 @@ describe('EmailDeliveryWorker', () => {
         })
         vi.mocked(mockEmailAdapter.send).mockResolvedValue({ messageId: 'ext-123' })
 
-        await EmailDeliveryWorker.initialize(
-          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          mockNotificationService,
-          mockConfigService,
-          mockTemplatesRepository,
-          mockTemplatesService,
-          mockInlineRenderingService,
-          mockAttachmentResolverService as AttachmentResolverService,
-          mockEmailAdapter,
-          mockRequestDetailService,
-        )
+        EmailDeliveryWorker.initialize({
+          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          notificationService: mockNotificationService,
+          templatesRepository: mockTemplatesRepository,
+          templatesService: mockTemplatesService,
+          inlineRenderingService: mockInlineRenderingService,
+          attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+          emailAdapter: mockEmailAdapter,
+          requestDetailService: mockRequestDetailService,
+        })
       })
 
       function makeBulkJob(
@@ -1723,21 +1682,18 @@ describe('EmailDeliveryWorker', () => {
           }),
         }
 
-        await EmailDeliveryWorker.initialize(
-          mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          mockNotificationService,
-          mockConfigService,
-          mockTemplatesRepository,
-          mockTemplatesService,
-          mockInlineRenderingService,
-          mockAttachmentResolverService as AttachmentResolverService,
-          mockEmailAdapter,
-          mockRequestDetailService,
-          2,
-          undefined,
-          undefined,
-          mockEventNotificationResolver as any,
-        )
+        EmailDeliveryWorker.initialize({
+          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+          notificationService: mockNotificationService,
+          templatesRepository: mockTemplatesRepository,
+          templatesService: mockTemplatesService,
+          inlineRenderingService: mockInlineRenderingService,
+          attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+          emailAdapter: mockEmailAdapter,
+          requestDetailService: mockRequestDetailService,
+          concurrency: 2,
+          eventNotificationResolver: mockEventNotificationResolver as any,
+        })
       }
 
       it("applies the event's header and sender to every recipient of a merge batch", async () => {
@@ -1991,18 +1947,17 @@ describe('EmailDeliveryWorker', () => {
     })
   })
   describe('redelivery', () => {
-    beforeEach(async () => {
-      await EmailDeliveryWorker.initialize(
-        mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        mockNotificationService,
-        mockConfigService,
-        mockTemplatesRepository,
-        mockTemplatesService,
-        mockInlineRenderingService,
-        mockAttachmentResolverService as AttachmentResolverService,
-        mockEmailAdapter,
-        mockRequestDetailService,
-      )
+    beforeEach(() => {
+      EmailDeliveryWorker.initialize({
+        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
     })
 
     // attemptsMade stays 0 on these jobs: Bull re-runs a stalled job (its pod stopped mid-send)

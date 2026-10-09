@@ -34,8 +34,9 @@ jobs:
         with:
           package: ${{ matrix.package }}
           tags: ${{ github.event.number }}
-          # :latest is whichever image was tagged most recently by any build.
-          tag_fallback: dev
+          # Unchanged packages reuse :dev, except migrations: it always builds (it is only a COPY
+          # of the SQL) so a PR's schema never trails a stale :dev.
+          tag_fallback: ${{ matrix.package != 'migrations' && 'dev' || '' }}
           triggers: ('${{ matrix.package }}/')
 
   import:

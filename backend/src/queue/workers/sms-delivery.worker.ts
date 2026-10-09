@@ -1,6 +1,5 @@
 import { BadRequestException, HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
-import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
 import { loadBatchRecipients } from './merge-batch-recipients'
@@ -14,6 +13,25 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport, SmsRecipientResult } from '../../adapters'
 import { StructuredLoggerService } from '../../common/logger'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+
+export interface SmsDeliveryWorkerDeps {
+  /** The Bull queue instance for SMS delivery jobs */
+  smsQueue: Bull.Queue<DeliveryJobPayload>
+  /** Service for database updates */
+  notificationService: NotificationService
+  /** Repository for template resolution */
+  templatesRepository: TemplatesRepository
+  /** Service for template rendering */
+  templatesService: TemplatesService
+  /** Service for inline template rendering */
+  inlineRenderingService: InlineRenderingService
+  /** SMS transport adapter for sending SMS messages */
+  smsAdapter: ISmsTransport
+  requestDetailService: NotificationRequestDetailService
+  /** Number of jobs to process in parallel (default: 2) */
+  concurrency?: number
+  structuredLogger?: StructuredLoggerService
+}
 
 /**
  * SMS Delivery Worker
@@ -37,29 +55,18 @@ export class SmsDeliveryWorker {
     return error instanceof HttpException && error.getStatus() === 400
   }
 
-  /**
-   * Initialize the SMS delivery worker on a queue
-   * @param smsQueue The BullMQ queue instance for SMS delivery jobs
-   * @param notificationService Service for database updates
-   * @param configService Configuration service for queue settings
-   * @param templatesRepository Repository for template resolution
-   * @param templatesService Service for template rendering
-   * @param inlineRenderingService Service for inline template rendering
-   * @param smsAdapter SMS transport adapter for sending SMS messages
-   * @param concurrency Number of jobs to process in parallel (default: 2)
-   */
-  static async initialize(
-    smsQueue: Bull.Queue<DeliveryJobPayload>,
-    notificationService: NotificationService,
-    configService: ConfigService,
-    templatesRepository: TemplatesRepository,
-    templatesService: TemplatesService,
-    inlineRenderingService: InlineRenderingService,
-    smsAdapter: ISmsTransport,
-    requestDetailService: NotificationRequestDetailService,
-    concurrency: number = 2,
-    structuredLogger?: StructuredLoggerService,
-  ): Promise<void> {
+  /** Initialize the SMS delivery worker on a queue */
+  static initialize({
+    smsQueue,
+    notificationService,
+    templatesRepository,
+    templatesService,
+    inlineRenderingService,
+    smsAdapter,
+    requestDetailService,
+    concurrency = 2,
+    structuredLogger,
+  }: SmsDeliveryWorkerDeps): void {
     const logger = new Logger(SmsDeliveryWorker.name)
     const workerContext = SmsDeliveryWorker.name
 
