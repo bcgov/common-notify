@@ -54,21 +54,16 @@ export function TableHeaderCell({
             filterTitle={filterTitle}
             activeFilterValues={activeFilterValues ?? []}
             onFilter={onFilter}
+            triggerLabel={
+              sortLabel ??
+              (typeof children === 'string' ? `Column options for ${children}` : 'Column options')
+            }
           >
-            <button
-              type="button"
-              className="data-table__dropdown-btn"
-              aria-label={
-                sortLabel ??
-                (typeof children === 'string' ? `Column options for ${children}` : 'Column options')
-              }
-            >
-              {isFiltered ? (
-                <span className="data-table__filter-badge">{activeFilterValues!.length}</span>
-              ) : (
-                <KeyboardArrowDownIcon className="data-table__dropdown-icon" aria-hidden="true" />
-              )}
-            </button>
+            {isFiltered ? (
+              <span className="data-table__filter-badge">{activeFilterValues!.length}</span>
+            ) : (
+              <KeyboardArrowDownIcon className="data-table__dropdown-icon" aria-hidden="true" />
+            )}
           </ColumnHeaderDropdown>
         </div>
       ) : (

@@ -123,7 +123,7 @@ describe('resolveApiKeyConsumer', () => {
     expect(repository.findOne).toHaveBeenCalledTimes(1)
     expect(repository.findOne).toHaveBeenCalledWith({
       where: { credentialIdentifier: 'cred-1' },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     expect(repository.update).not.toHaveBeenCalled()
   })
@@ -141,7 +141,7 @@ describe('resolveApiKeyConsumer', () => {
     expect(result).toBe(binding)
     expect(repository.findOne).toHaveBeenLastCalledWith({
       where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
   })
 
@@ -185,7 +185,7 @@ describe('resolveApiKeyConsumer', () => {
         clientId: In(['ENV123-APP456']),
         tenant: { externalId: In(['cstar-guid', 'ENV123']) },
       },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     // The rotated identifier is recorded, so the next request takes the fast path.
     expect(binding.credentialIdentifier).toBe('rotated-cred')
@@ -206,7 +206,7 @@ describe('resolveApiKeyConsumer', () => {
     expect(result).toBe(binding)
     expect(repository.findOne).toHaveBeenLastCalledWith({
       where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
   })
 
@@ -252,7 +252,7 @@ describe('resolveApiKeyConsumer', () => {
 
     expect(repository.findOne).toHaveBeenLastCalledWith({
       where: { clientId: In(['ENV123-APP456']), credentialIdentifier: IsNull() },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
   })
 

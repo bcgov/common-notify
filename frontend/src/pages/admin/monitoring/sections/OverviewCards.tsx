@@ -16,6 +16,13 @@ interface OverviewCardsProps {
 }
 
 /** The four headline numbers: how fast, how much, how far behind, and how close to full. */
+/** What the backlog card says under its count: nothing waiting, stalled, or an estimate. */
+function backlogLabel(pending: number, stuck: boolean, clears: number | null): string {
+  if (pending === 0) return 'Nothing waiting'
+  if (stuck) return 'Not sending'
+  return `Clears in ~${(clears ?? 0).toLocaleString()} min`
+}
+
 const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) => {
   const pending = messages.reduce((sum, m) => sum + m.pending, 0)
   const oldest = messages.reduce<number | null>(
@@ -67,13 +74,7 @@ const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) =>
 
       <SummaryCard title="Backlog" value={`${pending.toLocaleString()} pending`}>
         <p>Oldest {oldest === null ? '—' : formatDuration(oldest)}</p>
-        <p>
-          {pending === 0
-            ? 'Nothing waiting'
-            : stuck
-              ? 'Not sending'
-              : `Clears in ~${(clears ?? 0).toLocaleString()} min`}
-        </p>
+        <p>{backlogLabel(pending, stuck, clears)}</p>
       </SummaryCard>
 
       <SummaryCard

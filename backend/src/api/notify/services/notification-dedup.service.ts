@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHash, randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type Redis from 'ioredis'
 import { formatRedisError } from '../../../common/redis/redis-error.util'
 import { redisKey } from '../../../common/redis/redis-namespace'
@@ -323,7 +323,9 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
     for (const field of fields) {
       const values = recipients[field]
       if (Array.isArray(values)) {
-        recipients[field] = values.map((v) => (typeof v === 'string' ? normalize(v) : v)).sort()
+        recipients[field] = values
+          .map((v) => (typeof v === 'string' ? normalize(v) : v))
+          .sort(byCodeUnit)
       }
     }
     return { ...channel, recipients }
@@ -331,6 +333,17 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Code-unit order, deliberately not localeCompare: these sorts canonicalise a payload before it
+ * is hashed, so the order has to be identical on every pod regardless of the runtime's locale.
+ */
+function byCodeUnit(a: unknown, b: unknown): number {
+  const left = String(a)
+  const right = String(b)
+  if (left === right) return 0
+  return left < right ? -1 : 1
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -342,7 +355,7 @@ function canonicalJson(value: unknown): string {
     isObject(v)
       ? Object.fromEntries(
           Object.keys(v)
-            .sort()
+            .sort(byCodeUnit)
             .map((k) => [k, v[k]]),
         )
       : v,

@@ -1,6 +1,7 @@
-import * as http from 'http'
-import * as https from 'https'
-import { URL } from 'url'
+import * as http from 'node:http'
+import { trimCharEnd } from '../utils/trim-char'
+import * as https from 'node:https'
+import { URL } from 'node:url'
 import TransportStream from 'winston-transport'
 
 const MESSAGE = Symbol.for('message') as unknown as string
@@ -59,7 +60,7 @@ export class LokiTransport extends TransportStream {
 
   constructor(options: LokiTransportOptions) {
     super(options)
-    const base = options.url.replace(/\/+$/, '')
+    const base = trimCharEnd(options.url, '/')
     this.endpoint = new URL(base.endsWith('/loki/api/v1/push') ? base : `${base}/loki/api/v1/push`)
     this.labels = Object.fromEntries(
       Object.entries(options.labels).map(([k, v]) => [k, String(v ?? '')]),
@@ -85,7 +86,7 @@ export class LokiTransport extends TransportStream {
 
     const line =
       typeof info[MESSAGE] === 'string' ? (info[MESSAGE] as string) : JSON.stringify(info)
-    const level = String(info[Symbol.for('level') as unknown as string] ?? info.level ?? 'info')
+    const level = (info[Symbol.for('level') as unknown as string] ?? info.level ?? 'info') as string
     const parsed = info.timestamp ? new Date(info.timestamp as string).valueOf() : Date.now()
 
     this.queue.push({

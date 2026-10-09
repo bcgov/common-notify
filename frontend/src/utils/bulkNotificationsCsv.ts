@@ -88,34 +88,54 @@ function isValidPhone(value: string): boolean {
   return !!phone && !phone.ext && phone.isValid()
 }
 
+/**
+ * One digit group, optionally wrapped in parentheses. Returns the index after it, or null when
+ * there is no group here (no digits, or an unclosed parenthesis).
+ */
+function consumeDigitGroup(input: string, start: number): number | null {
+  let index = start
+  const parenthesized = input[index] === '('
+  if (parenthesized) index++
+
+  const digitsStart = index
+  while (index < input.length && input[index] >= '0' && input[index] <= '9') index++
+  if (index === digitsStart) return null
+
+  if (parenthesized) {
+    if (input[index] !== ')') return null
+    index++
+  }
+
+  return index
+}
+
+/** Separators between digit groups: dots, hyphens and whitespace. */
+function consumeSeparators(input: string, start: number): number {
+  let index = start
+  while (
+    index < input.length &&
+    (input[index] === '.' || input[index] === '-' || /\s/.test(input[index]))
+  ) {
+    index++
+  }
+  return index
+}
+
+/**
+ * Consume each character once. Nested repetitions in a regex can backtrack exponentially when a
+ * long run of digits ends with an invalid character.
+ */
 function isPhoneFormat(value: string): boolean {
   const input = value.trim()
   let index = input.startsWith('+') ? 1 : 0
 
-  // Consume each character once. Nested repetitions in a regex can backtrack
-  // exponentially when a long run of digits ends with an invalid character.
   while (index < input.length) {
-    const parenthesized = input[index] === '('
-    if (parenthesized) index++
+    const afterGroup = consumeDigitGroup(input, index)
+    if (afterGroup === null) return false
+    if (afterGroup === input.length) return true
 
-    const digitsStart = index
-    while (index < input.length && input[index] >= '0' && input[index] <= '9') index++
-    if (index === digitsStart) return false
-
-    if (parenthesized) {
-      if (input[index] !== ')') return false
-      index++
-    }
-
-    if (index === input.length) return true
-
-    while (
-      index < input.length &&
-      (input[index] === '.' || input[index] === '-' || /\s/.test(input[index]))
-    ) {
-      index++
-    }
-    // A separator must be followed by another digit group.
+    // A separator must be followed by another digit group, which the next pass checks.
+    index = consumeSeparators(input, afterGroup)
   }
 
   return false
@@ -213,6 +233,131 @@ export function parseCsv(text: string): ParsedCsv {
 }
 
 /**
+ * File-level problems, in the order they are reported. Returns null when the columns and the row
+ * count are all usable.
+ */
+function checkFile(headers: string[], rows: string[][], expected: string[]): string | null {
+  if (headers.length === 0) {
+    return 'This file is empty. Download the sample CSV and fill it in.'
+  }
+
+  for (const column of expected) {
+    if (!headers.includes(column)) {
+      return `Your CSV file is missing required column called '${column}'.`
+    }
+  }
+
+  const unexpected = headers.filter((header) => !expected.includes(header))
+  if (unexpected.length > 0) {
+    return `Your CSV file has a column this template does not use: '${unexpected[0]}'.`
+  }
+
+  const duplicateHeader = headers.find((header, index) => headers.indexOf(header) !== index)
+  if (duplicateHeader) {
+    return `Your CSV file has more than one column called '${duplicateHeader}'.`
+  }
+
+  if (rows.length === 0) {
+    return 'This file has no recipients. Add one row per person.'
+  }
+
+  if (rows.length > MAX_RECIPIENTS) {
+    return `This file has ${rows.length.toLocaleString()} recipients. The limit is ${MAX_RECIPIENTS.toLocaleString()} per send.`
+  }
+
+  return null
+}
+
+/**
+ * The recipient cell: format, validity, destination support, then duplication. Records the row a
+ * recipient was first seen on, so a later row can point back at it.
+ */
+function checkRecipient(
+  value: string,
+  rowNumber: number,
+  column: string,
+  channel: BulkChannel,
+  firstSeenAt: Map<string, number>,
+): RowIssue | null {
+  // Syntax and number validity are separate: readable separators are allowed,
+  // but letters, extensions, misplaced plus signs and unbalanced parentheses are not.
+  if (channel === 'sms' && !isPhoneFormat(value)) {
+    return {
+      row: rowNumber,
+      column,
+      value,
+      title: 'Invalid phone number format',
+      detail:
+        'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
+    }
+  }
+
+  if (!isValidRecipient(value, channel)) {
+    return {
+      row: rowNumber,
+      column,
+      value,
+      title: channel === 'sms' ? 'Invalid phone number' : 'Invalid format',
+      // The offending value is already in its own column, so the detail is the fix alone.
+      detail:
+        channel === 'sms'
+          ? 'Check the phone number.'
+          : 'Use a single @ with a domain after it, like name@example.com.',
+    }
+  }
+
+  if (channel === 'sms') {
+    const phone = parsePhoneNumberFromString(value, { defaultCountry: 'CA', extract: false })!
+    if (phone.countryCallingCode !== '1') {
+      return {
+        row: rowNumber,
+        column,
+        value,
+        title: 'Unsupported destination',
+        detail:
+          'SMS is not supported in the country or region for this phone number. Remove this recipient.',
+      }
+    }
+  }
+
+  const normalised = recipientKey(value, channel)
+  const firstSeen = firstSeenAt.get(normalised)
+  if (firstSeen !== undefined) {
+    return {
+      row: rowNumber,
+      column,
+      value,
+      title: `Duplicate of row ${firstSeen}`,
+      detail: `This recipient was already listed on row ${firstSeen}. Remove one of the rows.`,
+    }
+  }
+
+  firstSeenAt.set(normalised, rowNumber)
+  return null
+}
+
+/** One issue per empty cell, plus whatever the recipient cell is guilty of. */
+function checkCell(
+  value: string,
+  rowNumber: number,
+  column: string,
+  isRecipient: boolean,
+  channel: BulkChannel,
+  firstSeenAt: Map<string, number>,
+): RowIssue | null {
+  if (!value) {
+    return {
+      row: rowNumber,
+      column,
+      title: 'Missing or invalid value',
+      detail: `The '${column}' column is empty. Fill it in, or delete the row.`,
+    }
+  }
+
+  return isRecipient ? checkRecipient(value, rowNumber, column, channel, firstSeenAt) : null
+}
+
+/**
  * Check an uploaded file against the selected template.
  *
  * A file-level problem short-circuits: if the columns are wrong there is no point reporting the
@@ -225,131 +370,29 @@ export function validateCsv(
 ): ValidationResult {
   const { headers, rows } = parsed
   const recipientColumn = RECIPIENT_COLUMN[channel]
-  const expected = [recipientColumn, ...placeholders]
 
-  if (headers.length === 0) {
-    return {
-      fileIssue: 'This file is empty. Download the sample CSV and fill it in.',
-      rowIssues: [],
-    }
-  }
-
-  for (const column of expected) {
-    if (!headers.includes(column)) {
-      return {
-        fileIssue: `Your CSV file is missing required column called '${column}'.`,
-        rowIssues: [],
-      }
-    }
-  }
-
-  const unexpected = headers.filter((header) => !expected.includes(header))
-  if (unexpected.length > 0) {
-    return {
-      fileIssue: `Your CSV file has a column this template does not use: '${unexpected[0]}'.`,
-      rowIssues: [],
-    }
-  }
-
-  const duplicateHeader = headers.find((header, index) => headers.indexOf(header) !== index)
-  if (duplicateHeader) {
-    return {
-      fileIssue: `Your CSV file has more than one column called '${duplicateHeader}'.`,
-      rowIssues: [],
-    }
-  }
-
-  if (rows.length === 0) {
-    return { fileIssue: 'This file has no recipients. Add one row per person.', rowIssues: [] }
-  }
-
-  if (rows.length > MAX_RECIPIENTS) {
-    return {
-      fileIssue: `This file has ${rows.length.toLocaleString()} recipients. The limit is ${MAX_RECIPIENTS.toLocaleString()} per send.`,
-      rowIssues: [],
-    }
-  }
+  const fileIssue = checkFile(headers, rows, [recipientColumn, ...placeholders])
+  if (fileIssue) return { fileIssue, rowIssues: [] }
 
   const recipientIndex = headers.indexOf(recipientColumn)
   const rowIssues: RowIssue[] = []
   const firstSeenAt = new Map<string, number>()
 
+  // The cap is checked per row, not per cell, so one row can carry it past the limit.
   for (let index = 0; index < rows.length && rowIssues.length < MAX_REPORTED_ISSUES; index++) {
     const row = rows[index]
     const rowNumber = index + 2 // header occupies row 1
 
     for (let column = 0; column < headers.length; column++) {
-      const value = row[column] ?? ''
-      const name = headers[column]
-
-      if (!value) {
-        rowIssues.push({
-          row: rowNumber,
-          column: name,
-          title: 'Missing or invalid value',
-          detail: `The '${name}' column is empty. Fill it in, or delete the row.`,
-        })
-        continue
-      }
-
-      if (column === recipientIndex) {
-        // Syntax and number validity are separate: readable separators are allowed,
-        // but letters, extensions, misplaced plus signs and unbalanced parentheses are not.
-        if (channel === 'sms' && !isPhoneFormat(value)) {
-          rowIssues.push({
-            row: rowNumber,
-            column: name,
-            value,
-            title: 'Invalid phone number format',
-            detail:
-              'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
-          })
-          continue
-        }
-        if (!isValidRecipient(value, channel)) {
-          rowIssues.push({
-            row: rowNumber,
-            column: name,
-            value,
-            title: channel === 'sms' ? 'Invalid phone number' : 'Invalid format',
-            // The offending value is already in its own column, so the detail is the fix alone.
-            detail:
-              channel === 'sms'
-                ? 'Check the phone number.'
-                : 'Use a single @ with a domain after it, like name@example.com.',
-          })
-          continue
-        }
-
-        if (channel === 'sms') {
-          const phone = parsePhoneNumberFromString(value, { defaultCountry: 'CA', extract: false })!
-          if (phone.countryCallingCode !== '1') {
-            rowIssues.push({
-              row: rowNumber,
-              column: name,
-              value,
-              title: 'Unsupported destination',
-              detail:
-                'SMS is not supported in the country or region for this phone number. Remove this recipient.',
-            })
-            continue
-          }
-        }
-
-        const normalised = recipientKey(value, channel)
-        const firstSeen = firstSeenAt.get(normalised)
-        if (firstSeen !== undefined) {
-          rowIssues.push({
-            row: rowNumber,
-            column: name,
-            value,
-            title: `Duplicate of row ${firstSeen}`,
-            detail: `This recipient was already listed on row ${firstSeen}. Remove one of the rows.`,
-          })
-        } else {
-          firstSeenAt.set(normalised, rowNumber)
-        }
-      }
+      const issue = checkCell(
+        row[column] ?? '',
+        rowNumber,
+        headers[column],
+        column === recipientIndex,
+        channel,
+        firstSeenAt,
+      )
+      if (issue) rowIssues.push(issue)
     }
   }
 
