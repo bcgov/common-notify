@@ -186,7 +186,7 @@ export class EventNotificationResolver {
   ): Promise<EventChannelSetting> {
     const event = await this.eventRepository.findOne({
       where: { id: eventId, tenantId, isDeleted: false },
-      relations: ['channelSettings', 'channelSettings.recipients', 'channelSettings.cstarGroups'],
+      relations: { channelSettings: { recipients: true, cstarGroups: true } },
     })
 
     if (!event) {
