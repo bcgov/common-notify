@@ -54,14 +54,16 @@ export default defineConfig({
     target: 'esnext',
     // Minify option
     // https://vitejs.dev/config/build-options.html#build-minify
-    minify: 'esbuild',
+    // oxc is Vite 8's bundled minifier; 'esbuild' now needs esbuild installed separately.
+    minify: 'oxc',
     // Rollup Options
     // https://vitejs.dev/config/build-options.html#build-rollupoptions
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split external library from transpiled code.
-          react: ['react', 'react-dom'],
+        // Split external library from transpiled code. Function form: Vite 8 builds with
+        // rolldown, which does not take the object form.
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom)\//.test(id)) return 'react'
         },
       },
     },

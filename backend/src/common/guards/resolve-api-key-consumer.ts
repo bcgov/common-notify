@@ -66,7 +66,7 @@ export function parseConsumerGroups(value: string | undefined): string[] {
 export function describeGatewayHeaders(headers: Record<string, unknown>): string {
   const injected = Object.keys(headers)
     .filter((name) => /^x-(consumer|credential|authenticated|anonymous)/i.test(name))
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((name) => `${name}=${String(headers[name])}`)
 
   return injected.length ? injected.join(' ') : '(none)'
@@ -118,7 +118,7 @@ export async function resolveApiKeyConsumer(
   if (credentialIdentifier) {
     const byCredential = await repository.findOne({
       where: { credentialIdentifier },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     if (byCredential) {
       return byCredential
@@ -134,7 +134,7 @@ export async function resolveApiKeyConsumer(
   if (tenantGuids.length > 0) {
     const byTenantAndClientId = await repository.findOne({
       where: { clientId: In(clientIds), tenant: { externalId: In(tenantGuids) } },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     if (byTenantAndClientId) {
       await backfillCredentialIdentifier(repository, byTenantAndClientId, headers, logger)
@@ -144,7 +144,7 @@ export async function resolveApiKeyConsumer(
 
   const byClientId = await repository.findOne({
     where: { clientId: In(clientIds), credentialIdentifier: IsNull() },
-    relations: ['tenant'],
+    relations: { tenant: true },
   })
   if (!byClientId) {
     return null

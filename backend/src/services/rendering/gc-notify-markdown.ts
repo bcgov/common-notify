@@ -16,7 +16,7 @@ import type Token from 'markdown-it/lib/token.mjs'
  */
 
 /** Schemes an href may use. Anything else is replaced with `#` rather than dropped. */
-const ALLOWED_LINK_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:']
+const ALLOWED_LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 
 /** Inline style GC Notify puts on every link, since email has no stylesheet. */
 const LINK_STYLE = 'word-wrap: break-word; color: #1a4480;'
@@ -24,7 +24,7 @@ const LINK_STYLE = 'word-wrap: break-word; color: #1a4480;'
 /** C0/C1 controls and the spaces around them, removed before an href's scheme is read. */
 // Matching control characters is the point here: they are what an obfuscated scheme hides in.
 // eslint-disable-next-line no-control-regex
-const STRIPPED_BEFORE_SCHEME_CHECK = new RegExp('[\\u0000-\\u0020\\u007f-\\u00a0]', 'g')
+const STRIPPED_BEFORE_SCHEME_CHECK = /[\u0000-\u0020\u007f-\u00a0]/g
 
 /**
  * `javascript:` written with embedded whitespace or control characters - " java\tscript:alert(1)"
@@ -39,36 +39,52 @@ const stripForSchemeCheck = (href: string): string =>
  */
 export function safeHref(href: string): string {
   const stripped = stripForSchemeCheck(href)
-  const scheme = stripped.match(/^[a-z][a-z0-9+.-]*:/)
+  const scheme = /^[a-z][a-z0-9+.-]*:/.exec(stripped)
 
   if (!scheme) {
     return href
   }
 
-  return ALLOWED_LINK_SCHEMES.includes(scheme[0]) ? href : '#'
+  return ALLOWED_LINK_SCHEMES.has(scheme[0]) ? href : '#'
 }
 
 /**
  * GC Notify runs a typography pass over every body and subject, so output is not byte-identical
  * to input even with no placeholders.
  */
+/** True for a token shaped like local@domain.tld, the shape the quote pass must not corrupt. */
+function looksLikeAddress(token: string): boolean {
+  const at = token.indexOf('@')
+  if (at < 1) return false
+  const domain = token.slice(at + 1)
+  const dot = domain.indexOf('.')
+  return dot > 0 && dot < domain.length - 1
+}
+
+function straightenQuotes(token: string): string {
+  return token.replaceAll('‘', "'").replaceAll('’', "'").replaceAll('“', '"').replaceAll('”', '"')
+}
+
 export function applyTypography(text: string): string {
   let out = text
     // Straight quotes to smart quotes. Openers are those following start-of-string or whitespace.
     .replace(/(^|[\s([{])"/g, '$1“')
-    .replace(/"/g, '”')
+    .replaceAll('"', '”')
     .replace(/(^|[\s([{])'/g, '$1‘')
-    .replace(/'/g, '’')
+    .replaceAll("'", '’')
     // A space-surrounded hyphen becomes an en dash.
-    .replace(/ - /g, ' – ')
+    .replaceAll(' - ', ' – ')
     // Whitespace before punctuation is removed.
-    .replace(/\s+([,.;:!?])/g, '$1')
+    // Lookbehind so a run of whitespace is only attempted from its first character.
+    .replace(/(?<!\s)\s+([,.;:!?])/g, '$1')
 
   // An email address must survive the apostrophe pass: o'brien@gov.bc.ca would otherwise carry a
-  // right single quote and stop being a valid address.
-  out = out.replace(/\S+@\S+\.\S+/g, (address) =>
-    address.replace(/[‘’]/g, "'").replace(/[“”]/g, '"'),
-  )
+  // right single quote and stop being a valid address. Split on whitespace rather than matching an
+  // address pattern, which rescans a long token from every position.
+  out = out
+    .split(/(\s+)/)
+    .map((part) => (looksLikeAddress(part) ? straightenQuotes(part) : part))
+    .join('')
 
   return out
 }
@@ -162,7 +178,7 @@ function normaliseBlockMarkers(body: string): string {
     .split('\n')
     .map((line) =>
       line
-        .replace(/^(\s*)>/, '$1\\>')
+        .replace(/^(\s*)>/, String.raw`$1\>`)
         .replace(/^(\s*)\^\s?/, '$1> ')
         .replace(/^(\s*)•\s+/, '$1* '),
     )
@@ -180,7 +196,7 @@ function normaliseBlockMarkers(body: string): string {
  */
 const BLOCK_MARKER = 'GCNOTIFYBLOCK'
 const BLOCK_MARKER_PATTERN = new RegExp(
-  `(?:<p>\\s*)?@@${BLOCK_MARKER}:([A-Za-z0-9+/=]+)@@(?:\\s*</p>)?`,
+  String.raw`(?:<p>\s*)?@@${BLOCK_MARKER}:([A-Za-z0-9+/=]+)@@(?:\s*</p>)?`,
   'g',
 )
 

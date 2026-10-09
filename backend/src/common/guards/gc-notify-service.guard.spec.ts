@@ -163,7 +163,7 @@ describe('GcNotifyServiceGuard', () => {
       expect(request.tenantExternalId).toBe('ext-123')
       expect(mockApiKeyConsumerRepository.findOne).toHaveBeenCalledWith({
         where: { credentialIdentifier: 'cred-1' },
-        relations: ['tenant'],
+        relations: { tenant: true },
       })
     })
   })

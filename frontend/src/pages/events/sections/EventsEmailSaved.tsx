@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button, Callout } from '@bcgov/design-system-react-components'
@@ -91,11 +92,12 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
   const headerLogo =
     approvedLogos.find((logo) => logo.id === headerLogoId) ??
     approvedLogos.find((logo) => logo.isDefault)
-  const headerTitle = useCustomHeader
-    ? (emailSettings?.headerTitle ?? '')
-    : tenantShowsHeaderTitle
-      ? headerLogo?.displayTitle || 'Government of British Columbia'
-      : ''
+  const headerTitle = resolveEmailHeaderTitle({
+    useCustomTitle: useCustomHeader,
+    customTitle: emailSettings?.headerTitle,
+    tenantShowsHeaderTitle,
+    logoDisplayTitle: headerLogo?.displayTitle,
+  })
 
   function openTab(tab: EventTab) {
     navigate({ to: '/events/$eventId', params: { eventId }, search: { tab } })

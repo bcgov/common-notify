@@ -320,7 +320,7 @@ export class IngestionWorker {
                 `[${notifyId}] Attachment scan error: ${errorMsg}. Strict mode: retrying job.`,
               )
               // Strict mode: throw error to trigger BullMQ retry if ClamAV is unavailable
-              throw new Error(`Attachment scan failed: ${errorMsg}`)
+              throw new Error(`Attachment scan failed: ${errorMsg}`, { cause: scanError })
             }
           }
 

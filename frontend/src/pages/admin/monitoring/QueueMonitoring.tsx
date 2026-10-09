@@ -172,11 +172,7 @@ const QueueMonitoring: FC<QueueMonitoringProps> = ({ tab, onTabChange }) => {
         </Alert>
       )}
 
-      {isLoading && !data && (
-        <p role="status" className="text-muted">
-          Loading queue health…
-        </p>
-      )}
+      {isLoading && !data && <output className="text-muted d-block">Loading queue health…</output>}
 
       {data && (
         <>

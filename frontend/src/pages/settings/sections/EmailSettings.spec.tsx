@@ -182,12 +182,12 @@ describe('EmailSettings section', () => {
     renderWithRoles()
     expect(screen.getByRole('radio', { name: 'Use logo only (default)' })).toBeChecked()
     await userEvent.click(screen.getByRole('radio', { name: 'Use logo and title' }))
-    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent(
+    expect(screen.getByRole('figure', { name: 'Email header preview' })).toHaveTextContent(
       'Agriculture and Food (AF)',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Email logo/brand Primary logo' }))
     await userEvent.click(screen.getByRole('option', { name: 'Alternate logo' }))
-    expect(screen.getByRole('group', { name: 'Email header preview' })).toHaveTextContent(
+    expect(screen.getByRole('figure', { name: 'Email header preview' })).toHaveTextContent(
       'Health (HLTH)',
     )
     await userEvent.click(saveButton())

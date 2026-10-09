@@ -25,7 +25,7 @@ export const toastSlice = createSlice({
     showToast: (state, action: PayloadAction<Toast>) => {
       const toast = {
         ...action.payload,
-        id: action.payload.id || `${Date.now()}-${Math.random()}`,
+        id: action.payload.id || crypto.randomUUID(),
       }
       state.toasts.push(toast)
     },

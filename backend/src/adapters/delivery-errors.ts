@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common'
+import { describeError } from '../common/utils/describe-error'
 
 /**
  * The provider could not take the message right now - it is down, restarting, overloaded or
@@ -64,7 +65,7 @@ export function transientFromProviderError(
     message?: unknown
   }
   const httpStatus = typeof statusCode === 'number' ? statusCode : status
-  const text = typeof message === 'string' ? message : String(error)
+  const text = typeof message === 'string' ? message : describeError(error)
   if (typeof httpStatus === 'number' && isTransientHttpStatus(httpStatus)) {
     return new TransientDeliveryError(`${label}: upstream ${httpStatus} - ${text}`, 502)
   }

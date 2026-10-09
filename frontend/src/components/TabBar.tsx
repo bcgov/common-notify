@@ -19,7 +19,12 @@ interface TabBarProps<T extends string> {
  * A row of mutually exclusive view switches, drawn with the design system's ToggleButtonGroup
  * so it matches the event pages' tabs. The group handles arrow-key movement between options.
  */
-export function TabBar<T extends string>({ items, selected, onSelect, label }: TabBarProps<T>) {
+export function TabBar<T extends string>({
+  items,
+  selected,
+  onSelect,
+  label,
+}: Readonly<TabBarProps<T>>) {
   return (
     <div className="tab-bar">
       <ToggleButtonGroup
