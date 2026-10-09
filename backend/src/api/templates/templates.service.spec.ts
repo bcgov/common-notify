@@ -347,14 +347,16 @@ describe('TemplatesService', () => {
       )
     })
 
-    it('should preserve Legacy GC Notify empty substitution for present null values', async () => {
+    it('should preserve Legacy GC Notify empty substitution for null values in a preview', async () => {
       const template: Template = {
         ...mockLegacyTemplate,
         subject: 'Static subject',
         body: 'Status: ((status))',
       }
 
-      const result = await service.renderTemplateContent(template, { status: null })
+      const result = await service.renderTemplateContent(template, { status: null }, undefined, {
+        allowEmptyValues: true,
+      })
 
       expect(result.body).toBe('Status: ')
     })
@@ -418,14 +420,32 @@ describe('TemplatesService', () => {
       )
     })
 
-    it('should accept empty-string values as present personalisation', async () => {
+    it.each([
+      ['an empty string', ''],
+      ['a whitespace-only string', '   '],
+      ['null', null],
+    ])('should reject %s as missing personalisation', async (_label, value) => {
+      const template: Template = {
+        ...mockTemplate,
+        subject: 'Hello {{name}}',
+        body: 'Status: {{status}}',
+      }
+
+      await expect(
+        service.renderTemplateContent(template, { name: 'Alice', status: value }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: status')
+    })
+
+    it('should accept empty values when allowEmptyValues is set', async () => {
       const template: Template = {
         ...mockTemplate,
         subject: 'Static subject',
         body: 'Status: {{status}}',
       }
 
-      const result = await service.renderTemplateContent(template, { status: '' })
+      const result = await service.renderTemplateContent(template, { status: '' }, undefined, {
+        allowEmptyValues: true,
+      })
 
       expect(result.body).toBe('Status: ')
       expect(result.bodyType).toBe('markdown')
@@ -891,6 +911,24 @@ describe('TemplatesService', () => {
 
       expect(mockTenantSettingsService.resolveSenderAddress).toHaveBeenCalledWith('tenant-123')
       expect(result.from).toBe('permits@gov.bc.ca')
+    })
+
+    it('renders blank values, since a preview is shown while they are still being filled in', async () => {
+      mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
+
+      const result = await service.previewTemplate('tenant-123', 'template-123', {
+        params: { userName: '', siteName: 'MyApp' },
+      })
+
+      expect(result.body).toContain('# Welcome')
+    })
+
+    it('still rejects a placeholder with no key at all', async () => {
+      mockRepository.findById.mockResolvedValue(mockMarkdownTemplate)
+
+      await expect(
+        service.previewTemplate('tenant-123', 'template-123', { params: { siteName: 'MyApp' } }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: userName')
     })
   })
 

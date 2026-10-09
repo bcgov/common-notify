@@ -29,7 +29,7 @@ describe('EmailTemplateLayoutService', () => {
   }
   const logoImg =
     '<img src="https://gateway.example.test/logos/logo-id/image?format=email" alt="Agriculture" ' +
-    'height="54" style="height:54px;width:auto;border:0;display:block;">'
+    'height="80" style="height:80px;width:auto;border:0;display:block;">'
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -67,10 +67,11 @@ describe('EmailTemplateLayoutService', () => {
           body:
             '<div style="background-color: #ffffff; max-width: 600px;">' +
             '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" ' +
-            'style="width:100%;border-collapse:collapse;margin-bottom:28px;"><tr>' +
-            '<td style="vertical-align:middle;' +
-            `width:1%;white-space:nowrap;padding-right:16px;">${logoImg}</td>` +
-            '</tr></table></div>\n' +
+            'style="width:100%;border-collapse:collapse;"><tr>' +
+            '<td style="vertical-align:middle;padding-bottom:0px;border-bottom:1px solid #d8d8d8;' +
+            `width:1%;white-space:nowrap;padding-right:16px;">${logoImg}</td></tr>` +
+            '<tr><td colspan="1" height="28" style="height:28px;line-height:28px;font-size:0;">&nbsp;</td></tr>' +
+            '</table></div>\n' +
             '<p>Hello <strong>Ada</strong></p>\n',
           bodyType: 'html',
         })
@@ -79,9 +80,10 @@ describe('EmailTemplateLayoutService', () => {
       },
     )
 
-    it("falls back to the default title for a logo's alt text when it has no display title", async () => {
+    it('shows neither a title nor alt text when the logo has no display title', async () => {
       vi.mocked(tenantSettingsService.findByTenantId).mockResolvedValue({
         emailLogoId: 'logo-id',
+        useCustomEmailHeader: true,
       } as any)
       vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
         displayTitle: null,
@@ -89,7 +91,8 @@ describe('EmailTemplateLayoutService', () => {
 
       const result = await service.apply(template, rendered)
 
-      expect(result.body).toContain('alt="Government of British Columbia"')
+      expect(result.body).toContain('alt=""')
+      expect(result.body).not.toContain('border-left')
     })
 
     it("shows the logo's escaped display title beside it only when enabled", async () => {
@@ -187,19 +190,25 @@ describe('EmailTemplateLayoutService', () => {
       // Left unconstrained, a logo arrives at whatever size it was uploaded at. The preview caps
       // its height, so the email has to as well - as an attribute and a style, since mail
       // clients disagree about which they honour.
-      expect(result.body).toContain('height="54"')
-      expect(result.body).toContain('height:54px;width:auto;')
+      expect(result.body).toContain('height="80"')
+      expect(result.body).toContain('height:80px;width:auto;')
       // The preview's title is not bold, and the rule between the halves is 16px out either side.
       expect(result.body).not.toContain('font-weight:bold')
       expect(result.body).toContain('padding-right:16px')
       expect(result.body).toContain('border-left:1px solid #d8d8d8;padding-left:16px;')
     })
 
-    it('separates itself from the message with a gap rather than a rule', async () => {
+    it('sits closer to its own rule than the message below it does', async () => {
       const result = await service.apply(template, rendered)
 
-      expect(result.body).not.toContain('border-bottom')
-      expect(result.body).toContain('margin-bottom:28px')
+      // Nothing is added above the rule: the logos carry their own whitespace, and padding here
+      // stacks on top of that.
+      expect(result.body).toContain('padding-bottom:0px;border-bottom:1px solid #d8d8d8;')
+      // A spacer row rather than a table margin, which Outlook puts above the rule instead.
+      expect(result.body).not.toContain('margin-bottom')
+      expect(result.body).toContain(
+        '<tr><td colspan="2" height="28" style="height:28px;line-height:28px;font-size:0;">&nbsp;</td></tr>',
+      )
     })
 
     it('draws the dividing rule on the title rather than on its cell', async () => {

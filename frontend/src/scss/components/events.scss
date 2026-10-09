@@ -216,7 +216,7 @@
 // Kept in step with LOGO_HEIGHT_PX in the backend's email-template-layout.service, which is what
 // the delivered email uses - this preview is only honest while the two agree.
 .events__header-preview-logo {
-  height: 108px;
+  height: 80px;
   max-width: 270px;
   object-fit: contain;
   object-position: left center;

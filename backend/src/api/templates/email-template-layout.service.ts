@@ -25,9 +25,18 @@ export interface EmailHeaderOverride {
  * Height a sender's own logo is rendered at. The width follows it, so a wide logo stays wide.
  * The preview on the test send screen uses the same figure.
  */
-const LOGO_HEIGHT_PX = 108
+const LOGO_HEIGHT_PX = 80
 
-/** Gap between the header and the message itself, which separates the two. */
+/**
+ * Gap between the logo/title row and the rule under it.
+ *
+ * Zero on purpose. The approved logos have whitespace around their artwork, so the image box is
+ * taller than the logo looks and already supplies the gap - padding here is added on top of it
+ * and reads as too much. A logo trimmed to its artwork would want a value back.
+ */
+const HEADER_PADDING_BELOW_PX = 0
+
+/** Gap between that rule and the message itself, which separates the two. */
 const HEADER_MARGIN_BELOW_PX = 28
 
 /** Title used when a logo has no display title of its own. */
@@ -116,7 +125,9 @@ export class EmailTemplateLayoutService {
    */
   private headerHtml(logoId: string, title: string | null, alt: string): string {
     const divider = '1px solid #d8d8d8'
-    const cellStyle = 'vertical-align:middle;'
+    // Tight above the rule and generous below it, so the header reads as one block and the
+    // message below it as another, rather than the rule floating between two equal gaps.
+    const cellStyle = `vertical-align:middle;padding-bottom:${HEADER_PADDING_BELOW_PX}px;border-bottom:${divider};`
     const imageUrl = this.escapeHtmlAttribute(this.emailLogoService.buildEmailImageUrl(logoId))
     const cells = [
       // width:1% collapses the cell onto the logo so the title starts beside it rather than
@@ -139,8 +150,13 @@ export class EmailTemplateLayoutService {
 
     return (
       `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" ` +
-      `style="width:100%;border-collapse:collapse;margin-bottom:${HEADER_MARGIN_BELOW_PX}px;">` +
-      `<tr>${cells.join('')}</tr></table>`
+      `style="width:100%;border-collapse:collapse;">` +
+      `<tr>${cells.join('')}</tr>` +
+      // The gap below the rule is a spacer row rather than a margin on the table: Outlook's Word
+      // renderer misplaces table margins, putting the gap above the rule instead of below it.
+      `<tr><td colspan="${cells.length}" height="${HEADER_MARGIN_BELOW_PX}" ` +
+      `style="height:${HEADER_MARGIN_BELOW_PX}px;line-height:${HEADER_MARGIN_BELOW_PX}px;font-size:0;">&nbsp;</td></tr>` +
+      `</table>`
     )
   }
 
