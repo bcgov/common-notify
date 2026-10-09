@@ -61,9 +61,13 @@ vi.mock('@bcgov/design-system-react-components', () => ({
   SvgUpRightFromSquareIcon: () => null,
 }))
 
-function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
+function renderWithRoles(
+  roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN],
+  rateLimitPerMinute?: { EMAIL: number | null; SMS: number | null },
+) {
   state = {
     tenantSettings: {
+      rateLimitPerMinute,
       alertEmail: 'saved@example.com',
       defaultSenderEmail: 'noreply',
       saving: false,
@@ -84,6 +88,36 @@ describe('API key field', () => {
 })
 
 describe('TenantSettings section', () => {
+  it('shows different limits for Email and SMS', () => {
+    renderWithRoles(undefined, { EMAIL: 1000, SMS: 750 })
+    expect(screen.getByText('Email: 1,000 calls/minute')).toBeInTheDocument()
+    expect(screen.getByText('SMS: 750 calls/minute')).toBeInTheDocument()
+  })
+
+  it.each(['EMAIL', 'SMS'] as const)('handles a missing %s limit independently', (channel) => {
+    renderWithRoles(undefined, { EMAIL: 750, SMS: 750, [channel]: null })
+    expect(
+      screen.getByText(
+        channel === 'EMAIL' ? 'Email: No limit configured' : 'SMS: No limit configured',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(channel === 'EMAIL' ? 'SMS: 750 calls/minute' : 'Email: 750 calls/minute'),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    [750, '750 calls/minute'],
+    [1000, '1,000 calls/minute'],
+    [0, '0 calls/minute'],
+    [null, 'No limit configured'],
+    [undefined, 'Loading…'],
+  ])('renders the rate limit %s as %s', (value, expected) => {
+    renderWithRoles(undefined, value === undefined ? undefined : { EMAIL: value, SMS: value })
+    expect(screen.getByText(`Email: ${expected}`)).toBeInTheDocument()
+    expect(screen.getByText(`SMS: ${expected}`)).toBeInTheDocument()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     dispatchMock.mockImplementation((action) => ({

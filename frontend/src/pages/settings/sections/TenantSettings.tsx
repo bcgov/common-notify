@@ -33,7 +33,7 @@ const isValidSenderEmail = (value: string): boolean => SENDER_EMAIL_PATTERN.test
 
 const TenantSettings: FC = () => {
   const dispatch = useAppDispatch()
-  const { alertEmail, defaultSenderEmail, saving, error } = useAppSelector(
+  const { alertEmail, defaultSenderEmail, rateLimitPerMinute, saving, error } = useAppSelector(
     (state) => state.tenantSettings,
   )
   const { hasRole } = useCstarRoles()
@@ -159,11 +159,24 @@ const TenantSettings: FC = () => {
               <SvgInfoIcon />
             </Button>
             <Tooltip className="bcds-react-aria-Tooltip settings__tooltip--wide" placement="right">
-              This is the max API calls per minute for your tenant. Managed by the system.
+              These are the maximum API calls per minute for each channel in your tenant. Managed by
+              the system.
             </Tooltip>
           </TooltipTrigger>
         </span>
-        <p className="settings__rate-limit-value">500 calls/minute</p>
+        {(['EMAIL', 'SMS'] as const).map((channel) => {
+          const limit = rateLimitPerMinute?.[channel]
+          return (
+            <p className="settings__rate-limit-value" key={channel}>
+              {channel === 'EMAIL' ? 'Email' : 'SMS'}:{' '}
+              {limit === undefined
+                ? 'Loading…'
+                : limit === null
+                  ? 'No limit configured'
+                  : `${limit.toLocaleString()} calls/minute`}
+            </p>
+          )
+        })}
         <Link className="settings__external-link" href="#">
           Request increase limit
           <SvgUpRightFromSquareIcon />
