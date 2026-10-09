@@ -35,8 +35,6 @@ jobs:
           - 5432:5432
     steps:
       - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
         with:
           commands: |
             npm ci
@@ -44,17 +42,15 @@ jobs:
             npm run test:unit:cov
           dir: backend
           node_version: "22"
-          sonar_args: >
-            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
-            -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_backend
-            -Dsonar.sources=src
-            -Dsonar.test.inclusions=**/*spec.ts
-            -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
           dep_scan: off
           supply_scan: true
-          triggers: ('backend/')
+      - name: Publish backend coverage for the SonarCloud job
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: backend/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
 
   frontend-tests:
     name: Frontend Tests
@@ -63,8 +59,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
         with:
           commands: |
             npm ci
@@ -72,17 +66,79 @@ jobs:
             npm run test:cov
           dir: frontend
           node_version: "22"
-          sonar_args: >
-            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts,**/*spec.tsx,**/routeTree.gen.ts
-            -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_frontend
-            -Dsonar.sources=src
-            -Dsonar.test.inclusions=**/*spec.ts,**/*spec.tsx
-            -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
           dep_scan: off
           supply_scan: true
-          triggers: ('frontend/')
+      - name: Publish frontend coverage for the SonarCloud job
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend
+          path: frontend/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # One scan, because SonarCloud provisioned ONE project for this repo
+  # (bcgov_common-notify). We asked for a monorepo with backend and frontend
+  # components; bcgov_common-notify_backend does not exist. Two scanners
+  # pushing to a single project key do not merge - whichever finishes last
+  # replaces the other's results - so the scan is done once here over both
+  # apps, which is also the pattern bcgov documents
+  # (sonar.sources=ppr-api/src,ppr-ui/src in bcgov/sonarqube).
+  #
+  # Coverage comes from the test jobs as artifacts rather than being
+  # regenerated, so the suites still run exactly once.
+  # ---------------------------------------------------------------------------
+  sonar:
+    name: SonarCloud Scan
+    needs: [backend-tests, frontend-tests]
+    if: (! github.event.pull_request.draft)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      # The scan is guarded on the token below. Without this the job would pass
+      # silently while analysing nothing, which is how this went unnoticed in
+      # the first place. A warning, not a failure, so PRs stay green until the
+      # token is added.
+      - name: Warn when SonarQube analysis is skipped
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::warning title=SonarQube analysis skipped::SONAR_TOKEN is not set, so the scan did not run. Lint, tests and coverage did run. Add the token from https://sonarcloud.io/project/overview?id=bcgov_common-notify to enable it."
+
+      # Sonar needs full history to attribute issues to new code.
+      - uses: actions/checkout@v6
+        if: env.SONAR_TOKEN != ''
+        with:
+          fetch-depth: 0
+
+      - name: Collect coverage from the test jobs
+        if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-backend
+          path: backend/coverage
+
+      - name: Collect frontend coverage
+        if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-frontend
+          path: frontend/coverage
+
+      - uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v6.0.0
+        if: env.SONAR_TOKEN != ''
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=bcgov-sonarcloud
+            -Dsonar.projectKey=bcgov_common-notify
+            -Dsonar.sources=backend/src,frontend/src
+            -Dsonar.tests=backend/src,frontend/src
+            -Dsonar.test.inclusions=**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx
+            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/dist/**,**/*.gen.ts
+            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend/coverage/lcov.info
 
   # https://github.com/marketplace/actions/aqua-security-trivy
   trivy:
@@ -114,7 +170,7 @@ jobs:
 
   results:
     name: Analysis Results
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, sonar]
     if: (! github.event.pull_request.draft)
     runs-on: ubuntu-slim
     steps:
