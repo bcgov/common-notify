@@ -3,6 +3,12 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventTabs from './EventTabs'
 
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
+vi.mock('@/redux/hooks', () => ({
+  useAppSelector: (selector: (state: unknown) => unknown) =>
+    selector({ tenant: { selectedTenant: { id: 'tenant-1' } } }),
+}))
+
 const TAB_NAMES = [
   'Event Settings',
   'Email Notification',

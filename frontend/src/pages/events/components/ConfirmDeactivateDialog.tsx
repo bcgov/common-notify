@@ -7,6 +7,7 @@ type ConfirmDeactivateDialogProps = {
   isBusy: boolean
   onCancel: () => void
   onConfirm: () => void
+  description?: string
 }
 
 /**
@@ -18,6 +19,7 @@ const ConfirmDeactivateDialog: FC<ConfirmDeactivateDialogProps> = ({
   isBusy,
   onCancel,
   onConfirm,
+  description = 'This will stop notifications from being sent through this channel. Your settings will be saved and can be reactivated at any time.',
 }) => (
   <Modal
     isOpen={isOpen}
@@ -44,8 +46,7 @@ const ConfirmDeactivateDialog: FC<ConfirmDeactivateDialogProps> = ({
         </>
       }
     >
-      This will stop notifications from being sent through this channel. Your settings will be saved
-      and can be reactivated at any time.
+      {description}
     </AlertDialog>
   </Modal>
 )

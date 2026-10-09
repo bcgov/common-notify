@@ -1,5 +1,9 @@
 @import '../variables.scss';
 
+.events__sms-preview-notice {
+  margin: $spacing-md $spacing-lg 0;
+}
+
 // Events list page
 .events-page__description {
   display: inline-block;
@@ -55,6 +59,38 @@
   .bcds-react-aria-CheckboxGroup--label,
   .bcds-react-aria-RadioGroup--label {
     font-weight: 700;
+  }
+}
+
+// Fill short SMS pages so the actions sit at the bottom; longer forms still scroll
+// within the shared layout and retain the existing sticky action bar.
+.events--sms {
+  min-height: 100%;
+
+  > .events__section,
+  .events__form {
+    flex: 1 0 auto;
+  }
+
+  .events__section > .sticky-bar,
+  .events__form > .sticky-bar {
+    margin-top: auto;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .events__form > *:not(.sticky-bar) {
+    width: 100%;
+    max-width: 500px;
+    min-width: 0;
+  }
+
+  .events__form > .bcds-react-aria-TextField {
+    max-width: 418px;
+  }
+
+  .events__additional-recipients {
+    gap: 2px;
   }
 }
 
@@ -256,5 +292,38 @@
   }
   .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag.blue:not([data-disabled]) {
     background-color: var(--theme-blue-20, #d8eafd);
+  }
+}
+
+// Event SMS preview uses a compact plain-text pane and a single footer action.
+.notification-preview--sms-event {
+  .notification-preview__body {
+    height: min(55vh, 560px);
+  }
+
+  .notification-preview__text {
+    border: 0;
+    padding: 0;
+  }
+
+  .notification-preview__output-pane > .events__help {
+    background: var(--surface-color-background-light-gray, #faf9f8);
+    padding: $spacing-sm;
+  }
+
+  .notification-preview__footer {
+    align-items: center;
+    flex-wrap: wrap;
+
+    .events__help {
+      margin: 0 auto 0 0;
+    }
+  }
+
+  @media (max-width: $breakpoint-md) {
+    .notification-preview__body {
+      height: auto;
+      max-height: 55vh;
+    }
   }
 }

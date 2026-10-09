@@ -22,6 +22,8 @@ export interface TagListFieldProps {
   'aria-label': string
   placeholder?: string
   isDisabled?: boolean
+  /** Compact, wrapping layout for SMS recipients. */
+  isCompact?: boolean
   /** Validation is the caller's responsibility; this only controls how the field is displayed. */
   isInvalid?: boolean
   errorMessage?: string
@@ -41,6 +43,7 @@ const TagListField: FC<TagListFieldProps> = ({
   'aria-label': ariaLabel,
   placeholder,
   isDisabled = false,
+  isCompact = false,
   isInvalid = false,
   errorMessage,
 }) => {
@@ -74,7 +77,7 @@ const TagListField: FC<TagListFieldProps> = ({
   return (
     <>
       <div
-        className={`tag-list-field ${isDisabled ? 'tag-list-field--disabled' : ''} ${
+        className={`tag-list-field ${isCompact ? 'tag-list-field--compact' : ''} ${isDisabled ? 'tag-list-field--disabled' : ''} ${
           isInvalid ? 'tag-list-field--invalid' : ''
         }`}
       >
@@ -109,7 +112,13 @@ const TagListField: FC<TagListFieldProps> = ({
           errorMessage={errorMessage}
           // The DS TextArea omits `placeholder` and `rows` from its types, but
           // react-aria's useTextField still forwards them to the input.
-          {...({ placeholder, rows: 2 } as { placeholder?: string; rows?: number })}
+          {...({
+            placeholder: isCompact && values.length ? undefined : placeholder,
+            rows: isCompact ? 1 : 2,
+          } as {
+            placeholder?: string
+            rows?: number
+          })}
         />
       </div>
 

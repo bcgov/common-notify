@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,6 +10,7 @@ import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type { EntityManager } from 'typeorm'
+import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
@@ -31,6 +33,8 @@ import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-l
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 
 /**
  * Filters on values derived from an event's channel settings rather than stored on the event.
@@ -118,6 +122,9 @@ export class EventsService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
     private readonly cstarApiClient: CstarApiClient,
+    @InjectRepository(ProvisionedPhoneNumber)
+    private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
   /**
@@ -194,7 +201,26 @@ export class EventsService {
    */
   async getEvent(tenantId: string, eventId: string): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
-    return this.toResponseDto(event)
+    if (!(await this.isSmsEnabled(tenantId))) return this.toResponseDto(event)
+    const number = await this.findTenantPhoneNumber(tenantId)
+    return { ...this.toResponseDto(event), senderPhoneNumber: number?.phoneNumber ?? null }
+  }
+
+  private async isSmsEnabled(tenantId: string): Promise<boolean> {
+    const flags = await this.featureFlagService.getFlagsForTenant(tenantId)
+    return flags[FeatureFlagCode.SMS_NOTIFICATIONS] ?? false
+  }
+
+  private async assertSmsEnabled(tenantId: string): Promise<void> {
+    if (!(await this.isSmsEnabled(tenantId))) {
+      throw new ForbiddenException('SMS notifications are not enabled for this tenant')
+    }
+  }
+
+  private findTenantPhoneNumber(tenantId: string) {
+    return this.provisionedPhoneNumberRepository.findOne({
+      where: { tenantId, isDeleted: false },
+    })
   }
 
   /**
@@ -405,9 +431,8 @@ export class EventsService {
    * the tab's active toggle is local until the settings are applied, so `active` arrives here
    * alongside the data it depends on.
    *
-   * `fromPhoneNumberId` is not settable yet (the pool claim flow is a follow-up), so it stays
-   * permanently null - meaning an active SMS channel is not reachable until that flow lands,
-   * the same way an EMAIL channel can't be activated without a sender email.
+   * The sender is resolved from the tenant's live provisioned number; the caller cannot
+   * select another tenant's number or supply a sender ID.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -420,6 +445,7 @@ export class EventsService {
     updateDto: UpdateSmsChannelSettingDto,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
+    await this.assertSmsEnabled(tenantId)
     const event = await this.findEvent(tenantId, eventId)
     const templateId = updateDto.templateId ?? null
     // SMS has no cc/bcc - chk_event_channel_recipient_sms_kind rejects anything but TO.
@@ -432,7 +458,8 @@ export class EventsService {
     await this.assertWithinRecipientCap('SMS', recipients.length)
 
     const setting = this.findOrCreateSmsSetting(event, userId)
-
+    const number = await this.findTenantPhoneNumber(tenantId)
+    setting.fromPhoneNumberId = number?.id ?? null
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
@@ -474,6 +501,7 @@ export class EventsService {
     eventId: string,
     userId: string = 'system',
   ): Promise<EventResponseDto> {
+    await this.assertSmsEnabled(tenantId)
     return this.deactivateChannel(tenantId, eventId, NotificationChannel.SMS, userId)
   }
 
