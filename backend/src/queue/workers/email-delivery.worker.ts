@@ -1,6 +1,5 @@
 import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
-import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
 import { loadBatchRecipients } from './merge-batch-recipients'
@@ -21,6 +20,27 @@ import { StructuredLoggerService } from '../../common/logger'
 
 type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
   attachments?: SendEmailOptions['attachments']
+}
+
+export interface EmailDeliveryWorkerDeps {
+  /** The Bull queue instance for email delivery jobs */
+  emailQueue: Bull.Queue<DeliveryJobPayload>
+  /** Service for database updates */
+  notificationService: NotificationService
+  /** Repository for template resolution */
+  templatesRepository: TemplatesRepository
+  /** Service for template rendering */
+  templatesService: TemplatesService
+  /** Service for inline template rendering */
+  inlineRenderingService: InlineRenderingService
+  attachmentResolverService: AttachmentResolverService
+  /** Email transport adapter for sending emails */
+  emailAdapter: IEmailTransport
+  requestDetailService: NotificationRequestDetailService
+  /** Number of jobs to process in parallel (default: 2) */
+  concurrency?: number
+  structuredLogger?: StructuredLoggerService
+  tenantSettingsService?: TenantSettingsService
 }
 
 /**
@@ -68,33 +88,20 @@ export class EmailDeliveryWorker {
     return error instanceof HttpException && error.getStatus() === 400
   }
 
-  /**
-   * Initialize the email delivery worker on a queue
-   * @param emailQueue The BullMQ queue instance for email delivery jobs
-   * @param notificationService Service for database updates
-   * @param configService Configuration service for queue settings
-   * @param templatesRepository Repository for template resolution
-   * @param templatesService Service for template rendering
-   * @param inlineRenderingService Service for inline template rendering
-   * @param emailAdapter Email transport adapter for sending emails
-   * @param concurrency Number of jobs to process in parallel (default: 2)
-   */
-  static initialize(
-    emailQueue: Bull.Queue<DeliveryJobPayload>,
-    notificationService: NotificationService,
-    configService: ConfigService,
-    templatesRepository: TemplatesRepository,
-    templatesService: TemplatesService,
-    inlineRenderingService: InlineRenderingService,
-    attachmentResolverService: AttachmentResolverService,
-    emailAdapter: IEmailTransport,
-    requestDetailService: NotificationRequestDetailService,
-    concurrency: number = 2,
-    structuredLogger?: StructuredLoggerService,
-    // Last, and optional, because the parameters above are passed positionally: a new one in the
-    // middle silently rebinds every existing call's concurrency argument.
-    tenantSettingsService?: TenantSettingsService,
-  ): void {
+  /** Initialize the email delivery worker on a queue */
+  static initialize({
+    emailQueue,
+    notificationService,
+    templatesRepository,
+    templatesService,
+    inlineRenderingService,
+    attachmentResolverService,
+    emailAdapter,
+    requestDetailService,
+    concurrency = 2,
+    structuredLogger,
+    tenantSettingsService,
+  }: EmailDeliveryWorkerDeps): void {
     const logger = new Logger(EmailDeliveryWorker.name)
     const workerContext = EmailDeliveryWorker.name
 
