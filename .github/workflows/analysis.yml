@@ -66,14 +66,6 @@ jobs:
             npm run test:cov
           dir: frontend
           node_version: "22"
-          sonar_args: >
-            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts,**/*spec.tsx,**/routeTree.gen.ts
-            -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_frontend
-            -Dsonar.sources=src
-            -Dsonar.test.inclusions=**/*spec.ts,**/*spec.tsx
-            -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
           dep_scan: off
           supply_scan: true
       - name: Publish frontend coverage for the SonarCloud job
