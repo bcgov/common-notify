@@ -522,6 +522,10 @@
                                 </thead>
                                 <tbody>
                                 <tr>
+                                    <td>chk_event_channel_setting_custom_header</td>
+                                    <td>((use_custom_header &#61; true) OR ((header_logo_id IS NULL) AND (header_title IS NULL)))</td>
+                                </tr>
+                                <tr>
                                     <td>chk_event_channel_setting_active_complete</td>
                                     <td>((active &#61; false) OR ((template_id IS NOT NULL) AND ((((channel_code)::text &#61; &#39;EMAIL&#39;::text) AND (sender_email IS NOT NULL)) OR (((channel_code)::text &#61; &#39;SMS&#39;::text) AND (from_phone_number_id IS NOT NULL)))))</td>
                                 </tr>
@@ -530,16 +534,12 @@
                                     <td>((((channel_code)::text &#61; &#39;EMAIL&#39;::text) AND (from_phone_number_id IS NULL)) OR (((channel_code)::text &#61; &#39;SMS&#39;::text) AND (sender_email IS NULL) AND (use_custom_header &#61; false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))</td>
                                 </tr>
                                 <tr>
-                                    <td>chk_event_channel_setting_sender_email</td>
-                                    <td>((sender_email IS NULL) OR ((sender_email)::text ~ &#39;^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$&#39;::text))</td>
-                                </tr>
-                                <tr>
-                                    <td>chk_event_channel_setting_custom_header</td>
-                                    <td>((use_custom_header &#61; true) OR ((header_logo_id IS NULL) AND (header_title IS NULL)))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_event_channel_setting_header_title</td>
                                     <td>((header_title IS NULL) OR (btrim((header_title)::text) &lt;&gt; &#39;&#39;::text))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_event_channel_setting_sender_email</td>
+                                    <td>((sender_email IS NULL) OR ((sender_email)::text ~ &#39;^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$&#39;::text))</td>
                                 </tr>
                                 </tbody>
                             </table>

@@ -783,12 +783,16 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the record was last updated" size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="14" name="updated_by" nullable="true" remarks="User or system that last updated the record" size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="15" name="batch_id" nullable="true" remarks="Groups recipients of a bulk send into a single delivery batch, formatted as {notification_request id}-{channel}-{index}; null for non-bulk requests" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="16" name="params" nullable="true" remarks="Mail merge personalisation for this recipient, merged over the request's global params when rendering; null for non-merge sends" size="2147483647" type="jsonb" typeCode="1111"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="notification_request_detail_pkey" unique="true">
             <column ascending="true" name="id"/>
          </index>
          <index name="idx_notification_request_detail_batch_id" unique="false">
             <column ascending="true" name="batch_id"/>
+         </index>
+         <index name="idx_notification_request_detail_finished_at" unique="false">
+            <column ascending="true" name="last_attempt_at"/>
          </index>
          <index name="idx_notification_request_detail_recipient" unique="false">
             <column ascending="true" name="recipient_address"/>
