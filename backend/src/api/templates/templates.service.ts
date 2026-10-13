@@ -31,7 +31,7 @@ import {
 } from './email-template-layout.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
-  extractTemplatePersonalisationKeys,
+  analyseTemplatePersonalisation,
   describeTemplatePlaceholders,
 } from '../../services/rendering/template-personalisation-validation'
 import { toEmailHtml } from '../../services/rendering/email-body-html'
@@ -493,15 +493,18 @@ export class TemplatesService {
     personalisation: Record<string, any>,
     allowEmptyValues: boolean,
   ): void {
-    const requiredKeys = extractTemplatePersonalisationKeys(template, personalisation)
+    const { required, printed } = analyseTemplatePersonalisation(template, personalisation)
 
-    // An empty value renders as nothing, which is as much a gap in the sent message as an absent
-    // key, so both are reported as missing. Previews opt out: they render a template while its
-    // values are still being filled in.
-    const missingKeys = requiredKeys.filter(
+    // A printed value that is empty leaves as much of a gap in the sent message as an absent key,
+    // so both are missing. A value that is only tested (`{{#if notes}}`) may be blank: that is how
+    // a CSV cell or API caller says "skip this section". Previews allow blanks everywhere, since
+    // they render a template while its values are still being filled in.
+    const missingKeys = required.filter(
       (key) =>
         !Object.hasOwn(personalisation, key) ||
-        (!allowEmptyValues && isEmptyPersonalisationValue(personalisation[key])),
+        (!allowEmptyValues &&
+          printed.has(key) &&
+          isEmptyPersonalisationValue(personalisation[key])),
     )
 
     if (missingKeys.length > 0) {
