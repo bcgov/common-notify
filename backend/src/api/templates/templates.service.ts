@@ -500,7 +500,7 @@ export class TemplatesService {
     // values are still being filled in.
     const missingKeys = requiredKeys.filter(
       (key) =>
-        !Object.prototype.hasOwnProperty.call(personalisation, key) ||
+        !Object.hasOwn(personalisation, key) ||
         (!allowEmptyValues && isEmptyPersonalisationValue(personalisation[key])),
     )
 

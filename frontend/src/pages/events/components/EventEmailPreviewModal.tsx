@@ -59,7 +59,9 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
       const params: Record<string, string> = {}
       variables.forEach((variable) => {
         const raw = vals[variable.name] ?? ''
-        params[variable.name] = variable.type === 'boolean' ? (raw === 'true' ? 'true' : '') : raw
+        // A condition is either 'true' or empty, so the template treats anything else as false.
+        const isConditionOff = variable.type === 'boolean' && raw !== 'true'
+        params[variable.name] = isConditionOff ? '' : raw
       })
 
       setLoading(true)

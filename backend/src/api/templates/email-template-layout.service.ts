@@ -105,7 +105,9 @@ export class EmailTemplateLayoutService {
     const logo = await this.emailLogoService.findByIdIfApproved(logoId)
     const logoTitle = logo?.displayTitle?.trim() || DEFAULT_HEADER_TITLE
 
-    const title = header ? header.title : tenantSettings?.useCustomEmailHeader ? logoTitle : null
+    let title: string | null = null
+    if (header) title = header.title
+    else if (tenantSettings?.useCustomEmailHeader) title = logoTitle
 
     // A title beside the logo already says what it shows, so the image is then decorative.
     return { logoId, title, alt: title ? '' : logoTitle }

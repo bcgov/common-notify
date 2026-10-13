@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import type { FC, ReactNode } from 'react'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import EventEmailHeader from './EventEmailHeader'
@@ -32,6 +32,21 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({
   envelope,
   rendered,
 }) => {
+  let body: ReactNode
+  if (!rendered) {
+    // Nothing has been rendered yet, so the template is shown as it was written.
+    body = <p className="events__saved-body">{template.body}</p>
+  } else if (rendered.bodyHtml === undefined) {
+    body = <p className="events__saved-body">{rendered.bodyText}</p>
+  } else {
+    body = (
+      <div
+        className="events__preview-body"
+        dangerouslySetInnerHTML={{ __html: rendered.bodyHtml }}
+      />
+    )
+  }
+
   return (
     <div className="events__saved-preview">
       {envelope && (
@@ -50,17 +65,7 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({
       </p>
 
       <EventEmailHeader emailSettings={emailSettings} />
-      {!rendered ? (
-        // Nothing has been rendered yet, so the template is shown as it was written.
-        <p className="events__saved-body">{template.body}</p>
-      ) : rendered.bodyHtml !== undefined ? (
-        <div
-          className="events__preview-body"
-          dangerouslySetInnerHTML={{ __html: rendered.bodyHtml }}
-        />
-      ) : (
-        <p className="events__saved-body">{rendered.bodyText}</p>
-      )}
+      {body}
     </div>
   )
 }
