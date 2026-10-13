@@ -19,6 +19,7 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import StickyBar from '@/components/StickyBar'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import { CstarRole } from '@/enum/cstar-role.enum'
@@ -384,7 +385,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
         </div>
 
-        <div className="template-form__actions">
+        <StickyBar>
           <Button type="button" variant="secondary" onClick={handleCancel}>
             Cancel
           </Button>
@@ -402,7 +403,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
               {saving ? 'Saving...' : 'Save'}
             </Button>
           )}
-        </div>
+        </StickyBar>
       </form>
 
       <TemplatePreviewModal

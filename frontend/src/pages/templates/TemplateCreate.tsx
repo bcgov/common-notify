@@ -13,6 +13,7 @@ import TooltipTrigger from '@/components/TooltipTrigger'
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
+import StickyBar from '@/components/StickyBar'
 import TemplatePreviewModal from './TemplatePreviewModal'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
@@ -327,7 +328,7 @@ const TemplateCreate: FC = () => {
           </div>
         </div>
 
-        <div className="template-form__actions">
+        <StickyBar>
           <Button type="button" variant="secondary" onClick={handleCancel}>
             Cancel
           </Button>
@@ -342,7 +343,7 @@ const TemplateCreate: FC = () => {
           <Button type="submit" isDisabled={isSaveDisabled}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
-        </div>
+        </StickyBar>
       </form>
 
       <TemplatePreviewModal
