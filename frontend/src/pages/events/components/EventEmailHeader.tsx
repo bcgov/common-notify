@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import type { EventEmailSettings } from '@/api/events.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
+import { DEFAULT_EMAIL_HEADER_TITLE, resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 
 interface EventEmailHeaderProps {
   emailSettings: EventEmailSettings
@@ -18,6 +19,9 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
+  const tenantShowsHeaderTitle = useAppSelector(
+    (state) => state.emailSettings.useCustomEmailHeader ?? false,
+  )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
 
   // The header is previewed from the tenant's logo, the same as on the email tab. Both thunks
@@ -29,12 +33,23 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch, selectedTenantId])
 
-  // A custom header shows its own logo and title; the tenant default shows the tenant's
-  // configured logo on its own.
+  // Resolved as the backend resolves it at send time: a custom header without a logo inherits
+  // the tenant's, and a tenant without one gets the default logo.
   const useCustomHeader = emailSettings.useCustomHeader
-  const headerLogoId = useCustomHeader ? emailSettings.headerLogoId : tenantEmailLogoId
-  const headerLogo = approvedLogos.find((logo) => logo.id === headerLogoId)
-  const headerTitle = useCustomHeader ? (emailSettings.headerTitle ?? '') : ''
+  const headerLogoId = useCustomHeader
+    ? (emailSettings.headerLogoId ?? tenantEmailLogoId)
+    : tenantEmailLogoId
+  const headerLogo =
+    approvedLogos.find((logo) => logo.id === headerLogoId) ??
+    approvedLogos.find((logo) => logo.isDefault)
+  const headerTitle = resolveEmailHeaderTitle({
+    useCustomTitle: useCustomHeader,
+    customTitle: emailSettings.headerTitle,
+    tenantShowsHeaderTitle,
+    logoDisplayTitle: headerLogo?.displayTitle,
+  })
+  // A title beside the logo already says what it shows; on its own the logo has to say it.
+  const logoAlt = headerTitle ? '' : headerLogo?.displayTitle?.trim() || DEFAULT_EMAIL_HEADER_TITLE
 
   if (!headerLogo && !headerTitle) return null
 
@@ -42,7 +57,7 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
     <div className="events__header-preview-row">
       {headerLogo && (
         <img
-          alt=""
+          alt={logoAlt}
           className="events__header-preview-logo"
           loading="lazy"
           src={headerLogo.imageUrl}
