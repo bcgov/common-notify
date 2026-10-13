@@ -23,13 +23,11 @@ $page-narrow-width: 572px; // Single-column form pages (template create/edit)
   padding: 0 $page-gutter;
 }
 
-// Centred single-column variant. Each block still stretches to the column, so
+// Left-aligned single-column variant. Each block still stretches to the column, so
 // fields keep their own max-widths inside it.
 .page--narrow > * {
   width: 100%;
   max-width: $page-narrow-width;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* Heading block: optional breadcrumb, the page title, and an optional meta line */

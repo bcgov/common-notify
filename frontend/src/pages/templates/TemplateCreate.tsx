@@ -201,8 +201,7 @@ const TemplateCreate: FC = () => {
       <PageHeading
         title="Create reusable template"
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
-          { label: 'Templates', to: '/templates' },
+          { label: 'Template', to: '/templates' },
           { label: 'Create reusable template' },
         ]}
       />

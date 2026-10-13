@@ -234,8 +234,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       <PageHeading
         title={isReadOnly ? 'View reusable template' : 'Edit reusable template'}
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
-          { label: 'Templates', to: '/templates' },
+          { label: 'Template', to: '/templates' },
           {
             label: isReadOnly ? 'View reusable template' : 'Edit reusable template',
           },
