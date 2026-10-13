@@ -65,14 +65,16 @@ export interface QueueableOptions {
 /**
  * Fingerprint a send and check it against the dedup window before any expensive work
  * (attachment upload, per-row SMS rendering). Only a hint: `claimSend` makes the decision.
+ * `skip` leaves the send unfingerprinted, so `claimSend` lets it through too.
  */
 export async function findDuplicateSend(
   ctx: QueueableContext,
   tenantId: string,
   fingerprintSource: unknown,
+  skip = false,
 ): Promise<{ fingerprint?: string; duplicate: DuplicateNotification | null }> {
   const dedup = ctx.notificationDedupService
-  if (!dedup?.enabled) return { duplicate: null }
+  if (skip || !dedup?.enabled) return { duplicate: null }
   const fingerprint = dedup.fingerprint(fingerprintSource)
   return { fingerprint, duplicate: await dedup.findDuplicate(tenantId, fingerprint) }
 }
@@ -412,6 +414,7 @@ export async function handleMerge(
   requestRoute: string | undefined,
   channel: NotificationChannel,
   eventId?: string,
+  skipDedup = false,
 ) {
   const isSms = channel === NotificationChannel.SMS
   const logger = new Logger(`Queueable[${queueName}][${isSms ? 'smsMerge' : 'emailMerge'}]`)
@@ -420,7 +423,7 @@ export async function handleMerge(
   const channelName = isSms ? 'sms' : 'email'
 
   // Before validation and segment counting: for a large SMS merge those render every row.
-  const { fingerprint, duplicate } = await findDuplicateSend(ctx, tenantId, dto)
+  const { fingerprint, duplicate } = await findDuplicateSend(ctx, tenantId, dto, skipDedup)
   if (duplicate) return duplicateResponse(duplicate, [channelName])
 
   const mergeArray = channelPayload.recipients.mergeArray!
@@ -745,6 +748,10 @@ export function Queueable(
               ? req.user.id
               : tenantId
 
+        // A test send is repeated on purpose while the sender and header are adjusted, and those
+        // are applied by the delivery worker, so they are not in the fingerprint.
+        const skipDedup = options?.eventSend === 'test'
+
         // Event Send: expand the event data here
         let eventId: string | undefined
         if (options?.eventSend) {
@@ -771,6 +778,7 @@ export function Queueable(
             requestRoute,
             mergeChannel,
             eventId,
+            skipDedup,
           )
         }
 
@@ -789,6 +797,7 @@ export function Queueable(
           this as QueueableContext,
           tenantId,
           validatedPayload,
+          skipDedup,
         )
         if (duplicate) return duplicateResponse(duplicate, channels)
 
