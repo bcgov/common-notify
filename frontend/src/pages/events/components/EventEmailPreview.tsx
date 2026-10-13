@@ -1,6 +1,7 @@
 import type { FC, ReactNode } from 'react'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
 import EventEmailHeader from './EventEmailHeader'
 
 /** A template rendered with a set of values, as the preview endpoint returns it. */
@@ -39,12 +40,7 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({
   } else if (rendered.bodyHtml === undefined) {
     body = <p className="events__saved-body">{rendered.bodyText}</p>
   } else {
-    body = (
-      <div
-        className="events__preview-body"
-        dangerouslySetInnerHTML={{ __html: rendered.bodyHtml }}
-      />
-    )
+    body = <EmailBodyFrame html={rendered.bodyHtml} />
   }
 
   return (

@@ -1,17 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import { Button, InlineAlert } from '@bcgov/design-system-react-components'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import type { EventEmailSettings } from '@/api/events.api'
 import { detectVariables } from '@/utils/templateVariables'
+import type { DetectedVariable } from '@/utils/templateVariables'
 import EventEmailHeader from './EventEmailHeader'
 import type { RenderedNotification } from './EventEmailPreview'
 
 export interface AppliedNotification {
+  /** What the fields hold, so reopening the modal shows them as they were left. */
   values: Record<string, string>
+  /** What the template is rendered with. Send these, not `values`, so the email matches. */
+  params: Record<string, string>
   rendered: RenderedNotification
+}
+
+/**
+ * The template values a set of fields stands for. A condition is either 'true' or empty, since
+ * a template treats any non-empty string as true - including 'false'.
+ */
+export function toTemplateParams(
+  variables: readonly DetectedVariable[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const params: Record<string, string> = {}
+  variables.forEach((variable) => {
+    const raw = values[variable.name] ?? ''
+    params[variable.name] = variable.type === 'boolean' && raw !== 'true' ? '' : raw
+  })
+  return params
 }
 
 interface EventEmailPreviewModalProps {
@@ -55,15 +76,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
   )
 
   const runPreview = useCallback(
-    async (vals: Record<string, string>): Promise<RenderedNotification | null> => {
-      const params: Record<string, string> = {}
-      variables.forEach((variable) => {
-        const raw = vals[variable.name] ?? ''
-        // A condition is either 'true' or empty, so the template treats anything else as false.
-        const isConditionOff = variable.type === 'boolean' && raw !== 'true'
-        params[variable.name] = isConditionOff ? '' : raw
-      })
-
+    async (params: Record<string, string>): Promise<RenderedNotification | null> => {
       setLoading(true)
       setError(null)
       try {
@@ -86,7 +99,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
         setLoading(false)
       }
     },
-    [template.id, variables],
+    [template.id],
   )
 
   // Load and display existing variables in the first render
@@ -100,7 +113,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
     setInitialValues(initial)
     setDraft(initial)
     setNoticeVisible(true)
-    void runPreview(initial)
+    void runPreview(toTemplateParams(variables, initial))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, variables, runPreview])
 
@@ -108,15 +121,16 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
   useEffect(() => {
     if (!isOpen || !isDirty) return
 
-    const timer = setTimeout(() => void runPreview(draft), 500)
+    const timer = setTimeout(() => void runPreview(toTemplateParams(variables, draft)), 500)
     return () => clearTimeout(timer)
-  }, [isOpen, isDirty, draft, runPreview])
+  }, [isOpen, isDirty, draft, variables, runPreview])
 
   const handleApply = async () => {
     // A debounced render may still be pending, so this renders the draft as it stands rather
     // than handing the page whatever the last render happened to produce.
-    const result = await runPreview(draft)
-    if (result) onApply({ values: draft, rendered: result })
+    const params = toTemplateParams(variables, draft)
+    const result = await runPreview(params)
+    if (result) onApply({ values: draft, params, rendered: result })
   }
 
   return (
@@ -147,11 +161,11 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
       to={to || undefined}
       subject={subject}
       outputHeader={<EventEmailHeader emailSettings={emailSettings} />}
-      // Inlined rather than framed, to match the preview on the page. Only once a render has
-      // succeeded, so the modal's own loading and error states still show.
+      // The same frame as the preview on the page. Only once a render has succeeded, so the
+      // modal's own loading and error states still show.
       bodyOverride={
         !loading && !error && bodyHtml !== undefined ? (
-          <div className="events__preview-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+          <EmailBodyFrame html={bodyHtml} />
         ) : undefined
       }
       bodyHtml={bodyHtml}

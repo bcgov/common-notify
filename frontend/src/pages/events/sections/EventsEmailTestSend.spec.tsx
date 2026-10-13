@@ -80,7 +80,8 @@ vi.mock('../components/EventEmailPreviewModal', () => ({
         type="button"
         onClick={() =>
           onApply({
-            values: { firstName: 'Alice' },
+            values: { firstName: 'Alice', isUrgent: 'false' },
+            params: { firstName: 'Alice', isUrgent: '' },
             rendered: { subject: 'Hello Alice', bodyText: 'Hi Alice' },
           })
         }
@@ -352,7 +353,7 @@ describe('EventsEmailTestSend', () => {
       expect(showSuccessToast).toHaveBeenCalledWith('Test notification queued.')
     })
 
-    it('sends the values applied in Edit values, and previews them', async () => {
+    it('sends the values applied in Edit values as they were previewed', async () => {
       renderPage()
       await choose('Myself')
       await userEvent.click(await screen.findByRole('button', { name: 'Edit values' }))
@@ -365,14 +366,18 @@ describe('EventsEmailTestSend', () => {
       await waitFor(() =>
         expect(sendEventTestEmailMock).toHaveBeenCalledWith(
           'event-1',
-          { firstName: 'Alice' },
+          // A condition switched off goes as empty, as it did to the preview - not as 'false',
+          // which a template treats as true.
+          { firstName: 'Alice', isUrgent: '' },
           undefined,
         ),
       )
     })
 
-    it('reports a rejected send', async () => {
-      sendEventTestEmailMock.mockRejectedValue(new Error('Forbidden'))
+    it('reports a rejected send with the reason the API gave', async () => {
+      sendEventTestEmailMock.mockRejectedValue(
+        new Error('Missing personalisation for template ID template-1: firstName'),
+      )
       renderPage()
       await choose('Myself')
       await screen.findByText('Review Notification')
@@ -381,10 +386,25 @@ describe('EventsEmailTestSend', () => {
       await waitFor(() =>
         expect(showErrorToast).toHaveBeenCalledWith(
           'Unable to send test notification',
-          'Complete all required fields before sending a test notification.',
+          'Missing personalisation for template ID template-1: firstName',
         ),
       )
       expect(showSuccessToast).not.toHaveBeenCalled()
+    })
+
+    it('reports a rejected send that gives no reason', async () => {
+      sendEventTestEmailMock.mockRejectedValue('boom')
+      renderPage()
+      await choose('Myself')
+      await screen.findByText('Review Notification')
+      await userEvent.click(sendButton())
+
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith(
+          'Unable to send test notification',
+          'Something went wrong.',
+        ),
+      )
     })
 
     it('shows it is sending while the send is in flight', async () => {

@@ -121,9 +121,8 @@ describe('EventEmailPreviewModal', () => {
       expect(screen.getByText('permits@gov.bc.ca')).toBeInTheDocument()
       expect(screen.getByText('me@gov.bc.ca')).toBeInTheDocument()
       expect(screen.getByText('Email header')).toBeInTheDocument()
-      // Inlined rather than framed, to match the preview on the page.
-      expect(screen.getByText('Hello Molly')).toBeInTheDocument()
-      expect(screen.queryByTitle('Rendered email')).not.toBeInTheDocument()
+      // Framed, as on the page: the template is tenant-authored.
+      expect(screen.getByTitle('Rendered email').getAttribute('srcdoc')).toContain('Hello Molly')
     })
 
     it('leaves out an envelope line that has no address', async () => {
@@ -201,12 +200,30 @@ describe('EventEmailPreviewModal', () => {
       await waitFor(() =>
         expect(props.onApply).toHaveBeenCalledWith({
           values: { firstName: 'Molly!', isUrgent: 'true' },
+          params: { firstName: 'Molly!', isUrgent: 'true' },
           rendered: {
             subject: 'Permit for Molly!',
             bodyHtml: '<p>Hello Molly!</p>',
             bodyText: 'Hello Molly!',
           },
         }),
+      )
+    })
+
+    it('hands back a condition switched off as empty, the way the preview rendered it', async () => {
+      const { props } = renderModal({ values: { firstName: 'Molly' } })
+      await screen.findByText('Permit for Molly')
+
+      await userEvent.click(screen.getByRole('radio', { name: 'False' }))
+      await userEvent.click(applyButton())
+
+      await waitFor(() =>
+        expect(props.onApply).toHaveBeenCalledWith(
+          expect.objectContaining({
+            values: { firstName: 'Molly', isUrgent: 'false' },
+            params: { firstName: 'Molly', isUrgent: '' },
+          }),
+        ),
       )
     })
 

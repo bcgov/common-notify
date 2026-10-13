@@ -484,13 +484,17 @@ const TestSendForm: FC<TestSendFormProps> = ({ eventId, emailSettings }) => {
       // none is allowed: the API answers with the placeholders the template still needs.
       await sendEventTestEmail(
         eventId,
-        applied?.values ?? {},
+        applied?.params ?? {},
         testRecipientsFor(readyRows, recipient === 'other' ? recipientEmail : null),
       )
       showSuccessToast('Test notification queued.')
-    } catch {
-      // The same message as the checks above, so a rejected send reads like any other.
-      showSendBlockedToast()
+    } catch (error) {
+      // The API's reason - missing values, an inactive event, a recipient it will not send to -
+      // already worded for the user by the events API.
+      showErrorToast(
+        'Unable to send test notification',
+        error instanceof Error ? error.message : 'Something went wrong.',
+      )
     } finally {
       setSending(false)
     }
