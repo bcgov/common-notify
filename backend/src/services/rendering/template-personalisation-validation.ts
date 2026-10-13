@@ -73,7 +73,7 @@ function extractLegacyGcNotifyPlaceholders(text?: string, printed?: Set<string>)
   for (const match of text.matchAll(LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX)) {
     addPlaceholder(placeholders, match[1])
     // `((name??text))` prints the text, not the value, so `name` is only tested.
-    if (printed && !match[0].includes('??')) addPlaceholder(printed, match[1])
+    if (!match[0].includes('??')) addPlaceholder(printed, match[1])
   }
 
   return [...placeholders]
@@ -305,22 +305,19 @@ function collectMustacheTokens(
 ): void {
   for (const token of tokens) {
     const [type, value, , , children] = token
-    const rootName = getScopedIdentifier(value)
+    // Names inside a section resolve against the section's own context, not the caller's.
+    const rootName = scopedDepth === 0 ? getScopedIdentifier(value) : undefined
 
     switch (type) {
       case 'name':
       case '&':
       case '{':
-        if (rootName && scopedDepth === 0) {
-          addPlaceholder(placeholders, rootName)
-          if (printed) addPlaceholder(printed, rootName)
-        }
+        addPlaceholder(placeholders, rootName)
+        addPlaceholder(printed, rootName)
         break
       case '#':
       case '^':
-        if (rootName && scopedDepth === 0) {
-          addPlaceholder(placeholders, rootName)
-        }
+        addPlaceholder(placeholders, rootName)
         if (Array.isArray(children)) {
           collectMustacheTokens(children, placeholders, scopedDepth + 1, printed)
         }
@@ -353,9 +350,9 @@ function addPlaceholders(target: Set<string>, values: string[]): void {
   }
 }
 
-function addPlaceholder(placeholders: Set<string>, value?: string): void {
+function addPlaceholder(placeholders: Set<string> | undefined, value?: string): void {
   if (value && IDENTIFIER_REGEX.test(value)) {
-    placeholders.add(value)
+    placeholders?.add(value)
   }
 }
 
