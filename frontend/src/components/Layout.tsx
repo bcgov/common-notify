@@ -1,11 +1,10 @@
 import type { FC } from 'react'
 import { ToastContainer } from 'react-toastify'
-import { Header } from '@bcgov/design-system-react-components'
+import { Header, ProgressCircle } from '@bcgov/design-system-react-components'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchCstarTenants, fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
-import LoadingSpinner from './LoadingSpinner'
 import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
@@ -32,6 +31,7 @@ const Layout: FC<Props> = ({ children }) => {
   const rolesError = useAppSelector((state) => state.user.rolesError)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
   const userCurrent = useAppSelector((state) => state.user.current)
+  const globalLoading = useAppSelector((state) => state.loading.isLoading)
   const { canEdit } = useCstarRoles()
 
   // Tenant whose roles request is currently in flight, so the effect below doesn't
@@ -112,7 +112,11 @@ const Layout: FC<Props> = ({ children }) => {
   // render against another tenant's roles. A failed lookup also sets `rolesTenantId`,
   // so this can't spin forever — the effect above sends those users to /not-authorized.
   if (selectedTenant && userCurrent && rolesTenantId !== selectedTenant.id) {
-    return <LoadingSpinner isVisible />
+    return (
+      <div className="page-loading">
+        <ProgressCircle isIndeterminate valueLabel="Loading..." />
+      </div>
+    )
   }
 
   // Only block on CSTAR error if we don't have a selected tenant
@@ -122,14 +126,24 @@ const Layout: FC<Props> = ({ children }) => {
   }
 
   if (!selectedTenant && !showTenantModal && tenants.length > 0) {
-    return <LoadingSpinner isVisible />
+    return (
+      <div className="page-loading">
+        <ProgressCircle isIndeterminate valueLabel="Loading..." />
+      </div>
+    )
   }
 
   const showSidebar = location.pathname !== '/not-authorized'
 
   return (
     <>
-      <LoadingSpinner />
+      {globalLoading && (
+        <div className="page-loading page-loading--overlay">
+          <div className="page-loading__card">
+            <ProgressCircle isIndeterminate valueLabel="Loading..." />
+          </div>
+        </div>
+      )}
       <ToastContainer
         position="bottom-right"
         autoClose={5000}
