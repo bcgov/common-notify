@@ -268,11 +268,7 @@ export default function EventsSmsTab({
                 size="medium"
                 isReadOnly
                 isDisabled={fieldsDisabled}
-                description={
-                  senderPhoneNumber
-                    ? 'This number is assigned to your tenant and is shared by its SMS events.'
-                    : 'Your administrator assigns the sender number for your tenant.'
-                }
+                description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
               />
               <CheckboxGroup
                 label="Recipient(s)"
