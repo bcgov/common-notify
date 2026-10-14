@@ -23,6 +23,8 @@ import type { LimitAlertNotificationService } from '../../api/notify/services/li
 import type { SafelistCandidate, SafelistService } from '../../api/safelist/safelist.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import type { SmsSegmentService } from '../../api/notify/services/sms-segment.service'
+import type { EventNotificationResolver } from '../../api/events/event-notification.resolver'
+import type { NotifyEventTestSendRequest } from '../../api/notify/schemas/notify-event-send-request'
 import type {
   DedupClaim,
   DuplicateNotification,
@@ -49,21 +51,30 @@ export interface QueueableContext {
   safelistService?: SafelistService
   notificationRequestDetailService?: NotificationRequestDetailService
   smsSegmentService?: SmsSegmentService
+  eventNotificationResolver?: EventNotificationResolver
   notificationDedupService?: NotificationDedupService
   queueMap: Map<QueueName, Bull.Queue>
+}
+
+export type EventSendMode = 'full' | 'test'
+
+export interface QueueableOptions {
+  eventSend?: EventSendMode
 }
 
 /**
  * Fingerprint a send and check it against the dedup window before any expensive work
  * (attachment upload, per-row SMS rendering). Only a hint: `claimSend` makes the decision.
+ * `skip` leaves the send unfingerprinted, so `claimSend` lets it through too.
  */
 export async function findDuplicateSend(
   ctx: QueueableContext,
   tenantId: string,
   fingerprintSource: unknown,
+  skip = false,
 ): Promise<{ fingerprint?: string; duplicate: DuplicateNotification | null }> {
   const dedup = ctx.notificationDedupService
-  if (!dedup?.enabled) return { duplicate: null }
+  if (skip || !dedup?.enabled) return { duplicate: null }
   const fingerprint = dedup.fingerprint(fingerprintSource)
   return { fingerprint, duplicate: await dedup.findDuplicate(tenantId, fingerprint) }
 }
@@ -284,6 +295,64 @@ function isValidTenantContext(tenant: unknown): tenant is { id: string } {
 }
 
 /**
+ * Expand an event send request into the ordinary request shape.
+ *
+ * Event ID is stored in notification_request, delivery worker uses this
+ * to add the sender + header later in the pipeline.
+ */
+async function resolveEventSend(
+  ctx: QueueableContext,
+  mode: EventSendMode,
+  payload: unknown,
+  req: any,
+  tenantId: string,
+): Promise<NotifySimpleRequest> {
+  const resolver = ctx.eventNotificationResolver
+  if (!resolver) {
+    throw new InternalServerErrorException(
+      'EventNotificationResolver not injected. Ensure controller constructor includes: readonly eventNotificationResolver: EventNotificationResolver',
+    )
+  }
+
+  const request = payload as NotifyEventTestSendRequest
+  const authHeader = req?.headers?.authorization as string | undefined
+
+  if (mode === 'full') {
+    return resolver.resolveSend(tenantId, request.eventId, request.params, {
+      tenantId: req?.tenant?.externalId,
+      authHeader,
+    })
+  }
+
+  // Test Send
+  // Recipients chosen on the test send screen. The resolver decides which of them are allowed.
+  // Merge rows carry a value set per recipient, so each one receives a different message.
+  if (request.mergeArray?.length) {
+    return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+      mergeArray: request.mergeArray,
+    })
+  }
+
+  if (request.to?.length) {
+    return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+      to: request.to,
+    })
+  }
+
+  // None given, so the test goes back to whoever asked for it.
+  const callerEmail = req?.user?.email
+  if (typeof callerEmail !== 'string' || !callerEmail.trim()) {
+    throw new BadRequestException(
+      'Your account has no email address, so there is nowhere to send a test notification',
+    )
+  }
+
+  return resolver.resolveTestSend(tenantId, request.eventId, request.params, {
+    to: [callerEmail],
+  })
+}
+
+/**
  * Billable message count for a merge.
  *
  * Email is one message per recipient. SMS is billed in segments and every recipient of a merge
@@ -344,6 +413,8 @@ export async function handleMerge(
   apiKeyConsumerId: string | undefined,
   requestRoute: string | undefined,
   channel: NotificationChannel,
+  eventId?: string,
+  skipDedup = false,
 ) {
   const isSms = channel === NotificationChannel.SMS
   const logger = new Logger(`Queueable[${queueName}][${isSms ? 'smsMerge' : 'emailMerge'}]`)
@@ -352,7 +423,7 @@ export async function handleMerge(
   const channelName = isSms ? 'sms' : 'email'
 
   // Before validation and segment counting: for a large SMS merge those render every row.
-  const { fingerprint, duplicate } = await findDuplicateSend(ctx, tenantId, dto)
+  const { fingerprint, duplicate } = await findDuplicateSend(ctx, tenantId, dto, skipDedup)
   if (duplicate) return duplicateResponse(duplicate, [channelName])
 
   const mergeArray = channelPayload.recipients.mergeArray!
@@ -423,6 +494,9 @@ export async function handleMerge(
       createdBy: tenantId,
       payload: dto as any,
       requestRoute,
+      // An event merge is still an event send: without this the delivery worker has nothing to
+      // read the event's sender and header back from.
+      eventId,
     })
   } catch (error) {
     await claim.release()
@@ -604,6 +678,7 @@ export async function handleMerge(
 export function Queueable(
   queueName: QueueName = QueueName.INGESTION,
   channel?: NotificationChannel,
+  options?: QueueableOptions,
 ) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const logger = new Logger(`Queueable[${queueName}]`)
@@ -612,7 +687,7 @@ export function Queueable(
       try {
         // For single-channel routes the body is a bare channel; wrap it into a NotifySimpleRequest
         // so detection and downstream processing operate on the standard shape.
-        const payload: unknown =
+        let payload: unknown =
           channel && body && typeof body === 'object' ? { [channelKey(channel)]: body } : body
         // Validate required dependencies
         if (!this || typeof this !== 'object') {
@@ -673,6 +748,23 @@ export function Queueable(
               ? req.user.id
               : tenantId
 
+        // A test send is repeated on purpose while the sender and header are adjusted, and those
+        // are applied by the delivery worker, so they are not in the fingerprint.
+        const skipDedup = options?.eventSend === 'test'
+
+        // Event Send: expand the event data here
+        let eventId: string | undefined
+        if (options?.eventSend) {
+          eventId = (payload as { eventId?: string })?.eventId
+          payload = await resolveEventSend(
+            this as QueueableContext,
+            options.eventSend,
+            payload,
+            req,
+            tenantId,
+          )
+        }
+
         // Email merge send: a different payload/flow that fans out into batches downstream.
         const mergeChannel = mergeRequestChannel(payload)
         if (mergeChannel) {
@@ -685,6 +777,8 @@ export function Queueable(
             req?.apiKeyConsumerId,
             requestRoute,
             mergeChannel,
+            eventId,
+            skipDedup,
           )
         }
 
@@ -703,6 +797,7 @@ export function Queueable(
           this as QueueableContext,
           tenantId,
           validatedPayload,
+          skipDedup,
         )
         if (duplicate) return duplicateResponse(duplicate, channels)
 
@@ -789,6 +884,7 @@ export function Queueable(
             createdBy: tenantId,
             payload: processedPayload, // Store sanitized request payload for retry purposes
             requestRoute,
+            eventId,
           })
           logger.debug(
             `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,

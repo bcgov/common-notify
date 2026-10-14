@@ -469,6 +469,38 @@ function setParam(params: Record<string, unknown>, key: string, value: string): 
   }
 }
 
+/** One row's values, as the preview modals list them beside the rendered message. */
+export interface RowVariable {
+  name: string
+  value: string
+  type: 'text' | 'boolean'
+}
+
+/**
+ * The values of one row in the file's own column order, so the list matches the file being sent.
+ * The recipient column is left out - it is already shown as the To address.
+ */
+export function rowVariables(
+  parsed: ParsedCsv,
+  rowIndex: number,
+  channel: BulkChannel,
+): RowVariable[] {
+  return parsed.headers
+    .map((header, column) => {
+      const value = parsed.rows[rowIndex]?.[column] ?? ''
+      // The API's placeholder report lists paths, not types, so a boolean is recognised by its
+      // value. Only cosmetic: these fields are read-only, and the value is sent either way.
+      const isBoolean = /^(true|false)$/i.test(value.trim())
+
+      return {
+        name: header,
+        value: isBoolean ? value.trim().toLowerCase() : value,
+        type: (isBoolean ? 'boolean' : 'text') as 'boolean' | 'text',
+      }
+    })
+    .filter((variable) => variable.name !== RECIPIENT_COLUMN[channel])
+}
+
 /** The recipient address on one row, whichever column it sits in. */
 export function rowRecipient(parsed: ParsedCsv, rowIndex: number, channel: BulkChannel): string {
   const recipientIndex = parsed.headers.indexOf(RECIPIENT_COLUMN[channel])
