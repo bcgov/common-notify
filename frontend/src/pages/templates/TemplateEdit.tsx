@@ -19,11 +19,11 @@ import {
 import type { TemplateResponse } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
-import StickyBar from '@/components/StickyBar'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import TemplateFormActions from './TemplateFormActions'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
 import '@/scss/components/templates.scss'
 
@@ -385,25 +385,17 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
         </div>
 
-        <StickyBar>
-          <Button type="button" variant="secondary" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onPress={() => setPreviewOpen(true)}
-            isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
-          >
-            Preview
-          </Button>
-
+        <TemplateFormActions
+          onCancel={handleCancel}
+          onPreview={() => setPreviewOpen(true)}
+          isPreviewDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+        >
           {!isReadOnly && (
             <Button type="submit" isDisabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </Button>
           )}
-        </StickyBar>
+        </TemplateFormActions>
       </form>
 
       <TemplatePreviewModal

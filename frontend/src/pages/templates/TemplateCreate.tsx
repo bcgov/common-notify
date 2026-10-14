@@ -13,8 +13,8 @@ import TooltipTrigger from '@/components/TooltipTrigger'
 import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
-import StickyBar from '@/components/StickyBar'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import TemplateFormActions from './TemplateFormActions'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
@@ -328,22 +328,15 @@ const TemplateCreate: FC = () => {
           </div>
         </div>
 
-        <StickyBar>
-          <Button type="button" variant="secondary" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onPress={() => setPreviewOpen(true)}
-            isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
-          >
-            Preview
-          </Button>
+        <TemplateFormActions
+          onCancel={handleCancel}
+          onPreview={() => setPreviewOpen(true)}
+          isPreviewDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+        >
           <Button type="submit" isDisabled={isSaveDisabled}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
-        </StickyBar>
+        </TemplateFormActions>
       </form>
 
       <TemplatePreviewModal
