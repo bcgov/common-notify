@@ -49,10 +49,8 @@ export default function EventsSmsPreviewModal({
       const params = Object.fromEntries(
         variables.map((variable) => {
           const value = values[variable.name] ?? ''
-          return [
-            variable.name,
-            variable.type === 'boolean' ? (value === 'true' ? 'true' : '') : value,
-          ]
+          const booleanValue = value === 'true' ? 'true' : ''
+          return [variable.name, variable.type === 'boolean' ? booleanValue : value]
         }),
       )
       previewTemplate(template.id, params)

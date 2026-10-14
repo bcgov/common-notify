@@ -182,6 +182,75 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
     setEvent(updated)
   }
 
+  function renderTabContent() {
+    if (loadError) return <div className="alert alert-danger">{loadError}</div>
+
+    if (!event) return <p className="events__help">Loading event...</p>
+
+    if (selectedTab === 'settings')
+      return (
+        <EventsTab
+          values={{ name: event.name, description: event.description }}
+          onSave={handleSave}
+          isDisabled={!canEdit}
+        />
+      )
+
+    if (selectedTab === 'email')
+      return (
+        // The email channel starts disabled until the tab has been saved with it switched on.
+        <EventsEmailTab
+          values={{
+            active: event.emailSettings?.active ?? false,
+            senderEmail: event.emailSettings?.senderEmail ?? '',
+            templateId: event.emailSettings?.templateId ?? null,
+            to: event.emailSettings?.to ?? [],
+            cc: event.emailSettings?.cc ?? [],
+            bcc: event.emailSettings?.bcc ?? [],
+            cstarGroupIdsTo: event.emailSettings?.cstarGroupIdsTo ?? [],
+            cstarGroupIdsCc: event.emailSettings?.cstarGroupIdsCc ?? [],
+            cstarGroupIdsBcc: event.emailSettings?.cstarGroupIdsBcc ?? [],
+            useCustomHeader: event.emailSettings?.useCustomHeader ?? false,
+            headerLogoId: event.emailSettings?.headerLogoId ?? null,
+            headerTitle: event.emailSettings?.headerTitle ?? '',
+          }}
+          onSave={handleSaveEmailSettings}
+          onDeactivate={handleDeactivateEmail}
+          isDisabled={!canEdit}
+          isConfigured={event.emailSettings !== null}
+          defaultSenderEmail={defaultSenderEmail}
+          approvedLogos={approvedLogos}
+          tenantEmailLogoId={tenantEmailLogoId}
+          tenantShowsHeaderTitle={tenantShowsHeaderTitle}
+          tenantName={tenantName}
+          onUnsavedChangesChange={setEmailHasUnsavedChanges}
+          cstarGroups={cstarGroups}
+        />
+      )
+
+    if (selectedTab === 'sms')
+      return (
+        // The SMS channel starts disabled until the tab has been saved with it switched on.
+        <EventsSmsTab
+          key={selectedTenantId}
+          onUnsavedChangesChange={setSmsHasUnsavedChanges}
+          smsNotificationsEnabled={smsNotificationsEnabled}
+          senderPhoneNumber={event.senderPhoneNumber ?? null}
+          values={{
+            active: event.smsSettings?.active ?? false,
+            templateId: event.smsSettings?.templateId ?? null,
+            to: event.smsSettings?.to ?? [],
+          }}
+          onSave={handleSaveSmsSettings}
+          onDeactivate={handleDeactivateSms}
+          isDisabled={!canEdit}
+          isConfigured={event.smsSettings !== null}
+        />
+      )
+
+    return <EventsThirdPartyTab />
+  }
+
   return (
     <div className={`page events${selectedTab === 'sms' ? ' events--sms' : ''}`}>
       <PageHeading
@@ -204,67 +273,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
         }
       />
 
-      <section className="events__section">
-        {loadError ? (
-          <div className="alert alert-danger">{loadError}</div>
-        ) : !event ? (
-          <p className="events__help">Loading event...</p>
-        ) : selectedTab === 'settings' ? (
-          <EventsTab
-            values={{ name: event.name, description: event.description }}
-            onSave={handleSave}
-            isDisabled={!canEdit}
-          />
-        ) : selectedTab === 'email' ? (
-          // The email channel starts disabled until the tab has been saved with it switched on.
-          <EventsEmailTab
-            values={{
-              active: event.emailSettings?.active ?? false,
-              senderEmail: event.emailSettings?.senderEmail ?? '',
-              templateId: event.emailSettings?.templateId ?? null,
-              to: event.emailSettings?.to ?? [],
-              cc: event.emailSettings?.cc ?? [],
-              bcc: event.emailSettings?.bcc ?? [],
-              cstarGroupIdsTo: event.emailSettings?.cstarGroupIdsTo ?? [],
-              cstarGroupIdsCc: event.emailSettings?.cstarGroupIdsCc ?? [],
-              cstarGroupIdsBcc: event.emailSettings?.cstarGroupIdsBcc ?? [],
-              useCustomHeader: event.emailSettings?.useCustomHeader ?? false,
-              headerLogoId: event.emailSettings?.headerLogoId ?? null,
-              headerTitle: event.emailSettings?.headerTitle ?? '',
-            }}
-            onSave={handleSaveEmailSettings}
-            onDeactivate={handleDeactivateEmail}
-            isDisabled={!canEdit}
-            isConfigured={event.emailSettings !== null}
-            defaultSenderEmail={defaultSenderEmail}
-            approvedLogos={approvedLogos}
-            tenantEmailLogoId={tenantEmailLogoId}
-            tenantShowsHeaderTitle={tenantShowsHeaderTitle}
-            tenantName={tenantName}
-            onUnsavedChangesChange={setEmailHasUnsavedChanges}
-            cstarGroups={cstarGroups}
-          />
-        ) : selectedTab === 'sms' ? (
-          // The SMS channel starts disabled until the tab has been saved with it switched on.
-          <EventsSmsTab
-            key={selectedTenantId}
-            onUnsavedChangesChange={setSmsHasUnsavedChanges}
-            smsNotificationsEnabled={smsNotificationsEnabled}
-            senderPhoneNumber={event.senderPhoneNumber ?? null}
-            values={{
-              active: event.smsSettings?.active ?? false,
-              templateId: event.smsSettings?.templateId ?? null,
-              to: event.smsSettings?.to ?? [],
-            }}
-            onSave={handleSaveSmsSettings}
-            onDeactivate={handleDeactivateSms}
-            isDisabled={!canEdit}
-            isConfigured={event.smsSettings !== null}
-          />
-        ) : (
-          <EventsThirdPartyTab />
-        )}
-      </section>
+      <section className="events__section">{renderTabContent()}</section>
     </div>
   )
 }

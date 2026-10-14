@@ -82,6 +82,51 @@ type EventsSmsTabProps = {
   senderPhoneNumber?: string | null
 }
 
+type EventsSmsSavedSettingsProps = {
+  channelActive: boolean
+  selectedTemplate?: { body: string }
+  onEdit: () => void
+}
+
+function EventsSmsSavedSettings({
+  channelActive,
+  selectedTemplate,
+  onEdit,
+}: EventsSmsSavedSettingsProps) {
+  return (
+    <>
+      <Callout
+        variant="lightGrey"
+        title={channelActive ? 'Ready to send?' : 'SMS settings saved'}
+        description={
+          channelActive
+            ? 'Your SMS settings are ready. Continue to select recipients and send a test notification to verify the content and formatting.'
+            : 'Your SMS settings are saved. Activate this channel when you are ready to send notifications.'
+        }
+      />
+      {selectedTemplate ? (
+        <div className="events__saved-preview">
+          <p className="events__template-preview-content">{selectedTemplate.body}</p>
+          <EventsSmsEstimate body={selectedTemplate.body} />
+        </div>
+      ) : (
+        <p className="events__help">
+          The saved template preview is unavailable. Open settings to select a template.
+        </p>
+      )}
+      <p className="events__help">Test notifications are not available yet.</p>
+      <StickyBar>
+        <Button type="button" variant="secondary" onPress={onEdit}>
+          Edit settings
+        </Button>
+        <Button type="button" variant="primary" isDisabled>
+          Continue to test notification
+        </Button>
+      </StickyBar>
+    </>
+  )
+}
+
 export default function EventsSmsTab({
   values,
   onSave,
@@ -202,36 +247,11 @@ export default function EventsSmsTab({
         modalMessage={UNSAVED_SMS_CHANGES_MESSAGE}
       />
       {showSaved ? (
-        <>
-          <Callout
-            variant="lightGrey"
-            title={channelActive ? 'Ready to send?' : 'SMS settings saved'}
-            description={
-              channelActive
-                ? 'Your SMS settings are ready. Continue to select recipients and send a test notification to verify the content and formatting.'
-                : 'Your SMS settings are saved. Activate this channel when you are ready to send notifications.'
-            }
-          />
-          {selectedTemplate ? (
-            <div className="events__saved-preview">
-              <p className="events__template-preview-content">{selectedTemplate.body}</p>
-              <EventsSmsEstimate body={selectedTemplate.body} />
-            </div>
-          ) : (
-            <p className="events__help">
-              The saved template preview is unavailable. Open settings to select a template.
-            </p>
-          )}
-          <p className="events__help">Test notifications are not available yet.</p>
-          <StickyBar>
-            <Button type="button" variant="secondary" onPress={() => setShowSaved(false)}>
-              Edit settings
-            </Button>
-            <Button type="button" variant="primary" isDisabled>
-              Continue to test notification
-            </Button>
-          </StickyBar>
-        </>
+        <EventsSmsSavedSettings
+          channelActive={channelActive}
+          selectedTemplate={selectedTemplate}
+          onEdit={() => setShowSaved(false)}
+        />
       ) : (
         <form className="events__form" onSubmit={handleSubmit} noValidate>
           <div className="events__switch-field">
