@@ -39,6 +39,33 @@
   }
 }
 
+.tag-list-field--compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 4px 12px;
+
+  > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  > .bcds-react-aria-TextArea {
+    flex: 1 1 120px;
+  }
+
+  .bcds-react-aria-TextArea--Input {
+    min-height: 27px;
+    height: 27px;
+    padding: 0;
+    resize: none;
+    font: var(--typography-regular-body);
+  }
+}
+
 .tag-list-field--disabled {
   background: var(--surface-color-forms-disabled);
 }
