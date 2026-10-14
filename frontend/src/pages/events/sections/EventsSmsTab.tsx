@@ -71,7 +71,7 @@ function duplicatePhoneNumbers(addresses: string[]): string[] {
   return duplicates
 }
 
-type EventsSmsTabProps = {
+type EventsSmsTabProps = Readonly<{
   values: SmsSettingsValues
   onSave: (values: SmsApplyValues) => Promise<void>
   onDeactivate: () => Promise<void>
@@ -80,13 +80,13 @@ type EventsSmsTabProps = {
   onUnsavedChangesChange?: (value: boolean) => void
   smsNotificationsEnabled?: boolean
   senderPhoneNumber?: string | null
-}
+}>
 
-type EventsSmsSavedSettingsProps = {
+type EventsSmsSavedSettingsProps = Readonly<{
   channelActive: boolean
   selectedTemplate?: { body: string }
   onEdit: () => void
-}
+}>
 
 function EventsSmsSavedSettings({
   channelActive,

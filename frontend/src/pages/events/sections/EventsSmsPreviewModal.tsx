@@ -22,7 +22,7 @@ export default function EventsSmsPreviewModal({
   senderPhoneNumber,
   onClose,
   onSaveValues,
-}: Props) {
+}: Readonly<Props>) {
   const variables = useMemo(
     () => detectVariables(template.body, template.engineCode),
     [template.body, template.engineCode],

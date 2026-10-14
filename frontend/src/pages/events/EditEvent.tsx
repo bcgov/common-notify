@@ -54,7 +54,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const smsFeatureEnabled = useFeatureFlag('sms_notifications', selectedTenantId)
-  const [requestedTab, setSelectedTab] = useState<EventTab>(initialTab)
+  const [requestedTab, setRequestedTab] = useState<EventTab>(initialTab)
   // Also guard direct tab entry and a flag being disabled while the page is open.
   const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
   const [event, setEvent] = useState<EventResponse | null>(null)
@@ -118,11 +118,11 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
       setPendingTab(tab)
       return
     }
-    setSelectedTab(tab)
+    setRequestedTab(tab)
   }
 
   function leavePendingTab() {
-    if (pendingTab) setSelectedTab(pendingTab)
+    if (pendingTab) setRequestedTab(pendingTab)
     setEmailHasUnsavedChanges(false)
     setSmsHasUnsavedChanges(false)
     setPendingTab(null)
