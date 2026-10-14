@@ -42,23 +42,17 @@ jobs:
         with:
           package: ${{ matrix.package }}
           tags: dev
-          # Diff the merge commit against the previous main; diff_branch defaults to
-          # main, which on a push to main is always empty so nothing ever built.
-          diff_branch: HEAD^
-          # :latest is whichever image was tagged most recently by any build.
-          tag_fallback: dev
-          triggers: ('${{ matrix.package }}/')
+          # Always build (no tag_fallback/triggers). GitHub drops queued runs in a concurrency
+          # group, so a diff against the previous commit can miss a skipped merge's changes.
 
       - name: Report deployed image
         shell: bash
         env:
           PKG: ${{ matrix.package }}
-          TRIGGERED: ${{ steps.build.outputs.triggered }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          [ "${TRIGGERED}" = "true" ] && SRC="fresh build of ${GITHUB_SHA}" || SRC="retagged existing :dev (unchanged)"
-          echo "${PKG}: ${SRC} (digest ${DIGEST:-none})"
-          echo "- **${PKG}**: ${SRC} — \`${DIGEST:-none}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "${PKG}: build of ${GITHUB_SHA} (digest ${DIGEST:-none})"
+          echo "- **${PKG}**: build of ${GITHUB_SHA} — \`${DIGEST:-none}\`" >> "${GITHUB_STEP_SUMMARY}"
 
   import:
     name: Import to ImageStream
