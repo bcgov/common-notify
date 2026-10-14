@@ -36,6 +36,8 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
+import { EventsModule } from '../api/events/events.module'
+import { EventNotificationResolver } from '../api/events/event-notification.resolver'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
@@ -72,6 +74,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     AttachmentModule,
     ClamavModule,
     forwardRef(() => NotifyModule),
+    forwardRef(() => EventsModule),
   ],
   providers: [
     DeliveryReconcilerService,
@@ -195,6 +198,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
+    @Optional() private readonly eventNotificationResolver?: EventNotificationResolver,
     @Optional()
     @Inject(ProviderToken.REDIS_CLIENT)
     private readonly redisClient?: Redis | null,
@@ -317,6 +321,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
         concurrency: emailConcurrency,
         structuredLogger: this.structuredLogger,
         tenantSettingsService: this.tenantSettingsService,
+        eventNotificationResolver: this.eventNotificationResolver,
       })
       this.heartbeat?.track(this.emailQueue, emailConcurrency)
       this.logger.log('Email delivery worker initialization started')
