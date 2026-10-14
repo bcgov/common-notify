@@ -39,4 +39,9 @@ export class EmailLogoService {
 
     return `${baseUrl}${pathPrefix}/logos/${encodeURIComponent(id)}/image`
   }
+
+  /** The image URL for use inside an email, which serves the PNG rendition rather than the SVG. */
+  buildEmailImageUrl(id: string): string {
+    return `${this.buildPublicImageUrl(id)}?format=email`
+  }
 }

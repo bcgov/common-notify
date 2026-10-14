@@ -41,6 +41,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -149,6 +150,11 @@ const mockNotificationDedupService = {
   claim: vi.fn(),
 }
 
+const mockEventNotificationResolver = {
+  resolveSend: vi.fn(),
+  resolveTestSend: vi.fn(),
+}
+
 describe('Notify Controllers', () => {
   let service: NotifyService
   let app: INestApplication
@@ -214,6 +220,7 @@ describe('Notify Controllers', () => {
           useValue: mockSmsSegmentService,
         },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
+        { provide: EventNotificationResolver, useValue: mockEventNotificationResolver },
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -715,6 +722,62 @@ describe('Notify Controllers', () => {
 
         expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
         expectNothingAccepted()
+      })
+
+      describe('event sends', () => {
+        const eventId = '12345678-1234-4234-8234-123456789012'
+        const resolved = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: eventId },
+          },
+        }
+
+        beforeEach(() => {
+          mockEventNotificationResolver.resolveSend.mockResolvedValue(resolved)
+          mockEventNotificationResolver.resolveTestSend.mockResolvedValue(resolved)
+          mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+        })
+
+        it('sends every test, even one identical to an earlier send', async () => {
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, to: ['test@example.com'] })
+            .expect(202)
+
+          expect(mockNotificationDedupService.findDuplicate).not.toHaveBeenCalled()
+          expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+          expect(mockNotificationService.create).toHaveBeenCalled()
+          expect(response.body.duplicate).toBeUndefined()
+        })
+
+        it('sends every merge test, even one identical to an earlier send', async () => {
+          mockEventNotificationResolver.resolveTestSend.mockResolvedValue({
+            email: {
+              content: { templateId: eventId },
+              recipients: { mergeArray: [['to'], ['test@example.com']] },
+            },
+          })
+
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, mergeArray: [['to'], ['test@example.com']] })
+            .expect(202)
+
+          expect(mockNotificationDedupService.findDuplicate).not.toHaveBeenCalled()
+          expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+          expect(response.body.duplicate).toBeUndefined()
+        })
+
+        it('still deduplicates a full event send', async () => {
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event')
+            .send({ eventId })
+            .expect(202)
+
+          expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+          expectNothingAccepted()
+        })
       })
     })
 

@@ -4,8 +4,7 @@ import { Button } from '@bcgov/design-system-react-components'
 import { previewTemplate } from '@/api/templates.api'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import SmsPreview from '@/components/SmsPreview'
-import type { PreviewVariable } from '@/components/NotificationPreviewModal'
-import { rowParams, rowRecipient, RECIPIENT_COLUMN } from '@/utils/bulkNotificationsCsv'
+import { rowParams, rowRecipient, rowVariables } from '@/utils/bulkNotificationsCsv'
 import type { BulkChannel, ParsedCsv } from '@/utils/bulkNotificationsCsv'
 
 interface BulkNotificationsPreviewModalProps {
@@ -75,21 +74,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
     if (isOpen) setRowIndex(0)
   }, [isOpen])
 
-  // The spreadsheet's own values, in its column order, so the list matches the file being sent.
-  const variables: PreviewVariable[] = parsed.headers
-    .map((header, column) => {
-      const value = parsed.rows[rowIndex]?.[column] ?? ''
-      // The API's placeholder report lists paths, not types, so a boolean is recognised by its
-      // value. Only cosmetic: these fields are read-only, and the value is sent either way.
-      const isBoolean = /^(true|false)$/i.test(value.trim())
-
-      return {
-        name: header,
-        value: isBoolean ? value.trim().toLowerCase() : value,
-        type: (isBoolean ? 'boolean' : 'text') as 'boolean' | 'text',
-      }
-    })
-    .filter((variable) => variable.name !== RECIPIENT_COLUMN[channel])
+  const variables = rowVariables(parsed, rowIndex, channel)
 
   return (
     <NotificationPreviewModal
