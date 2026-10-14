@@ -46,6 +46,11 @@ function setupStore(cachedUsage: TenantUsageResponse | null = null) {
 }
 
 describe('fetchSettings rate limit', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(getSettings).mockResolvedValue(null)
+  })
+
   it('refreshes the displayed limit after generating a key without resetting settings', async () => {
     const store = setupStore(usage([]))
     vi.mocked(getApiKeyUsage).mockResolvedValue(usage([1000, 750]))
@@ -56,11 +61,6 @@ describe('fetchSettings rate limit', () => {
     })
     expect(getApiKeyUsage).toHaveBeenCalledTimes(1)
     expect(getSettings).not.toHaveBeenCalled()
-  })
-
-  beforeEach(() => {
-    vi.resetAllMocks()
-    vi.mocked(getSettings).mockResolvedValue(null)
   })
 
   it.each([

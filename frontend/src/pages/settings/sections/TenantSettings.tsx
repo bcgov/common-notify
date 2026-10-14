@@ -31,6 +31,12 @@ const normalizeSenderEmail = (value: string): string | null => value.trim() || n
 
 const isValidSenderEmail = (value: string): boolean => SENDER_EMAIL_PATTERN.test(value)
 
+function formatRateLimit(limit: number | null | undefined): string {
+  if (limit === undefined) return 'Loading…'
+  if (limit === null) return 'No limit configured'
+  return `${limit.toLocaleString()} calls/minute`
+}
+
 const TenantSettings: FC = () => {
   const dispatch = useAppDispatch()
   const { alertEmail, defaultSenderEmail, rateLimitPerMinute, saving, error } = useAppSelector(
@@ -164,19 +170,12 @@ const TenantSettings: FC = () => {
             </Tooltip>
           </TooltipTrigger>
         </span>
-        {(['EMAIL', 'SMS'] as const).map((channel) => {
-          const limit = rateLimitPerMinute?.[channel]
-          return (
-            <p className="settings__rate-limit-value" key={channel}>
-              {channel === 'EMAIL' ? 'Email' : 'SMS'}:{' '}
-              {limit === undefined
-                ? 'Loading…'
-                : limit === null
-                  ? 'No limit configured'
-                  : `${limit.toLocaleString()} calls/minute`}
-            </p>
-          )
-        })}
+        {(['EMAIL', 'SMS'] as const).map((channel) => (
+          <p className="settings__rate-limit-value" key={channel}>
+            {channel === 'EMAIL' ? 'Email' : 'SMS'}:{' '}
+            {formatRateLimit(rateLimitPerMinute?.[channel])}
+          </p>
+        ))}
         <Link className="settings__external-link" href="#">
           Request increase limit
           <SvgUpRightFromSquareIcon />

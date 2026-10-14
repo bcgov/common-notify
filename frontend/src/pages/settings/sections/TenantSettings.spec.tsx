@@ -88,6 +88,17 @@ describe('API key field', () => {
 })
 
 describe('TenantSettings section', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dispatchMock.mockImplementation((action) => ({
+      unwrap: () =>
+        Promise.resolve({
+          alertEmail: action.payload.alertEmail,
+          defaultSenderEmail: action.payload.defaultSenderEmail,
+        }),
+    }))
+  })
+
   it('shows different limits for Email and SMS', () => {
     renderWithRoles(undefined, { EMAIL: 1000, SMS: 750 })
     expect(screen.getByText('Email: 1,000 calls/minute')).toBeInTheDocument()
@@ -116,17 +127,6 @@ describe('TenantSettings section', () => {
     renderWithRoles(undefined, value === undefined ? undefined : { EMAIL: value, SMS: value })
     expect(screen.getByText(`Email: ${expected}`)).toBeInTheDocument()
     expect(screen.getByText(`SMS: ${expected}`)).toBeInTheDocument()
-  })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    dispatchMock.mockImplementation((action) => ({
-      unwrap: () =>
-        Promise.resolve({
-          alertEmail: action.payload.alertEmail,
-          defaultSenderEmail: action.payload.defaultSenderEmail,
-        }),
-    }))
   })
 
   it('seeds the inputs from the slice at mount', () => {
