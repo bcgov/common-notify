@@ -28,6 +28,7 @@ import type { Tenant } from '@/interfaces/CstarTenant'
 
 const navigateMock = vi.fn()
 
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
 vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn() }))
 
 vi.mock('@tanstack/react-router', () => ({

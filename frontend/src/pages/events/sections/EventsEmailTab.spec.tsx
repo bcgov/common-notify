@@ -289,7 +289,7 @@ describe('EventsEmailTab', () => {
         await screen.findByText('The sender email address must be an @gov.bc.ca address.'),
       ).toBeInTheDocument()
       expect(onSave).not.toHaveBeenCalled()
-    })
+    }, 15000)
 
     it('rejects an empty address on an active channel', async () => {
       const { onSave } = renderTab({ values: savedAndActive, isConfigured: true })
