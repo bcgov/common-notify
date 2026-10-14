@@ -150,7 +150,7 @@ export class NotificationService {
       channelCodes: ['EMAIL'],
       recipients: addresses.length > 0 ? { email: addresses } : null,
       delayedSendTime:
-        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+        delayedSendTime && !Number.isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
     }
   }
 
@@ -204,7 +204,7 @@ export class NotificationService {
       channelCodes: channels.length > 0 ? channels : null,
       recipients: Object.keys(recipients).length > 0 ? recipients : null,
       delayedSendTime:
-        delayedSendTime && !isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
+        delayedSendTime && !Number.isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
     }
   }
 
@@ -229,13 +229,14 @@ export class NotificationService {
       recipients: recipients,
       delayedSendTime: delayedSendTime,
       requestRoute: dto.requestRoute,
+      eventId: dto.eventId,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
     // Reload with tenant relation for full data in SSE stream
     const fullNotification = await this.notificationRepository.findOne({
       where: { id: saved.id },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     return fullNotification || saved
   }
@@ -449,7 +450,7 @@ export class NotificationService {
   async findOne(id: string, tenantId: string): Promise<NotificationRequest> {
     const notification = await this.notificationRepository.findOne({
       where: { id, tenantId },
-      relations: ['tenant'],
+      relations: { tenant: true },
     })
     if (!notification) {
       throw new NotFoundException(`Notification request with id '${id}' not found`)
@@ -730,7 +731,7 @@ export class NotificationService {
     } else if (scheduledTime) {
       // Validate and reschedule
       const newScheduledTime = new Date(scheduledTime)
-      if (isNaN(newScheduledTime.getTime())) {
+      if (Number.isNaN(newScheduledTime.getTime())) {
         throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
       }
 

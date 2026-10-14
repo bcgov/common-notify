@@ -1,6 +1,5 @@
 import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import Bull from 'bull'
-import { ConfigService } from '@nestjs/config'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
 import { loadBatchRecipients } from './merge-batch-recipients'
@@ -15,12 +14,40 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
 import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
+import type {
+  EventEmailSendSettings,
+  EventNotificationResolver,
+} from '../../api/events/event-notification.resolver'
+import type { EmailHeaderOverride } from '../../api/templates/email-template-layout.service'
 import { IEmailTransport } from '../../adapters'
 import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
 import { StructuredLoggerService } from '../../common/logger'
 
 type ResolvedEmailDeliveryPayload = Omit<NotifyEmailChannel, 'attachments'> & {
   attachments?: SendEmailOptions['attachments']
+}
+
+export interface EmailDeliveryWorkerDeps {
+  /** The Bull queue instance for email delivery jobs */
+  emailQueue: Bull.Queue<DeliveryJobPayload>
+  /** Service for database updates */
+  notificationService: NotificationService
+  /** Repository for template resolution */
+  templatesRepository: TemplatesRepository
+  /** Service for template rendering */
+  templatesService: TemplatesService
+  /** Service for inline template rendering */
+  inlineRenderingService: InlineRenderingService
+  attachmentResolverService: AttachmentResolverService
+  /** Email transport adapter for sending emails */
+  emailAdapter: IEmailTransport
+  requestDetailService: NotificationRequestDetailService
+  /** Number of jobs to process in parallel (default: 2) */
+  concurrency?: number
+  structuredLogger?: StructuredLoggerService
+  tenantSettingsService?: TenantSettingsService
+  /** Resolves the sender and header of the event a request came from */
+  eventNotificationResolver?: EventNotificationResolver
 }
 
 /**
@@ -69,32 +96,55 @@ export class EmailDeliveryWorker {
   }
 
   /**
-   * Initialize the email delivery worker on a queue
-   * @param emailQueue The BullMQ queue instance for email delivery jobs
-   * @param notificationService Service for database updates
-   * @param configService Configuration service for queue settings
-   * @param templatesRepository Repository for template resolution
-   * @param templatesService Service for template rendering
-   * @param inlineRenderingService Service for inline template rendering
-   * @param emailAdapter Email transport adapter for sending emails
-   * @param concurrency Number of jobs to process in parallel (default: 2)
+   * The sender and header of the event this request came from, or null when it came from none.
    */
-  static async initialize(
-    emailQueue: Bull.Queue<DeliveryJobPayload>,
+  private static async resolveEventSettings(
+    notifyId: string,
+    tenantId: string,
     notificationService: NotificationService,
-    configService: ConfigService,
-    templatesRepository: TemplatesRepository,
-    templatesService: TemplatesService,
-    inlineRenderingService: InlineRenderingService,
-    attachmentResolverService: AttachmentResolverService,
-    emailAdapter: IEmailTransport,
-    requestDetailService: NotificationRequestDetailService,
-    concurrency: number = 2,
-    structuredLogger?: StructuredLoggerService,
-    // Last, and optional, because the parameters above are passed positionally: a new one in the
-    // middle silently rebinds every existing call's concurrency argument.
-    tenantSettingsService?: TenantSettingsService,
-  ): Promise<void> {
+    eventNotificationResolver: EventNotificationResolver | undefined,
+    logger: Logger,
+  ): Promise<EventEmailSendSettings | null> {
+    if (!eventNotificationResolver) return null
+
+    try {
+      const notification = await notificationService.findOne(notifyId, tenantId)
+      if (!notification?.eventId) return null
+
+      return await eventNotificationResolver.findEmailSendSettings(notification.eventId)
+    } catch (error) {
+      logger.warn(
+        `[${notifyId}] Could not read event send settings, falling back to the tenant's: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+      return null
+    }
+  }
+
+  private static toHeaderOverride(
+    settings: EventEmailSendSettings | null,
+  ): EmailHeaderOverride | undefined {
+    if (!settings?.useCustomHeader) return undefined
+
+    return { logoId: settings.headerLogoId, title: settings.headerTitle }
+  }
+
+  /** Initialize the email delivery worker on a queue */
+  static initialize({
+    emailQueue,
+    notificationService,
+    templatesRepository,
+    templatesService,
+    inlineRenderingService,
+    attachmentResolverService,
+    emailAdapter,
+    requestDetailService,
+    concurrency = 2,
+    structuredLogger,
+    tenantSettingsService,
+    eventNotificationResolver,
+  }: EmailDeliveryWorkerDeps): void {
     const logger = new Logger(EmailDeliveryWorker.name)
     const workerContext = EmailDeliveryWorker.name
 
@@ -117,12 +167,33 @@ export class EmailDeliveryWorker {
           throw new Error('Invalid delivery job: tenantId is missing or invalid')
         }
 
+        // An event-sourced send carries its own sender and header, which have no home on the
+        // request payload - the request records which event it came from and they are read back
+        // here. Null for every other send, which leaves the tenant's own settings in place.
+        //
+        // Resolved before the merge branch below because an event test send can be a merge: the
+        // test send screen takes merge rows, so a merge does come from an event and needs the
+        // event's header as much as a single send does. That costs one read per batch, which is
+        // a read per 100 recipients rather than per recipient.
+        const eventSettings = await EmailDeliveryWorker.resolveEventSettings(
+          notifyId,
+          tenantId,
+          notificationService,
+          eventNotificationResolver,
+          logger,
+        )
+
         // The tenant's configured sender, resolved once for every recipient this job sends to.
         // Null when unset - or when the service is absent, as it is in a test context that boots
         // the worker without the settings module - which leaves the adapter on `ches.from`.
-        const fromAddress = (await tenantSettingsService?.getSenderAddress(tenantId)) ?? null
+        const fromAddress =
+          eventSettings?.senderEmail ??
+          (await tenantSettingsService?.getSenderAddress(tenantId)) ??
+          null
+        const headerOverride = EmailDeliveryWorker.toHeaderOverride(eventSettings)
 
-        // Mail merge batch: resolve the template once, then render + send per recipient individually.
+        // Mail merge batch: resolve the template once, then render + send per recipient
+        // individually.
         if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
           return await EmailDeliveryWorker.processMailMergeBatch(
             job.data.batchId,
@@ -137,6 +208,7 @@ export class EmailDeliveryWorker {
             requestDetailService,
             notificationService,
             fromAddress,
+            headerOverride,
             batchProgressReporter(job),
           )
         }
@@ -220,7 +292,11 @@ export class EmailDeliveryWorker {
                 { ...request?.params, ...emailPayload.params },
                 EmailDeliveryWorker.normalizeTemplateBodyType(emailPayload.content?.bodyType),
               )
-              const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
+              const rendered = await templatesService.applyEmailLayout(
+                template,
+                renderedTemplate,
+                headerOverride,
+              )
 
               emailPayload = {
                 ...emailPayload,
@@ -285,6 +361,7 @@ export class EmailDeliveryWorker {
               body: emailPayload.content?.body,
               bodyType: emailPayload.content?.bodyType ?? 'text',
             },
+            headerOverride,
           )
           emailPayload = { ...emailPayload, content: { ...emailPayload.content, ...branded } }
         }
@@ -528,6 +605,7 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
     fromAddress: string | null,
+    headerOverride: EmailHeaderOverride | undefined,
     reportProgress?: BatchProgressReporter,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params } = mailMergeData
@@ -599,7 +677,11 @@ export class EmailDeliveryWorker {
             template,
             mergedParams,
           )
-          const rendered = await templatesService.applyEmailLayout(template, renderedTemplate)
+          const rendered = await templatesService.applyEmailLayout(
+            template,
+            renderedTemplate,
+            headerOverride,
+          )
           subject = rendered.subject
           body = rendered.body
           bodyType = rendered.bodyType
@@ -608,6 +690,7 @@ export class EmailDeliveryWorker {
           const branded = await templatesService.applyEmailLayout(
             { tenantId, channelCode: 'EMAIL' },
             { ...rendered, bodyType: inlineContent!.bodyType ?? 'text' },
+            headerOverride,
           )
           subject = branded.subject
           body = branded.body

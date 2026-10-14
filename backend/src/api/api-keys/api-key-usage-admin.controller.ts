@@ -62,8 +62,8 @@ export class ApiKeyUsageAdminController {
     @Query('search') search?: string,
   ): Promise<PaginatedAdminUsageResponseDto> {
     return this.apiKeyUsageService.getAllTenantsUsage({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
       search,
     })
   }

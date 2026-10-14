@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
+import { fetchApiKeyUsage } from './apiKeyUsage.thunks'
 import {
   getApprovedEmailLogos,
   getSettings,
@@ -16,20 +17,35 @@ import type {
 import type { RootState } from '../store'
 
 /**
- * Loads the whole tenant_settings row. Dispatched ONLY by Settings.tsx, which owns the
- * page-level loading gate; every settings slice seeds its values from this one action.
- * Resolves to null when no tenant is selected or no settings row exists yet.
+ * Loads tenant settings and usage limits for Settings.tsx and EditEvent.tsx.
+ * Every settings slice seeds its values from this action; Settings.tsx owns its loading gate.
+ * Reuses cached usage for this tenant. Resolves to null when no tenant is selected.
  */
 export const fetchSettings = createAsyncThunk<
-  TenantSettings | null,
+  | (Partial<TenantSettings> & { rateLimitPerMinute: { EMAIL: number | null; SMS: number | null } })
+  | null,
   void,
   { state: RootState; rejectValue: string }
->('settings/fetch', async (_, { getState, rejectWithValue }) => {
+>('settings/fetch', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
     const tenantId = getState().tenant.selectedTenant?.id
     if (!tenantId) return null
 
-    return await getSettings()
+    const cachedUsage = getState().apiKeyUsage.usage
+    const [settings, usage] = await Promise.all([
+      getSettings(),
+      cachedUsage?.tenantId === tenantId
+        ? Promise.resolve(cachedUsage)
+        : dispatch(fetchApiKeyUsage()).unwrap(),
+    ])
+
+    // Each channel has its own limit. Missing channels are unconfigured; preserve zero.
+    const rateLimitPerMinute = {
+      EMAIL:
+        usage.channels.find((channel) => channel.channel === 'EMAIL')?.rateLimitPerMinute ?? null,
+      SMS: usage.channels.find((channel) => channel.channel === 'SMS')?.rateLimitPerMinute ?? null,
+    }
+    return { ...settings, rateLimitPerMinute }
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load settings')
   }

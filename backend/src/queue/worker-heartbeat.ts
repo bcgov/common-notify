@@ -1,6 +1,6 @@
 import type Bull from 'bull'
 import type Redis from 'ioredis'
-import { hostname } from 'os'
+import { hostname } from 'node:os'
 import { Logger } from '@nestjs/common'
 import { redisKey } from '../common/redis/redis-namespace'
 

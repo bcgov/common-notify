@@ -1,4 +1,4 @@
-import type { EventEmitter } from 'events'
+import type { EventEmitter } from 'node:events'
 
 /** The most recent error logged, kept so a failed shutdown can name its cause. */
 export interface RecordedError {
@@ -9,6 +9,13 @@ export interface RecordedError {
 }
 
 let lastError: RecordedError | undefined
+
+/** Names the last logged error for a failed shutdown, or says there wasn't one. */
+function describeLastError(error: RecordedError | undefined): string {
+  if (!error) return 'no error was logged'
+  const stack = error.stack ? `\n${error.stack}` : ''
+  return `last error logged at ${error.at}: [${error.context ?? 'unknown'}] ${error.message}${stack}`
+}
 
 export function recordError(error: Omit<RecordedError, 'at'>): void {
   lastError = { ...error, at: new Date().toISOString() }
@@ -32,9 +39,7 @@ export function installShutdownDiagnostics(
   })
   target.on('exit', (code: number) => {
     if (code === 0) return
-    const cause = lastError
-      ? `last error logged at ${lastError.at}: [${lastError.context ?? 'unknown'}] ${lastError.message}${lastError.stack ? `\n${lastError.stack}` : ''}`
-      : 'no error was logged'
+    const cause = describeLastError(lastError)
     write(`[shutdown] process exiting with code ${code}; ${cause}\n`)
   })
 }

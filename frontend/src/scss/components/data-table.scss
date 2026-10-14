@@ -341,17 +341,18 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     color: $dark-text;
     white-space: nowrap;
 
-    &:hover {
+    &:hover,
+    &[aria-expanded='true'] {
       background-color: $light-bg;
     }
 
     &--active {
       font-weight: 600;
     }
+  }
 
-    &--submenu {
-      position: relative;
-    }
+  &__submenu-anchor {
+    position: relative;
   }
 
   &__submenu-arrow {

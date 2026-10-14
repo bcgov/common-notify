@@ -100,50 +100,49 @@ const EventsCstarGroups: FC<EventsCstarGroupsProps> = ({
   }
 
   return (
-    <div
-      className="events__additional-recipients events__cstar-groups"
-      role="group"
-      aria-label="CSTAR groups"
-    >
-      <span className="events__field-label">CSTAR Groups (required)</span>
+    // Flex lives on the inner div: fieldsets have a history of ignoring display: flex.
+    <fieldset aria-label="CSTAR groups">
+      <div className="events__additional-recipients events__cstar-groups">
+        <span className="events__field-label">CSTAR Groups (required)</span>
 
-      {GROUP_FIELDS.map(({ id, label }) => {
-        const field = fields[id]
-        const usedElsewhere = groupIdsUsedByOtherFields(fields, id)
-        // A group picked in another field is dropped from this one's options rather than
-        // flagged after the fact. Groups this field already holds stay listed even when a
-        // sibling holds them too, so a duplicate saved before this rule existed can still be
-        // seen and removed.
-        const availableItems = groupItems.filter(
-          (item) => !usedElsewhere.has(item.id) || field.groupIds.includes(item.id),
-        )
+        {GROUP_FIELDS.map(({ id, label }) => {
+          const field = fields[id]
+          const usedElsewhere = groupIdsUsedByOtherFields(fields, id)
+          // A group picked in another field is dropped from this one's options rather than
+          // flagged after the fact. Groups this field already holds stay listed even when a
+          // sibling holds them too, so a duplicate saved before this rule existed can still be
+          // seen and removed.
+          const availableItems = groupItems.filter(
+            (item) => !usedElsewhere.has(item.id) || field.groupIds.includes(item.id),
+          )
 
-        return (
-          <div className="events__recipient-group" key={id}>
-            <Checkbox
-              isSelected={field.enabled}
-              onChange={(enabled) => updateField(id, { enabled })}
-              isDisabled={isDisabled}
-            >
-              {label}
-            </Checkbox>
-
-            {field.enabled && (
-              <Select
-                selectionMode="multiple"
-                aria-label={`${label} CSTAR groups`}
-                placeholder="Select group(s)..."
-                items={availableItems}
-                value={field.groupIds}
-                onChange={(keys) => updateField(id, { groupIds: keys.map(String) })}
-                size="small"
+          return (
+            <div className="events__recipient-group" key={id}>
+              <Checkbox
+                isSelected={field.enabled}
+                onChange={(enabled) => updateField(id, { enabled })}
                 isDisabled={isDisabled}
-              />
-            )}
-          </div>
-        )
-      })}
-    </div>
+              >
+                {label}
+              </Checkbox>
+
+              {field.enabled && (
+                <Select
+                  selectionMode="multiple"
+                  aria-label={`${label} CSTAR groups`}
+                  placeholder="Select group(s)..."
+                  items={availableItems}
+                  value={field.groupIds}
+                  onChange={(keys) => updateField(id, { groupIds: keys.map(String) })}
+                  size="small"
+                  isDisabled={isDisabled}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </fieldset>
   )
 }
 

@@ -9,7 +9,7 @@ interface Props {
 }
 
 /** Read-only SMS preview; the displayed maximum comes from the bulk SMS design. */
-export default function SmsPreview({ body, label, showParts = false }: Props) {
+export default function SmsPreview({ body, label, showParts = false }: Readonly<Props>) {
   const { characters, segments } = segmentSms(body)
   return (
     <div className={`sms-preview${showParts ? ' sms-preview--final' : ''}`}>

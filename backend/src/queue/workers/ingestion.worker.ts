@@ -13,6 +13,26 @@ import { PhoneNumberService } from '../../api/notify/services/phone-number.servi
 import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { FAILED_JOB_RETENTION } from '../job-retention'
 
+export interface IngestionWorkerDeps {
+  /** The Bull queue instance for ingestion jobs */
+  ingestionQueue: Bull.Queue<IngestionJobPayload>
+  /** Queue for email delivery jobs */
+  emailQueue: Bull.Queue<DeliveryJobPayload>
+  /** Queue for SMS delivery jobs */
+  smsQueue: Bull.Queue<DeliveryJobPayload>
+  /** Service for database updates */
+  notificationService: NotificationService
+  requestDetailService: NotificationRequestDetailService
+  /** Configuration service for queue settings */
+  configService: ConfigService
+  /** Service for malware scanning */
+  clamavService?: ClamavService
+  /** Number of jobs to process in parallel (default: 1) */
+  concurrency?: number
+  attachmentService?: AttachmentService
+  phoneNumberService?: PhoneNumberService
+}
+
 /**
  * Ingestion Worker
  *
@@ -87,28 +107,19 @@ export class IngestionWorker {
     )
   }
 
-  /**
-   * Initialize the ingestion worker on a queue
-   * @param ingestionQueue The BullMQ queue instance for ingestion jobs
-   * @param emailQueue Queue for email delivery jobs
-   * @param smsQueue Queue for SMS delivery jobs
-   * @param notificationService Service for database updates
-   * @param configService Configuration service for queue settings
-   * @param clamavService Service for malware scanning
-   * @param concurrency Number of jobs to process in parallel (default: 1)
-   */
-  static async initialize(
-    ingestionQueue: Bull.Queue<IngestionJobPayload>,
-    emailQueue: Bull.Queue<DeliveryJobPayload>,
-    smsQueue: Bull.Queue<DeliveryJobPayload>,
-    notificationService: NotificationService,
-    requestDetailService: NotificationRequestDetailService,
-    configService: ConfigService,
-    clamavService?: ClamavService,
-    concurrency: number = 1,
-    attachmentService?: AttachmentService,
-    phoneNumberService: PhoneNumberService = new PhoneNumberService(),
-  ): Promise<void> {
+  /** Initialize the ingestion worker on a queue */
+  static initialize({
+    ingestionQueue,
+    emailQueue,
+    smsQueue,
+    notificationService,
+    requestDetailService,
+    configService,
+    clamavService,
+    concurrency = 1,
+    attachmentService,
+    phoneNumberService = new PhoneNumberService(),
+  }: IngestionWorkerDeps): void {
     const logger = new Logger(IngestionWorker.name)
 
     logger.log(`Registering ingestion worker processor (concurrency=${concurrency})`)
@@ -320,7 +331,7 @@ export class IngestionWorker {
                 `[${notifyId}] Attachment scan error: ${errorMsg}. Strict mode: retrying job.`,
               )
               // Strict mode: throw error to trigger BullMQ retry if ClamAV is unavailable
-              throw new Error(`Attachment scan failed: ${errorMsg}`)
+              throw new Error(`Attachment scan failed: ${errorMsg}`, { cause: scanError })
             }
           }
 

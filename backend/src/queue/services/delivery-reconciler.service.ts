@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm'
-import { randomUUID } from 'crypto'
+import { randomUUID } from 'node:crypto'
 import type Bull from 'bull'
 import type Redis from 'ioredis'
 import { NotificationRequestDetail } from '../../api/notification/entities/notification-request-detail.entity'
@@ -31,7 +31,7 @@ import { recordReconcilePass } from '../reconcile-activity'
 import type { ReconcileActionRecord, ReconcileKind } from '../reconcile-activity'
 
 const intFromEnv = (name: string, fallback: number) => {
-  const value = parseInt(process.env[name] || '', 10)
+  const value = Number.parseInt(process.env[name] || '', 10)
   return Number.isFinite(value) ? value : fallback
 }
 

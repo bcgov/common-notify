@@ -29,7 +29,7 @@ jobs:
     name: Remove DB User from Crunchy
     runs-on: ubuntu-slim
     steps:
-      - uses: bcgov/action-crunchy@v1.2.6
+      - uses: bcgov/action-crunchy@v2.1.0
         name: Remove PR Specific User
         with:
           oc_namespace: ${{ secrets.OC_DEV_NAMESPACE }}
@@ -60,7 +60,7 @@ jobs:
       group: gateway-config-apply
       cancel-in-progress: false  # Queue instead of canceling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Generate DEV + remaining open-PR config (exclude closing PR)
         env:

@@ -36,6 +36,8 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
+import { EventsModule } from '../api/events/events.module'
+import { EventNotificationResolver } from '../api/events/event-notification.resolver'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
 import { WebhookService } from '../api/webhook/webhook.service'
@@ -72,6 +74,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     AttachmentModule,
     ClamavModule,
     forwardRef(() => NotifyModule),
+    forwardRef(() => EventsModule),
   ],
   providers: [
     DeliveryReconcilerService,
@@ -173,10 +176,10 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
   private heartbeat?: WorkerHeartbeat
 
   constructor(
-    @Inject(QueueName.INGESTION) private ingestionQueue?: Bull.Queue,
-    @Inject(QueueName.EMAIL_DELIVERY) private emailQueue?: Bull.Queue,
-    @Inject(QueueName.SMS_DELIVERY) private smsQueue?: Bull.Queue,
-    @Inject(QueueName.WEBHOOK_DELIVERY) private webhookQueue?: Bull.Queue,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Bull.Queue,
+    @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Bull.Queue,
+    @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Bull.Queue,
+    @Inject(QueueName.WEBHOOK_DELIVERY) private readonly webhookQueue?: Bull.Queue,
     @InjectRepository(NotificationRequest)
     private readonly notificationRepository?: Repository<NotificationRequest>,
     private readonly configService?: ConfigService,
@@ -195,6 +198,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     private readonly webhookService?: WebhookService,
     private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
+    @Optional() private readonly eventNotificationResolver?: EventNotificationResolver,
     @Optional()
     @Inject(ProviderToken.REDIS_CLIENT)
     private readonly redisClient?: Redis | null,
@@ -226,7 +230,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     const queues = stages.flat()
     if (queues.length === 0) return
 
-    const drainMs = parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
+    const drainMs = Number.parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
     this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
 
     const drain = async (): Promise<void> => {
@@ -260,7 +264,7 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     }
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
     if (!this.ingestionQueue || !this.emailQueue || !this.smsQueue) {
       this.logger.debug('Queue configuration not available - skipping worker initialization')
@@ -284,18 +288,18 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
     try {
       this.logger.debug('About to initialize ingestion worker...')
       // Initialize ingestion worker - orchestrates fan-out to delivery queues
-      IngestionWorker.initialize(
-        this.ingestionQueue,
-        this.emailQueue,
-        this.smsQueue,
-        this.notificationService,
-        this.notificationRequestDetailService,
-        this.configService,
-        this.clamavService,
+      IngestionWorker.initialize({
+        ingestionQueue: this.ingestionQueue,
+        emailQueue: this.emailQueue,
+        smsQueue: this.smsQueue,
+        notificationService: this.notificationService,
+        requestDetailService: this.notificationRequestDetailService,
+        configService: this.configService,
+        clamavService: this.clamavService,
         concurrency,
-        this.attachmentService,
-        this.phoneNumberService,
-      )
+        attachmentService: this.attachmentService,
+        phoneNumberService: this.phoneNumberService,
+      })
       this.heartbeat?.track(this.ingestionQueue, concurrency)
       this.logger.debug('Ingestion worker initialization started')
 
@@ -305,20 +309,20 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       // and returns immediately after setting up listeners
       const emailConcurrency =
         this.configService?.get<number>('queue.emailDeliveryWorkerConcurrency') || 2
-      EmailDeliveryWorker.initialize(
-        this.emailQueue,
-        this.notificationService,
-        this.configService,
-        this.templatesRepository,
-        this.templatesService,
-        this.inlineRenderingService,
-        this.attachmentResolverService,
-        this.emailAdapter,
-        this.notificationRequestDetailService,
-        emailConcurrency,
-        this.structuredLogger,
-        this.tenantSettingsService,
-      )
+      EmailDeliveryWorker.initialize({
+        emailQueue: this.emailQueue,
+        notificationService: this.notificationService,
+        templatesRepository: this.templatesRepository,
+        templatesService: this.templatesService,
+        inlineRenderingService: this.inlineRenderingService,
+        attachmentResolverService: this.attachmentResolverService,
+        emailAdapter: this.emailAdapter,
+        requestDetailService: this.notificationRequestDetailService,
+        concurrency: emailConcurrency,
+        structuredLogger: this.structuredLogger,
+        tenantSettingsService: this.tenantSettingsService,
+        eventNotificationResolver: this.eventNotificationResolver,
+      })
       this.heartbeat?.track(this.emailQueue, emailConcurrency)
       this.logger.log('Email delivery worker initialization started')
 
@@ -328,18 +332,17 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       // and returns immediately after setting up listeners
       const smsConcurrency =
         this.configService?.get<number>('queue.smsDeliveryWorkerConcurrency') || 2
-      SmsDeliveryWorker.initialize(
-        this.smsQueue,
-        this.notificationService,
-        this.configService,
-        this.templatesRepository,
-        this.templatesService,
-        this.inlineRenderingService,
-        this.smsAdapter,
-        this.notificationRequestDetailService,
-        smsConcurrency,
-        this.structuredLogger,
-      )
+      SmsDeliveryWorker.initialize({
+        smsQueue: this.smsQueue,
+        notificationService: this.notificationService,
+        templatesRepository: this.templatesRepository,
+        templatesService: this.templatesService,
+        inlineRenderingService: this.inlineRenderingService,
+        smsAdapter: this.smsAdapter,
+        requestDetailService: this.notificationRequestDetailService,
+        concurrency: smsConcurrency,
+        structuredLogger: this.structuredLogger,
+      })
       this.heartbeat?.track(this.smsQueue, smsConcurrency)
       this.logger.log('SMS delivery worker initialization started')
 

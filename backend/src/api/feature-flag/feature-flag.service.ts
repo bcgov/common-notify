@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { IsNull, Repository } from 'typeorm'
 import { FeatureFlag } from './entities/feature-flag.entity'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
@@ -55,7 +55,9 @@ export class FeatureFlagService {
 
       // Fall back to global flag (tenantId = NULL)
       const globalFlag = await this.featureFlagRepository.findOne({
-        where: { code, tenantId: null },
+        // IsNull(), not null: TypeORM rejects a bare null in a where condition, and the throw is
+        // swallowed below as "feature disabled", which 403s every flag-guarded route.
+        where: { code, tenantId: IsNull() },
       })
 
       // Return flag status or default to false
@@ -176,7 +178,7 @@ export class FeatureFlagService {
    */
   async getByCodeAndTenant(code: string, tenantId?: string): Promise<FeatureFlag | null> {
     return this.featureFlagRepository.findOne({
-      where: { code, tenantId: tenantId ?? null },
+      where: { code, tenantId: tenantId ?? IsNull() },
     })
   }
 }

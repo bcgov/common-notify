@@ -286,7 +286,7 @@ describe('NotificationService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id, tenantId },
-        relations: ['tenant'],
+        relations: { tenant: true },
       })
       expect(result).toEqual(mockNotification)
     })
