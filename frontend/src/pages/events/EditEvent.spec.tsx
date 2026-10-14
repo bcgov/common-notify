@@ -7,6 +7,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import EditEvent from './EditEvent'
 import tenantReducer, { selectTenant } from '@/redux/slices/tenant.slice'
 import tenantSettingsReducer from '@/redux/slices/tenantSettings.slice'
+import apiKeyUsageReducer from '@/redux/slices/apiKeyUsage.slice'
+import { getApiKeyUsage } from '@/api/apiKeyUsage.api'
 import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import userReducer from '@/redux/slices/user.slice'
 import {
@@ -25,6 +27,8 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { Tenant } from '@/interfaces/CstarTenant'
 
 const navigateMock = vi.fn()
+
+vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn() }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -111,6 +115,7 @@ function makeStore(
     reducer: {
       tenant: tenantReducer,
       tenantSettings: tenantSettingsReducer,
+      apiKeyUsage: apiKeyUsageReducer,
       emailSettings: emailSettingsReducer,
       user: userReducer,
     },
@@ -158,6 +163,11 @@ describe('EditEvent', () => {
       event({ emailSettings: { ...configuredEmail, active: false } }),
     )
     vi.mocked(getSettings).mockResolvedValue(null)
+    vi.mocked(getApiKeyUsage).mockResolvedValue({
+      tenantId: 'tenant-1',
+      fiscalYearStart: '2026-04-01',
+      channels: [],
+    })
     vi.mocked(getApprovedEmailLogos).mockResolvedValue([])
   })
 

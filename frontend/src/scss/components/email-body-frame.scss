@@ -1,0 +1,10 @@
+@import '../variables.scss';
+
+// Sized to its content by EmailBodyFrame once the email has loaded.
+.email-body-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}

@@ -14,6 +14,10 @@ export class EmailLogo {
   @Column({ type: 'varchar', nullable: true, name: 'file_key' })
   fileKey: string | null
 
+  /** The rendition used in emails (PNG). Null falls back to fileKey. */
+  @Column({ type: 'varchar', nullable: true, name: 'email_file_key' })
+  emailFileKey: string | null
+
   @Column({ type: 'varchar', name: 'source_code' })
   sourceCode: string
 
